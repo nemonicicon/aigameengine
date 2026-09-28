@@ -437,3 +437,48 @@ Receipt: `packs/v1_kaeli_street.rpack` (v1_anima_outfit + the Sketchfab camo car
 a fold under the bust (four A/Bs -- skin, normal map, shadow, caps -- before the radial push), holes at a rolled
 hem, cloth between her knees in motion. Open: two small marks at the tank's lower bust, the waistband's lining
 edge reads as a light band.
+
+## CLANKER (09-27)
+
+### 29 · A skate library onto another body, board and all — DONE (09-27)
+**The gap.** jacob: "His name is Clanker. let me see him in engine, in the skate park, skating". Clanker
+(`skate_src/robot/build_robot.py`, 1.72 m to the antenna tip, hips 0.61 m against reva's 1.05) arrived with
+no clips, and a scene's cast plays clips from its OWN pack (a borrowed partner clip is a T-pose). The skate
+library and its board channels were authored on reva.
+**The fix.** `skate_src/author/retarget_skate.py <donor> <target>`: each frame through the canonical transfer
+(retarget.py, the engine's donorPoseF in Python) and baked into the target pack. Limbs keep ABSOLUTE semantics
+(their rests really differ: her arms out, his hanging); the TRUNK takes the donor's movement from rest --
+⛔ absolute semantics laid reva's posture (a neck resting ~25 degrees forward) on a pivot under a cylinder and
+cocked his head 40 degrees on every frame; the head keeps its whole TURN and a quarter of its TILT (a control
+bench showed reva's authored head really rolls 37.5 degrees down the board -- on a cylinder, a broken neck).
+Feet and hands (not in the canon) by deviation from rest; the hips' travel scaled by the leg ratio (0.605);
+each `<clip>_bd` re-derived from HIS toe-joint midpoint with the donor's board rotation.
+Receipt: 14 moves + 14 board channels in `packs/v1_clanker.rpack`; `scenes/clanker_skate.txt` on skate10
+(`D:/reva902/clanker/clanker_skates.mp4`, 60 fps); the clip audit reads 40 of 1,798 frames with a wheel up to
+0.093 u into the floor -- the carve dip already open for every rider.
+**Handed on.** `rpack2gltf.py --mesh` writes a pack's own skinned, textured body into the glTF (materials
+from the source file matched by geometry, not order); Blender and Godot 4.7.2 re-read him within 3 um of
+the engine's skinning. He is in the aigameengine kit at `godot/characters/clanker/`.
+
+## X3D (09-27)
+
+### 30 · Hair that feels the world -- DONE (09-27)
+**The gap.** jacob, of x3d: "could you give her hair physics". The H1 chain solver (verlet, a spring toward the
+animated pose, measured gravity) mined any chain named for hair -- but it (1) ran for the scene cast only, never a
+set ACTOR, so a body in a crowd or on the bench's sheet had rigid hair; and (2) lived in the body's own frame, so
+hair only answered POSE changes: a skater rolling, carving, popping and landing, and her hair could not know.
+Measured on x3d as the scene hero: tip lag mean 1 cm, max 7-8 cm over a run of tricks -- rigid.
+**The fix.** Actors take chain slots after the cast's (`CH_ACTORS` 16; past that it says so, once). Every body
+PUBLISHES the rig->world matrix it is drawn with (`chainPublish`), and the solver carries its state through the
+body's motion between the last two published frames (one frame late: invisible, and no draw path was reordered).
+Inertia comes for free -- the hair swings on a carve, lifts on a pop, settles on a landing -- the damping, now on
+WORLD velocity, is air drag, and gravity is the world's down in her frame (a rider pitched on a pipe hangs toward
+the ground). One step per frame per slot (`g_frameStamp`): an actor drawn once per panel stepped four times a frame
+on a four-angle sheet. A jump past 0.35 u or 30 degrees in a frame is a cut, not motion.
+Receipt: x3d (`skate_src/x3d/build_x3d.py`: three four-bone back chains rooted in Spine2 + a front-lock chain in the
+head, `chains: x3d x4 lens=[4,4,4,4]`), the skate10 run as hero, REVA_CHDBG: at 30 fps rig-only mean 1.0 cm / max
+8.5 cm vs world 2.0-2.5 cm / 17 cm; the 60 fps take mean 1.6 cm, worst 12 cm; frames of the kickflip side by side.
+Controls: `REVA_CHWORLD=0` (the old frame), `REVA_ACTORCHAINS=0` (no actor chains).
+Open: the solver's spring is first-order, so its steady trailing scales with the step (twice at 30 fps what it is at
+60); an actor's own `sc` enters the gravity only through its published matrix (right) -- the pre-publish frames use
+the pack scale; no hair-vs-body collision (the spring keeps it near its pose).

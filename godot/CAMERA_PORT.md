@@ -11,6 +11,9 @@ with Clanker riding); track, pan and the hand-held phone kept the rider in frame
 stick figure first, then Clanker, the demo's rider now -- `rider=reva` brings her back); the orbit reached its end heading exactly at t =
 4.0 s (0.00 deg); the dolly move landed on its end pose (0.0000 m); the fisheye opened a 44 deg lens to
 60-64 deg; the hand-held eye's frame-to-frame motion changed 3.6x as much as the tracking lens's (the bob).
+The rigs are scored with the REFERENCE filmer, `filmer=reva` (her moves on the stick figure), so the numbers stay
+comparable: the demo's default filmer is now x3d, a smaller body whose retargeted filming move bobs the phone
+less (2.9x) -- a property of the filmer, not of the rig.
 Two bugs the Godot run found and fixed: `E` is a Godot shader built-in (the seven-segment flags collided),
 and the club's own phone chrome drew its timer digits 2.5x too narrow (now square in both orientations).
 

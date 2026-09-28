@@ -7,9 +7,10 @@ Two files in `godot/animations/`, exported from the club engine by `skate_src/au
 | `reva_skate_moves.glb` | 14 skate moves, each with the **skateboard's own motion** (the board flips, pops and is caught — it is animated per trick, not attached) |
 | `reva_moves.glb` | 18 other authored moves (board handling, arms up, a crawl, lying down, …) |
 
-⭐ **And a character ready to use: `godot/characters/clanker/clanker.glb`** — CLANKER, the studio's own robot
-(made entirely by code), with the same 14 skate moves already baked onto HIS skeleton and his real body and
-texture. No retargeting: instance him and play `z_rm_sk_ride`. See `godot/characters/clanker/README.md`.
+⭐ **And characters ready to use: `godot/characters/`** — CLANKER (the studio's robot) and X3D (the skater
+girl), made entirely by code, each with the same 14 skate moves already baked onto its OWN skeleton and its real
+body and texture. No retargeting: instance one and play `z_rm_sk_ride`. x3d's hair swings with
+`ClubHair.attach(instance)` (`godot/characters/club_hair.gd`). See `godot/characters/README.md`.
 
 **Skeleton:** reva's — Mixamo-style names (`Hips Spine Spine1 Spine2 Neck Head LeftShoulder LeftArm
 LeftForeArm LeftHand LeftUpLeg LeftLeg LeftFoot LeftToeBase`, the same on the right, and `face_jaw`), 23

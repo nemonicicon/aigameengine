@@ -15,7 +15,7 @@ instruments, and references. **No content** (characters, levels, audio) is inclu
 
 | task | read | then |
 |---|---|---|
-| use a READY character (a rusty robot with the skate moves on his own skeleton and the board animated) | `godot/characters/clanker/README.md` | instance `clanker.glb`, play `z_rm_sk_ride`; a trick = `play("z_rm_sk_kf")` then `queue("z_rm_sk_ride")`; keep the `.import` (the AnimationPlayer's optimizer OFF) |
+| use a READY character (Clanker the robot, x3d the skater girl: the skate moves on their own skeletons, the board animated) | `godot/characters/README.md` | instance `<name>.glb`, play `z_rm_sk_ride`; a trick = `play("z_rm_sk_kf")` then `queue("z_rm_sk_ride")`; keep the `.import` (the AnimationPlayer's optimizer OFF); hair physics: `ClubHair.attach(instance)` |
 | use our skate moves and body moves | `godot/ANIMATION_IMPORT.md` | import `godot/animations/*.glb`, retarget with a `BoneMap` on `SkeletonProfileHumanoid`, set loop modes from the table, parent the real board under the `skateboard` node |
 | use the cameras (tripod, dolly/crane, track, pan, orbit, the hand-held phone, shake, fisheye, the phone-screen frame) | `godot/CAMERA_PORT.md` — exact math with line numbers into the C | `godot/club_camera.gd` + `godot/club_camera_post.gdshader`, **verified in Godot 4.7.2**: open `godot/` as a project and press F5 (`demo/main.gd` sets every rig up in code); `demo/score_rigs.py` re-measures them |
 | check a result | `godot/CAMERA_PORT.md` §5 | record with Godot's Movie Maker (`--write-movie out.avi --fixed-fps 60`), `ffmpeg -i out.avi out.mp4`, run `skate_src/robot_neko/mp4steps.py`, `heldiff.py`, `scenesheet.py`, `sfxcheck.py` on it — they read any mp4 |

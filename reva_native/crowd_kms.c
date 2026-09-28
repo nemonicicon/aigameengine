@@ -251,6 +251,27 @@ static int    g_stepHeld=0;     /* STOP MOTION: 1 on a frame that re-exposes the
  * simulation that runs in the draw would take two steps of gravity per frame. One stamp
  * per frame, and the solver refuses to advance twice on the same one. */
 static unsigned g_frameStamp=0;
+/* ⭐ SET ACTORS SWING TOO (x3d, 09-27). The chains ran for the hero and the cast only, so a body with hair
+ * physics standing in a set -- a crowd, the bench's four-angle sheet -- had rigid hair. An actor takes its
+ * own state slot after the cast's, one per actor up to CH_ACTORS (past that it says so, once);
+ * REVA_ACTORCHAINS=0 is the control. */
+#define CH_ACTORS 16
+#define CH_SLOTS (SCN_MAXCAST+CH_ACTORS)
+static int g_actorChainSlot=-1;   /* the slot of the actor being drawn, for the length of its actorDraw call */
+/* ⭐ CHAINS FEEL THE WORLD (x3d, 09-27). The solver lived in the body's own frame, so hair only answered POSE
+ * changes: a skater rolling at 3 m/s, carving, popping, landing -- her hair could not know. Measured on x3d as
+ * the scene hero: tip lag mean 1 cm, max 7 cm over a whole run of tricks, i.e. rigid. Each body now PUBLISHES
+ * the rig->world matrix it is drawn with, and the solver carries its state through the body's motion between
+ * the last two published frames (one frame late: invisible, and no draw path had to be reordered). Inertia
+ * then comes for free -- the hair swings on a carve, lifts on a landing -- and the verlet damping, now applied
+ * to WORLD velocity, is air drag: moving hair trails. Gravity is the world's down in her frame, so a rider
+ * pitched on a pipe wall hangs toward the ground, not toward her feet. REVA_CHWORLD=0 is the control. */
+static float g_chM[CH_SLOTS][2][16]; static unsigned g_chMSt[CH_SLOTS][2];
+static void chainPublish(int slot,const float*m){
+    if(slot<0||slot>=CH_SLOTS) return;
+    if(g_chMSt[slot][1]!=g_frameStamp){           /* a new frame: the last one becomes the previous */
+        memcpy(g_chM[slot][0],g_chM[slot][1],64); g_chMSt[slot][0]=g_chMSt[slot][1]; g_chMSt[slot][1]=g_frameStamp; }
+    memcpy(g_chM[slot][1],m,64); }
 /* the mesh shader's alpha, published so drawSet's water pass can reach it */
 static GLint g_labAlpha=-1;
 static float g_chLagMax=0.f; static double g_chLagAcc=0; static long g_chLagN=0;  /* tip lag telemetry */
@@ -276,9 +297,33 @@ static void chainSim(void*Pv,M4*world,int who){
     /* ⛔ ONE STATE PER CAST SLOT, not per hero/partner (ROBOT NEKO ep 2). With [2] every partner
      * passed who=1, so in a three-hander slot 2 reseeded slot 1's braids on every call and
      * neither body's hair ever simulated. Indexed by g_castI; sized to SCN_MAXCAST (asserted). */
-    static float sp[SCN_MAXCAST][8][14][3], pp[SCN_MAXCAST][8][14][3];
-    static void* seeded[SCN_MAXCAST];
-    if(!g_chainsOn||!P||!P->nCh) return;
+    static float sp[CH_SLOTS][8][14][3], pp[CH_SLOTS][8][14][3];
+    static void* seeded[CH_SLOTS];
+    static unsigned stampOf[CH_SLOTS];
+    if(!g_chainsOn||!P||!P->nCh||who<0||who>=CH_SLOTS) return;
+    /* ⛔ ONE STEP PER FRAME PER SLOT. An actor is drawn once per PANEL -- the bench's four-angle sheet draws
+     * it four times a frame -- and every call used to be a verlet step, so the hair would have swung four
+     * times as fast on a sheet as in a take. A second call in the same frame poses from the state it has. */
+    int adv=(stampOf[who]!=g_frameStamp); stampOf[who]=g_frameStamp;
+    static int wOn=-1; if(wOn<0){ const char*e9=getenv("REVA_CHWORLD"); wOn=!(e9&&e9[0]=='0'); }
+    float gdir[3]={0.f,-1.f,0.f}, wsc=0.f, D9[12]; int haveD=0;
+    if(wOn&&g_chMSt[who][1]&&g_chMSt[who][1]+1u>=g_frameStamp){
+        const float*m1=g_chM[who][1];
+        float s2=m1[0]*m1[0]+m1[1]*m1[1]+m1[2]*m1[2];
+        if(s2>1e-12f){ wsc=sqrtf(s2);
+            for(int r=0;r<3;r++) gdir[r]=-m1[r*4+1]/wsc;                   /* world down, in her frame */
+            if(adv&&g_chMSt[who][1]+1u==g_frameStamp&&g_chMSt[who][0]+2u==g_frameStamp){
+                const float*m0=g_chM[who][0];
+                /* D = inverse(M_last) * M_before: where a point that stayed put in the WORLD now sits in her
+                 * frame. The uniform scale cancels; a jump past half a unit or 45 degrees is a cut, not motion. */
+                for(int c=0;c<3;c++) for(int r=0;r<3;r++)
+                    D9[c*3+r]=(m1[r*4]*m0[c*4]+m1[r*4+1]*m0[c*4+1]+m1[r*4+2]*m0[c*4+2])/s2;
+                float dt9[3]={m0[12]-m1[12],m0[13]-m1[13],m0[14]-m1[14]};
+                for(int r=0;r<3;r++) D9[9+r]=(m1[r*4]*dt9[0]+m1[r*4+1]*dt9[1]+m1[r*4+2]*dt9[2])/s2;
+                float tl=sqrtf(D9[9]*D9[9]+D9[10]*D9[10]+D9[11]*D9[11]);
+                float tr=D9[0]+D9[4]+D9[8];                                  /* 1+2cos(angle) */
+                haveD=(tl*wsc<0.35f&&tr>1.f+2.f*0.866f); } } }      /* a cut, not motion: skating is <0.2 u a frame even at 30 fps;
+                                                                  * a scripted snap under 1.5 u would otherwise whip the hair */
     float dtf=(float)g_chDt; if(dtf>0.033f)dtf=0.033f; if(dtf<1e-4f)dtf=1e-4f;
     float sK=g_chStiff*dtf*60.f; if(sK>0.9f)sK=0.9f;
     /* \u26d4 DAMPING WAS PER FRAME, SO IT MEANT DIFFERENT THINGS AT DIFFERENT RATES.
@@ -287,7 +332,7 @@ static void chainSim(void*Pv,M4*world,int who){
      * could not have worked. g_chDamp is defined per 1/60 s; raise it to the step. */
     float dmp=powf(g_chDamp,dtf*60.f);
     /* a*dt^2, in RIG units: the pack's scale maps rig->world, so divide by it. */
-    float grav=-CLUB_UNITS_PER_S2*g_chGrav*dtf*dtf/(P->scale>1e-6f?P->scale:1.f);
+    float grav=-CLUB_UNITS_PER_S2*g_chGrav*dtf*dtf/(wsc>1e-6f?wsc:(P->scale>1e-6f?P->scale:1.f));
     for(int c=0;c<P->nCh;c++){
         int n=P->chN[c]; if(n<2) continue;
         float a[14][3];
@@ -299,15 +344,19 @@ static void chainSim(void*Pv,M4*world,int who){
         if(seeded[who]!=(void*)P||
            (sp[who][c][0][0]==0&&sp[who][c][0][1]==0&&sp[who][c][0][2]==0)){
             for(int i=0;i<n;i++) for(int k=0;k<3;k++){ sp[who][c][i][k]=a[i][k]; pp[who][c][i][k]=a[i][k]; } }
+        if(haveD&&seeded[who]==(void*)P) for(int i=1;i<n;i++){      /* carry the state through her motion */
+            float*v9[2]={sp[who][c][i],pp[who][c][i]};
+            for(int q9=0;q9<2;q9++){ float x9=v9[q9][0],y9=v9[q9][1],z9=v9[q9][2];
+                for(int r=0;r<3;r++) v9[q9][r]=D9[r]*x9+D9[3+r]*y9+D9[6+r]*z9+D9[9+r]; } }
         sp[who][c][0][0]=a[0][0]; sp[who][c][0][1]=a[0][1]; sp[who][c][0][2]=a[0][2];
         /* ⭐ A HELD EXPOSURE DOES NOT INTEGRATE. dt is zero on a held frame and the clamp
          * above lifts it to 1e-4 -- but verlet's inertia term does not care about dt, so the
          * hair would keep swinging between exposures while the body stood still. Skip the
          * step and the solve; the write-back below still poses the bones from where it is. */
-        if(!g_stepHeld) for(int i=1;i<n;i++){ float np[3], step[3];
+        if(!g_stepHeld&&adv) for(int i=1;i<n;i++){ float np[3], step[3];
             for(int k=0;k<3;k++){
                 float vel=(sp[who][c][i][k]-pp[who][c][i][k])*dmp;
-                step[k]=vel+(a[i][k]-sp[who][c][i][k])*sK+(k==1?grav:0.f); }
+                step[k]=vel+(a[i][k]-sp[who][c][i][k])*sK-gdir[k]*grav; }
             /* \u26d4 CLAMP THE STEP TO THE LINK. gravity alone is ~0.165 rig units per frame
              * (-2.4/scale * dt^2 * 60) and Anima's braid links are ~0.04, so a node was being
              * thrown four segment-lengths in one step -- past the point where a distance
@@ -325,7 +374,7 @@ static void chainSim(void*Pv,M4*world,int who){
          * -- the tip solved against stale neighbours every frame. The rig this solver shipped
          * against had 2-3 bone tails and the longest anything else carries is six, so two was
          * never measured against a braid. n passes for an n-link chain; hers is 8x8. */
-        if(!g_stepHeld){ int npass=n; if(npass<2) npass=2; if(npass>14) npass=14;
+        if(!g_stepHeld&&adv){ int npass=n; if(npass<2) npass=2; if(npass>14) npass=14;
         for(int pass=0;pass<npass;pass++)
             for(int i=1;i<n;i++){ float d[3]; float L=P->chLen[c][i]; if(L<1e-7f) continue;
                 for(int k=0;k<3;k++) d[k]=sp[who][c][i][k]-sp[who][c][i-1][k];
@@ -5827,6 +5876,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
         wmsApply(P,T,Q,W,wms,wdt,g_wms); }
     for(unsigned i=0;i<P->nNodes;i++){ M4 loc; m4_trs(loc,T[i],Q[i],S[i]);
         if(P->nodes[i].parent<0) memcpy(W[i],loc,64); else m4_mul(W[i],W[P->nodes[i].parent],loc); }
+    if(g_actorChainSlot>=0) chainSim(P,W,g_actorChainSlot);   /* ⭐ her hair swings on the pose just solved (09-27) */
     /* THE FEET, MEASURED. The board is placed from these, so they are the contract --
      * and REVA_SKDBG prints them, which is what turns "her feet look wrong" into a
      * number that can be checked. */
@@ -5885,6 +5935,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
              * opposite directions: they cannot drift apart. */
             mdl[13]+=((restFoot-ftY)*eff + SK_DECK_H)*plantMix; } }
     glUniformMatrix4fv(mModel,1,GL_FALSE,mdl);
+    if(g_actorChainSlot>=0) chainPublish(g_actorChainSlot,mdl);   /* her chains feel where she goes */
     /* ⭐ AND IF IT IS STANDING IN WATER, THE WATER KNOWS. The push scales with speed, so
      * standing still barely marks the surface, wading leaves a wake and arriving fast
      * makes a splash -- all three out of one multiply, because the body already knows how
@@ -6063,6 +6114,11 @@ static void actorsDraw(GLint mModel,GLint mPal,GLint mBind,float*pal,GLint uUse,
          * A->air is a deliberate lift and a plant cancels it exactly. */
         int gnd=(!isk && A->air<=0.001f && hipDrop>-0.001f && hipDrop<0.001f);
         g_actorOver=A->over; g_actorOverW=A->overW;   /* her layer, for the length of the call (09-11) */
+        { static int on9=-1; if(on9<0){ const char*e9=getenv("REVA_ACTORCHAINS"); on9=!(e9&&e9[0]=='0'); }
+          g_actorChainSlot=(on9&&P->nCh&&i<CH_ACTORS)?SCN_MAXCAST+i:-1;
+          if(on9&&P->nCh&&i>=CH_ACTORS){ static int told9=0; if(!told9){ told9=1;
+              printf("[chains] actor %d and beyond carry chains but have no slot (CH_ACTORS=%d): their hair holds its pose\n",i,CH_ACTORS);
+              fflush(stdout); } } }
         actorDraw(P,isk?-1:A->clip,isk?NULL:A->dnP,isk?-1:A->dnC,
                   A->phase,m,mModel,mPal,mBind,pal,isk?&sp:NULL,ft,pmix,
                   &A->wms,g_actorDt,
@@ -6072,6 +6128,7 @@ static void actorsDraw(GLint mModel,GLint mPal,GLint mBind,float*pal,GLint uUse,
                   /* `look camera` resolves to wherever the lens is THIS frame */
                   A->hasLook==2 ? g_camPos : (A->hasLook==1 ? A->look : NULL),
                   CLOTH_ACTOR0+(i%(CLOTH_SLOTS-CLOTH_ACTOR0)), uUse, uTint);
+        g_actorChainSlot=-1;
         /* both ends into world space, through the body's own matrix */
         { float*nq=ft+8, *hq=ft+11;
           A->neckW[0]=m[0]*nq[0]+m[4]*nq[1]+m[8]*nq[2]+m[12];
@@ -12288,6 +12345,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
             g_partFaceOK=1; } }
     { static int wasActP=0; morphBlend(P,g_partMorphW,&wasActP); }   /* her face talks too */
     mouthArm(P,g_partMorphW,g_labMouthP,g_labMouthS,g_labOpen);
+    chainPublish((g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1,model);   /* her chains feel where she goes */
     glUniformMatrix4fv(mModel,1,GL_FALSE,model);
     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
         mouthMeshArm(P,mi,g_partMorphW,g_labOpen);
@@ -16954,6 +17012,7 @@ int main(int argc,char**argv){
              * every pair move since the high five was judged on the multi-cam wall,
              * which rebinds per panel and hid the bug. */
             glUniformMatrix4fv(mModel,1,GL_FALSE,model);
+            chainPublish(0,model);   /* her chains feel where she goes */
             mouthArm(P,g_heroMorphW,g_labMouthP,g_labMouthS,g_labOpen);
             /* the hologram needs two passes (depth, then colour); a solid character needs one */
             for(int hp2=((g_fpvNow||g_camHoldSlot==0)?2:(skSolid?1:0));hp2<2;hp2++){   /* first person, or her own camera: her body is not drawn */

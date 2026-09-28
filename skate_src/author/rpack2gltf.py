@@ -319,7 +319,16 @@ def export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src_mats, stem):
             for k in ("emissiveFactor", "doubleSided"):
                 if k in src: mat[k] = src[k]
             lost = ([k for k in ("metallicRoughnessTexture",) if k in spbr] +
-                    [k for k in ("emissiveTexture", "occlusionTexture", "extensions") if k in src])
+                    [k for k in ("emissiveTexture", "occlusionTexture") if k in src])
+            # an extension made only of numbers (x3d's KHR_materials_specular: her low sheen) travels; one that
+            # points at a texture cannot -- the pack does not hold that texture
+            for ek, ev in (src.get("extensions") or {}).items():
+                if '"index"' in json.dumps(ev):
+                    lost.append(ek)
+                else:
+                    mat.setdefault("extensions", {})[ek] = ev
+                    used = G.j.setdefault("extensionsUsed", [])
+                    if ek not in used: used.append(ek)
             if lost:
                 print("   ⛔ %s: %s not carried (a pack holds base colour and normal maps only)"
                       % (mat["name"], ", ".join(lost)))

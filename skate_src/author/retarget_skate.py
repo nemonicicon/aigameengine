@@ -2,7 +2,7 @@
 """retarget_skate.py -- a skate move library onto ANOTHER body, baked into its own pack, board and all.
 
     python skate_src/author/retarget_skate.py reva_native/packs/v1_r2moves.rpack reva_native/packs/v1_clanker.rpack \
-        [--clips "z_rm_sk_*"] [--exclude z_rm_sk_pickup] [--dry]
+        [--clips "z_rm_sk_*"] [--exclude z_rm_sk_pickup] [--head-tilt 0.25] [--dry]
 
 Written for Clanker (09-27, jacob: "let me see him in engine, in the skate park, skating"): a 1.72 m robot
 whose hips stand 0.61 m up, against reva's 1.05. The skate library was authored on reva, and a scene's
@@ -27,7 +27,8 @@ from retarget import Basis, transfer, char_frame, NCANON
 
 TRUNK = (0, 1, 2, 3, 4, 5)   # hips, spine x3, neck, head
 LEVEL = (4, 5)               # neck, head: a robot TURNS his head, he does not tilt it
-HEAD_TILT = 0.25             # how much of the donor's head TILT is kept (all of its TURN is)
+HEAD_TILT = 0.25             # how much of the donor's head TILT is kept (all of its TURN is); --head-tilt.
+                             # A quarter is Clanker's (a cylinder head does not cock); a person keeps it all.
 
 
 def level(q, keep):
@@ -76,12 +77,15 @@ from rpack import Rpack, append_clips, lint_name
 
 
 def main():
+    global HEAD_TILT
     ap = argparse.ArgumentParser()
     ap.add_argument("donor"); ap.add_argument("target")
     ap.add_argument("--clips", default="z_rm_sk_*")
     ap.add_argument("--exclude", default="z_rm_sk_pickup")
+    ap.add_argument("--head-tilt", type=float, default=HEAD_TILT)
     ap.add_argument("--dry", action="store_true")
     a = ap.parse_args()
+    HEAD_TILT = a.head_tilt
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     D, T = Rpack(a.donor), Rpack(a.target)
@@ -166,7 +170,7 @@ def main():
         out.append((nm, c["fps"], F, tracks))
         if bd:
             out.append((bd_name, c["fps"], F, {(0, 1): board_T, (0, 0): board_R}))
-        print("   %-18s %3d frames: %2d bone tracks%s" % (nm, F, len(tracks), ", + its board, re-derived from his feet" if bd else ""))
+        print("   %-18s %3d frames: %2d bone tracks%s" % (nm, F, len(tracks), ", + its board, re-derived from the target's feet" if bd else ""))
     if a.dry or not out:
         print("dry run -- nothing written" if a.dry else "nothing to write"); return 0
     force = any(lint_name(n) for (n, _f, _F, _t) in out)

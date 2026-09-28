@@ -3,15 +3,18 @@ extends Node3D
 ##
 ## CLANKER rides a ring among pillars on z_rm_sk_ride (the board animated by the move itself) and throws
 ## a trick every 2.5 s -- pop, kickflip, shove-it, manual, grab, method, each one-shot handing back to the
-## ride; a filmer (reva's moves on the stick figure) rides inside him on z_rm_sk_film with a phone on her
-## RIGHT hand bone. One ClubCamera shows it. F5 runs the tracking lens. A test chooses a rig and records
+## ride; X3D rides inside him on z_rm_sk_film with a phone on her RIGHT hand bone, filming him, her hair on
+## Godot's spring bones (characters/club_hair.gd). One ClubCamera shows it. F5 runs the tracking lens. A test chooses a rig and records
 ## it with Movie Maker (an ABSOLUTE path -- a relative one is not written):
 ##   godot --path godot --write-movie C:/out/track/f.png --fixed-fps 60 --quit-after 360 -- mode=track log=1
 ## mode: tripod pan track orbit hold move      extras: shake=<m> fish=<0..1> feed=<0|1|2> log=1
 ## rider=clanker|reva (reva = her moves on the stick figure)      tricks=1|0
+## filmer=x3d|reva      hair=1|0 (her spring bones: ClubHair)      watch=filmer (the lens follows her instead of him)
+## speed=<m/s> (2.5; 0 = they ride in place: the control for anything that swings)
 
 const SKATE := preload("res://animations/reva_skate_moves.glb")
 const CLANKER := preload("res://characters/clanker/clanker.glb")
+const X3D := preload("res://characters/x3d/x3d.glb")
 const TRICKS := ["z_rm_sk_pop", "z_rm_sk_kf", "z_rm_sk_shove", "z_rm_sk_manual", "z_rm_sk_grab", "z_rm_sk_method"]
 const RING := 5.0        # the rider's circle, metres
 const SPEED := 2.5       # metres per second
@@ -38,7 +41,10 @@ func _ready() -> void:
 	_world()
 	var who: String = args.get("rider", "clanker")
 	rider = _skater(CLANKER if who == "clanker" else SKATE, "z_rm_sk_ride", 1)
-	filmer = _skater(SKATE, "z_rm_sk_film", 2)   # render layer 2: the phone's own camera does not see her
+	var cam_girl: String = args.get("filmer", "x3d")
+	filmer = _skater(X3D if cam_girl == "x3d" else SKATE, "z_rm_sk_film", 2)   # layer 2: her own phone does not see her
+	if cam_girl == "x3d" and args.get("hair", "1") == "1":
+		ClubHair.attach(filmer)
 	rider_ap = rider.find_children("*", "AnimationPlayer", true, false)[0]
 	rider_sk = rider.find_children("*", "Skeleton3D", true, false)[0]
 	hips_bone = rider_sk.find_bone("Hips")
@@ -108,7 +114,7 @@ func _skater(file: PackedScene, anim_name: String, layer: int) -> Node3D:
 ## Both skaters on their circles at time t. A rider rolls ALONG her board: the move's board nose is the
 ## model's +X, so +X goes along the travel and she stands sideways to it, as a skater does.
 func _place(time: float) -> void:
-	var ang := time * SPEED / RING
+	var ang := time * float(args.get("speed", str(SPEED))) / RING
 	_put(rider, ang, RING)
 	_put(filmer, ang - 1.7 / RING, RING - 0.9)    # ~1.7 m behind her, on the INSIDE of her line (one side, always)
 
@@ -121,7 +127,7 @@ func _put(s: Node3D, ang: float, radius: float) -> void:
 
 func _camera(mode: String) -> void:
 	cam = ClubCamera.new()
-	cam.subject = rider
+	cam.subject = filmer if args.get("watch", "") == "filmer" else rider
 	cam.aim_height = 0.8 if args.get("rider", "clanker") == "clanker" else 0.63   # his chest / her hips
 	cam.lens_fov = 44.0
 	cam.tripod_eye = Vector3(7.2, 2.0, 2.4)          # inside the pillar ring, outside hers

@@ -20,6 +20,16 @@ was paid for by a real failure, and most of them say which one.
 | **References** | `design/` — animation principles (the Williams layer), authoring, skating, cloth, faces, scene direction, cinematography (Mascelli / Murch / Katz, distilled), the level format, and `engine_capabilities.md`: every capability with the failure that exposed it. `design/papers/README.md` lists the physics papers used (links, not copies). |
 | **AI workflow** | `CLAUDE.md` and `.claude/skills/` — the instructions and skills the AI worked from: how to build, run and screenshot the engine (`run-reva`, with `driver.py`), film craft, "build the capability instead of working around it", and the ROBOT NEKO skill whose LESSONS LEDGER is fourteen episodes of mistakes and the rule each one left. |
 
+## Using it with Godot 4 (or with any AI)
+
+`AGENTS.md` is the brief for an AI assistant (GPT, Grok, Codex, Claude): what to read, in what order, and the
+rules this engine was built by. `godot/` is the hand-off to a Godot 4 project:
+- `godot/animations/*.glb` — our skate moves (with the skateboard animated per trick) and other authored moves,
+  on a Mixamo-named skeleton, verified in Blender to 5 micrometres; `godot/ANIMATION_IMPORT.md` to retarget them.
+- `godot/CAMERA_PORT.md` — every camera rig specified exactly, with a reference `club_camera.gd` and
+  `club_camera_post.gdshader` (translated from the C, not yet run in Godot) and a definition of done.
+- `skate_src/author/rpack2gltf.py` — export any pack's skeleton and authored clips to `.glb`.
+
 ## What is NOT here
 
 Characters (`reva_native/packs/`), props (`props/`), audio (`aud/`, `aud2/`), levels (all but one bench

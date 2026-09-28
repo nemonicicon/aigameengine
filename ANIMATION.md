@@ -2,8 +2,10 @@
 
 Everything here is Python (numpy + Pillow) unless it says it drives the engine. Engine packs are the
 club's own `.rpack` format (`skate_src/author/rpack.py` reads and append-writes it; the layout is in its
-docstring). ⛔ There is **no `.rpack` → glTF/FBX exporter yet**: clips authored here play in this engine;
-the portable form of a move is its SCORE (`skate_src/author/moves/*.py`), which is math on a skeleton.
+docstring). `skate_src/author/rpack2gltf.py` exports a pack's skeleton and its authored clips to glTF (`.glb`)
+for any other engine — verified by re-reading in Blender (`godot/verify_export_blender.py`); the ready-made
+files and the Godot 4 import guide are in `godot/`. A move's SCORE (`skate_src/author/moves/*.py`) is its
+portable source.
 
 ## 1 · Skeletons: any humanoid, by bone name
 

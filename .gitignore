@@ -100,3 +100,7 @@ reva_native/_archive/
 # the kit
 __pycache__/
 out/
+
+# the Godot hand-off: the exported moves and their visual check ARE the deliverable
+!godot/animations/*.glb
+!godot/*.png

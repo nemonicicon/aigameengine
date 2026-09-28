@@ -1,5 +1,7 @@
 # THE CAMERA — every lens the club has, and the rule each one cost
 
+*(Porting to Godot 4: `godot/CAMERA_PORT.md` has the exact math for each rig and a reference implementation.)*
+
 All of it lives in `reva_native/crowd_kms.c`. A scene script line (`reva_native/scenes/<name>.txt`,
 manual: `design/scene_direction.md`) or a live control line (`anim_bench/lab_ctl.txt`, written by
 `driver.py lab`) sets these keys; `camDirector()` (crowd_kms.c ~12815) decides each frame which lens

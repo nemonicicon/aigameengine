@@ -6,6 +6,8 @@ Hair physics for any of them: `ClubHair.attach(instance)` (`club_hair.gd`).
 
 ## [CLANKER — the studio's robot, ready for Godot 4](clanker/README.md)
 
+![clanker](clanker/preview_godot.png)
+
 ## [X3D -- the skater girl, ready for Godot 4](x3d/README.md)
 
 ![x3d](x3d/preview_godot.png)

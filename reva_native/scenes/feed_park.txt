@@ -1,0 +1,16 @@
+# feed_park -- REVA IS FILMING (the look test for skate promo ep 2, not an episode).
+# jacob: "i want reva to be filming ... the majority of the episode should be the camera feed that reva is
+# holding. the game we are working on, it is about capturing clips, filming your friends skating."
+# THE SHAPE OF THE WHOLE EPISODE, in miniature: her feed, a wide out of it, her feed again.
+# `feed=1 fish=0.42` puts the shot inside her camera; `feed=0 fish=0` is the room's own eye.
+# THE FILMER'S DISTANCE IS THE SHOT: at a foot behind kaeli the fisheye reads as a knee, and the first take came
+# back as one. She trails by ~3 u, which on a fisheye is a whole body in frame with the park behind it.
+cast 0=reva 1=kaeli
+
+0 dur=0.4 step=0 tone=0.66 snap=1 hmark=s10_b2 pmark=s10_b8 hclip=z_rm_sk_film pclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pprop=skateboard@1.4@0@board hlook=0 plook=0 feed=0 fish=0 cam=16.0,2.6,-4.3,22.6,0.8,8.0,62 |
+# 1. THE FEED -- her camera, her friend, both of them rolling
+0 dur=6.0 feed=1 fish=0.42 hpath=@loopB hloop=1 hspd=3.3 ppath=@loopB ploop=1 pspd=3.3 htrick=z_rm_sk_push@0.3 ptrick=z_rm_sk_push@0.1,z_rm_sk_kf@3.6 camhold=0,1,-1,0.95 |
+# 2. OUT OF THE CAMERA -- the room's eye, so you see what she is doing
+0 dur=4.0 feed=0 fish=0 cam=20.3,0.55,11.9,19.8,1.2,13.4,56 camshake=0.06,1.0 |
+# 3. BACK IN, for the trick
+0 dur=5.0 feed=1 fish=0.42 ptrick=z_rm_sk_pop@1.4,z_rm_sk_kf@3.2 camhold=0,1,-1,0.95 camshake=0 |

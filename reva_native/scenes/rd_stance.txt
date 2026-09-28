@@ -1,0 +1,14 @@
+# rd_stance -- THE RIDING STANCE, from the angles jacob judges it on (a fixture, not an episode).
+# jacob: "the knees look off" / "how they are standng on the skateboard doesent seem to natural" / and on the
+# first attempt at a fix, with a photo taken from BEHIND: "knees are very very bad" -- the legs bowed out.
+# THE CAUSE (read off the authoring script, not guessed): RIDE_KNEEOUT pushes each knee's pole vector outward,
+# and a foot's toe-out yaw ROTATES that leg's pole by the same angle -- so a 42-degree front foot plus a kneeout
+# splayed both knees. The stance keeps the bend (RIDE_SINK) and drops the splay.
+# Rows: behind (jacob's angle), front, side, low 3/4.
+cast 0=kaeli 1=reva
+
+0 dur=0.4 step=0 tod=12 tone=0.66 snap=1 hmark=s1 hclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pmark=park pclip=z_upright hlook=0 plook=0 cam=0.0,1.5,-3.6,0.0,1.1,1.0,40 |
+0 dur=2.6 cam=0.0,1.5,-3.6,0.0,1.1,1.0,40 |
+0 dur=2.6 cam=0.0,1.5,5.6,0.0,1.1,1.0,40 |
+0 dur=2.6 cam=-4.6,1.5,1.0,0.0,1.1,1.0,42 |
+0 dur=2.6 cam=-3.2,0.7,-2.8,0.0,1.0,1.0,44 |

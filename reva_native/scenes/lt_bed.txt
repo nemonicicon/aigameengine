@@ -1,0 +1,6 @@
+# contact-pass A/B fixture: ep 12's cuddle and get-up (not an episode)
+cast 0=reva 1=kaeli
+0 dur=0.3 step=60 tod=1.0 snap=1 hmark=bed_reva pmark=bed_kaeli hclip=z_rm_bed_back pclip=z_rm_bed_nestle hlook=0 plook=0 cam=3.5,5.0,5.3,3.4,1.2,5.25,55 |
+0 dur=4.8 cam=3.5,5.0,5.3,3.4,1.2,5.25,55 |
+0 dur=4.8 cam=4.9,2.9,2.6,3.3,1.5,5.5,32 |
+1 dur=4.0 snap=1 pmark=bed_kaeli_up pclip=z_rm_bed_getup hclip=z_rm_bed_alone cam=9.6,2.9,4.2,4.4,1.4,6.8,48 |

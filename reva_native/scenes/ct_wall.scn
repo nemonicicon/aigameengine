@@ -1,0 +1,10 @@
+scene 1 ct_wall.wav 6.720 2
+cast KAELI REVA SUSAN ARCHIVE -
+line 0 0.000 0.300 
+env 0 
+stage cam=8.0,2.4,5.0,0.0,1.6,5.0,55 dur=0.300 hbrow=auto hclip=z_upright hgt=0 hlook=0 hmark=wa pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=park pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=12
+vis 0 
+line 0 0.720 6.000 
+env 0 
+stage cam=8.0,2.4,5.0,0.0,1.6,5.0,55 dur=6.000 hbrow=auto hclip=z_upright hgt=0 hlook=0 hmark=wb pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=park pside=0.12 pyaw=180 shot=ots step=60 tod=12
+vis 0 

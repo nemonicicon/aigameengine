@@ -1,0 +1,6 @@
+# contact-pass fixture on clips that play right on these bodies (not an episode):
+# line 1: face to face 0.55 u apart, both gesturing (body vs body); line 2: kaeli gesturing with her back to the cupboard
+cast 0=reva 1=kaeli
+0 dur=0.3 step=60 tod=12 snap=1 hmark=faceA pmark=faceB hclip=x_convo1 pclip=x_convo2 hlook=0 plook=0 cam=3.27,2.3,6.8,3.27,1.9,3.0,38 |
+0 dur=5.0 |
+1 dur=5.0 snap=1 hmark=away pmark=cupback pclip=x_convo1 cam=11.8,2.3,6.6,9.0,1.8,7.3,40 |

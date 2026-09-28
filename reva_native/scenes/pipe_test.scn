@@ -1,0 +1,17 @@
+scene 1 pipe_test.wav 20.580 5
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 1.500 
+env 0 
+stage cam=0.0,6.0,27.0,0.0,5.5,0.0,55 dur=1.500 hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=pipe_deck hprop=skateboard@1.4@0@board pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=pipe_deck2 pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots snap=1 step=12 tod=13.0
+line 0 1.920 1.400 
+env 0 
+stage cam=0.0,6.0,27.0,0.0,5.5,0.0,55 dur=1.400 hair=z_rm_sk_kf hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=pipe_deck hpipe=vert,2.0 hprop=skateboard@1.4@0@board pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=pipe_deck2 pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots step=12 tod=13.0
+line 1 3.740 9.000 
+env 0 
+stage cam=0.0,6.0,27.0,0.0,5.5,0.0,55 dur=9.000 hair=z_rm_sk_kf hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=pipe_deck hpipe=vert,2.0 hprop=skateboard@1.4@0@board pair=z_rm_sk_shove,z_rm_sk_kf pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=pipe_deck2 ppipe=vert,1.5 pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots step=12 tod=13.0
+line 0 13.160 5.000 
+env 0 
+stage camtrack=0,14,2.0,90,50,1.6 dur=5.000 hair=z_rm_sk_kf hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=pipe_deck hpipe=vert,2.0 hprop=skateboard@1.4@0@board pair=z_rm_sk_shove,z_rm_sk_kf pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=pipe_deck2 ppipe=vert,1.5 pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots step=12 tod=13.0
+line 0 18.580 2.000 
+env 0 
+stage cam=0.0,6.0,27.0,0.0,5.5,0.0,55 dur=2.000 hair=off hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=pipe_deck hpipe=off hprop=skateboard@1.4@0@board pair=off pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=pipe_deck2 ppipe=off pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots step=12 tod=13.0

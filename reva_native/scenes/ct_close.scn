@@ -1,0 +1,14 @@
+scene 1 ct_close.wav 11.140 3
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 0.300 
+env 0 
+stage cam=3.27,2.3,6.8,3.27,1.9,3.0,38 dur=0.300 hbrow=auto hclip=x_convo1 hgt=0 hlook=0 hmark=faceA pbrow=auto pclip=x_convo2 pgap=1.15 plook=0 pmark=faceB pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=12
+vis 0 
+line 0 0.720 5.000 
+env 0 
+stage cam=3.27,2.3,6.8,3.27,1.9,3.0,38 dur=5.000 hbrow=auto hclip=x_convo1 hgt=0 hlook=0 hmark=faceA pbrow=auto pclip=x_convo2 pgap=1.15 plook=0 pmark=faceB pside=0.12 pyaw=180 shot=ots step=60 tod=12
+vis 0 
+line 1 6.140 5.000 
+env 0 
+stage cam=11.8,2.3,6.6,9.0,1.8,7.3,40 dur=5.000 hbrow=auto hclip=x_convo1 hgt=0 hlook=0 hmark=away pbrow=auto pclip=x_convo1 pgap=1.15 plook=0 pmark=cupback pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=12
+vis 0 

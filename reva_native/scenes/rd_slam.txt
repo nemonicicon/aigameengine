@@ -1,0 +1,25 @@
+# rd_slam -- THE RAGDOLL TEST (a fixture, not an episode).
+#
+# THE ONE QUESTION: when a MOVING body is cued limp mid-run, does the engine hand its skeleton to physics --
+# starting from the pose it was in, carrying the speed it had, and settling on the floor's real geometry?
+#
+# PASS (all four, and the frames are the verdict):
+#   1. the log says  [ragdoll] line 1 slot 0 ... LIMP at (x,y,z), carrying ~4 u/s   (she was rolling at hspd=4)
+#   2. [rd] hips drop from ~0.9 u to under 0.45 u within ~1.2 s and the speed trace reaches ~0 -- she SETTLES
+#   3. [rd] lowest joint never goes below the floor line (floor= in the same row) by more than its own radius
+#   4. the frames: upright on the board -> limbs trailing in the air -> a body lying on the floor, not a pose
+# FAIL: she keeps riding (no cue), she snaps to the floor in one frame (no carry), she sinks through the floor,
+#   she slides on forever (no friction), or she is dragged on down the path while limp (the root not frozen).
+# CONTROL: the same take with REVA_NORAGDOLL=1 -- she rides the whole path upright and no [ragdoll] line prints.
+# PRECONDITIONS, each checked before the verdict: the build is the NEW one; z_rm_sk_ride plays upright on her
+#   (frame 0); the path actually moves her (the [path] log + frame 0 vs frame 30); the lens holds the whole
+#   fall in frame (a FIXED wide, 9 u to her left, so nothing about the camera moves while she does).
+# RUN (from the repo root, $PY = the pythoncore 3.14 exe):
+#   $PY reva_native/scenes/compile_scene.py reva_native/scenes/rd_slam.txt
+#   $PY .claude/skills/run-reva/driver.py scene <out>.mp4 --name rd_slam --set _slam --seconds 9 --fps 30 \
+#       --new --raw --subject anima_outfit --partner r2moves --env REVA_RDDBG=1
+cast 0=kaeli 1=reva
+
+0 dur=0.4 step=0 tod=12 tone=0.66 snap=1 hmark=s1 hclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pmark=park pclip=z_upright hlook=0 plook=0 cam=-5.0,1.7,6.5,0.4,0.8,6.5,50 |
+0 dur=8.0 hpath=s1,s2 hspd=4.0 hdoll=1.5 |
+0 dur=3.0 cam=-4.2,0.20,6.9,0.4,0.28,6.9,46 |

@@ -1,0 +1,7 @@
+/* [win32 port 2026-08-21] Make the ANSI CRT (readdir/fopen) speak UTF-8.
+ * Linux treats filenames as opaque bytes; Windows converts them through the active
+ * codepage, which is 1252 here and has no U+014D. One pack of 220 is named
+ * "Ninjato" with a macron, so readdir reported a mangled name and fopen could not
+ * find it -- a fatal error from a file that was never remarkable on the Pi.
+ * activeCodePage=UTF-8 (Windows 10 1903+) makes the byte-oriented code work as written. */
+1 24 "crowd_win.manifest"

@@ -1,0 +1,49 @@
+# cam_test -- a LENS TEST FIXTURE, not a scene (ROBOT NEKO ep 11, B3). Shoot it with --set southbank.
+# The X-Games lenses: cammove (a dolly / crane / push-in from the line's cam= to its own pose), camsecs (its
+# travel time), camorbit (the replay orbit round a body's CONTINUOUS spot), camshake (a handheld on top of any
+# placed lens), and an ABSOLUTE eye height (`=h`) for camtrack/camorbit. The lens is never stepped: under
+# step=12 the bodies step on the exposure clock and every lens here glides on its own.
+# reva laps the open floor on the ep 10 path test's loop (kf_a r_roll kf_b kb t_b kf_a -- counter-clockwise seen
+# from above, so her FRONT faces into the loop); kaeli stands on her board on t_c, north of it, in front of the
+# ep 9 main wide. Every eye is on the main wide's side of the loop, inside the loop, or over a mark a body has
+# stood on -- the two pillars on record are (11.9, 0.4) and (26.5, 13).
+#   line 0  (snap) the main wide, held
+#   line 1  cammove, no camsecs: the main wide pushes in and cranes down to a low 3/4 over the WHOLE line -- its
+#           words, the gap and the next beat -- so it lands on the next cut
+#   line 2  cammove + camsecs=4.0 on a 2.9 s line: it moves on from where line 1 left it (the carried end) ...
+#   line 3  ... and, with no lens key, is CARRIED ON into this line until its 4 s are up (no cut)
+#   line 4  camorbit round kaeli (slot 1), standing: headings 100 -> 260, the lens on her north side, the loop behind
+#   line 5  camorbit 0,0 with `=2.2`: a WORLD-frame follow -- 4 u south of reva wherever she is on the loop, eye at
+#           world y 2.2 -- the half-pipe's lens (camtrack's azim turns with a rider who reverses at every wall)
+#   line 6  camshake=0.25,1.5 on the plain main wide: the handheld, alone
+#   line 7  camtrack with `=2.6` (absolute eye height), the shake still on (sticky): azim 90 = her front = INSIDE
+#           this loop. On this level floor `=2.6` and `2.6` frame alike; the half-pipe is where they part.
+#   line 8  campan from the main wide's eye, camshake=0 (off); hloop=0 -- her last lap
+# LOOK FOR in the take's .log:
+#   [lens] line 1 cammove over 4.42 s: eye 20.00,3.20,18.00 -> 18.00,1.70,13.50 ... fov 58 -> 46
+#   [lens] line 2 cammove over 4.00 s: eye 18.00,1.70,13.50 -> 15.20,2.40,11.00 ...
+#   [lens] line 3: cammove carried on -- ~1.0 s of it left       (4.0 less its 2.92 s line, give or take a frame)
+#   [lens] line 4 camorbit slot 1 radius 4.00 height 1.90 heading 100 -> 260 over 5.42 s fov 50 aimh 1.50 (cut)
+#   [lens] line 5 camorbit slot 0 radius 4.00 height =2.20 heading 0 -> 0 over 5.42 s fov 52 aimh 1.50 (cut)
+#   [lens] line 6: camorbit off -- the line's cam= takes the lens      [lens] line 6 camshake amp 0.25 u hz 1.50
+#   [lens] line 7 camtrack slot 0 dist 5.20 height =2.60 (absolute) azim 90 fov 56 aimh 1.60 (cut)
+#   [lens] line 8 campan slot 0 aimh 1.40 eye 20.00,3.20,18.00 (cut)   [lens] line 8 camshake off
+# REVA_LENSDBG=1 (via --env) prints the lens and the tracked body's height and vertical speed every 30 frames.
+# RUN from the repo root, PY=/c/Users/jacob/AppData/Local/Python/pythoncore-3.14-64/python.exe (action lines only:
+# nothing to voice):
+#   $PY reva_native/scenes/compile_scene.py reva_native/scenes/cam_test.txt
+#   $PY .claude/skills/run-reva/driver.py scene D:/reva902/robot_neko/ep11/cam_test_t8.mp4 --name cam_test --set southbank --seconds 35 --fps 8 --new --raw --subject r2moves --partner anima_outfit --pclip z_rm_sk_ride --clip z_rm_sk_ride
+# (judge SMOOTHNESS at --fps 24, not 8: an 8 fps take cannot show a lens gliding between stepped bodies)
+# grammar: a lens test fixture, not a scene
+cast 0=reva 1=kaeli
+mouth hinge
+
+0 dur=0.5 step=12 tone=0.66 snap=1 hmark=kf_a hclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pmark=t_c pclip=z_rm_sk_ride pprop=skateboard@1.4@0@board cam=20,3.2,18,19,1.3,4,58 |
+0 dur=4.0 hpath=kf_a,r_roll,kf_b,kb,t_b,kf_a hloop=1 hspd=3.0 htrick=z_rm_sk_push@0.1 cammove=18.0,1.7,13.5,19.2,1.0,5.5,46 |
+0 dur=2.5 cammove=15.2,2.4,11.0,19.5,1.0,5.0,40 camsecs=4.0 |
+0 dur=2.0 |
+0 dur=5.0 camorbit=1,4.0,1.9,100,260,50,1.5 |
+0 dur=5.0 camorbit=0,4.0,=2.2,0,0,52,1.5 |
+0 dur=3.0 cam=20,3.2,18,19,1.3,4,58 camshake=0.25,1.5 |
+0 dur=5.0 camtrack=0,5.2,=2.6,90,56,1.6 |
+0 dur=4.0 hloop=0 campan=0,1.4 cam=20,3.2,18,19,1.3,4,58 camshake=0 |

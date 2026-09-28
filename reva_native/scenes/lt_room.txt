@@ -1,0 +1,7 @@
+# ep 12 light test: the ONE AM room at the episode's own lenses, no dialogue (not an episode)
+cast 0=reva 1=kaeli
+0 dur=1.0 step=60 tone=0.66 tod=1.0 snap=1 hmark=bedside pmark=k_door hlook=0 plook=0 pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke cam=10.5,3.8,5.6,3.3,1.2,5.4,44 |
+0 dur=1.0 cam=4.9,2.9,2.6,3.3,1.5,5.5,32 |
+0 dur=1.0 cam=9.6,2.9,4.2,4.4,1.4,6.8,48 |
+0 dur=1.0 cam=16.8,2.6,10.8,13.5,2.75,10.8,38 |
+0 dur=1.0 cam=17.5,3.0,11.6,5.0,1.6,6.0,55 |

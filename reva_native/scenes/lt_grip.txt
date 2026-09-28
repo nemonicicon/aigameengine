@@ -1,0 +1,5 @@
+# ep 12 grip test: the cigarette on kaeli's middle-finger knuckle, held by its end vs 30% along (not an episode)
+cast 0=reva 1=kaeli
+0 dur=1.0 step=60 tod=1.0 snap=1 hmark=bedside pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke cam=16.0,1.9,10.8,13.4,1.7,10.8,40 |
+0 dur=1.0 pprop=v1_x_cigarette@0.16@0@middle_01_r:0.3@F2EFE8@light:0.5:0.5@smoke |
+0 dur=1.0 cam=13.4,1.75,13.2,13.45,1.65,11.0,30 |

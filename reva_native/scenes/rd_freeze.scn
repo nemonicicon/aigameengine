@@ -1,0 +1,10 @@
+scene 1 rd_freeze.wav 5.020 2
+cast KAELI REVA SUSAN ARCHIVE -
+line 0 0.000 0.600 
+env 0 
+stage cam=-3.6,1.55,1.0,0.0,0.95,1.0,48 dur=0.600 hbrow=auto hclip=z_rm_sk_ride hgt=0 hlook=0 hmark=s1 hprop=skateboard@1.4@0@board pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=park pside=0.12 pyaw=180 shot=ots snap=1 step=0 tod=12 tone=0.66
+vis 0 
+line 0 1.020 4.000 
+env 0 
+stage cam=-3.6,1.55,1.0,0.0,0.95,1.0,48 dur=4.000 hbrow=auto hclip=z_rm_sk_ride hdoll=1.0 hgt=0 hlook=0 hmark=s1 hprop=skateboard@1.4@0@board pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=park pside=0.12 pyaw=180 shot=ots step=0 tod=12 tone=0.66
+vis 0 

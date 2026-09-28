@@ -2,7 +2,7 @@
 
     python godot/demo/score_rigs.py out/c_<mode>.log ...   (the mode is read from the DEMO line)
 
-CAM <frame> <t>  <eye xyz>  <forward xyz>  <reva's hips on screen: x y inview>  <fov>
+CAM <frame> <t>  <eye xyz>  <forward xyz>  <the rider's hips on screen: x y inview>  <fov>
 """
 import math, sys
 
@@ -40,18 +40,18 @@ def main():
             verdict = d1.max() > 1e-5 and r < 0.35
             why.append("shake: eye speed up to %.4f m/frame, frame-to-frame change of it up to %.4f (ratio %.2f -- smooth < 0.35)" % (d1.max(), d2.max(), r))
         elif mode == "pan":
-            verdict = d1.max() < 1e-6 and seen >= 0.95; why.append("eye moved at most %.2e m, reva in frame %.0f%%" % (d1.max(), 100 * seen))
+            verdict = d1.max() < 1e-6 and seen >= 0.95; why.append("eye moved at most %.2e m, the rider in frame %.0f%%" % (d1.max(), 100 * seen))
         elif mode == "orbit":
             k = int(np.argmax(t >= 4.0 + 1e-6))
             err = abs(((heading[k] - 180.0) + 180.0) % 360.0 - 180.0)
             verdict = err < 0.5 and seen >= 0.95
-            why.append("heading at t=%.3f s: %.2f deg (asked 180; error %.2f), reva in frame %.0f%%" % (t[k], heading[k], err, 100 * seen))
+            why.append("heading at t=%.3f s: %.2f deg (asked 180; error %.2f), the rider in frame %.0f%%" % (t[k], heading[k], err, 100 * seen))
         elif mode == "move":
             k = int(np.argmax(t >= 3.0 + 1e-6))
             err = float(np.linalg.norm(eye[k] - np.array([2.2, 1.3, 2.2])))
             verdict = err < 1e-3; why.append("eye at t=%.3f s is %.4f m from the move's end" % (t[k], err))
         else:   # track / hold
-            verdict = seen >= 0.95; why.append("reva in frame %.0f%% of %d frames" % (100 * seen, len(t)))
+            verdict = seen >= 0.95; why.append("the rider in frame %.0f%% of %d frames" % (100 * seen, len(t)))
         if float(ex.get("fish", 0)) > 0:
             why.append("render fov %.1f deg for an authored 44 (the fisheye opens the field)" % fov.max())
             verdict = verdict and fov.max() > 44.5

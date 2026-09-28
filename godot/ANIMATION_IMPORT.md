@@ -7,6 +7,10 @@ Two files in `godot/animations/`, exported from the club engine by `skate_src/au
 | `reva_skate_moves.glb` | 14 skate moves, each with the **skateboard's own motion** (the board flips, pops and is caught — it is animated per trick, not attached) |
 | `reva_moves.glb` | 18 other authored moves (board handling, arms up, a crawl, lying down, …) |
 
+⭐ **And a character ready to use: `godot/characters/clanker/clanker.glb`** — CLANKER, the studio's own robot
+(made entirely by code), with the same 14 skate moves already baked onto HIS skeleton and his real body and
+texture. No retargeting: instance him and play `z_rm_sk_ride`. See `godot/characters/clanker/README.md`.
+
 **Skeleton:** reva's — Mixamo-style names (`Hips Spine Spine1 Spine2 Neck Head LeftShoulder LeftArm
 LeftForeArm LeftHand LeftUpLeg LeftLeg LeftFoot LeftToeBase`, the same on the right, and `face_jaw`), 23
 bones, no fingers, **metres, Y up, facing +Z**, rest pose standing. Rigged in-house; the moves were
@@ -20,16 +24,25 @@ Every animation keys EVERY bone (rest pose held where the move is silent), so a 
 last move's pose — the check found exactly that on the first export (an arm left in the air, 2.04 m out).
 
 **In Godot 4.7.2** (`demo/check_pose.gd` + `demo/check_pose_compare.py`): the files import with no error;
-posed at fixed frames, the hips, feet and the board land within 2 micrometres of the club engine and the
-board's nose axis exactly; the head and hands are off by up to 2.7 mm on one frame of the kickflip (the spine
-~0.05 degrees, one key step) -- NOT the import optimizer, the immutable-track removal, the bake rate or the
-quaternions (each A/B'd), cause not isolated, far below visible. Switching from one move to another never
-leaves a bone where the last move put it. The demo project's `.import` files already carry the loop modes.
+posed at fixed frames, EVERY joint and the board land within **3 micrometres** of the club engine and the
+board's nose axis within 0.02 degrees — reva's skate and body moves and Clanker's alike. Switching from one
+move to another never leaves a bone where the last move put it. The demo project's `.import` files carry
+the loop modes and the optimizer setting below.
+
+⛔ **Godot's animation OPTIMIZER is on by default, and it is an option of the `AnimationPlayer` NODE, not of
+each animation.** On, it drops keys it judges redundant (Clanker's ride kept 40 of its 62 hip keys) and the
+pose drifts 1–3 mm off the authored one. The first version of this kit set `optimizer/enabled` per
+animation — Godot carries that key along and never reads it — so the optimizer stayed on, and the 2.7 mm it
+left on the kickflip was written up here as "not the optimizer, cause not isolated": toggling a dead
+setting cannot move anything. `demo/set_import.py` now writes it where Godot reads it
+(`"nodes": {"PATH:AnimationPlayer": {"optimizer/enabled": false}}`).
 
 ## Import (Godot 4)
 
 1. Put the `.glb` in the project. Godot imports it as a scene: a `Skeleton3D` (+ the stick figure, and the
-   `skateboard` node in the skate file) and an `AnimationPlayer` holding the moves.
+   `skateboard` node in the skate file) and an `AnimationPlayer` holding the moves. In its *Advanced Import
+   Settings*, select the **`AnimationPlayer`** node and turn the **Optimizer** off (see ⛔ above) — or copy
+   our `.import` file beside the `.glb`.
 2. **Retarget onto your character** (Godot's own humanoid retargeting): open the `.glb`'s *Advanced Import
    Settings*, select the `Skeleton3D`, and under *Retarget* create a `BoneMap` with the
    `SkeletonProfileHumanoid` profile — Mixamo-style names map automatically. Do the same on your

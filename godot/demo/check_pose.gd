@@ -2,6 +2,7 @@ extends SceneTree
 ## check_pose.gd -- does GODOT pose our moves where the club engine does?
 ##   godot --headless --path godot --script res://demo/check_pose.gd -- clip=z_rm_sk_kf frames=0,9,15,21
 ##   godot ... -- file=moves clip=z_upright frames=0,4 before=z_rm_skiphand@1.5
+##   godot ... -- file=clanker clip=z_rm_sk_kf frames=0,9,15,21 all=1     (or file=res://<any .glb>)
 ## Prints, for each frame, the world position of a few joints (and the skateboard's origin and nose axis)
 ## as `POSE <frame> <name> x y z`, for check_pose_compare.py to hold against the pack's own forward
 ## kinematics -- a second, independent path to the same numbers.
@@ -32,7 +33,12 @@ func _init() -> void:
 				for f in kv[1].split(","):
 					frames.append(int(f))
 			"file":
-				file = "res://animations/reva_moves.glb" if kv[1] == "moves" else "res://animations/reva_skate_moves.glb"
+				if kv[1].begins_with("res://"):
+					file = kv[1]
+				elif kv[1] == "clanker":
+					file = "res://characters/clanker/clanker.glb"
+				else:
+					file = "res://animations/reva_moves.glb" if kv[1] == "moves" else "res://animations/reva_skate_moves.glb"
 			"before":
 				before = kv[1].split("@")[0]
 				before_t = float(kv[1].split("@")[1])

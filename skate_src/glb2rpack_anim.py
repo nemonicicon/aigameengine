@@ -572,7 +572,9 @@ def main():
     # A RIDE LOOP IS FLAT. A loop that lifts the body a long way is a trick being repeated,
     # not someone rolling along -- and wiring one to ROLL makes the character kickflip
     # continuously while simply moving. Measured against his own standing height.
-    bodyH = max(1e-6, max(m['rise'] for m in meas))
+    # A BODY WITH NO CLIPS IS A BODY: a character built to receive retargeted moves (Clanker, 09-27) arrives
+    # with none, and max() of nothing killed the bake after the skin was already read.
+    bodyH = max(1e-6, max((m['rise'] for m in meas), default=0.0))
     riders = sorted([m for m in loops if m['name'] not in role and m['rise'] < bodyH * 0.55],
                     key=lambda m: m['alt'])
     if riders:

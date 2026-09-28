@@ -1,14 +1,19 @@
 extends Node3D
 ## demo/main.gd -- the club's camera rigs and skate moves in a Godot 4 scene, built in code.
 ##
-## Reva rides a ring among pillars on z_rm_sk_ride (the board animated by the move itself); a filmer
-## rides inside her on z_rm_sk_film with a phone on her RIGHT hand bone. One ClubCamera shows it.
-## F5 runs the tracking lens. A test chooses a rig and records it with Movie Maker:
-##   godot --path godot --write-movie out/track/f.png --fixed-fps 60 --quit-after 360 -- mode=track log=1
+## CLANKER rides a ring among pillars on z_rm_sk_ride (the board animated by the move itself) and throws
+## a trick every 2.5 s -- pop, kickflip, shove-it, manual, grab, method, each one-shot handing back to the
+## ride; a filmer (reva's moves on the stick figure) rides inside him on z_rm_sk_film with a phone on her
+## RIGHT hand bone. One ClubCamera shows it. F5 runs the tracking lens. A test chooses a rig and records
+## it with Movie Maker (an ABSOLUTE path -- a relative one is not written):
+##   godot --path godot --write-movie C:/out/track/f.png --fixed-fps 60 --quit-after 360 -- mode=track log=1
 ## mode: tripod pan track orbit hold move      extras: shake=<m> fish=<0..1> feed=<0|1|2> log=1
+## rider=clanker|reva (reva = her moves on the stick figure)      tricks=1|0
 
 const SKATE := preload("res://animations/reva_skate_moves.glb")
-const RING := 5.0        # reva's circle, metres
+const CLANKER := preload("res://characters/clanker/clanker.glb")
+const TRICKS := ["z_rm_sk_pop", "z_rm_sk_kf", "z_rm_sk_shove", "z_rm_sk_manual", "z_rm_sk_grab", "z_rm_sk_method"]
+const RING := 5.0        # the rider's circle, metres
 const SPEED := 2.5       # metres per second
 
 var args := {}
@@ -18,6 +23,9 @@ var filmer: Node3D
 var hips_bone := -1
 var rider_sk: Skeleton3D
 var hand: BoneAttachment3D
+var rider_ap: AnimationPlayer
+var next_trick := 1.5
+var trick_i := 0
 var t := 0.0
 var frame := 0
 
@@ -28,8 +36,10 @@ func _ready() -> void:
 		if kv.size() == 2:
 			args[kv[0]] = kv[1]
 	_world()
-	rider = _skater("z_rm_sk_ride", 1)
-	filmer = _skater("z_rm_sk_film", 2)          # render layer 2: the phone's own camera does not see her
+	var who: String = args.get("rider", "clanker")
+	rider = _skater(CLANKER if who == "clanker" else SKATE, "z_rm_sk_ride", 1)
+	filmer = _skater(SKATE, "z_rm_sk_film", 2)   # render layer 2: the phone's own camera does not see her
+	rider_ap = rider.find_children("*", "AnimationPlayer", true, false)[0]
 	rider_sk = rider.find_children("*", "Skeleton3D", true, false)[0]
 	hips_bone = rider_sk.find_bone("Hips")
 	var fsk: Skeleton3D = filmer.find_children("*", "Skeleton3D", true, false)[0]
@@ -84,8 +94,8 @@ func _world() -> void:
 		add_child(p)
 
 
-func _skater(anim_name: String, layer: int) -> Node3D:
-	var s: Node3D = SKATE.instantiate()
+func _skater(file: PackedScene, anim_name: String, layer: int) -> Node3D:
+	var s: Node3D = file.instantiate()
 	add_child(s)
 	var ap: AnimationPlayer = s.find_children("*", "AnimationPlayer", true, false)[0]
 	ap.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
@@ -112,7 +122,7 @@ func _put(s: Node3D, ang: float, radius: float) -> void:
 func _camera(mode: String) -> void:
 	cam = ClubCamera.new()
 	cam.subject = rider
-	cam.aim_height = 0.63
+	cam.aim_height = 0.8 if args.get("rider", "clanker") == "clanker" else 0.63   # his chest / her hips
 	cam.lens_fov = 44.0
 	cam.tripod_eye = Vector3(7.2, 2.0, 2.4)          # inside the pillar ring, outside hers
 	cam.tripod_aim = Vector3(0.0, 0.6, 0.0)
@@ -169,11 +179,18 @@ func _process(delta: float) -> void:
 	t += delta
 	frame += 1
 	_place(t)
+	# a trick is a one-shot that starts and ends on the ride's pose: play it, and queue the ride behind it
+	if args.get("tricks", "1") == "1" and t >= next_trick:
+		rider_ap.play(TRICKS[trick_i % TRICKS.size()])
+		rider_ap.queue("z_rm_sk_ride")
+		print("TRICK %.2f %s" % [t, TRICKS[trick_i % TRICKS.size()]])
+		trick_i += 1
+		next_trick = t + 2.5
 	if args.get("log", "0") == "1":
 		call_deferred("_log")
 
 
-## after everyone has moved: where the lens is, where it looks, and where reva is in its frame
+## after everyone has moved: where the lens is, where it looks, and where the rider is in its frame
 func _log() -> void:
 	var eye := cam.global_position
 	var fwd := -cam.global_transform.basis.z

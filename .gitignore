@@ -104,6 +104,11 @@ out/
 # the Godot hand-off: the exported moves and their visual check ARE the deliverable
 !godot/animations/*.glb
 !godot/*.png
+# a character we own and hand over whole (Clanker: body, texture, moves, board in one .glb). Godot
+# extracts the embedded texture beside it on import -- that copy is rebuilt, so it stays out.
+!godot/characters/**/*.glb
+!godot/characters/**/preview_*.png
+godot/characters/**/*.png.import
 
 # Godot: its import cache is rebuilt from the sources; the .import files (loop modes) are kept
 godot/.godot/

@@ -28,11 +28,17 @@ rules this engine was built by. `godot/` is the hand-off to a Godot 4 project:
   on a Mixamo-named skeleton, verified in Blender to 5 micrometres; `godot/ANIMATION_IMPORT.md` to retarget them.
 - `godot/CAMERA_PORT.md` — every camera rig specified exactly; `club_camera.gd` + `club_camera_post.gdshader`
   implement them, VERIFIED in Godot 4.7.2 — `godot/` is itself a Godot project: open it and press F5.
-- `skate_src/author/rpack2gltf.py` — export any pack's skeleton and authored clips to `.glb`.
+- `godot/characters/clanker/` — **CLANKER**, the studio's robot, ready to play: his body, texture and rig with
+  the 14 skate moves already on his skeleton and the board animated per trick (no retargeting). Made entirely
+  by code: `skate_src/robot/build_robot.py` (Blender, from his character sheet) → `retarget_skate.py` →
+  `rpack2gltf.py --mesh`. He stars in the demo.
+- `skate_src/author/rpack2gltf.py` — export any pack's skeleton and authored clips to `.glb` (`--mesh`: with
+  the pack's own skinned, textured body instead of the stick figure).
 
 ## What is NOT here
 
-Characters (`reva_native/packs/`), props (`props/`), audio (`aud/`, `aud2/`), levels (all but one bench
+Characters (`reva_native/packs/` — the one exception is CLANKER, ours and made by code, in
+`godot/characters/clanker/`), props (`props/`), audio (`aud/`, `aud2/`), levels (all but one bench
 fixture in `reva_native/sets/`), scenes and episodes (only silent engine test fixtures remain in
 `reva_native/scenes/`), source models, the game-mode designs and the story. Those were third-party
 assets (Fab, Sketchfab, Mixamo, Unreal marketplace projects) or the studio's own IP.

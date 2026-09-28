@@ -6,8 +6,9 @@ definition of done.
 
 **Verified in Godot 4.7.2** (the `demo/` project in this folder — open `godot/` in Godot and press F5): every
 rig recorded with Movie Maker at a fixed 60 fps and measured by `demo/score_rigs.py` — the tripod never
-moved (0 m); with shake its motion was smooth (frame-to-frame change 0.16 of its speed); track, pan and
-the hand-held phone kept reva in frame 360 of 360 frames; the orbit reached its end heading exactly at t =
+moved (0 m); with shake its motion was smooth (frame-to-frame change 0.16 of its speed, 0.15 on the re-run
+with Clanker riding); track, pan and the hand-held phone kept the rider in frame 360 of 360 frames (reva's
+stick figure first, then Clanker, the demo's rider now -- `rider=reva` brings her back); the orbit reached its end heading exactly at t =
 4.0 s (0.00 deg); the dolly move landed on its end pose (0.0000 m); the fisheye opened a 44 deg lens to
 60-64 deg; the hand-held eye's frame-to-frame motion changed 3.6x as much as the tracking lens's (the bob).
 Two bugs the Godot run found and fixed: `E` is a Godot shader built-in (the seven-segment flags collided),

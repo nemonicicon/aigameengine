@@ -5,6 +5,8 @@
         --clips "z_rm_sk_*" --exclude z_rm_sk_pickup --board
     python skate_src/author/rpack2gltf.py reva_native/packs/v1_r2moves.rpack out/reva_moves.glb \
         --clips "z_*" --exclude "z_rm_sk_*,z_twisttest"
+    python skate_src/author/rpack2gltf.py reva_native/packs/v1_clanker.rpack out/clanker.glb \
+        --clips "z_rm_sk_*" --board --mesh --materials-from D:/reva902/clanker/clanker.glb
 
 Written for a Godot 4 team (godot/ANIMATION_IMPORT.md): Godot's native 3D format is glTF, and a clip
 here is already what a glTF animation is -- per-bone LOCAL rotation / translation keys at a frame rate.
@@ -13,8 +15,17 @@ What goes in the file, and what deliberately does not:
   * the skeleton (every bone, rest pose, names as they are -- reva's are Mixamo-style: Hips, Spine,
     LeftUpLeg ...), a skin over it, and each selected clip as a glTF animation (LINEAR, the clip's own
     fps). Root motion rides on the bone that carries it (Hips on reva's z_rm_* clips).
-  * NO MESH FROM ANY ASSET. A generated STICK FIGURE (an octahedron per bone, left side blue, right side
-    red, rigidly skinned) so the moves can be looked at in Godot or Blender before retargeting; delete it.
+  * by default NO MESH FROM ANY ASSET: a generated STICK FIGURE (an octahedron per bone, left side blue,
+    right side red, rigidly skinned) so the moves can be looked at in Godot or Blender before
+    retargeting; delete it.
+  * `--mesh`: the pack's OWN meshes instead of the stick figure, for a character that is ours to hand
+    over (Clanker, 09-27). Skinned exactly as the club engine skins them -- each vertex through its
+    mesh's bind matrix, then its bones' world x inverse-bind -- with the pack's textures embedded.
+    The materials are what the engine draws: base colour (+ normal map), double-sided (the engine never
+    culls), BLEND where the pack blends, a 0.4 alpha cut where the texture has alpha, and an untextured
+    mesh's `#rrggbb` name as its colour. `--materials-from <source.glb>` names the file the pack was
+    baked from: each mesh then takes the source's material (name, metallic, roughness, emission),
+    matched by GEOMETRY. Morph targets (a face's shapes) are not exported, and it says so.
   * `--board`: a skateboard node (a generated deck + four wheels) driven by each clip's `<clip>_bd`
     channel -- the board frame in the rider's model space (origin the deck-top centre, +X the nose, +Y
     the deck's up), exactly as the club engine draws it. Clips without a channel leave the board where
@@ -24,9 +35,10 @@ What goes in the file, and what deliberately does not:
     loop is written to the animation's `extras` and printed.
 
 Checked by godot/verify_export_blender.py: Blender's glTF importer re-reads the file and every joint's
-world position is compared with this file's own forward kinematics at sampled frames.
+world position is compared with this file's own forward kinematics at sampled frames -- and with
+`--mesh`, every vertex of the deformed body against the engine's skinning of the pack.
 """
-import argparse, fnmatch, json, math, os, struct, sys
+import argparse, fnmatch, io, json, math, os, re, struct, sys
 
 import numpy as np
 
@@ -137,6 +149,218 @@ def flat_normals(P, T):
     return V, np.repeat(n, 3, axis=0), np.arange(len(V)).reshape(-1, 3)
 
 
+# ------------------------------------------------------------------ the pack's own meshes (--mesh)
+MESH = struct.Struct("<15I")
+MESH_FIELDS = ("name", "node", "verts", "nidx", "nbones", "flags", "oPos", "oNorm", "oUV", "oJ", "oW", "oIdx",
+               "oBM", "oIBM", "oBind")
+
+
+def pack_meshes(R):
+    return [dict(zip(MESH_FIELDS, MESH.unpack_from(R.buf, R.offMeshes + mi * 60))) for mi in range(R.nMeshes)]
+
+
+def col_major(buf, off):
+    """a pack matrix (16 floats, column-major, as GL takes it) as a row-major numpy 4x4"""
+    return np.frombuffer(buf, "<f4", 16, off).astype(np.float64).reshape(4, 4).T
+
+
+def pack_materials(R):
+    """per mesh (texture, normal texture, flags) from the FIRST material record naming it, and the
+    per-texture flip / nearest sets from EVERY record -- both exactly as the engine's loader reads them"""
+    per, flip, near = {}, set(), set()
+    for r in range(R.nMats):
+        o = R.offMats + r * 36
+        mesh, fl = struct.unpack_from("<I", R.buf, o)[0], struct.unpack_from("<I", R.buf, o + 16)[0]
+        tex = struct.unpack_from("<i", R.buf, o + 24)[0]
+        ntex = struct.unpack_from("<i", R.buf, o + 28)[0] - 1      # +1 in the file, so an old pack reads none
+        tex = tex if 0 <= tex < R.nTex else -1
+        ntex = ntex if 0 <= ntex < R.nTex else -1
+        if tex >= 0:
+            if fl & 2: flip.add(tex)
+            if fl & 1: near.add(tex)
+        if ntex >= 0 and fl & 2: flip.add(ntex)
+        per.setdefault(mesh, (tex, ntex, fl))
+    return per, flip, near
+
+
+def texture_blob(R, t):
+    off, ln = struct.unpack_from("<II", R.buf, R.offTexTable + t * 16 + 8)
+    return bytes(R.buf[off:off + ln])
+
+
+def has_alpha(blob):
+    """does this image cut anything out? (the engine discards below 0.4 on every textured mesh)"""
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(blob))
+        if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+            return im.convert("RGBA").getextrema()[3][0] < 255
+        return False
+    except ImportError:                    # no PIL: a PNG whose colour type carries alpha (4, 6) counts
+        return blob[:4] == b"\x89PNG" and len(blob) > 25 and blob[25] in (4, 6)
+
+
+def srgb_to_linear(c):
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def source_materials(path, R, meshes):
+    """--materials-from: the material each pack mesh had in the file it was baked from, matched by
+    GEOMETRY -- vertex count and position bounds, which the baker copies bit for bit.
+    ⛔ NOT BY ORDER: the baker reorders meshes. Measured on Clanker: his metal is the pack's mesh 1 and
+    the source's primitive 3, so matching by list position would have put chrome on his paint."""
+    b = open(path, "rb").read()
+    if b[:4] != b"glTF":
+        sys.exit("--materials-from: %s is not a .glb" % path)
+    j = json.loads(b[20:20 + struct.unpack_from("<I", b, 12)[0]])
+    prims = []
+    for m in j.get("meshes", []):
+        for p in m["primitives"]:
+            acc = j["accessors"][p["attributes"]["POSITION"]]
+            prims.append((acc["count"], np.array(acc.get("min", [0.0] * 3)), np.array(acc.get("max", [0.0] * 3)),
+                          p.get("material")))
+    out = {}
+    for mi, m in enumerate(meshes):
+        P = np.frombuffer(R.buf, "<f4", m["verts"] * 3, m["oPos"]).reshape(-1, 3)
+        lo, hi = P.min(0), P.max(0)
+        hits = [k for k, (cnt, mn, mx, _mat) in enumerate(prims)
+                if cnt == m["verts"] and np.abs(mn - lo).max() < 1e-5 and np.abs(mx - hi).max() < 1e-5]
+        if len(hits) == 1 and prims[hits[0]][3] is not None:
+            out[mi] = j["materials"][prims[hits[0]][3]]
+        else:
+            print("   ⛔ mesh %d (%d verts): %s in %s -- it keeps the engine's plain material"
+                  % (mi, m["verts"], "no partner" if not hits else "%d partners" % len(hits), os.path.basename(path)))
+    return out
+
+
+def export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src_mats, stem):
+    """the pack's skinned meshes as glTF primitives: returns a one-line summary"""
+    per, tflip, tnear = pack_materials(R)
+    gtex = {}
+
+    def gl_texture(t, kind):
+        """one pack texture as a glTF image + texture (once); `kind` names it -- Godot extracts an embedded
+        image to a file named after it, as `<file>_<name>.png`: `clanker_basecolor_0.png`, not `clanker_image_0.png`"""
+        if t in gtex:
+            return gtex[t]
+        blob = texture_blob(R, t)
+        mime = "image/png" if blob[:4] == b"\x89PNG" else ("image/jpeg" if blob[:2] == b"\xff\xd8" else None)
+        if mime is None:
+            print("   ⛔ texture %d is neither PNG nor JPEG -- left out" % t)
+            gtex[t] = None
+            return None
+        G.j.setdefault("images", []).append({"bufferView": G.view(blob), "mimeType": mime,
+                                             "name": "%s_%d" % (kind, t)})
+        smp = {"magFilter": 9728 if t in tnear else 9729, "minFilter": 9728 if t in tnear else 9987,
+               "wrapS": 10497, "wrapT": 10497}                     # REPEAT, as the engine's loader
+        samplers = G.j.setdefault("samplers", [])
+        if smp not in samplers:
+            samplers.append(smp)
+        G.j.setdefault("textures", []).append({"sampler": samplers.index(smp), "source": len(G.j["images"]) - 1})
+        gtex[t] = len(G.j["textures"]) - 1
+        return gtex[t]
+
+    groups, skinkey, nv_all, nt_all, reused = {}, {}, 0, 0, 0
+    for mi, m in enumerate(meshes):
+        if not (m["flags"] & 4) or not m["nbones"]:
+            print("   mesh %d: not skinned -- the engine does not draw it on a body, left out" % mi)
+            continue
+        nv, nb = m["verts"], m["nbones"]
+        B = col_major(R.buf, m["oBind"])
+        P = np.frombuffer(R.buf, "<f4", nv * 3, m["oPos"]).reshape(nv, 3).astype(np.float64)
+        attrs = {"POSITION": G.acc(P @ B[:3, :3].T + B[:3, 3], "VEC3", minmax=True)}
+        if m["flags"] & 1:
+            N = np.frombuffer(R.buf, "<f4", nv * 3, m["oNorm"]).reshape(nv, 3).astype(np.float64)
+            N = N @ np.linalg.inv(B[:3, :3])                         # the inverse-transpose, as rows
+            L = np.linalg.norm(N, axis=1, keepdims=True)
+            N = np.where(L > 1e-9, N / np.maximum(L, 1e-12), np.array([0.0, 1.0, 0.0]))
+            attrs["NORMAL"] = G.acc(N, "VEC3")
+        tex, ntex, _mfl = per.get(mi, (-1, -1, 0))
+        if m["flags"] & 2:
+            UV = np.frombuffer(R.buf, "<f4", nv * 2, m["oUV"]).reshape(nv, 2).astype(np.float64).copy()
+            if tex in tflip:            # the engine flips that image on load: in glTF's convention, v' = 1 - v
+                UV[:, 1] = 1.0 - UV[:, 1]
+            attrs["TEXCOORD_0"] = G.acc(UV, "VEC2")
+        # ---- the skin: the pack's bone map and inverse binds, or the skeleton's own skin when they agree
+        bm = np.frombuffer(R.buf, "<u2", nb, m["oBM"]).astype(int)
+        IBM = np.frombuffer(R.buf, "<f4", nb * 16, m["oIBM"]).astype(np.float64).reshape(nb, 4, 4).transpose(0, 2, 1)
+        J = np.frombuffer(R.buf, "u1", nv * 4, m["oJ"]).reshape(nv, 4).astype(int)
+        Wt = np.frombuffer(R.buf, "u1", nv * 4, m["oW"]).reshape(nv, 4).astype(np.float64) / 255.0
+        bad = J >= nb                                                 # the engine skips an index past the map
+        Wt[bad] = 0.0; J[bad] = 0
+        dead = Wt.sum(1) < 1e-6
+        Wt[dead] = [1.0, 0.0, 0.0, 0.0]
+        Wt /= Wt.sum(1, keepdims=True)
+        if all(int(b) in jidx for b in bm) and all(np.abs(IBM[k] - np.linalg.inv(Wr[int(b)])).max() < 1e-4
+                                                   for k, b in enumerate(bm)):
+            skin = 0
+            J = np.array([jidx[int(b)] for b in bm])[J]
+            reused += 1
+        else:
+            key = (tuple(bm.tolist()), IBM.tobytes())
+            if key not in skinkey:
+                raw = np.frombuffer(R.buf, "<f4", nb * 16, m["oIBM"]).reshape(nb, 16)   # already column-major
+                G.j["skins"].append({"name": "%s_skin%d" % (stem, len(G.j["skins"])),
+                                     "joints": [gi[int(b)] for b in bm], "inverseBindMatrices": G.acc(raw, "MAT4")})
+                skinkey[key] = len(G.j["skins"]) - 1
+            skin = skinkey[key]
+        attrs["JOINTS_0"] = G.acc(J, "VEC4", 5123)
+        attrs["WEIGHTS_0"] = G.acc(Wt, "VEC4")
+        # ---- the material
+        mname = R.sname(m["name"]) or ("mesh%d" % mi)
+        mat = {"name": "%s_%d" % (mname, mi), "doubleSided": True,
+               "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 0.8}}
+        src = src_mats.get(mi)
+        if src:
+            mat["name"] = src.get("name", mat["name"])
+            spbr = src.get("pbrMetallicRoughness", {})
+            for k in ("baseColorFactor", "metallicFactor", "roughnessFactor"):
+                if k in spbr: mat["pbrMetallicRoughness"][k] = spbr[k]
+            for k in ("emissiveFactor", "doubleSided"):
+                if k in src: mat[k] = src[k]
+            lost = ([k for k in ("metallicRoughnessTexture",) if k in spbr] +
+                    [k for k in ("emissiveTexture", "occlusionTexture", "extensions") if k in src])
+            if lost:
+                print("   ⛔ %s: %s not carried (a pack holds base colour and normal maps only)"
+                      % (mat["name"], ", ".join(lost)))
+        if tex >= 0 and m["flags"] & 2:
+            gt = gl_texture(tex, "basecolor")
+            if gt is not None: mat["pbrMetallicRoughness"]["baseColorTexture"] = {"index": gt}
+        if ntex >= 0 and m["flags"] & 2:
+            gt = gl_texture(ntex, "normal")
+            if gt is not None: mat["normalTexture"] = {"index": gt}
+        if tex < 0:                     # an untextured mesh takes its colour from #rrggbb in its NAME
+            hx = re.search(r"#([0-9a-fA-F]{6})", mname)
+            if hx:
+                mat["pbrMetallicRoughness"]["baseColorFactor"] = [
+                    srgb_to_linear(int(hx.group(1)[k:k + 2], 16) / 255.0) for k in (0, 2, 4)] + [1.0]
+        if m["flags"] & 8:
+            mat["alphaMode"] = "BLEND"
+        elif tex >= 0 and has_alpha(texture_blob(R, tex)):
+            mat["alphaMode"] = "MASK"; mat["alphaCutoff"] = 0.4
+        G.j["materials"].append(mat)
+        prim = {"attributes": attrs, "material": len(G.j["materials"]) - 1}
+        if m["nidx"]:
+            prim["indices"] = G.acc(np.frombuffer(R.buf, "<u4", m["nidx"], m["oIdx"]), "SCALAR", 5125)
+            nt_all += m["nidx"] // 3
+        groups.setdefault(skin, []).append(prim)
+        nv_all += nv
+    body = nodes[meshes[0]["node"]]["name"] if meshes else stem
+    if body in {nodes[n]["name"] for n in keep}:
+        body += "_mesh"
+    for skin, prims in groups.items():
+        nm = body if len(groups) == 1 else "%s_%d" % (body, skin)
+        G.j["meshes"].append({"name": nm, "primitives": prims})
+        G.j["nodes"].append({"name": nm, "mesh": len(G.j["meshes"]) - 1, "skin": skin})
+        G.j["scenes"][0]["nodes"].append(len(G.j["nodes"]) - 1)
+    if struct.unpack_from("<I", R.buf, 4 + 14 * 4)[0]:
+        print("   note: this pack carries a morph table (a face's shapes) -- NOT exported by --mesh")
+    return "%d meshes (%d verts, %d tris) on %s, %d texture(s)" % (
+        sum(len(p) for p in groups.values()), nv_all, nt_all,
+        "the skeleton's own skin" if reused and len(groups) == 1 else "%d skin(s)" % len(groups),
+        sum(1 for v in gtex.values() if v is not None))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pack"); ap.add_argument("out")
@@ -144,6 +368,9 @@ def main():
     ap.add_argument("--exclude", default="", help="comma list of glob patterns")
     ap.add_argument("--board", action="store_true", help="a skateboard node driven by <clip>_bd channels")
     ap.add_argument("--no-figure", action="store_true", help="skeleton only, no stick figure")
+    ap.add_argument("--mesh", action="store_true", help="the pack's own skinned, textured meshes (no stick figure)")
+    ap.add_argument("--materials-from", default="", help="the .glb the pack was baked from: its materials, "
+                                                         "matched to the meshes by geometry (with --mesh)")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -160,9 +387,18 @@ def main():
             and not c["name"].endswith("_bd")]
     if not pick:
         sys.exit("no clip matches %s" % a.clips)
+    meshes = pack_meshes(R) if a.mesh else []
+    stem = os.path.splitext(os.path.basename(a.pack))[0]
+    stem = stem[3:] if stem.startswith("v1_") else stem
 
-    # the skeleton: the root chain and every bone; mesh nodes and measurement marks stay behind
-    keep = [i for i, n in enumerate(nodes) if n["kind"] == 1 or (n["kind"] == 0 and n["parent"] < 0)]
+    # the skeleton: the root chain and every bone (and, with --mesh, every node a mesh is skinned to);
+    # mesh nodes and measurement marks stay behind
+    skinned_to = set()
+    for m in meshes:
+        if m["flags"] & 4 and m["nbones"]:
+            skinned_to.update(np.frombuffer(R.buf, "<u2", m["nbones"], m["oBM"]).tolist())
+    keep = [i for i, n in enumerate(nodes)
+            if n["kind"] == 1 or (n["kind"] == 0 and n["parent"] < 0) or i in skinned_to]
     keep_set = set(keep)
     for i in list(keep):                       # every ancestor of a bone comes too
         p = nodes[i]["parent"]
@@ -198,8 +434,12 @@ def main():
     if len(roots) == 1: skin["skeleton"] = roots[0]
     G.j["skins"].append(skin)
 
-    # ---- the stick figure: one octahedron per bone, rigidly on it
-    if not a.no_figure:
+    # ---- the body: the pack's own meshes, or the stick figure (one octahedron per bone, rigidly on it)
+    body_line = ""
+    if a.mesh:
+        src = source_materials(a.materials_from, R, meshes) if a.materials_from else {}
+        body_line = export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src, stem)
+    elif not a.no_figure:
         head = {n: Wr[n][:3, 3] for n in bones}
         height = max(h[1] for h in head.values()) - min(h[1] for h in head.values())
         PP, JJ, TT, side = [], [], [], []
@@ -316,8 +556,9 @@ def main():
         summary.append((c["name"], F, fps, loops, worst, board_node is not None and bd >= 0, skipped))
 
     G.write(a.out)
-    print("wrote %s: %d bones, %d animations%s%s" % (a.out, len(bones), len(summary),
-          "" if a.no_figure else ", a stick figure", ", a skateboard" if board_node is not None else ""))
+    what = (", " + body_line) if body_line else ("" if a.no_figure else ", a stick figure")
+    print("wrote %s: %d bones, %d animations%s%s" % (a.out, len(bones), len(summary), what,
+          ", a skateboard" if board_node is not None else ""))
     for nm, F, fps, loops, worst, hasbd, sk in summary:
         print("   %-22s %4d f @ %2g fps  %-5s (first-last %5.1f deg)%s%s" % (nm, F, fps, "seamless" if loops else "one-way",
               worst, "  + board" if hasbd else "", ("  (%d tracks skipped)" % sk) if sk else ""))

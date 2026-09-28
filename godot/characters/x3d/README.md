@@ -8,7 +8,7 @@ jacob's second character: a stylised low-poly girl -- magenta skin, long straigh
 
 One file, **`x3d.glb`**: its body (13,844 vertices, 8,752 triangles, 1 texture; materials
 `M_Hair`, `M_Skin`, `M_Pants`, `M_Chain`, `M_Top`, `M_Shoe`, `M_Belt`, `M_Band`, `M_Sole`, `M_Metal`), a 68-bone Mixamo-named skeleton, and our **14 skate moves already on its own skeleton**, with the
-skateboard animated per trick. Nothing to retarget: put it in a project and play `z_rm_sk_ride`. Its hair carries 4 physics chains ([["Hair_Lock_R1", "Hair_Lock_R4"], ["Hair_Back_L1", "Hair_Back_L4"], ["Hair_Back_C1", "Hair_Back_C4"], ["Hair_Back_R1", "Hair_Back_R4"]]): the club engine swings them, and in Godot one line does -- `ClubHair.attach(instance)` (`godot/characters/club_hair.gd`).
+skateboard animated per trick. Nothing to retarget: put it in a project and play `z_rm_sk_ride`. Its hair carries 4 physics chains (`Hair_Lock_R1..4`, `Hair_Back_L1..4`, `Hair_Back_C1..4`, `Hair_Back_R1..4`): the club engine swings them, and in Godot one line does -- `ClubHair.attach(instance)` (`godot/characters/club_hair.gd`).
 
 ## Use it
 
@@ -31,7 +31,7 @@ skateboard animated per trick. Nothing to retarget: put it in a project and play
 
 - Blender re-read this file: every joint of every move within **1 µm**, every vertex of the body within
   **1 µm** of the club engine's own skinning (`godot/verify_export_blender.py`).
-- Godot 4.7.2.: every joint and the board within **1 µm** on 4 moves (`demo/check_pose.gd` + `check_pose_compare.py`).
+- Godot 4.7.2: every joint and the board within **1 µm** on 4 moves (`demo/check_pose.gd` + `check_pose_compare.py`).
 
 ## Rebuild it
 

@@ -104,3 +104,6 @@ out/
 # the Godot hand-off: the exported moves and their visual check ARE the deliverable
 !godot/animations/*.glb
 !godot/*.png
+
+# Godot: its import cache is rebuilt from the sources; the .import files (loop modes) are kept
+godot/.godot/

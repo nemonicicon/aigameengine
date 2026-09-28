@@ -1,6 +1,6 @@
 // club_camera_post.gdshader -- the club engine's post pass, the fisheye and the phone's frame, for Godot 4.
 //
-// ⛔ A REFERENCE TRANSLATION, NOT YET RUN IN GODOT. The ground truth is the fragment shader in
+// Translated from, and verified in Godot 4.7.2 against, the fragment shader in
 // reva_native/crowd_kms.c postInit (lines 2592-2680). Bloom and FXAA are left to Godot (Environment glow,
 // Project Settings > Rendering > Anti Aliasing > FXAA); the club's tone knee is kept as an option.
 //
@@ -39,24 +39,25 @@ float seg(vec2 p, vec2 a, vec2 b, float w) {
 	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
 	return step(length(pa - ba * h), w);
 }
+// (the segment flags are seg_a..seg_g: E, PI and TAU are Godot shader built-ins)
 float digit(vec2 p, int d) {
 	if (p.x < -0.1 || p.x > 0.6 || p.y < -0.1 || p.y > 1.1) { return 0.0; }
 	float on = 0.0;
 	float w = 0.055;
-	bool A = (d != 1 && d != 4);
-	bool B = (d != 5 && d != 6);
-	bool C = (d != 2);
-	bool D = (d != 1 && d != 4 && d != 7);
-	bool E = (d == 0 || d == 2 || d == 6 || d == 8);
-	bool F = (d != 1 && d != 2 && d != 3 && d != 7);
-	bool G = (d != 0 && d != 1 && d != 7);
-	if (A) { on = max(on, seg(p, vec2(0.05, 1.0), vec2(0.45, 1.0), w)); }
-	if (B) { on = max(on, seg(p, vec2(0.5, 0.95), vec2(0.5, 0.55), w)); }
-	if (C) { on = max(on, seg(p, vec2(0.5, 0.45), vec2(0.5, 0.05), w)); }
-	if (D) { on = max(on, seg(p, vec2(0.05, 0.0), vec2(0.45, 0.0), w)); }
-	if (E) { on = max(on, seg(p, vec2(0.0, 0.45), vec2(0.0, 0.05), w)); }
-	if (F) { on = max(on, seg(p, vec2(0.0, 0.95), vec2(0.0, 0.55), w)); }
-	if (G) { on = max(on, seg(p, vec2(0.05, 0.5), vec2(0.45, 0.5), w)); }
+	bool seg_a = (d != 1 && d != 4);
+	bool seg_b = (d != 5 && d != 6);
+	bool seg_c = (d != 2);
+	bool seg_d = (d != 1 && d != 4 && d != 7);
+	bool seg_e = (d == 0 || d == 2 || d == 6 || d == 8);
+	bool seg_f = (d != 1 && d != 2 && d != 3 && d != 7);
+	bool seg_g = (d != 0 && d != 1 && d != 7);
+	if (seg_a) { on = max(on, seg(p, vec2(0.05, 1.0), vec2(0.45, 1.0), w)); }
+	if (seg_b) { on = max(on, seg(p, vec2(0.5, 0.95), vec2(0.5, 0.55), w)); }
+	if (seg_c) { on = max(on, seg(p, vec2(0.5, 0.45), vec2(0.5, 0.05), w)); }
+	if (seg_d) { on = max(on, seg(p, vec2(0.05, 0.0), vec2(0.45, 0.0), w)); }
+	if (seg_e) { on = max(on, seg(p, vec2(0.0, 0.45), vec2(0.0, 0.05), w)); }
+	if (seg_f) { on = max(on, seg(p, vec2(0.0, 0.95), vec2(0.0, 0.55), w)); }
+	if (seg_g) { on = max(on, seg(p, vec2(0.05, 0.5), vec2(0.45, 0.5), w)); }
 	return on;
 }
 
@@ -93,13 +94,16 @@ void fragment() {
 		col *= mix(1.0, 0.84, smoothstep(0.42, 0.80, r));                      // a phone lens falls off a little
 		float g = fhash(fu * vec2(720.0, 1280.0) + vec2(feedT * 37.0, feedT * 29.0));
 		col += (g - 0.5) * 0.022;                                                // sensor noise, not tape grain
-		float sc = (feed > 1.5) ? 1.0 : (9.0 / 16.0);                            // keep the chrome square either way
-		vec2 q = vec2((fu.x - 0.055) / sc, (fu.y - 0.945));
+		// SQUARE CHROME: one unit across must be as many pixels as one unit up. The club's shader scaled x by
+		// 9/16 in portrait (and 1 sideways) the wrong way round -- its timer digits were 2.5x too narrow, found
+		// on a Godot capture. Across = (the phone's width = height * fasp), so divide the x offsets by fasp.
+		float kx = 1.0 / fasp;
+		vec2 q = vec2((fu.x - 0.055) / kx, (fu.y - 0.945));
 		float blink = step(0.35, fract(feedT));
 		if (blink > 0.5 && length(q) < 0.013) { col = mix(col, vec3(0.95, 0.12, 0.10), 0.95); }
 		float tsec = floor(mod(feedT, 60.0));
 		float tmin = floor(mod(feedT / 60.0, 10.0));
-		vec2 tp = vec2((fu.x - 0.085) / (0.030 * sc), (fu.y - 0.935) / 0.024);
+		vec2 tp = vec2((fu.x - 0.085) / (0.024 * kx), (fu.y - 0.935) / 0.024);
 		float ink = digit(tp, int(tmin));
 		ink = max(ink, step(length(vec2(tp.x - 0.85, tp.y - 0.30)), 0.07));   // the colon
 		ink = max(ink, step(length(vec2(tp.x - 0.85, tp.y - 0.72)), 0.07));

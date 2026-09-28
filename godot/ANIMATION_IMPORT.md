@@ -19,6 +19,13 @@ sampled frames each, landed within **5 micrometres** of the source (`godot/verif
 Every animation keys EVERY bone (rest pose held where the move is silent), so a move never inherits the
 last move's pose — the check found exactly that on the first export (an arm left in the air, 2.04 m out).
 
+**In Godot 4.7.2** (`demo/check_pose.gd` + `demo/check_pose_compare.py`): the files import with no error;
+posed at fixed frames, the hips, feet and the board land within 2 micrometres of the club engine and the
+board's nose axis exactly; the head and hands are off by up to 2.7 mm on one frame of the kickflip (the spine
+~0.05 degrees, one key step) -- NOT the import optimizer, the immutable-track removal, the bake rate or the
+quaternions (each A/B'd), cause not isolated, far below visible. Switching from one move to another never
+leaves a bone where the last move put it. The demo project's `.import` files already carry the loop modes.
+
 ## Import (Godot 4)
 
 1. Put the `.glb` in the project. Godot imports it as a scene: a `Skeleton3D` (+ the stick figure, and the

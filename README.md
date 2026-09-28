@@ -26,8 +26,8 @@ was paid for by a real failure, and most of them say which one.
 rules this engine was built by. `godot/` is the hand-off to a Godot 4 project:
 - `godot/animations/*.glb` — our skate moves (with the skateboard animated per trick) and other authored moves,
   on a Mixamo-named skeleton, verified in Blender to 5 micrometres; `godot/ANIMATION_IMPORT.md` to retarget them.
-- `godot/CAMERA_PORT.md` — every camera rig specified exactly, with a reference `club_camera.gd` and
-  `club_camera_post.gdshader` (translated from the C, not yet run in Godot) and a definition of done.
+- `godot/CAMERA_PORT.md` — every camera rig specified exactly; `club_camera.gd` + `club_camera_post.gdshader`
+  implement them, VERIFIED in Godot 4.7.2 — `godot/` is itself a Godot project: open it and press F5.
 - `skate_src/author/rpack2gltf.py` — export any pack's skeleton and authored clips to `.glb`.
 
 ## What is NOT here

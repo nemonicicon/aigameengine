@@ -16,7 +16,7 @@ instruments, and references. **No content** (characters, levels, audio) is inclu
 | task | read | then |
 |---|---|---|
 | use our skate moves and body moves | `godot/ANIMATION_IMPORT.md` | import `godot/animations/*.glb`, retarget with a `BoneMap` on `SkeletonProfileHumanoid`, set loop modes from the table, parent the real board under the `skateboard` node |
-| port the cameras (tripod, dolly/crane, track, pan, orbit, the hand-held phone, shake, fisheye, the phone-screen frame) | `godot/CAMERA_PORT.md` — exact math with line numbers into the C | start from `godot/club_camera.gd` + `godot/club_camera_post.gdshader`: a line-by-line translation of the C, ⛔ **never run in Godot** — prove it with the brief's section 5 before trusting it |
+| use the cameras (tripod, dolly/crane, track, pan, orbit, the hand-held phone, shake, fisheye, the phone-screen frame) | `godot/CAMERA_PORT.md` — exact math with line numbers into the C | `godot/club_camera.gd` + `godot/club_camera_post.gdshader`, **verified in Godot 4.7.2**: open `godot/` as a project and press F5 (`demo/main.gd` sets every rig up in code); `demo/score_rigs.py` re-measures them |
 | check a result | `godot/CAMERA_PORT.md` §5 | record with Godot's Movie Maker (`--write-movie out.avi --fixed-fps 60`), `ffmpeg -i out.avi out.mp4`, run `skate_src/robot_neko/mp4steps.py`, `heldiff.py`, `scenesheet.py`, `sfxcheck.py` on it — they read any mp4 |
 
 Suggested order: (1) import the animations and get `z_rm_sk_ride` looping on a character with the board
@@ -50,9 +50,9 @@ under her feet; (2) the tripod and the tracking lens; (3) the hand-held phone ri
 
 ## Paste-ready starter (for a chat assistant that cannot read the repo)
 
-> I'm porting camera rigs from a custom C engine to **Godot 4** (GDScript). Below is the exact spec
-> (CAMERA_PORT.md) and a reference translation (club_camera.gd, club_camera_post.gdshader) that has never
-> been run. Review the translation against the spec, fix anything that is wrong for Godot 4, then give me:
+> I'm using camera rigs ported from a custom C engine in **Godot 4** (GDScript). Below is the exact spec
+> (CAMERA_PORT.md) and the implementation (club_camera.gd, club_camera_post.gdshader), verified in Godot
+> 4.7.2 by a demo scene. Help me wire it into my own scene and characters, then give me:
 > a minimal test scene (a moving target on a path, a tripod, a tracking camera and a hand-held camera
 > parented to a `BoneAttachment3D`), and the steps to record it with Movie Maker at a fixed 60 fps so I
 > can check that the hand-held eye bobs while its aim lags, the tripod holds still, and the orbit arrives

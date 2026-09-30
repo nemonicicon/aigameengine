@@ -1,0 +1,55 @@
+# one_take -- ROBOT NEKO ep 15: ONE TAKE.
+# THE JOKE. The show got ported to Linux on a machine that has the engine and the tools and none of the
+# content: no street, no reva, no kaeli, no Holly's head, no skateboard (the baker drops a rigid mesh), and
+# no voice model (the proxy answers nothing) -- so the two characters that were MADE BY CODE, CLANKER and X3D,
+# do the episode on the club's bare floor in the scratch track. And on this branch the sim runs on whole
+# ticks with a receipt: every take is the same take. So when Clanker bails, there is no other tape.
+# KEYS: hmark/pmark, hpath=@route + hspd/hloop, htrick, dur= action lines, cam= pinned on EVERY line (ep 9),
+# step=12 for the talking, step=24 under the moving body, sfx at absolute seconds.
+# LEDGER APPLIED: ep 3 (a payoff the frame can show: the kickflip and the bail are in frame, pinned),
+# ep 6 (slot 1 cast explicitly, its clip benched on that body: z_rm_sk_film is x3d's own),
+# ep 9 (every line pinned; a walk takes time -> the ride lines carry dur), ep 11 (fast action on a finer step),
+# ep 12 (the register: dry, not sad -- a robot stating facts), the show rule (punchline and OUT).
+# ⛔ NOT the show's voice: espeak scratch (say_espeak.py). Re-speak with Kokoro and recompile where it exists.
+cast 0=clanker 1=x3d
+sfx 0.00 roll 0.10
+sfx 4.00 roll 0.10
+sfx 8.00 roll 0.10
+sfx 12.00 roll 0.10
+sfx 16.00 roll 0.10
+sfx 20.00 roll 0.10
+sfx 24.00 roll 0.10
+sfx 28.00 roll 0.10
+sfx 32.00 roll 0.10
+sfx 36.00 roll 0.10
+sfx 40.00 roll 0.10
+sfx 44.00 roll 0.10
+sfx 48.00 roll 0.10
+sfx 19.28 pop 0.55
+sfx 19.75 land 0.45
+sfx 50.60 roll 0.14
+sfx 55.45 land 0.50
+0 dur=4.0 step=24 tone=0.66 hmark=ride0 hpath=@loop hspd=2.4 hloop=1 hclip=z_rm_sk_ride pmark=film pclip=z_rm_sk_film cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Where's the street?
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | It didn't ship. The repository has the engine and the tools. Not the content.
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Where's reva?
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | Same folder as the street.
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Where's your board?
+0 step=24 htrick=z_rm_sk_kf@0.3 camtrack=0,5.0,1.6,90,50,1.1 | Same folder.
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Got it.
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | Was that the same kickflip as last time?
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Tick four thirty. Exact hash. Same kickflip.
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | So I can never land it differently.
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Not on this branch.
+1 cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 | Why do we sound like this?
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | The voice model lives on a drive that is not plugged into this machine. This is the scratch track.
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | You sound fine.
+0 step=24 camtrack=0,4.6,1.9,90,48,1.2 | I am a robot. I have always sounded like this.
+0 dur=4.0 step=24 hpath=@lane hspd=4.2 hloop=0 hclip=z_rm_sk_ride cam=8.0,1.3,-13.0,0.0,0.9,-13.0,46 |
+0 dur=2.6 step=24 hclip=z_rm_sk_bail cam=8.0,1.3,-13.0,3.5,0.9,-13.0,46 |
+1 step=12 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Got it.
+0 step=12 cam=8.0,1.3,-13.0,4.5,1.0,-13.0,40 | Replay the tape.
+1 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | Which one?
+0 cam=8.0,1.3,-13.0,4.5,1.0,-13.0,40 | The one where I stay on.
+1 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 | There is only one tape.
+1 dur=1.8 cam=3.6,3.0,-5.0,5.5,2.6,-8.4,40 |

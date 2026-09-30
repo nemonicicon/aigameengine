@@ -17,11 +17,12 @@ the episode's number and title on it.
   * AN END CARD, then everything is concatenated at the episode's own size and rate.
 """
 import argparse, glob, math, os, random, shutil, struct, subprocess, sys, tempfile, wave
+import shutil
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 W, H, FPS, SR = 1280, 720, 24, 48000
-FF = next(iter(glob.glob(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet",
-                                      "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)
+FF = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet",
+                                      "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
 
 
 def font(names, size):
@@ -177,7 +178,7 @@ def clip(tmp, name, dur, ep, title, seed, end, audio):
 
 def probe_fps(path):
     """the take's own frame rate, as an integer; None if it cannot be read"""
-    fp = os.path.join(os.path.dirname(FF), "ffprobe.exe") if FF else None
+    fp = shutil.which("ffprobe") or (os.path.join(os.path.dirname(FF), "ffprobe.exe") if FF else None)
     try:
         out = subprocess.run([fp, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
                               "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip()
@@ -189,7 +190,7 @@ def probe_fps(path):
 
 def probe_size(path):
     """the take's own width and height; None if it cannot be read (ROBOT NEKO ep 13)"""
-    fp = os.path.join(os.path.dirname(FF), "ffprobe.exe") if FF else None
+    fp = shutil.which("ffprobe") or (os.path.join(os.path.dirname(FF), "ffprobe.exe") if FF else None)
     try:
         out = subprocess.run([fp, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                               "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip()

@@ -30,6 +30,10 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
   ⛔ Without `stdbuf -o0` a piped log is block-buffered and ends at the kill with nothing in it.
 - Lab bench: `.claude/skills/run-reva/linux_lab.py <pack> <clip> <outdir>` — one body, the four lab cams,
   a PNG per angle. `driver.py` is still Windows-only (taskkill, crowd.exe).
+- A scene take: `.claude/skills/run-reva/linux_scene.py OUT.mp4 --name <scene> --subject <hero> --partner <pack>
+  --set <set> --seconds N --fps 8|60` — `driver.py scene`'s twin (REVA_SCENEFPS + REVA_FIXEDSTEP, the wav muxed).
+  Voices where Kokoro cannot exist: `scenes/say_espeak.py` (a SCRATCH TRACK, same contract, says so in the log).
+  ROBOT NEKO ep 15 (ONE TAKE) was shot entirely this way; its ledger rows are in the robot-neko skill.
 - ⛔ `holly.hlm` (the venue-screen head) is content: a missing one now logs `NO HEAD MODEL` and the floor
   runs with dark screens instead of dying in `load_model`.
 

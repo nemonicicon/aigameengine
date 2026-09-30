@@ -41,9 +41,9 @@ AUTHOR = os.path.join(ROOT, "skate_src", "author")
 PY = os.environ.get("CLUB_PYTHON", sys.executable)
 MINGW = r"C:\msys64\mingw64\bin"
 LF = chr(10)
-FFMPEG = next(iter(glob.glob(os.path.join(
+FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
     os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
-    "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)
+    "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
 
 SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
 LIBS = ["-Dmain=SDL_main", "-lmingw32", "-lSDL2main", "-lSDL2", "-lEGL", "-lGLESv2", "-lm"]

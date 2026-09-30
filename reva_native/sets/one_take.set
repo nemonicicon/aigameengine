@@ -1,0 +1,16 @@
+# one_take.set -- ROBOT NEKO ep 15 (ONE TAKE). The set that shipped: the club's own floor, no
+# street, no house, no park -- because none of them are in the repository. Two lights so the
+# bodies are not lit by the dark-room rig alone, a filming mark for x3d OUTSIDE the loop (take 1
+# ran the loop through her: 28 audit hits), a loop for clanker, a lane away from her for the bail.
+# Yaw, MEASURED on this build (two 3 s takes, ep 15): 0 faces -x, 90 faces -z, 180 faces +x, 270 faces +z.
+light  -3.0  3.2  -5.0   1.00 0.86 0.70   4.5  5.0
+light   4.0  2.6 -12.0   0.55 0.65 1.00   3.0  6.0
+mark  film     5.6  0  -8.5   300
+mark  ride0   -4.5  0  -8.0    90
+mark  ride1   -1.0  0 -12.5     0
+mark  ride2    3.5  0  -8.0   270
+mark  ride3   -1.0  0  -3.6   180
+mark  lane0   -3.5  0 -13.0   270
+mark  lane1    5.5  0 -13.0   270
+route loop ride0 ride1 ride2 ride3 ride0
+route lane lane0 lane1

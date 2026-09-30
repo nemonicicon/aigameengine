@@ -11,6 +11,7 @@ without an error. Input-side seeking (`-ss T -i file`) decodes forward from the 
 is frame-accurate on modern ffmpeg; that is what this uses.
 """
 import glob, os, shutil, subprocess, sys, tempfile
+import shutil
 from PIL import Image, ImageChops
 
 a = sys.argv[1:]
@@ -18,8 +19,8 @@ mp4 = a[0]
 times = [float(x) for x in a[1].split(",")]
 n = int(a[a.index("--n") + 1]) if "--n" in a else 12
 thr = int(a[a.index("--thr") + 1]) if "--thr" in a else 10
-FF = next(iter(glob.glob(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet",
-                                      "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))))
+FF = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet",
+                                      "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
 for t in times:
     d = tempfile.mkdtemp()
     subprocess.run([FF, "-y", "-ss", "%.3f" % t, "-i", mp4, "-frames:v", str(n), os.path.join(d, "f%03d.png")],

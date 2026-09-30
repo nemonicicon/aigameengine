@@ -40,6 +40,8 @@ jobs:
             test -s out/perturb$P/hash.txt
           done
           diff out/perturb85/hash.txt out/perturb170/hash.txt && echo "receipt: identical across fill bytes"
+          # the receipt itself, for comparing this runner against any other machine's run of the same command
+          cat out/perturb85/hash.txt
       - name: the frame is not black
         run: |
           python3 - <<'EOF'
@@ -58,3 +60,4 @@ jobs:
           path: |
             out/lab/*.png
             out/lab/engine.log
+            out/perturb85/hash.txt

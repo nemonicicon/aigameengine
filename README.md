@@ -87,7 +87,21 @@ python3 .claude/skills/run-reva/linux_lab.py reva_native/packs/v1_clanker.rpack 
 ```
 
 `REVA_SHOT`, `REVA_FIXEDSTEP` and the rest of the instruments work unchanged; `driver.py` is still the
-Windows driver. The Pi build (KMS/DRM, no SDL) is what you get without `-DREVA_SDL`.
+Windows driver.
+
+## Raspberry Pi 4
+
+`reva_native/build_pi.sh` builds both routes onto the Pi's glass (64-bit Raspberry Pi OS, `dtoverlay=vc4-kms-v3d`):
+
+- **`crowd_kms`** — the engine's original form: DRM master on the vc4 card, GBM/EGL, page-flips at the video
+  clock, the F310 on `/dev/input/js0`. No compositor and no desktop; this is the composite-CRT show. The card
+  is found at boot (`REVA_DRM=/dev/dri/cardN` pins it).
+- **`crowd_linux`** — the SDL platform, same binary as desktop Linux: keyboard and mouse, the select screens,
+  `REVA_SHOT` capture. On the Pi desktop it is a window; with no desktop, `SDL_VIDEODRIVER=kmsdrm` puts it
+  straight on the glass.
+
+Status: both compile and the SDL path renders (verified on x86, including with ARM's unsigned `char`); the
+KMS path has not been run on a Pi 4 since the 09-11 audio work, which had broken its build until now.
 
 ## Where to start reading
 

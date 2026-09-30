@@ -25,12 +25,16 @@
 #if defined(_WIN32) && !defined(REVA_SDL)
 #define REVA_SDL 1
 #endif
+#include <ctype.h>
+/* [pi 2026-09-30] SDL on EVERY platform: the audio mixer and the scene WAVs (09-11) are SDL audio,
+ * and were written while only the Windows build was being compiled -- the KMS build had been
+ * dead since then. On the Pi's KMS path SDL is initialised for AUDIO only; the glass stays DRM. */
+#include <SDL2/SDL.h>
 #ifdef REVA_SDL
 /* [win32 port 2026-08-21] The Pi presents by taking DRM master on card1 and page-flipping GBM
  * buffers. Windows has no KMS, so SDL2 supplies the window, the GLES2 context (via ANGLE) and
  * the gamepad. EGL/GLES2 headers stay common -- ANGLE ships both. The 251 GL calls and all the
  * scene logic are untouched; only ~45 lines of platform code differ. */
-#include <SDL2/SDL.h>
 #ifdef _WIN32
 #include <process.h>   /* _execv: the start menu's MAIN MENU relaunch */
 #include <direct.h>    /* _chdir: the PHOSPHOR grade-A handoff */
@@ -2561,6 +2565,8 @@ static void sfxListener(const float*eye,const float*ctr){
 static void sfxInit(void){
     if(getenv("REVA_NOAUDIO")){ printf("[sfx] REVA_NOAUDIO: no mixer\n"); return; }
     { const char*e=getenv("REVA_SFXDBG"); g_sfxDbg=(e&&e[0]!='0')?1:0; }
+    /* [pi] the KMS build never calls SDL_Init: the mixer owns its subsystem (refcounted, a no-op on SDL video builds) */
+    if(SDL_InitSubSystem(SDL_INIT_AUDIO)!=0){ printf("[sfx] SDL audio init FAILED: %s -- silent\n",SDL_GetError()); return; }
     SDL_AudioSpec want, have; memset(&want,0,sizeof want);
     want.freq=SFX_RATE; want.format=AUDIO_S16SYS; want.channels=2; want.samples=1024; want.callback=sfxCallback;
     g_mixDev=SDL_OpenAudioDevice(NULL,0,&want,&have,0);
@@ -13650,8 +13656,21 @@ int main(int argc,char**argv){
     { SDL_DisplayMode dm; if(!SDL_GetCurrentDisplayMode(g_disp,&dm))
         printf("display %d: %dx%d@%dHz -> drawable %dx%d\n",g_disp,dm.w,dm.h,dm.refresh_rate,W,H); }
 #else
-    /* KMS: card1 (vc4) -> Composite-1 */
-    int fd=open("/dev/dri/card1",O_RDWR|O_CLOEXEC); if(fd<0) die("open card1");
+    /* KMS: the card WITH A CONNECTOR. On a Pi 4 (vc4-kms-v3d) /dev/dri holds two cards -- v3d
+     * (render only, no connectors) and vc4 (the display) -- and which one is card0 depends on
+     * probe order, so "card1" was a guess that held on one board. REVA_DRM=/dev/dri/cardN pins it;
+     * otherwise every card is opened and the first one that reports a connector is the glass. */
+    int fd=-1;
+    { const char*ed=getenv("REVA_DRM"); char cp[64]; const char*tried[8]; int nt=0;
+      for(int ci=-1;ci<8&&fd<0;ci++){
+          if(ci<0){ if(!ed||!ed[0]) continue; snprintf(cp,sizeof cp,"%s",ed); }
+          else snprintf(cp,sizeof cp,"/dev/dri/card%d",ci);
+          int f=open(cp,O_RDWR|O_CLOEXEC); if(f<0) continue;
+          drmModeRes*r=drmModeGetResources(f);
+          if(r&&r->count_connectors>0){ fd=f; printf("drm: %s (%d connectors)\n",cp,r->count_connectors); }
+          else { if(nt<8) tried[nt++]=strdup(cp); close(f); }
+          if(r) drmModeFreeResources(r); }
+      if(fd<0){ fprintf(stderr,"drm: no card with a connector"); for(int i=0;i<nt;i++) fprintf(stderr,"%s %s",i?",":" (tried",tried[i]); fprintf(stderr,"%s\n",nt?")":""); die("open drm card"); } }
     drmSetMaster(fd);   /* labwc must be gone; if this fails we still try (first client may auto-master) */
     drmModeRes*res=drmModeGetResources(fd); if(!res) die("resources");
     drmModeConnector*conn=NULL;
@@ -13705,8 +13724,14 @@ int main(int argc,char**argv){
     for(int i=0;i<nc;i++){ EGLint id; eglGetConfigAttrib(dpy,cfgs[i],EGL_NATIVE_VISUAL_ID,&id);
         if(id==GBM_FORMAT_XRGB8888){ cfg=cfgs[i]; break; } }
     { EGLint dz=0; eglGetConfigAttrib(dpy,cfg,EGL_DEPTH_SIZE,&dz); printf("EGL depth bits: %d\n",dz); }
+    /* [pi] ES3 first: holly.c ships #version 300 es and a Pi 4's v3d speaks ES 3.1; the crowd's own
+     * ES2 shaders run unchanged on it (the Windows build has asked for 3 since 08-21). ES2 stays
+     * the floor for an older SoC, and the head then declines loudly instead of exit(1)ing. */
+    static const EGLint cx3[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};
     static const EGLint cx2[]={EGL_CONTEXT_CLIENT_VERSION,2,EGL_NONE};
-    EGLContext ctx=eglCreateContext(dpy,cfg,EGL_NO_CONTEXT,cx2); if(ctx==EGL_NO_CONTEXT) die("ctx");
+    EGLContext ctx=eglCreateContext(dpy,cfg,EGL_NO_CONTEXT,cx3);
+    if(ctx==EGL_NO_CONTEXT){ printf("EGL: no ES3 context -- ES2\n"); ctx=eglCreateContext(dpy,cfg,EGL_NO_CONTEXT,cx2); }
+    if(ctx==EGL_NO_CONTEXT) die("ctx");
     EGLSurface esurf=eglCreateWindowSurface(dpy,cfg,(EGLNativeWindowType)gsurf,NULL); if(esurf==EGL_NO_SURFACE) die("esurf");
     if(!eglMakeCurrent(dpy,esurf,esurf,ctx)) die("current");
 #endif
@@ -14916,7 +14941,12 @@ int main(int argc,char**argv){
         { /* mouse look grabs the cursor only once a key or the mouse has actually been
            * used, so a pad-only session never loses its pointer; the start menu lets go. */
           static int grabOK=-1; if(grabOK<0) grabOK=getenv("REVA_NOMOUSEGRAB")?0:1;
-          SDL_SetRelativeMouseMode((grabOK&&g_kbActive&&!g_pause)?SDL_TRUE:SDL_FALSE); }
+#ifdef REVA_SDL
+          SDL_SetRelativeMouseMode((grabOK&&g_kbActive&&!g_pause)?SDL_TRUE:SDL_FALSE);
+#else
+          (void)grabOK;
+#endif
+        }
         { static int aper=-2; static long aF=0;   /* REVA_AUTOA=<frames>: pulse the A button for the bench
            * (headless jump/swing/fire verification -- menus run before this loop, untouched) */
           if(aper==-2){ const char*e=getenv("REVA_AUTOA"); aper=e?atoi(e):0; }

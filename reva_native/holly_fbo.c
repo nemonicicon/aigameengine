@@ -38,6 +38,8 @@ int holly_fbo_init(int w, int h, const char *model_path) {
    * which took the whole club down on a checkout that has the engine and no head -- while every
    * caller already treats a failed init as "no screens tonight" (holly_fbo_texture()==0). Say it
    * loudly and let the floor run. */
+  { const char *gv = (const char *)glGetString(GL_VERSION);
+    if (!gv || !strstr(gv, "ES 3")) { fprintf(stderr, "[holly] ⛔ NEEDS AN ES3 CONTEXT, have '%s' -- venue screens stay dark\n", gv ? gv : "?"); return 0; } }
   { const char *mp = model_path ? model_path : "holly.hlm";
     FILE *probe = fopen(mp, "rb");
     if (!probe) { fprintf(stderr, "[holly] ⛔ NO HEAD MODEL: %s (%s) -- venue screens stay dark\n", mp, strerror(errno)); return 0; }

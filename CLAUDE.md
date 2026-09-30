@@ -32,6 +32,19 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
 - ⛔ `holly.hlm` (the venue-screen head) is content: a missing one now logs `NO HEAD MODEL` and the floor
   runs with dark screens instead of dying in `load_model`.
 
+## Build & run (Raspberry Pi 4, 2026-09-30)
+- `reva_native/build_pi.sh [kms|sdl|both]`. Two routes onto the glass from the same file: `crowd_kms` (the
+  original: DRM master, GBM page flips, js0 pad, the composite CRT) and `crowd_linux` (the SDL platform:
+  keyboard, select screens, `REVA_SHOT`; `SDL_VIDEODRIVER=kmsdrm` with no desktop). 64-bit OS,
+  `dtoverlay=vc4-kms-v3d`.
+- ⛔ The KMS path had been DEAD since 09-11: the audio mixer and scene WAVs are SDL audio and were only ever
+  compiled on Windows. SDL is now included on every platform; the KMS build inits it for AUDIO only.
+- The DRM card is FOUND (first card that reports a connector; `REVA_DRM=/dev/dri/cardN` pins it) — on a
+  Pi 4 v3d and vc4 are two cards and "card1" was a guess. The context is ES3 with an ES2 floor, because
+  holly's shaders are `#version 300 es` and its compiler `exit(1)`s; on ES2 the head now declines loudly.
+- ⛔ NOT YET RUN ON A PI. Verified here: both paths compile on x86, the SDL path renders, and a
+  `-funsigned-char` build (ARM's `char`) renders a pixel-identical frame. The rest waits for hardware.
+
 ## Headless verification instruments (env, all off by default)
 `REVA_FIXEDSTEP=<fps>` replaces wall time with one virtual step per rendered frame (and pins the crowd's
 seed) — it is what makes any capture comparable. `REVA_SHOT=<frame>` ARMS a capture (`REVA_SHOT_PATH`

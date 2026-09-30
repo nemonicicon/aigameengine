@@ -18,7 +18,7 @@ shot= to land. PPMs are converted to PNG beside them. LOOK AT THEM.
 import os, sys, time, subprocess, glob
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 NATIVE = os.path.join(ROOT, "reva_native")
-EXE = os.path.join(NATIVE, "crowd_linux")
+EXE = os.environ.get("REVA_LINUX_EXE") or os.path.join(NATIVE, "crowd_linux")   # an A/B build goes here
 
 def main():
     if len(sys.argv) < 4:

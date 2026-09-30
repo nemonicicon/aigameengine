@@ -1,0 +1,60 @@
+# this_morning -- ROBOT NEKO ep 16: SINCE THIS MORNING.
+# THE JOKE. Last episode they had fourteen skate clips and nothing else: they could not walk, wave or bow, and the
+# board had not shipped. This morning somebody wrote the rest in code (z_gest.py, z_walk.py) and found the board in
+# the baker. So they use ALL of it, on every line -- she shrugs at everything, he bows after everything -- until
+# she tells him to stop, and he bows. Punchline and OUT.
+# KEYS: hmark/pmark walked to (the engine's walk election takes w_walk), hpath=@lane + htrick with the board DRAWN,
+# hclip/pclip = the gesture set (loops: first == last), dur= action lines, cam= pinned on every line (ep 9).
+# LEDGER APPLIED: ep 15 (yaw measured, lenses clear of paths, heads aimed at measured height, audit on every take),
+# ep 3 (the payoff is in frame: the bows and the kickflip are pinned), ep 12 (register: dry facts).
+# ⛔ Voices: espeak scratch (say_espeak.py) -- re-speak with Kokoro and recompile where it exists.
+cast 0=clanker 1=x3d
+sfx 4.10 steps 0.35
+sfx 5.30 steps 0.35
+sfx 6.50 steps 0.35
+sfx 7.70 steps 0.35
+sfx 38.20 steps 0.35
+sfx 39.40 steps 0.35
+sfx 40.60 steps 0.35
+sfx 41.80 steps 0.35
+sfx 49.00 steps 0.35
+sfx 50.20 steps 0.35
+sfx 51.40 steps 0.35
+sfx 52.60 steps 0.35
+sfx 69.80 steps 0.35
+sfx 71.00 steps 0.35
+sfx 72.20 steps 0.35
+sfx 73.40 steps 0.35
+sfx 43.10 roll 0.14
+sfx 44.97 pop 0.55
+sfx 45.45 land 0.45
+0 dur=3.6 step=12 tone=0.66 snap=1 hmark=c0 hclip=z_idle pmark=x_in pclip=z_idle cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+1 dur=4.0 pmark=x0 pclip=z_idle cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+1 pclip=z_hello cam=0.2,2.4,-3.2,0.2,1.6,-8.5,40 | Hey.
+0 hclip=z_nod cam=0.2,2.4,-3.2,0.2,1.6,-8.5,40 | Hey.
+1 pclip=z_point cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | You walked here.
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | I walk now.
+1 pclip=z_shrug cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Since when?
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Since this morning. Somebody wrote it in code.
+1 pclip=z_think cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Why are you bowing?
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | That is also since this morning.
+1 pclip=z_no cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Stop it.
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Sorry.
+1 pclip=z_shrug cam=0.2,2.4,-3.2,0.2,1.6,-8.5,40 | Your board came back too.
+0 hclip=z_point cam=0.2,2.4,-3.2,0.2,1.6,-8.5,40 | It was in the same folder as the street.
+1 pclip=z_shrug cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Only the board came out.
+0 hclip=z_nod cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Then it is a board. Watch.
+0 dur=4.6 step=24 hmark=lane0 hclip=z_idle pclip=z_idle cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+0 dur=4.2 step=24 hpath=@lane hspd=3.8 hloop=0 hclip=z_rm_sk_ride htrick=z_rm_sk_kf@1.9 cam=6.2,1.2,-13.0,-1.0,0.9,-13.0,46 |
+1 step=12 pclip=z_point cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Got it.
+0 dur=5.0 hmark=c0 hclip=z_idle cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+1 pclip=z_think cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | That was the same kickflip as last time.
+0 hclip=z_no cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Last time there was no board.
+1 pclip=z_shrug cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | Then last time was a hop.
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | It was a kickflip without a board.
+1 pclip=z_no cam=-1.0,2.9,-6.0,1.6,2.5,-8.5,36 | That is a hop. And stop bowing.
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Sorry.
+1 dur=4.5 pmark=x_out pclip=z_idle cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 |
+1 pclip=z_shrug cam=0.5,3.0,0.5,0.5,1.0,-8.5,52 | I am keeping the hop.
+0 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 | Thank you.
+0 dur=1.6 hclip=z_bow cam=2.2,2.3,-5.2,-1.2,1.45,-8.5,48 |

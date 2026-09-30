@@ -47,6 +47,12 @@ Worked examples: `z_sk_ride.py` / `z_sk_board.py` (a skateboard ride with the bo
 rider's own clip: pop, kickflip, shove-it, manual, drop-in, bail, the catch-up pickup), `z_board*.py`,
 `z_hug.py`, `z_kiss.py`, `z_hi5.py`, `z_rm_cartwheel.py` (root motion: `z_rm_*` owns its root),
 `z_bow.py`, `z_armsup.py`, `z_breathe.py`, `z_tiptoe.py`. `bake_moves.sh` bakes them all.
+Over REST, for ANY rig the canon resolves (no base clip needed): `z_gest.py` (idle, hello, bow, point, shrug, nod,
+no, think -- the talking body's bank, every clip a loop) and `z_walk.py` (`w_walk`, a two-bone-IK walk cycle: the
+name the engine's walk election looks for, so `hmark=`/`pmark=` walk a body). Both bury a rigid `skateboard` node
+under the floor; the skate clips bring it back. Written for the code-built bodies (ROBOT NEKO ep 16).
+`glb2rpack_anim.py` keeps a RIGID mesh on an animated node (a skateboard on its own node) as a one-bone skinned
+mesh; `--norigid` restores the skinned-only bake.
 Also: `sliceclip.py` (cut a real LOOP out of a transition), `restclip.py`, `fingers.py`, `unbake.py`.
 
 ⛔ **A clip's name is not evidence**: a clip called `idle` was a 184-frame get-up and three elections

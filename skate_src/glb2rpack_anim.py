@@ -201,6 +201,7 @@ def main():
     ap.add_argument('--fps', type=float, default=30.0)
     ap.add_argument('--scale', type=float, default=1.0)
     ap.add_argument('--maxbones', type=int, default=MAXB)
+    ap.add_argument('--norigid', action='store_true', help='skip rigid meshes on animated nodes (the pre-09-30 behaviour)')
     ap.add_argument('--autoslice', action='store_true',
                     help='find the moves inside long reels automatically instead of being told where they are')
     ap.add_argument('--keepnames', action='store_true',
@@ -276,6 +277,44 @@ def main():
                           'verts': js['accessors'][att['POSITION']]['count']})
     if not prims:
         raise SystemExit('no skinned primitive found')
+    # ⭐ RIGID MESHES ON AN ANIMATED NODE (2026-09-30, ROBOT NEKO ep 15). The shipped characters carry
+    # their skateboard as a mesh on its own node -- no JOINTS_0, animated per trick by that node's
+    # translation/rotation channels. Skipped as "not skinned", both riders rode thin air for a whole
+    # episode. A rigid mesh IS a skinned mesh with one bone: its own node, weight 1.0, inverse bind =
+    # the inverse of the node's bind-pose world. Only nodes an animation actually moves qualify (the
+    # ground planes some GLBs carry stay out); --norigid keeps the old behaviour.
+    animNodes = set(ch['target'].get('node') for an in js.get('animations', []) for ch in an.get('channels', []))
+    if not a.norigid:
+        for mi, m in enumerate(js.get('meshes', [])):
+            for pi, prim in enumerate(m.get('primitives', [])):
+                att = prim.get('attributes', {})
+                if 'JOINTS_0' in att or 'POSITION' not in att:
+                    continue
+                node = next((ni for ni, nd in enumerate(nodes) if nd.get('mesh') == mi), -1)
+                if node < 0 or node not in animNodes:
+                    continue
+                nv = js['accessors'][att['POSITION']]['count']
+                # the node's bind-pose world, up the parent chain, and its inverse (numpy, like the rest of the kit)
+                import numpy as _np
+                def _trs(nd):
+                    if 'matrix' in nd:
+                        return _np.array(nd['matrix'], dtype=float).reshape(4, 4).T
+                    t = nd.get('translation', [0, 0, 0]); q = nd.get('rotation', [0, 0, 0, 1]); sc = nd.get('scale', [1, 1, 1])
+                    x, y, z, w = q
+                    R = _np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                                   [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                                   [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+                    M = _np.eye(4); M[:3, :3] = R * _np.array(sc)[None, :]; M[:3, 3] = t
+                    return M
+                W = _np.eye(4); n2 = node; guard = 0
+                while n2 >= 0 and guard < 128:
+                    W = _trs(nodes[n2]) @ W; n2 = parent[n2]; guard += 1
+                ibm = _np.linalg.inv(W).T.reshape(-1).tolist()      # column-major, like glTF
+                js.setdefault('skins', []).append({'joints': [node], 'inverseBindMatrices': None})
+                prims.append({'mi': mi, 'pi': pi, 'prim': prim, 'att': att, 'node': node,
+                              'skin': len(js['skins']) - 1, 'name': m.get('name', 'mesh%d' % mi), 'verts': nv,
+                              'ji': [0] * (4 * nv), 'jw': [1.0, 0.0, 0.0, 0.0] * nv, 'ibmList': ibm})
+                print('  rigid mesh %-20s on animated node %d (%s): one bone, weight 1' % (m.get('name', '?'), node, nodes[node].get('name', '?')))
     prims.sort(key=lambda q: -q['verts'])
 
     allJointNodes = set()
@@ -289,13 +328,14 @@ def main():
         att, prim = q['att'], q['prim']
         skin = js['skins'][q['skin']]
         joints = skin['joints']
-        ibm = (accessor(js, bin_, skin['inverseBindMatrices']) if 'inverseBindMatrices' in skin
+        ibm = (q['ibmList'] if 'ibmList' in q else
+               accessor(js, bin_, skin['inverseBindMatrices']) if skin.get('inverseBindMatrices') is not None
                else [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] * len(joints))
         pos = accessor(js, bin_, att['POSITION'])
         nrm = accessor(js, bin_, att['NORMAL']) if 'NORMAL' in att else None
         uv = accessor(js, bin_, att['TEXCOORD_0']) if 'TEXCOORD_0' in att else None
-        ji = accessor(js, bin_, att['JOINTS_0'])
-        jw = accessor(js, bin_, att['WEIGHTS_0'])
+        ji = q['ji'] if 'ji' in q else accessor(js, bin_, att['JOINTS_0'])
+        jw = q['jw'] if 'jw' in q else accessor(js, bin_, att['WEIGHTS_0'])
         idx = accessor(js, bin_, prim['indices']) if 'indices' in prim else list(range(len(pos) // 3))
         nv = len(pos) // 3
         if a.scale != 1.0:

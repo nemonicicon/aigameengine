@@ -15,5 +15,6 @@
 set -e
 cd "$(dirname "$0")"
 OUT=${1:-crowd_linux}
-gcc -O2 -DREVA_SDL -o "$OUT" crowd_kms.c holly_fbo.c -lSDL2 -lEGL -lGLESv2 -lm
+# -ffp-contract=off: no fused multiply-add, so the sim hash (REVA_SIMHASH) can agree between x86 and ARM
+gcc -O2 -ffp-contract=off -DREVA_SDL -o "$OUT" crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c -lSDL2 -lEGL -lGLESv2 -lm
 echo "built $OUT"

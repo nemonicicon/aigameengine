@@ -53,7 +53,19 @@
 #define STBI_ONLY_JPEG   /* cast expansion: the Fab GLBs ship JPEG basecolors */
 #include <stb/stb_image.h>
 #include <stb/stb_easy_font.h>
-#include "holly_fbo.h"   /* the head that goes on the venue screens */
+#include "holly_fbo.h"
+/* ---- THE DICE (2026-09-30) ---------------------------------------------------------------
+ * rand() is the C library's: glibc and msvcrt roll different sequences from the same seed, so
+ * a bench-seeded show on Windows and the same show on a Pi were never the same show. One
+ * 64-bit LCG (Knuth's MMIX constants), 31 bits out like rand(), identical on every platform.
+ * REVA_RAND=libc puts the library's back, for re-checking a capture blessed before this. */
+static unsigned long long g_dice=12345ull; static int g_diceLibc=-1;
+static void clubSrand(unsigned s){ if(g_diceLibc<0){ const char*e=getenv("REVA_RAND"); g_diceLibc=(e&&!strcmp(e,"libc"))?1:0; }
+    (srand)(s); g_dice=(unsigned long long)s*0x9E3779B97F4A7C15ull+0x2545F4914F6CDD1Dull; }
+static int clubRand(void){ if(g_diceLibc<0) clubSrand(1); if(g_diceLibc) return (rand)();
+    g_dice=g_dice*6364136223846793005ull+1442695040888963407ull; return (int)(g_dice>>33); }
+#define rand() clubRand()
+#define srand(s) clubSrand(s)   /* the head that goes on the venue screens */
 /* Mouth state. Fixed until the UDP receiver lands -- the same three floats the
  * native renderer already takes, so the wire format needs no design. */
 static float g_holly_open=0.45f, g_holly_wide=0.0f, g_holly_seal=0.0f;
@@ -109,29 +121,7 @@ static float frnd(void);
 static volatile int g_run=1;
 static void onsig(int s){ (void)s; g_run=0; }
 
-/* ---------- math (same as crowd_bench) ---------- */
-typedef float M4[16];
-static void m4_mul(M4 r,const M4 a,const M4 b){ M4 t; for(int c=0;c<4;c++)for(int rw=0;rw<4;rw++){ t[c*4+rw]=0; for(int k=0;k<4;k++) t[c*4+rw]+=a[k*4+rw]*b[c*4+k]; } memcpy(r,t,64); }
-static void m4_trs(M4 m,const float*t,const float*q,const float*s){
-    float x=q[0],y=q[1],z=q[2],w=q[3];
-    float xx=x*x,yy=y*y,zz=z*z,xy=x*y,xz=x*z,yz=y*z,wx=w*x,wy=w*y,wz=w*z;
-    m[0]=(1-2*(yy+zz))*s[0]; m[1]=(2*(xy+wz))*s[0]; m[2]=(2*(xz-wy))*s[0]; m[3]=0;
-    m[4]=(2*(xy-wz))*s[1]; m[5]=(1-2*(xx+zz))*s[1]; m[6]=(2*(yz+wx))*s[1]; m[7]=0;
-    m[8]=(2*(xz+wy))*s[2]; m[9]=(2*(yz-wx))*s[2]; m[10]=(1-2*(xx+yy))*s[2]; m[11]=0;
-    m[12]=t[0]; m[13]=t[1]; m[14]=t[2]; m[15]=1; }
-static void m4_persp(M4 m,float fovyDeg,float aspect,float zn,float zf){
-    float f=1.0f/tanf(fovyDeg*(float)M_PI/360.0f); memset(m,0,64);
-    m[0]=f/aspect; m[5]=f; m[10]=(zf+zn)/(zn-zf); m[11]=-1; m[14]=2*zf*zn/(zn-zf); }
-static void m4_lookat(M4 m,float ex,float ey,float ez,float cx,float cy,float cz){
-    float fz[3]={ex-cx,ey-cy,ez-cz}; float l=sqrtf(fz[0]*fz[0]+fz[1]*fz[1]+fz[2]*fz[2]); for(int i=0;i<3;i++)fz[i]/=l;
-    float up[3]={0,1,0};
-    float sx[3]={ up[1]*fz[2]-up[2]*fz[1], up[2]*fz[0]-up[0]*fz[2], up[0]*fz[1]-up[1]*fz[0] };
-    l=sqrtf(sx[0]*sx[0]+sx[1]*sx[1]+sx[2]*sx[2]); for(int i=0;i<3;i++)sx[i]/=l;
-    float uy[3]={ fz[1]*sx[2]-fz[2]*sx[1], fz[2]*sx[0]-fz[0]*sx[2], fz[0]*sx[1]-fz[1]*sx[0] };
-    m[0]=sx[0];m[1]=uy[0];m[2]=fz[0];m[3]=0; m[4]=sx[1];m[5]=uy[1];m[6]=fz[1];m[7]=0;
-    m[8]=sx[2];m[9]=uy[2];m[10]=fz[2];m[11]=0;
-    m[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); m[13]=-(uy[0]*ex+uy[1]*ey+uy[2]*ez); m[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); m[15]=1; }
-
+#include "club.h"   /* the 4x4s (club_math.c) and the mixer (club_audio.c): the split, stage 1 and 2 (2026-09-30) */
 /* ---------- rpack (RPK1 v2) ---------- */
 typedef struct { unsigned name; int parent; unsigned kind; float t[3],q[4],s[3]; } __attribute__((packed)) PNode;
 typedef struct { unsigned name,node,verts,idxCount,boneCount,flags,offPos,offNorm,offUV,offJoints,offWeights,offIdx,offBoneMap,offIBM,offBind; } PMesh;
@@ -534,6 +524,26 @@ static void die(const char*m){ fprintf(stderr,"FATAL: %s (egl 0x%x gl 0x%x)\n",m
  * regression, any A/B of two builds, and any "did my edit do that?" needs this on.
  * REVA_SCENEFPS already did it for the scene timeline alone; this generalises it. */
 static double g_fixedStepMs=-1.0, g_virtMs=0.0;
+/* ---- THE TICK (2026-09-30): the sim clock only ever moves by whole ticks ------------------
+ * The N64 lesson, as the recomp projects retell it: the game runs at its own fixed tick and
+ * the picture is whatever rate the glass can manage. Until now that was true only under
+ * REVA_FIXEDSTEP (a bench switch); the show ran on wall time, and the four per-frame physics
+ * steps used a constant 1/60 whatever the frame took -- so a Pi at 20 fps ran the actors at a
+ * third speed while their clips played at full. Now g_virtMs is THE clock: every frame it
+ * advances by k whole ticks (REVA_TICK=<hz>, default 60), k from the wall time owed, capped
+ * at TICK_MAX so a stall is not a debt, snapped to whole ticks against vsync jitter, and a
+ * display faster than the tick waits for the boundary rather than draw the same instant
+ * twice. The frame's sim step is simStepS() = k ticks. REVA_FIXEDSTEP is k=1 with the tick
+ * equal to the step, byte for byte what it was. ⛔ Render interpolation between ticks needs
+ * the sim/draw split (they are one loop today); a 60 Hz tick on a 60 Hz panel never shows it.
+ * The tick count since boot is the sim hash's frame number (REVA_SIMHASH). */
+static double g_tickMs=1000.0/60.0;
+static int    g_tickN=1;           /* ticks this frame, 1..TICK_MAX */
+static double g_tickAcc=0.0;       /* wall ms owed to the sim */
+static long   g_tickTotal=0;       /* ticks since boot */
+static double g_wallDt=1.0/60.0;   /* the frame's REAL seconds: the HUD fps and the ladder read this, never the sim */
+#define TICK_MAX 4
+static double wall_ms(void){ struct timespec ts; clock_gettime(CLOCK_MONOTONIC,&ts); return ts.tv_sec*1000.0+ts.tv_nsec/1e6; }
 /* ---- STOP MOTION: THE EXPOSURE CLOCK ------------------------------------------------
  * jacob, 08-28, on the talking faces: "it kinda looks like robot chicken... i kinda dig
  * it". design/stop_motion.md banked the recipe and named what it was missing: a step rate
@@ -574,11 +584,10 @@ static float  g_tone=0.f, g_toneCtl=0.f;
 static void clockInit(void){
     static int init=0; if(init) return; init=1;
     const char*e=getenv("REVA_FIXEDSTEP");
-    if(e&&atof(e)>0.0) g_fixedStepMs=1000.0/atof(e); }
-static double now_raw_ms(void){
-    clockInit();
-    if(g_fixedStepMs>0.0) return g_virtMs;
-    struct timespec ts; clock_gettime(CLOCK_MONOTONIC,&ts); return ts.tv_sec*1000.0+ts.tv_nsec/1e6; }
+    if(e&&atof(e)>0.0) g_fixedStepMs=1000.0/atof(e);
+    { const char*t=getenv("REVA_TICK"); if(t&&atof(t)>0.0) g_tickMs=1000.0/atof(t); }
+    if(g_fixedStepMs>0.0) g_tickMs=g_fixedStepMs;   /* a measured run: the tick IS the step */ }
+static double now_raw_ms(void){ clockInit(); return g_virtMs; }   /* whole ticks only; wall_ms() is the wall */
 static double now_ms(void){
     return (g_stepFps>0.f&&g_animMs>=0.0)?g_animMs:now_raw_ms(); }
 /* REVA_CLEAR=r,g,b -- override the stage backdrop. It exists for one test:
@@ -652,7 +661,71 @@ static void todApply(float h){
     if(g_sun[1]<0.06f){ g_sun[1]=0.06f;
         float l9=sqrtf(g_sun[0]*g_sun[0]+g_sun[1]*g_sun[1]+g_sun[2]*g_sun[2]);
         if(l9>1e-5f){ g_sun[0]/=l9; g_sun[1]/=l9; g_sun[2]/=l9; } } }
-static void clockTick(void){ if(g_fixedStepMs>0.0) g_virtMs+=g_fixedStepMs; }
+static void clockTick(void){
+    clockInit();
+    static double last=-1.0; double w=wall_ms(); if(last<0.0) last=w;
+    double d=w-last; last=w; g_wallDt=d*0.001;
+    if(g_fixedStepMs>0.0){ g_tickN=1; g_virtMs+=g_fixedStepMs; g_tickTotal++; return; }
+    for(int n=1;n<=TICK_MAX;n++) if(fabs(d-n*g_tickMs)<0.2*g_tickMs){ d=n*g_tickMs; break; }   /* vsync jitter is not time */
+    g_tickAcc+=d; if(g_tickAcc>TICK_MAX*g_tickMs) g_tickAcc=TICK_MAX*g_tickMs;
+    int k=(int)floor(g_tickAcc/g_tickMs);
+    if(k<1){ double rem=g_tickMs-g_tickAcc; struct timespec ts={0,(long)(rem*1e6)}; if(ts.tv_nsec>0) nanosleep(&ts,NULL);
+             last=wall_ms(); g_tickAcc=0.0; k=1; }
+    else g_tickAcc-=k*g_tickMs;
+    g_tickN=k; g_virtMs+=k*g_tickMs; g_tickTotal+=k; }
+static float simStepS(void){ return (float)(g_tickN*g_tickMs*0.001); }   /* the frame's sim step */
+/* ---- THE LADDER (2026-09-30): one build, from a Pi 4 to a desktop -----------------------------
+ * REVA_TIER=pi|low|mid|high|ultra|auto (default high: byte for byte what the club drew before).
+ * A tier is the render scale (the 3D rect inside the post target), the sun map size (boot only:
+ * the map is allocated once), bloom, FXAA and the cloth substeps. `auto` starts at high and
+ * MEASURES: a frame running over the tick by a third for ~45 frames steps down one rung; a frame
+ * finishing inside half the tick for 30 s steps up. Under REVA_FIXEDSTEP auto never moves -- a
+ * measured run is a measurement. design/platform_tiers.md has the Pi 4 numbers the rungs came
+ * from and what each rung asks of the fill rate. */
+typedef struct { const char*name; float rscale; int sunMap; float bloom; int fxaa; int clothSub; } Tier;
+static const Tier TIERS[]={
+    {"pi",   0.50f, 512, 0.00f,0,1},
+    {"low",  0.67f,1024, 0.00f,1,2},
+    {"mid",  0.85f,2048, 0.12f,1,4},
+    {"high", 1.00f,2048, 0.12f,1,4},
+    {"ultra",1.00f,4096, 0.12f,1,8}};
+#define TIER_N 5
+static int g_tier=3, g_tierAuto=0, g_clothSub=4, g_sunMap=2048; static double g_workMs=0.0;
+static void tierApply(int t,int boot);
+static void tierInit(void){
+    const char*e=getenv("REVA_TIER"); int t=3;
+    if(e&&e[0]){ if(!strcmp(e,"auto")){ g_tierAuto=1; t=3; }
+        else if(e[0]>='0'&&e[0]<='9') t=atoi(e);
+        else { t=-1; for(int i=0;i<TIER_N;i++) if(!strcmp(e,TIERS[i].name)) t=i;
+               if(t<0){ printf("[tier] REVA_TIER=%s is not a rung (pi low mid high ultra auto) -- high\n",e); t=3; } } }
+    if(t<0) t=0; if(t>=TIER_N) t=TIER_N-1;
+    tierApply(t,1); }
+static void tierAuto(void){
+    if(!g_tierAuto||g_fixedStepMs>0.0) return;
+    static int slow=0,fast=0,cool=0; double tick=g_tickMs;
+    if(g_wallDt*1000.0>tick*1.35) slow++; else slow=0;
+    if(g_workMs<tick*0.45) fast++; else fast=0;
+    if(cool>0) cool--;
+    if(slow>=45&&g_tier>0){ tierApply(g_tier-1,0); slow=0; fast=0; cool=1800; }
+    else if(fast>=1800&&!cool&&g_tier<TIER_N-1){ tierApply(g_tier+1,0); fast=0; } }
+/* ---- THE SIM HASH (2026-09-30): the cross-platform receipt --------------------------------
+ * Pixels differ between llvmpipe, v3d and ANGLE by rasterizer; simulation state need not. Each
+ * frame mixes what the sim decided -- the hero's world matrices after FK, her position and
+ * heading, every crowd slot's place and state -- into two FNV-1a hashes: EXACT (the float bits;
+ * a regression receipt on one machine) and COARSE (each float rounded to 1e-3 first; what two
+ * machines with different libm last bits can still agree on). REVA_SIMHASH=<every N frames>
+ * prints them; a REVA_SHOT frame always does. ⛔ FMA contraction changes the last bit between
+ * x86 and ARM: the build scripts pass -ffp-contract=off so the exact hash has a chance. */
+static unsigned long long g_shEx=0, g_shCo=0; static int g_shEvery=-1;
+static void simHashBegin(void){ g_shEx=g_shCo=1469598103934665603ull;
+    if(g_shEvery<0){ const char*e=getenv("REVA_SIMHASH"); g_shEvery=e?atoi(e):0; } }
+static void simHashMix(const float*f,unsigned n){
+    for(unsigned i=0;i<n;i++){ unsigned u; memcpy(&u,&f[i],4);
+        for(int b=0;b<4;b++){ g_shEx^=(u>>(8*b))&255u; g_shEx*=1099511628211ull; }
+        long q=lround((double)f[i]*1000.0); unsigned long long uq=(unsigned long long)q;
+        for(int b=0;b<8;b++){ g_shCo^=(uq>>(8*b))&255u; g_shCo*=1099511628211ull; } } }
+static void simHashPrint(const char*why){
+    printf("[simhash] tick %ld exact %016llx coarse %016llx (%s)\n",g_tickTotal,g_shEx,g_shCo,why); fflush(stdout); }
 /* THE EXPOSURE. Once per rendered frame, straight after clockTick(). Off, it tracks the raw
  * clock exactly, so switching stop motion on mid-take starts from NOW rather than from
  * wherever it was last left. On, it advances only by WHOLE steps -- floor, not round, so a
@@ -2262,39 +2335,7 @@ enum { MODE_DANCE=0, MODE_SKATE, MODE_BR, MODE_ARENA, MODE_RTS, MODE_SCOOT,
  * exit -- written to a temp and renamed so a crash mid-write cannot leave half a file.
  * REVA_NOSAVE=1 makes the bench blind to it: a regression shot must not depend on last
  * night, and the four strict shots stay bit-identical. */
-#define SAVE_MAX 256
-static char  g_svKey[SAVE_MAX][48], g_svVal[SAVE_MAX][96];
-static int   g_svN=0, g_svDirty=0, g_svOff=-1;
-static const char*SAVE_PATH="save/club.sav";
-static int saveOff(void){ if(g_svOff<0) g_svOff=getenv("REVA_NOSAVE")?1:0; return g_svOff; }
-static int saveFind(const char*k){ for(int i=0;i<g_svN;i++) if(!strcmp(g_svKey[i],k)) return i; return -1; }
-static const char*saveGetS(const char*k,const char*def){ int i=saveFind(k); return i<0?def:g_svVal[i]; }
-static long saveGetI(const char*k,long def){ int i=saveFind(k); return i<0?def:atol(g_svVal[i]); }
-static void saveSetS(const char*k,const char*v){
-    if(saveOff()) return;
-    int i=saveFind(k);
-    if(i<0){ if(g_svN>=SAVE_MAX){ printf("[save] %d keys -- SAVE_MAX is full, dropping %s\n",SAVE_MAX,k); return; }
-             i=g_svN++; snprintf(g_svKey[i],sizeof g_svKey[i],"%s",k); }
-    if(strcmp(g_svVal[i],v)){ snprintf(g_svVal[i],sizeof g_svVal[i],"%s",v); g_svDirty=1; } }
-static void saveSetI(const char*k,long v){ char b[32]; snprintf(b,sizeof b,"%ld",v); saveSetS(k,b); }
-static void saveLoad(void){
-    if(saveOff()){ printf("[save] REVA_NOSAVE: the club remembers nothing tonight\n"); return; }
-    FILE*f=fopen(SAVE_PATH,"r"); if(!f){ printf("[save] no %s yet -- first night\n",SAVE_PATH); return; }
-    char ln[160]; while(fgets(ln,sizeof ln,f)){
-        char*eq=strchr(ln,'='); if(!eq||ln[0]=='#') continue; *eq=0;
-        char*v=eq+1; size_t n=strlen(v); while(n&&(v[n-1]=='\n'||v[n-1]=='\r')) v[--n]=0;
-        if(g_svN<SAVE_MAX){ snprintf(g_svKey[g_svN],48,"%s",ln); snprintf(g_svVal[g_svN],96,"%s",v); g_svN++; } }
-    fclose(f); printf("[save] %d key(s) from %s\n",g_svN,SAVE_PATH); }
-static void saveFlush(void){
-    if(saveOff()||!g_svDirty) return;
-    /* temp + rename: a crash between open and close leaves LAST night's file, not half of
-     * tonight's. */
-    char tmp[64]; snprintf(tmp,sizeof tmp,"%s.tmp",SAVE_PATH);
-    FILE*f=fopen(tmp,"w"); if(!f){ printf("[save] cannot write %s\n",tmp); return; }
-    fprintf(f,"# THE CLUB -- what it remembers. key=value, one per line.\n");
-    for(int i=0;i<g_svN;i++) fprintf(f,"%s=%s\n",g_svKey[i],g_svVal[i]);
-    fclose(f); remove(SAVE_PATH); if(rename(tmp,SAVE_PATH)) printf("[save] rename failed\n");
-    g_svDirty=0; }
+/* the store itself (SAVE_MAX keys, saveGetS/I, saveSetS/I, saveLoad, saveFlush) is club_save.c since 2026-09-30 */
 /* a record for this door+variant: returns 1 if it is new, and remembers it */
 static int saveRecord(int mode,int variant,long score){
     char k[48]; snprintf(k,sizeof k,"door.%d.%d.best",mode,variant);
@@ -2370,7 +2411,6 @@ typedef struct {
     int wKind, wAmmo, wVar; float wCd;  /* THE WEAPON LAYER: the hero's carry (wVar = which mesh) */
 } Game;
 static Game GM;
-static int sfxPlay(const char*name,float gain,const float*pos,int loop);   /* the mixer (09-11), defined below */
 static void gmBanner(const char*s,float t){
     if(strcmp(GM.msg,s)) sfxPlay("banner",0.35f,NULL,0);   /* a NEW banner pings; a repeat does not */
     snprintf(GM.msg,sizeof GM.msg,"%s",s); GM.msgT=t; }
@@ -2472,109 +2512,7 @@ static int g_manual=0; static double g_inT=0; static float g_manAlt=0, g_manSpd=
  * and the hero draw read that, never the wish, so a mode the lens refuses stays third person. */
 static int g_fpv=0, g_fpvNow=0;
 
-/* ================= THE AUDIO MIXER (09-11) =========================================
- * The audit ranked "a runtime audio mixer" sixth: the engine had ZERO sound effects outside
- * a scene and played one queued wav; no door made a sound; Act V is entirely sound design.
- * One SDL device (44.1 kHz stereo s16), 32 voices mixed in float with a soft knee, a wav
- * bank loaded by NAME from scenes/sfx (foley.py / foley_game.py fill it), per-voice gain,
- * pan, loop, and an optional world position: distance attenuation and pan against the
- * listener the lens publishes every frame. The scene track is a voice on the same device
- * now (it used to open its own). A set can carry `sound <name> x y z [gain] [loop]` for an
- * ambience. ctl sfx=<name>[,<name>...] test-fires from the lab.
- *   REVA_NOAUDIO=1 opens nothing. REVA_SFXDBG=1 prints every play. ⭐ REVA_AUDIODUMP=<path>
- *   writes the mixed output as raw s16 stereo 44.1k -- the RECEIPT: audio cannot be seen in
- *   a PPM, so anim_bench/audiocheck.py reads the dump and counts the bursts. */
-#define SFX_BANK 64
-#define SFX_VOICES 32
-#define SFX_RATE 44100
-typedef struct { char name[32]; float*pcm; int n; int missing; } SfxClip;
-typedef struct { int clip; int pos; float gain,pan; int loop,on,spatial; float p[3]; int gen; } SfxVoice;
-static SfxClip g_sfx[SFX_BANK]; static int g_nSfx=0;
-static SfxVoice g_voice[SFX_VOICES]; static int g_voiceGen=1;
-static SDL_AudioDeviceID g_mixDev=0;
-static float g_lstE[3]={0,0,0}, g_lstR[3]={1,0,0};
-static FILE*g_mixDump=NULL; static long g_mixDumpFrames=0;
-static float g_sfxMaster=1.f; static int g_sfxDbg=0, g_sfxPlays=0;
-static void sfxCallback(void*ud,Uint8*stream,int len){
-    (void)ud; int frames=len/4; short*out=(short*)stream;
-    static float acc[8192*2]; if(frames>8192) frames=8192;
-    memset(acc,0,(size_t)frames*2*sizeof(float));
-    for(int v=0;v<SFX_VOICES;v++){ SfxVoice*V=&g_voice[v]; if(!V->on) continue;
-        SfxClip*C=&g_sfx[V->clip]; if(!C->pcm){ V->on=0; continue; }
-        float g=V->gain*g_sfxMaster, pan=V->pan;
-        if(V->spatial){ float dx=V->p[0]-g_lstE[0],dy=V->p[1]-g_lstE[1],dz=V->p[2]-g_lstE[2]; float d2=dx*dx+dy*dy+dz*dz;
-            g*=1.f/(1.f+d2*0.012f);                         /* about -6 dB at 9 units, -20 dB at 29 */
-            float dl=sqrtf(d2)+1e-3f; pan=(dx*g_lstR[0]+dz*g_lstR[2])/dl*0.8f; }
-        if(pan>1.f)pan=1.f; if(pan<-1.f)pan=-1.f;
-        float gl=g*sqrtf(0.5f*(1.f-pan)), gr=g*sqrtf(0.5f*(1.f+pan));
-        int p=V->pos;
-        for(int i=0;i<frames;i++){ if(p>=C->n){ if(V->loop) p=0; else { V->on=0; break; } }
-            float s=C->pcm[p++]; acc[i*2]+=s*gl; acc[i*2+1]+=s*gr; }
-        V->pos=p; }
-    for(int i=0;i<frames*2;i++){ float s=acc[i]; s=s/(1.f+fabsf(s)*0.35f); if(s>1.f)s=1.f; if(s<-1.f)s=-1.f; out[i]=(short)(s*32767.f); }
-    if(g_mixDump){ fwrite(out,4,(size_t)frames,g_mixDump); g_mixDumpFrames+=frames; fflush(g_mixDump); } }   /* flushed: a harness KILLS the engine */
-/* convert any wav to the mixer's float mono 44.1k; returns the bank slot or -1 */
-static int sfxBankFromWav(const char*name,Uint8*buf,Uint32 len,SDL_AudioSpec*spec){
-    SDL_AudioCVT cvt;
-    int r=SDL_BuildAudioCVT(&cvt,spec->format,spec->channels,spec->freq,AUDIO_F32SYS,1,SFX_RATE);
-    if(r<0){ printf("[sfx] %s: cannot convert (%s)\n",name,SDL_GetError()); return -1; }
-    Uint8*work=(Uint8*)malloc((size_t)len*(r?cvt.len_mult:1)+16); memcpy(work,buf,len);
-    int n;
-    if(r){ cvt.buf=work; cvt.len=(int)len; SDL_ConvertAudio(&cvt); n=cvt.len_cvt/4; }
-    else n=(int)len/4;
-    float*pcm=(float*)malloc((size_t)n*sizeof(float)); memcpy(pcm,work,(size_t)n*sizeof(float)); free(work);
-    int slot=-1; for(int i=0;i<g_nSfx;i++) if(!strcmp(g_sfx[i].name,name)){ slot=i; break; }
-    if(slot<0){ if(g_nSfx>=SFX_BANK){ printf("[sfx] bank FULL (%d) -- %s not loaded\n",SFX_BANK,name); free(pcm); return -1; } slot=g_nSfx++; }
-    if(g_mixDev) SDL_LockAudioDevice(g_mixDev);
-    if(g_sfx[slot].pcm) free(g_sfx[slot].pcm);
-    snprintf(g_sfx[slot].name,32,"%s",name); g_sfx[slot].pcm=pcm; g_sfx[slot].n=n; g_sfx[slot].missing=0;
-    if(g_mixDev) SDL_UnlockAudioDevice(g_mixDev);
-    return slot; }
-static int sfxLoad(const char*name){
-    for(int i=0;i<g_nSfx;i++) if(!strcmp(g_sfx[i].name,name)) return g_sfx[i].missing?-1:i;
-    char path[256]; snprintf(path,sizeof path,"scenes/sfx/%s.wav",name);
-    SDL_AudioSpec spec; Uint8*buf=NULL; Uint32 len=0;
-    if(!SDL_LoadWAV(path,&spec,&buf,&len)){
-        printf("[sfx] '%s' MISSING (%s) -- foley.py / foley_game.py make it\n",name,path);
-        if(g_nSfx<SFX_BANK){ snprintf(g_sfx[g_nSfx].name,32,"%s",name); g_sfx[g_nSfx].missing=1; g_nSfx++; }
-        return -1; }
-    int slot=sfxBankFromWav(name,buf,len,&spec); SDL_FreeWAV(buf);
-    if(slot>=0&&g_sfxDbg) printf("[sfx] loaded %s: %d samples\n",name,g_sfx[slot].n);
-    return slot; }
-static int sfxPlaySlot(int slot,float gain,const float*pos,int loop){
-    if(slot<0||!g_mixDev) return -1;
-    int v=-1; for(int i=0;i<SFX_VOICES;i++) if(!g_voice[i].on){ v=i; break; }
-    if(v<0){ int best=0; for(int i=1;i<SFX_VOICES;i++) if(!g_voice[i].loop&&g_voice[i].pos>g_voice[best].pos) best=i; v=best; }
-    SDL_LockAudioDevice(g_mixDev);
-    SfxVoice*V=&g_voice[v]; V->clip=slot; V->pos=0; V->gain=gain; V->pan=0.f; V->loop=loop; V->on=1;
-    V->spatial=(pos!=NULL); if(pos){ V->p[0]=pos[0]; V->p[1]=pos[1]; V->p[2]=pos[2]; }
-    V->gen=g_voiceGen++;
-    SDL_UnlockAudioDevice(g_mixDev);
-    g_sfxPlays++;
-    if(g_sfxDbg){ printf("[sfx] play %s gain %.2f%s\n",g_sfx[slot].name,gain,pos?" (spatial)":""); fflush(stdout); }
-    return (v<<16)|(V->gen&0xffff); }
-static int sfxPlay(const char*name,float gain,const float*pos,int loop){ return sfxPlaySlot(sfxLoad(name),gain,pos,loop); }
-static void sfxStop(int id){ if(id<0||!g_mixDev) return; int v=id>>16; if(v<0||v>=SFX_VOICES) return;
-    SDL_LockAudioDevice(g_mixDev); if((g_voice[v].gen&0xffff)==(id&0xffff)) g_voice[v].on=0; SDL_UnlockAudioDevice(g_mixDev); }
-static void sfxListener(const float*eye,const float*ctr){
-    float fx=ctr[0]-eye[0], fz=ctr[2]-eye[2], fl=sqrtf(fx*fx+fz*fz); if(fl<1e-4f) return;
-    if(g_mixDev) SDL_LockAudioDevice(g_mixDev);
-    g_lstE[0]=eye[0]; g_lstE[1]=eye[1]; g_lstE[2]=eye[2];
-    g_lstR[0]=fz/fl; g_lstR[1]=0.f; g_lstR[2]=-fx/fl;      /* right = forward x up */
-    if(g_mixDev) SDL_UnlockAudioDevice(g_mixDev); }
-static void sfxInit(void){
-    if(getenv("REVA_NOAUDIO")){ printf("[sfx] REVA_NOAUDIO: no mixer\n"); return; }
-    { const char*e=getenv("REVA_SFXDBG"); g_sfxDbg=(e&&e[0]!='0')?1:0; }
-    /* [pi] the KMS build never calls SDL_Init: the mixer owns its subsystem (refcounted, a no-op on SDL video builds) */
-    if(SDL_InitSubSystem(SDL_INIT_AUDIO)!=0){ printf("[sfx] SDL audio init FAILED: %s -- silent\n",SDL_GetError()); return; }
-    SDL_AudioSpec want, have; memset(&want,0,sizeof want);
-    want.freq=SFX_RATE; want.format=AUDIO_S16SYS; want.channels=2; want.samples=1024; want.callback=sfxCallback;
-    g_mixDev=SDL_OpenAudioDevice(NULL,0,&want,&have,0);
-    if(!g_mixDev){ printf("[sfx] mixer device FAILED: %s -- silent\n",SDL_GetError()); return; }
-    { const char*d=getenv("REVA_AUDIODUMP"); if(d&&d[0]){ g_mixDump=fopen(d,"wb"); if(!g_mixDump) printf("[sfx] dump FAILED to open %s\n",d); } }
-    SDL_PauseAudioDevice(g_mixDev,0);
-    printf("[sfx] mixer %d Hz stereo, %d voices%s\n",have.freq,SFX_VOICES,g_mixDump?" (dumping raw s16)":""); fflush(stdout); }
-
+/* ================= THE AUDIO MIXER (09-11) lives in club_audio.c since 2026-09-30 ==================== */
 /* ================= THE POST PASS (09-11) ==========================================
  * The audit ranked "a post pass" fifth for the game and the film alike: the club had no
  * bloom, no anti-aliasing and no fog, the tone knee lived in two mesh shaders (and not the
@@ -2603,6 +2541,22 @@ static int   g_postOn=0;                    /* the decision for THIS frame */
  * saturated pixels bloom: 0.12 over 0.95. (An HDR buffer is what separates "bright" from
  * "white"; EXT_color_buffer_half_float is present when that day comes.) */
 static float g_bloom=0.12f; static int g_fxaa=1; static float g_bloomThr=0.95f, g_postKnee=0.70f;
+/* ---- RENDER SCALE (2026-09-30): the ladder's biggest rung ------------------------------------
+ * A Pi 4 is fill-bound: its GPU shades about a gigapixel a second in practice, and 720p with a
+ * shadow pass and a post pass is three screens a frame. So the 3D frame is drawn into a SUB-RECT
+ * of the post target (g_rW x g_rH = g_rscale of the screen) and the post quad, which already
+ * runs once over every pixel, upsamples it: no second target, no reallocation, changeable
+ * every frame. Every fetch in the two post shaders goes through fetch(): uv*uvs, clamped to
+ * the rect. The anim lab (mode ANIM) is an instrument and always draws at 1:1; its multi-cam
+ * grid is laid out in screen pixels and would land off the rect. */
+static float g_rscale=1.f; static int g_rW=0,g_rH=0,g_rsOn=0; static GLint g_pu_uvs=-1,g_bu_uvs=-1;
+static void tierApply(int t,int boot){
+    const Tier*T=&TIERS[t]; g_tier=t;
+    g_rscale=T->rscale; g_bloom=T->bloom; g_fxaa=T->fxaa; g_clothSub=T->clothSub;
+    if(boot) g_sunMap=T->sunMap;
+    printf("[tier] %s: render %.0f%%, sun map %d%s, bloom %.2f, fxaa %d, cloth x%d%s\n",T->name,T->rscale*100.f,
+           boot?T->sunMap:g_sunMap,boot?"":" (boot only)",T->bloom,T->fxaa,T->clothSub,g_tierAuto?"  [auto]":""); fflush(stdout); }
+#define MAINVIEW(W,H) glViewport(0,0,(g_mainFB&&g_mainFB==g_postFbo)?g_rW:(W),(g_mainFB&&g_mainFB==g_postFbo)?g_rH:(H))
 static float g_fish=0.f;      /* ⭐ 0 = the lens we had, 1 = a full equidistant fisheye; ~0.6 is the VX look */
 static float g_tape=0.f;      /* ⭐ the tape frame: 4:3 pillarbox, vignette, grain, a REC dot */
 static int   g_camHoldSlot=-1;   /* ⭐ the slot whose camera this shot is coming from: never drawn */
@@ -2646,9 +2600,10 @@ static void postInit(int W,int H){
     const char*vsQ="attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.0,1.0); }\n";
     /* threshold + 9-tap gaussian along dir (px units). thr>0 only on the first (downsample) pass. */
     const char*fsB=
-      "precision mediump float; varying vec2 uv; uniform sampler2D tex; uniform vec2 px; uniform vec2 dir; uniform float thr;\n"
+      "precision mediump float; varying vec2 uv; uniform sampler2D tex; uniform vec2 px; uniform vec2 dir; uniform float thr; uniform vec2 uvs;\n"
+      "vec3 fetch(sampler2D t,vec2 q){ return texture2D(t,min(q,vec2(1.0))*uvs).rgb; }\n"
       "void main(){ float w[5]; w[0]=0.227; w[1]=0.194; w[2]=0.121; w[3]=0.054; w[4]=0.016; vec3 c=vec3(0.0);\n"
-      "  for(int i=-4;i<=4;i++){ vec3 s=texture2D(tex,uv+dir*px*float(i)).rgb;\n"
+      "  for(int i=-4;i<=4;i++){ vec3 s=fetch(tex,uv+dir*px*float(i));\n"
       "    if(thr>0.0) s=max(s-vec3(thr),vec3(0.0))/(1.0-thr);\n"
       "    c+=s*w[i<0?-i:i]; }\n"
       "  gl_FragColor=vec4(c,1.0); }\n";
@@ -2656,7 +2611,8 @@ static void postInit(int W,int H){
     const char*fsP=
       "precision mediump float; varying vec2 uv; uniform sampler2D tex; uniform sampler2D blm; uniform vec2 px;\n"
       "uniform float tone; uniform float bloom; uniform float fxaa; uniform float fish; uniform float asp; uniform float tht;\n"
-      "uniform float feed; uniform float feedT;\n"
+      "uniform float feed; uniform float feedT; uniform vec2 uvs;\n"
+      "vec3 fetch(sampler2D t,vec2 q){ return texture2D(t,min(q,vec2(1.0))*uvs).rgb; }\n"
       "float fhash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n"
       "float luma(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }\n"
       /* \u2b50 THE FISHEYE, as a projection and not a polynomial: the radius on the frame is the ANGLE off the
@@ -2697,20 +2653,20 @@ static void postInit(int W,int H){
       "    fu=vec2(dx+0.5,uv.y); }\n"
       "  vec2 fw=warpA(fu,fasp);\n"
       "  vec2 uvw=vec2(0.5+(fw.x-0.5)*wf,fw.y);\n"
-      "  vec3 col=texture2D(tex,uvw).rgb;\n"
+      "  vec3 col=fetch(tex,uvw);\n"
       "  if(fxaa>0.5){\n"
-      "    vec3 nw=texture2D(tex,uvw+vec2(-1.0,-1.0)*px).rgb, ne=texture2D(tex,uvw+vec2(1.0,-1.0)*px).rgb;\n"
-      "    vec3 sw=texture2D(tex,uvw+vec2(-1.0,1.0)*px).rgb,  se=texture2D(tex,uvw+vec2(1.0,1.0)*px).rgb;\n"
+      "    vec3 nw=fetch(tex,uvw+vec2(-1.0,-1.0)*px), ne=fetch(tex,uvw+vec2(1.0,-1.0)*px);\n"
+      "    vec3 sw=fetch(tex,uvw+vec2(-1.0,1.0)*px),  se=fetch(tex,uvw+vec2(1.0,1.0)*px);\n"
       "    float lnw=luma(nw),lne=luma(ne),lsw=luma(sw),lse=luma(se),lm=luma(col);\n"
       "    float lmin=min(lm,min(min(lnw,lne),min(lsw,lse))), lmax=max(lm,max(max(lnw,lne),max(lsw,lse)));\n"
       "    vec2 d=vec2(-((lnw+lne)-(lsw+lse)),((lnw+lsw)-(lne+lse)));\n"
       "    float dr=max((lnw+lne+lsw+lse)*(0.25*0.125),1.0/128.0);\n"
       "    float rd=1.0/(min(abs(d.x),abs(d.y))+dr);\n"
       "    d=min(vec2(8.0),max(vec2(-8.0),d*rd))*px;\n"
-      "    vec3 a=0.5*(texture2D(tex,uvw+d*(1.0/3.0-0.5)).rgb+texture2D(tex,uvw+d*(2.0/3.0-0.5)).rgb);\n"
-      "    vec3 b=a*0.5+0.25*(texture2D(tex,uvw+d*-0.5).rgb+texture2D(tex,uvw+d*0.5).rgb);\n"
+      "    vec3 a=0.5*(fetch(tex,uvw+d*(1.0/3.0-0.5))+fetch(tex,uvw+d*(2.0/3.0-0.5)));\n"
+      "    vec3 b=a*0.5+0.25*(fetch(tex,uvw+d*-0.5)+fetch(tex,uvw+d*0.5));\n"
       "    float lb=luma(b); col=(lb<lmin||lb>lmax)?a:b; }\n"
-      "  col+=texture2D(blm,uvw).rgb*bloom;\n"
+      "  col+=fetch(blm,uvw)*bloom;\n"
       /* ⛔ THE KNEE IS ON LUMINANCE HERE, NOT PER CHANNEL. The mesh shaders' per-channel knee
        * (the film's, measured on faces) rolls a lawn's green alone and leaves its red and blue
        * -- a saturated bright colour comes out grey. Rolling the luminance and scaling the
@@ -2758,13 +2714,13 @@ static void postInit(int W,int H){
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     GLuint p=glCreateProgram(); glAttachShader(p,sh(GL_VERTEX_SHADER,vsQ)); glAttachShader(p,sh(GL_FRAGMENT_SHADER,fsP));
     glBindAttribLocation(p,0,"p"); glLinkProgram(p); { GLint ok; glGetProgramiv(p,GL_LINK_STATUS,&ok); if(!ok) die("post link"); }
-    g_postProg=p; g_pu_tex=glGetUniformLocation(p,"tex"); g_pu_blm=glGetUniformLocation(p,"blm"); g_pu_px=glGetUniformLocation(p,"px");
+    g_postProg=p; g_pu_tex=glGetUniformLocation(p,"tex"); g_pu_blm=glGetUniformLocation(p,"blm"); g_pu_px=glGetUniformLocation(p,"px"); g_pu_uvs=glGetUniformLocation(p,"uvs");
     g_pu_tone=glGetUniformLocation(p,"tone"); g_pu_bloom=glGetUniformLocation(p,"bloom"); g_pu_fxaa=glGetUniformLocation(p,"fxaa");
     g_pu_fish=glGetUniformLocation(p,"fish"); g_pu_asp=glGetUniformLocation(p,"asp"); g_pu_tht=glGetUniformLocation(p,"tht");
     g_pu_feed=glGetUniformLocation(p,"feed"); g_pu_feedT=glGetUniformLocation(p,"feedT");
     GLuint b=glCreateProgram(); glAttachShader(b,sh(GL_VERTEX_SHADER,vsQ)); glAttachShader(b,sh(GL_FRAGMENT_SHADER,fsB));
     glBindAttribLocation(b,0,"p"); glLinkProgram(b); { GLint ok; glGetProgramiv(b,GL_LINK_STATUS,&ok); if(!ok) die("blur link"); }
-    g_blurProg=b; g_bu_tex=glGetUniformLocation(b,"tex"); g_bu_px=glGetUniformLocation(b,"px"); g_bu_dir=glGetUniformLocation(b,"dir"); g_bu_thr=glGetUniformLocation(b,"thr");
+    g_blurProg=b; g_bu_tex=glGetUniformLocation(b,"tex"); g_bu_px=glGetUniformLocation(b,"px"); g_bu_uvs=glGetUniformLocation(b,"uvs"); g_bu_dir=glGetUniformLocation(b,"dir"); g_bu_thr=glGetUniformLocation(b,"thr");
     static const float q[12]={-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1};
     glGenBuffers(1,&g_postVbo); glBindBuffer(GL_ARRAY_BUFFER,g_postVbo); glBufferData(GL_ARRAY_BUFFER,sizeof q,q,GL_STATIC_DRAW);
     { const char*e; if((e=getenv("REVA_FEED"))&&e[0]){ g_tape=(float)atoi(e); if(g_tape<0.f)g_tape=0.f; if(g_tape>2.f)g_tape=2.f; if(g_tape>0.f) g_post=1; printf("[feed] %s (REVA_FEED)\n",(g_tape>0.f)?"ON":"off"); }
@@ -2782,20 +2738,24 @@ static void postQuad(void){ glBindBuffer(GL_ARRAY_BUFFER,g_postVbo); glEnableVer
 /* the decision for this frame, made once at the top of it so every uniform upload agrees */
 static void postDecide(int mode,int modeAnim){
     int want=(g_post>=0)?g_post:(mode!=modeAnim);
+    g_rsOn=(g_rscale<0.999f&&mode!=modeAnim&&g_postFbo)?1:0; if(g_rsOn) want=1;   /* the post quad IS the upsampler */
+    g_rW=g_rsOn?(int)(g_postW*g_rscale+0.5f):g_postW; g_rH=g_rsOn?(int)(g_postH*g_rscale+0.5f):g_postH;
+    if(g_rW<64) g_rW=64; if(g_rH<64) g_rH=64;
     g_postOn=(want&&g_postFbo)?1:0;
     static int said=-1; if(said!=g_postOn){ said=g_postOn; printf("[post] %s\n",g_postOn?"ON: bloom + fxaa + tone in one pass":"off"); fflush(stdout); } }
 static void postBegin(int W,int H){ if(!g_postOn){ g_mainFB=0; return; }
-    g_mainFB=g_postFbo; glBindFramebuffer(GL_FRAMEBUFFER,g_postFbo); glViewport(0,0,W,H); }
+    g_mainFB=g_postFbo; glBindFramebuffer(GL_FRAMEBUFFER,g_postFbo); glViewport(0,0,g_rW,g_rH); (void)W; (void)H; }
 static void postEnd(int W,int H,float tone){ if(!g_postOn) return;
     glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
     glActiveTexture(GL_TEXTURE0);
-    if(g_bloom>0.f){ glUseProgram(g_blurProg); glUniform1i(g_bu_tex,0);
+    float rs=g_rsOn?g_rscale:1.f; int bW=(int)(g_blmW*rs+0.5f), bH=(int)(g_blmH*rs+0.5f); if(bW<16) bW=16; if(bH<16) bH=16;
+    if(g_bloom>0.f){ glUseProgram(g_blurProg); glUniform1i(g_bu_tex,0); if(g_bu_uvs>=0) glUniform2f(g_bu_uvs,rs,rs);
         /* pass 1: threshold + horizontal blur, full -> quarter */
-        glBindFramebuffer(GL_FRAMEBUFFER,g_blmFbo[0]); glViewport(0,0,g_blmW,g_blmH);
-        glBindTexture(GL_TEXTURE_2D,g_postTex); glUniform2f(g_bu_px,1.f/W,1.f/H); glUniform2f(g_bu_dir,2.f,0.f); glUniform1f(g_bu_thr,g_bloomThr); postQuad();
+        glBindFramebuffer(GL_FRAMEBUFFER,g_blmFbo[0]); glViewport(0,0,bW,bH);
+        glBindTexture(GL_TEXTURE_2D,g_postTex); glUniform2f(g_bu_px,1.f/g_rW,1.f/g_rH); glUniform2f(g_bu_dir,2.f,0.f); glUniform1f(g_bu_thr,g_bloomThr); postQuad();
         /* pass 2: vertical blur, quarter -> quarter */
         glBindFramebuffer(GL_FRAMEBUFFER,g_blmFbo[1]);
-        glBindTexture(GL_TEXTURE_2D,g_blmTex[0]); glUniform2f(g_bu_px,1.f/g_blmW,1.f/g_blmH); glUniform2f(g_bu_dir,0.f,1.f); glUniform1f(g_bu_thr,0.f); postQuad();
+        glBindTexture(GL_TEXTURE_2D,g_blmTex[0]); glUniform2f(g_bu_px,1.f/bW,1.f/bH); glUniform2f(g_bu_dir,0.f,1.f); glUniform1f(g_bu_thr,0.f); postQuad();
         /* pass 3: horizontal again, wider (the quarter-res taps are 4 screen px each) */
         glBindFramebuffer(GL_FRAMEBUFFER,g_blmFbo[0]);
         glBindTexture(GL_TEXTURE_2D,g_blmTex[1]); glUniform2f(g_bu_dir,1.f,0.f); postQuad(); }
@@ -2803,7 +2763,7 @@ static void postEnd(int W,int H,float tone){ if(!g_postOn) return;
     glUseProgram(g_postProg); glUniform1i(g_pu_tex,0); glUniform1i(g_pu_blm,1);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,g_bloom>0.f?g_blmTex[0]:g_postTex);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_postTex);
-    glUniform2f(g_pu_px,1.f/W,1.f/H); glUniform1f(g_pu_tone,tone>0.f?tone:g_postKnee); glUniform1f(g_pu_bloom,g_bloom>0.f?g_bloom:0.f); glUniform1f(g_pu_fxaa,(float)g_fxaa);
+    glUniform2f(g_pu_px,1.f/g_rW,1.f/g_rH); if(g_pu_uvs>=0) glUniform2f(g_pu_uvs,rs,rs); glUniform1f(g_pu_tone,tone>0.f?tone:g_postKnee); glUniform1f(g_pu_bloom,g_bloom>0.f?g_bloom:0.f); glUniform1f(g_pu_fxaa,(float)g_fxaa);
     glUniform1f(g_pu_fish,(g_fishTh>0.f)?g_fish:0.f); glUniform1f(g_pu_asp,(H>0)?((float)W/(float)H):1.777f);
     glUniform1f(g_pu_tht,(g_fishTh>0.f)?g_fishTh:0.8f);
     g_tapeT+=(float)g_animDtS; if(g_tapeT>1e6f) g_tapeT=0.f;
@@ -3110,7 +3070,7 @@ static const char* charSelect(SDL_Window*win,int W,int H){
       e=getenv("REVA_AUTOPICK"); if(e) autoPick=atol(e); }
     double t0=now_ms(), tPrev=t0;
     printf("CHARACTER SELECT: %d on the stage\n",nc);
-    while(done<0&&g_run){
+    while(done<0&&g_run){ if(g_fixedStepMs<=0.0) clockTick();
         clockTick();
         double tn=now_ms(), tsec=(tn-t0)/1000.0; float dt=(float)((tn-tPrev)/1000.0); tPrev=tn;
         if(dt>0.1f) dt=0.1f;
@@ -3269,7 +3229,7 @@ static int modeSelect(SDL_Window*win,int W,int H){
       e=getenv("REVA_AUTOMODE"); if(e) autoMode=atol(e); }
     double t0=now_ms(), tPrev=t0;
     printf("GAME MODE SELECT: %d doors\n",MODE_N);
-    while(done<0&&g_run){
+    while(done<0&&g_run){ if(g_fixedStepMs<=0.0) clockTick();
             clockTick();
         double tn=now_ms(), tsec=(tn-t0)/1000.0; float dt=(float)((tn-tPrev)/1000.0); tPrev=tn;
         if(dt>0.1f) dt=0.1f; (void)dt; fno++;
@@ -3354,7 +3314,7 @@ static int modeSelect(SDL_Window*win,int W,int H){
         int nv=0; while(nv<4&&MODE_VAR[done][nv]) nv++;
         long autoVar=-1; { const char*e=getenv("REVA_AUTOVAR"); if(e) autoVar=atol(e); }
         int sel2=0, done2=-1, dyP2=0, aP2=1, bP2=1, stP2=1; long fno2=0;
-        while(done2<-0.5&&g_run){
+        while(done2<-0.5&&g_run){ if(g_fixedStepMs<=0.0) clockTick();
             clockTick();
             double tn=now_ms(), tsec=(tn-t0)/1000.0; tPrev=tn; fno2++;
             jsPoll(tsec); kbPoll(tsec);   /* W/S pick, SPACE confirms, E backs out */
@@ -4841,9 +4801,9 @@ static void sclConstrain(SetCloth*S,int i,int j,float rest,float alphaT,float*la
  * paper's whole point is that those are not the same thing. */
 static void sclStep(SetCloth*S,float dtFull){
     if(dtFull>0.033f) dtFull=0.033f; if(dtFull<1e-4f) dtFull=1e-4f;
-    static int NSUB=-1;
-    if(NSUB<0){ const char*e=getenv("REVA_CLOTHITER"); NSUB=e?atoi(e):4;
-                if(NSUB<1) NSUB=1; if(NSUB>16) NSUB=16; }
+    int NSUB=g_clothSub;
+    { static int env9=-1; if(env9<0){ const char*e=getenv("REVA_CLOTHITER"); env9=e?atoi(e):0; } if(env9>0) NSUB=env9; }
+    if(NSUB<1) NSUB=1; if(NSUB>16) NSUB=16;
     for(int ss=0;ss<NSUB;ss++){
     float dt=dtFull/(float)NSUB;
     /* club units are ~1.75x metric, so gravity is too */
@@ -6071,7 +6031,7 @@ static void actorsTick(float dt){
  *   Receivers: all four mesh programs (uShVP/uShMap/uShOn), four taps, slope-scaled bias;
  *   only the SUN term is shadowed. Cut-out casters (leaves, hair) alpha-test in the pass.
  *   ctl shadow=0|1 (default: on whenever a sun is up), shadowext=<units>; REVA_SHADOW=0. */
-#define SUNMAP 2048
+#define SUNMAP g_sunMap   /* the ladder sets it at boot (REVA_TIER); declared beside the tiers */
 #define NSUNCAST 96
 typedef struct { Pack*P; int mi; M4 model; float pal[MAXB*16]; } SunCast;
 static SunCast g_sunCast[NSUNCAST]; static int g_nSunCast=0, g_nSunCrowd=0;
@@ -12126,7 +12086,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
 #define g_partWalkC   (Lw9->walkC)
         const float WALK_ON=0.22f;                    /* world units/sec worth walking for */
         float want=(g_partSpd>WALK_ON&&!P->nWheel&&!castRides(g_castI))?1.f:0.f;   /* ⭐ ep 9: a rider rolls */
-        float stp=animStepS((float)((g_fixedStepMs>0.0)?g_fixedStepMs*0.001:0.0166));
+        float stp=animStepS(simStepS());
         g_partWalkMix += (want-g_partWalkMix)*(1.f-expf(-stp/0.18f));
         if(g_partWalkMix>0.02f){
             if(g_partWalkP!=P){                        /* resolve her walk once per body */
@@ -12163,7 +12123,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
             unsigned n=P->nNodes<160?P->nNodes:160;
             if(cpqOk[s]) for(unsigned i=0;i<n;i++){ float d=fabsf(Q[i][0]*cpq[s][i][0]+Q[i][1]*cpq[s][i][1]+Q[i][2]*cpq[s][i][2]+Q[i][3]*cpq[s][i][3]); if(d>1.f)d=1.f; e+=2.f*acosf(d); }
             for(unsigned i=0;i<n;i++) memcpy(cpq[s][i],Q[i],16); cpqOk[s]=1;
-            float sdt=(float)((g_fixedStepMs>0.0)?g_fixedStepMs*0.001:g_chDt); g_motE[s]=(sdt>1e-5f)?e/sdt:0.f; }
+            float sdt=simStepS(); g_motE[s]=(sdt>1e-5f)?e/sdt:0.f; }
         /* REVA_STAGEDBG=1: is she WALKING to her mark or gliding to it? A contact sheet
          * cannot answer that -- animation is verified in motion -- so the engine says. */
         { static int sd=-1; if(sd<0){ const char*e=getenv("REVA_STAGEDBG"); sd=(e&&e[0]!='0'); }
@@ -12882,7 +12842,7 @@ static void sunPass(int W,int H){
         else glDrawArrays(GL_TRIANGLES,0,M->verts); }
     { static int said2=0; if(!said2&&g_nSunCast>0){ said2=1; printf("[shadow] first pass: %d stashed casters (%d crowd), %d props in the set\n",g_nSunCast,g_nSunCrowd,g_setNI); fflush(stdout); } }
     g_nSunCast=g_nSunCrowd=0;
-    glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); glViewport(0,0,W,H);
+    glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,g_sunTex); glActiveTexture(GL_TEXTURE0); }
 
 static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float*ctr){
@@ -13610,6 +13570,7 @@ int main(int argc,char**argv){
      * every boot replayed the identical show, which is why the seed moved to time() --
      * that stays the default for the SHOW; only a measured run pins it.) */
     clockInit();                 /* before srand: the seed rule depends on it */
+    tierInit();                  /* ⭐ the ladder: before the sun map is allocated */
     sunInit();                   /* the sun starts OFF: the club is a dark room */
     platLoad(); questLoad();     /* ⭐ the doors' data (09-11): the course and the errand come from files */
     if(g_fixedStepMs>0.0) g_bench=1;
@@ -14619,7 +14580,7 @@ int main(int argc,char**argv){
     sunMapInit(vs);  /* ⭐ the sun's shadow map (09-11): the mesh vertex shader over a depth-pack fragment */
 
     /* slots on a 26x12-ish floor */
-    Slot*slots=malloc(NS*sizeof(Slot)); unsigned seed=777;
+    Slot*slots=calloc((size_t)NS,sizeof(Slot)); unsigned seed=777;   /* ⛔ ZEROED (09-30): pgT/pgD/blk were never set at spawn and pgT is read in the roam tree -- heap garbage, and with it the receipt, varied with the heap's history */
     g_slots=slots; g_NS=NS; g_packs=packs;   /* the weapon layer's file-scope view of the floor */
     /* S4f: two standing donors -- the MOB1 mocap bank (CivicDefenseV2 Source/FBX, baked
      * via skate_src/mob1/merge_mob1.py) first, kaeli's ZAMN set second. Authored clips
@@ -14832,32 +14793,34 @@ int main(int argc,char**argv){
 
     unsigned maxNodes=0; for(int i=0;i<NP;i++) if(packs[i].nNodes>maxNodes) maxNodes=packs[i].nNodes;
     if(hasReva&&revaP.nNodes>maxNodes) maxNodes=revaP.nNodes;
-    float (*T)[3]=malloc(maxNodes*12); float (*Q)[4]=malloc(maxNodes*16); float (*S)[3]=malloc(maxNodes*12);
-    float (*T2)[3]=malloc(maxNodes*12); float (*Q2)[4]=malloc(maxNodes*16); float (*S2)[3]=malloc(maxNodes*12);
-    M4 *world=malloc(maxNodes*sizeof(M4));
+    float (*T)[3]=calloc(maxNodes,12); float (*Q)[4]=calloc(maxNodes,16); float (*S)[3]=calloc(maxNodes,12);
+    float (*T2)[3]=calloc(maxNodes,12); float (*Q2)[4]=calloc(maxNodes,16); float (*S2)[3]=calloc(maxNodes,12);
+    M4 *world=calloc(maxNodes,sizeof(M4));
     static float pal[MAXB*16];
     int curProg=-1; GLint uVP=0,uModel=0,uBind=0,uPal=0,uTint=0,uUse=0;
     #define USEPROG(i) do{ if(curProg!=(i)){ curProg=(i); glUseProgram(PR[i].prog); \
         uVP=PR[i].uVP; uModel=PR[i].uModel; uBind=PR[i].uBind; uPal=PR[i].uPal; uTint=PR[i].uTint; uUse=PR[i].uUse; g_curNrmLoc=PR[i].uNrm; } }while(0)
 
-    double t0=now_ms(), lastStat=t0; long frames=0; int first=1;
+    double t0=now_ms(), lastStat=wall_ms(); long frames=0; int first=1; long tickAcc9=0;
 #ifndef REVA_SDL
     drmEventContext evctx; memset(&evctx,0,sizeof evctx);
     evctx.version=2; evctx.page_flip_handler=flipHandler;
 #endif
-    int *order=malloc(NS*sizeof(int)); float *depth=malloc(NS*sizeof(float));
+    int *order=calloc((size_t)NS,sizeof(int)); float *depth=calloc((size_t)NS,sizeof(float));
 
     double lastT=now_ms();
     double workAcc=0; long workN=0;   /* bench: sim+GPU work per frame, flip wait EXCLUDED */
     while(g_run){
         clockTick();
+        tierAuto();
+        simHashBegin();
         animTick();
         /* the bodies' view of the scene clock: latched on an exposure, held between */
         if(!g_stepHeld||g_scnTA<0.f||g_scnT<g_scnTA) g_scnTA=g_scnT;
-        actorsTick(animStepS((float)((g_fixedStepMs>0.0)?g_fixedStepMs*0.001:0.0166)));
-        rbStep(animStepS((float)((g_fixedStepMs>0.0)?g_fixedStepMs*0.001:0.0166)));   /* ⭐ the loose objects (09-11) */
+        actorsTick(animStepS(simStepS()));
+        rbStep(animStepS(simStepS()));   /* ⭐ the loose objects (09-11) */
         if(g_tod>=0.f){   /* Z6: the day runs, and the light is recomputed every frame */
-            if(g_todRate!=0.f) g_tod+=g_todRate*animStepS((float)((g_fixedStepMs>0.0)?g_fixedStepMs*0.001:0.0166));
+            if(g_todRate!=0.f) g_tod+=g_todRate*animStepS(simStepS());
             todApply(g_tod); }
         /* ⛔ AND IT HAS TO REACH EVERY PROGRAM. A uniform is per-program state, the sun
          * was only ever uploaded to the one AP points at (index 1), and USEPROG picks
@@ -14881,7 +14844,7 @@ int main(int argc,char**argv){
                   if(R9->uShMap>=0) glUniform1i(R9->uShMap,3);
                   if(R9->uShOn>=0) glUniform1f(R9->uShOn,(float)g_shadowOn); } }
           if(wasP) glUseProgram((GLuint)wasP); curProg=-1; }
-        double frameT0=now_ms();
+        double frameT0=wall_ms();
         double tsec=(now_ms()-t0)/1000.0;
         double dt=(now_ms()-lastT)/1000.0; lastT=now_ms(); if(dt>0.25)dt=0.25;
         g_chDt=dt;   /* H1: the chains read the frame clock */
@@ -15051,7 +15014,7 @@ int main(int argc,char**argv){
                   else glDisableVertexAttribArray(4);
                   if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
                   else glDrawArrays(GL_TRIANGLES,0,M->verts); } }
-          glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); glViewport(0,0,W,H);   /* back to THE SCREEN, which may be the post FBO */
+          glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);   /* back to THE SCREEN, which may be the post FBO */
           glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); curProg=-1; }
         sunPass(W,H); curProg=-1;   /* ⭐ THE SUN'S SHADOW MAP (09-11): props + last frame's stashed bodies */
         nCast=0;   /* the shadow-caster stash refills as the frame draws */
@@ -16181,6 +16144,7 @@ int main(int argc,char**argv){
             for(unsigned i=0;i<P->nNodes;i++){ M4 loc; m4_trs(loc,T[i],Q[i],S[i]);
                 if(P->nodes[i].parent<0) memcpy(world[i],loc,64); else m4_mul(world[i],world[P->nodes[i].parent],loc); }
             chainSim(P,world,0);   /* H1: the hero's tails/hair swing after the pose is solved */
+            simHashMix((const float*)world,P->nNodes*16);   /* ⭐ the receipt: her solved pose */
 
             /* ================= FOOT IK: HER FEET BELONG TO THE BOARD ==================
              * Posing the legs got the stance right but left the feet only APPROXIMATELY on
@@ -16974,7 +16938,7 @@ int main(int argc,char**argv){
                   m4_mul(fvp,fproj,fview);
                   memcpy(curVP,fvp,64); glUniformMatrix4fv(mVP,1,GL_FALSE,fvp); }
             } else {
-                glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); glViewport(0,0,W,H);   /* the screen, or the post FBO */
+                glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);   /* the screen, or the post FBO */
                 memcpy(curVP,vp,64); memcpy(g_watVP,vp,64); glUniformMatrix4fv(mVP,1,GL_FALSE,vp);
                 /* THE SET goes down before the actors do -- same program, same lights,
                  * and the depth buffer sorts the rest. Inside this loop because the
@@ -17413,7 +17377,7 @@ int main(int argc,char**argv){
                     glLineWidth(1.0f);
                     glUseProgram(skSolid?PR[1].prog:hProg); }
                 glDisable(GL_SCISSOR_TEST);
-                glViewport(0,0,W,H);
+                MAINVIEW(W,H);
                 glUniformMatrix4fv(mVP,1,GL_FALSE,curVP); }
             /* THE PARK and THE BOARD are real objects, so they are drawn with the OPAQUE
              * textured program -- her hologram program has no tint or texture path and would
@@ -19492,7 +19456,7 @@ int main(int argc,char**argv){
                   drawText(x9,y9,sc9,tx,cc9[0],cc9[1],cc9[2],0.98f);
                   drawText(x9,y9-30.f,1.7f,g_scnWho[sp9],cc9[0]*0.62f,cc9[1]*0.72f,cc9[2]*0.70f,0.85f); } }
           char ln[128]; time_t tt=time(NULL); struct tm*tmv=localtime(&tt);
-          static double fpsAvg=0; fpsAvg+=(1.0/(dt>0.001?dt:0.001)-fpsAvg)*0.05;
+          static double fpsAvg=0; fpsAvg+=(1.0/(g_wallDt>0.001?g_wallDt:0.001)-fpsAvg)*0.05;
           /* THE OLD UI (jacob: "tuned to my taste") -- the page's scheme: GREEN sys block
            * top-right (#39ff8a), CYAN music info bottom-center (#7df9ff) with the CHORD in hot
            * pink (#ff7be0), credit line bottom-left. Layout mirrors reva_dance.html. */
@@ -19626,8 +19590,11 @@ int main(int argc,char**argv){
               if(sp->artist[0]){ char a2[96]; snprintf(a2,sizeof a2,"by %s",sp->artist);
                   drawText(60,386,1.6f,a2,0.5f,0.95f,0.85f,0.95f); } }
           glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST); curProg=-1; }
+        { float sv9[4]={g_rvx,g_rvz,g_rvHead,g_rvAlt}; simHashMix(sv9,4);
+          for(int i9=0;i9<NS;i9++){ float sl9[6]={slots[i9].x,slots[i9].z,slots[i9].rotY,(float)slots[i9].state,(float)slots[i9].clip,(float)slots[i9].phase}; simHashMix(sl9,6); }
+          if(g_shEvery>0&&(g_frameNo%(unsigned long)g_shEvery)==0) simHashPrint("every"); }
         if(g_bench) glFinish();   /* make the GPU actually finish so the number means something */
-        workAcc+=now_ms()-frameT0; workN++;
+        { double w9=wall_ms()-frameT0; workAcc+=w9; workN++; tickAcc9+=g_tickN; g_workMs+=(w9-g_workMs)*0.1; }
 #ifdef REVA_SDL
         /* HEADLESS FRAME DUMP: REVA_SHOT=<frame> writes that presented frame to
          * REVA_SHOT_PATH (default /tmp/reva-shot.ppm) and exits, so a change can be
@@ -19676,7 +19643,7 @@ int main(int argc,char**argv){
               FILE*sf=fopen(pth,"wb");
               if(sf){ fprintf(sf,"P6\n%d %d\n255\n",W,H);
                       { unsigned char*rw=(unsigned char*)malloc((size_t)W*3); for(int y=H-1;y>=0;y--){ for(int x=0;x<W;x++){ rw[x*3]=px[((size_t)y*W+x)*4]; rw[x*3+1]=px[((size_t)y*W+x)*4+1]; rw[x*3+2]=px[((size_t)y*W+x)*4+2]; } fwrite(rw,1,(size_t)W*3,sf); } free(rw); }   /* GL origin is bottom-left */
-                      fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,W,H,fno); }
+                      fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,W,H,fno); simHashPrint("shot"); }
               free(px); fflush(stdout); g_capBegun=1; if(++taken>=burst) exit(0); } }
         clipAuditFrame();   /* ⭐ ep 10: every body drawn this frame, tested together */
         SDL_GL_SwapWindow(g_win);
@@ -19726,11 +19693,11 @@ int main(int argc,char**argv){
         g_prevBo=bo; g_prevFb=fb;
 #endif
         frames++;
-        if(now_ms()-lastStat>5000){ if(g_dieN||g_hideN) printf("[ledger] die=%ld hide=%ld inflight=%ld%s\n",g_dieN,g_hideN,g_dieN-g_hideN,(g_dieN-g_hideN>3)?"  ZOMBIE ALARM":"");
+        if(wall_ms()-lastStat>5000){ if(g_dieN||g_hideN) printf("[ledger] die=%ld hide=%ld inflight=%ld%s\n",g_dieN,g_hideN,g_dieN-g_hideN,(g_dieN-g_hideN>3)?"  ZOMBIE ALARM":"");
             printf("fps %.1f work %.2fms %dx%d | s0 %.1f,%.1f st%d sp%.2f | s42 %.1f,%.1f st%d sp%.2f | rv %.1f,%.1f tgt%d %.1f,%.1f\n",
-            frames*1000.0/(now_ms()-lastStat), workN?workAcc/workN:0.0, W,H, slots[0].x,slots[0].z,slots[0].state,slots[0].spd,
+            frames*1000.0/(wall_ms()-lastStat), workN?workAcc/workN:0.0, W,H, slots[0].x,slots[0].z,slots[0].state,slots[0].spd,
             slots[42%NS].x,slots[42%NS].z,slots[42%NS].state,slots[42%NS].spd,
-            g_rvx,g_rvz,CAMD.tgt,slots[CAMD.tgt>=0&&CAMD.tgt<NS?CAMD.tgt:0].x,slots[CAMD.tgt>=0&&CAMD.tgt<NS?CAMD.tgt:0].z); frames=0; workAcc=0; workN=0; lastStat=now_ms(); fflush(stdout); }
+            g_rvx,g_rvz,CAMD.tgt,slots[CAMD.tgt>=0&&CAMD.tgt<NS?CAMD.tgt:0].x,slots[CAMD.tgt>=0&&CAMD.tgt<NS?CAMD.tgt:0].z); printf("[tick] %.2f ticks/frame (%ld ticks, %.0f Hz)\n",frames?(double)tickAcc9/frames:0.0,g_tickTotal,1000.0/g_tickMs); frames=0; workAcc=0; workN=0; tickAcc9=0; lastStat=wall_ms(); fflush(stdout); }
     }
     clipAuditExit();   /* ⭐ ep 10: a scene cut off by the exit still gets its TOTAL */
     printf("exiting clean\n");

@@ -23,10 +23,10 @@ set -e
 cd "$(dirname "$0")"
 WHICH=${1:-both}
 if [ "$WHICH" = kms ] || [ "$WHICH" = both ]; then
-  gcc -O2 -o crowd_kms crowd_kms.c holly_fbo.c -I/usr/include/libdrm -ldrm -lgbm -lSDL2 -lEGL -lGLESv2 -lm
+  gcc -O2 -ffp-contract=off -o crowd_kms crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c -I/usr/include/libdrm -ldrm -lgbm -lSDL2 -lEGL -lGLESv2 -lm
   echo "built crowd_kms      (DRM master; run with the desktop stopped: sudo systemctl stop lightdm  /  ./crowd_kms 400 packs)"
 fi
 if [ "$WHICH" = sdl ] || [ "$WHICH" = both ]; then
-  gcc -O2 -DREVA_SDL -o crowd_linux crowd_kms.c holly_fbo.c -lSDL2 -lEGL -lGLESv2 -lm
+  gcc -O2 -ffp-contract=off -DREVA_SDL -o crowd_linux crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c -lSDL2 -lEGL -lGLESv2 -lm
   echo "built crowd_linux    (desktop: REVA_WINDOWED=1 ./crowd_linux 400 packs select;  no desktop: SDL_VIDEODRIVER=kmsdrm ./crowd_linux 400 packs select)"
 fi

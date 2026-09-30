@@ -11,7 +11,8 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
   gcc dies SILENTLY with exit 1 and no output: `export PATH=/c/msys64/mingw64/bin:$PATH`.
 - `windres crowd_win.rc -O coff -o crowd_win_rc.o` once (the UTF-8 manifest: without it, fopen dies on a
   pack with a non-ASCII name), then
-  `gcc -O2 -o crowd_new.exe crowd_kms.c holly_fbo.c crowd_win_rc.o -Dmain=SDL_main -lmingw32 -lSDL2main -lSDL2 -lEGL -lGLESv2 -lm`
+  `gcc -O2 -ffp-contract=off -o crowd_new.exe crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c crowd_win_rc.o -Dmain=SDL_main -lmingw32 -lSDL2main -lSDL2 -lEGL -lGLESv2 -lm`
+  (`club.h` names the units: the split started 09-30 — the 4x4s and the audio mixer are their own files.)
 - Build to `crowd_new.exe`, verify on pixels, THEN copy over `crowd.exe`.
 - Run: `REVA_WINDOWED=1 ./crowd.exe 400 packs select` (fullscreen without WINDOWED). ⛔ argv[3] is a
   FLOW (`select`) or a body to load as the hero, never both.
@@ -44,6 +45,23 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
   holly's shaders are `#version 300 es` and its compiler `exit(1)`s; on ES2 the head now declines loudly.
 - ⛔ NOT YET RUN ON A PI. Verified here: both paths compile on x86, the SDL path renders, and a
   `-funsigned-char` build (ARM's `char`) renders a pixel-identical frame. The rest waits for hardware.
+
+## The tick, the receipt, the dice, the ladder (2026-09-30 — `design/platform_tiers.md`)
+- **The sim runs on whole ticks.** `REVA_TICK=<hz>` (default 60); a frame gets 1..4 ticks from the wall
+  time it owes, snapped against vsync jitter, capped. `simStepS()` is the frame's sim step — never a
+  constant 1/60 again. `REVA_FIXEDSTEP` is one tick per frame with the tick equal to the step. The stat
+  line's `fps`/`work` and the HUD fps read `wall_ms()`; `now_ms()` is the tick clock, always.
+- **`REVA_SIMHASH=<every N frames>`** prints `[simhash] tick N exact … coarse …` (and every `REVA_SHOT`
+  frame does). Same inputs must print the same hashes; a mismatch is a determinism regression. Build with
+  `-ffp-contract=off` (the scripts do) or x86 and ARM disagree on the last bit.
+- **`rand()` is the club's own LCG** on every platform (`REVA_RAND=libc` for the library's). ⛔ Any capture
+  blessed before 09-30 that has a crowd in it re-rolls.
+- **The uninitialised-memory test:** two runs with `MALLOC_PERTURB_=85` and `=170` must print identical
+  `[simhash]` lines. They did not, once: the crowd slots were `malloc`'d and three fields were read before
+  spawn ever set them. `calloc` the arrays the sim reads; the build matrix runs the A/B on every push.
+- **`REVA_TIER=pi|low|mid|high|ultra|auto`** (default `high` = the old look). A rung is the 3D render scale
+  (a sub-rect of the post target, upsampled by the post quad), the sun map (boot only), bloom, FXAA and the
+  cloth substeps. `auto` measures and moves; never under `REVA_FIXEDSTEP`. The lab always draws 1:1.
 
 ## Headless verification instruments (env, all off by default)
 `REVA_FIXEDSTEP=<fps>` replaces wall time with one virtual step per rendered frame (and pins the crowd's

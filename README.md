@@ -56,7 +56,7 @@ So **the engine boots to `FATAL: no packs` until you bake a character** (below).
    export PATH=/c/msys64/mingw64/bin:$PATH
    cd reva_native
    windres crowd_win.rc -O coff -o crowd_win_rc.o      # the UTF-8 manifest: without it, fopen dies on non-ASCII pack names
-   gcc -O2 -o crowd.exe crowd_kms.c holly_fbo.c crowd_win_rc.o -Dmain=SDL_main -lmingw32 -lSDL2main -lSDL2 -lEGL -lGLESv2 -lm
+   gcc -O2 -ffp-contract=off -o crowd.exe crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c crowd_win_rc.o -Dmain=SDL_main -lmingw32 -lSDL2main -lSDL2 -lEGL -lGLESv2 -lm
    ```
 3. Python 3 with `numpy` and `Pillow` for the tools. ⛔ Not the Microsoft Store `python` alias. Point
    the tools at a real interpreter with `CLUB_PYTHON=/path/to/python.exe` (default: the Python running the tool).

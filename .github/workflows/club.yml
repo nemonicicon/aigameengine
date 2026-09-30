@@ -1,0 +1,60 @@
+# THE CLUB -- the build matrix (2026-09-30).
+# The KMS path rotted for three weeks because nothing built it. Every push now builds every
+# platform variant this runner can, bakes Clanker from godot/characters/, renders one lab frame
+# under Xvfb on llvmpipe and refuses a black one. The sim hash of that frame is in the log:
+# two runners disagreeing on it is a determinism regression, not a flake.
+name: club
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libgles-dev libegl-dev libstb-dev libdrm-dev libgbm-dev xvfb libgl1-mesa-dri
+          python3 -m pip install --quiet numpy Pillow
+      - name: build sdl (crowd_linux)
+        run: reva_native/build_linux.sh
+      - name: build kms (crowd_kms, compile + link only -- no DRM on a runner)
+        run: reva_native/build_pi.sh kms
+      - name: bake clanker
+        run: |
+          mkdir -p out/packs
+          python3 skate_src/glb2rpack_anim.py godot/characters/clanker/clanker.glb out/packs/v1_clanker.rpack --keepnames | tail -3
+      - name: lab frame (Xvfb, llvmpipe)
+        run: |
+          REVA_SIMHASH=100 python3 .claude/skills/run-reva/linux_lab.py out/packs/v1_clanker.rpack z_rm_sk_ride out/lab 0,2 960x540
+          grep -E '\[simhash\]|GL_RENDERER|reva loaded' out/lab/engine.log | tail -6
+      - name: the receipt does not depend on heap history (MALLOC_PERTURB_ A/B)
+        run: |
+          # two fill bytes for fresh allocations; the sim hashes must agree, or something reads memory it never wrote
+          for P in 85 170; do
+            mkdir -p out/perturb$P
+            MALLOC_PERTURB_=$P REVA_WINDOWED=1 REVA_FIXEDSTEP=30 REVA_AUTOMODE=0 REVA_AUTOPICK=0 REVA_SIMHASH=50 \
+              REVA_SHOT=300 REVA_SHOT_PATH=$PWD/out/perturb$P/f.ppm \
+              timeout 900 xvfb-run -a -s "-screen 0 640x360x24" stdbuf -o0 -e0 \
+              reva_native/crowd_linux 40 $PWD/out/packs select 640x360 > out/perturb$P/engine.log 2>&1 || true
+            grep '\[simhash\]' out/perturb$P/engine.log > out/perturb$P/hash.txt
+            test -s out/perturb$P/hash.txt
+          done
+          diff out/perturb85/hash.txt out/perturb170/hash.txt && echo "receipt: identical across fill bytes"
+      - name: the frame is not black
+        run: |
+          python3 - <<'EOF'
+          from PIL import Image; import glob, sys
+          bad=0
+          for f in sorted(glob.glob('out/lab/cam*.png')):
+              im=Image.open(f).convert('L'); h=im.histogram(); lit=sum(h[40:])/float(im.width*im.height)
+              print(f, im.size, 'lit fraction %.3f'%lit)
+              if lit<0.02: bad+=1
+          sys.exit(1 if bad or not glob.glob('out/lab/cam*.png') else 0)
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-frames
+          path: |
+            out/lab/*.png
+            out/lab/engine.log

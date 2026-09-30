@@ -45,7 +45,7 @@ FFMPEG = next(iter(glob.glob(os.path.join(
     os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
     "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)
 
-SRC = ["crowd_kms.c", "holly_fbo.c", "crowd_win_rc.o"]
+SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
 LIBS = ["-Dmain=SDL_main", "-lmingw32", "-lSDL2main", "-lSDL2", "-lEGL", "-lGLESv2", "-lm"]
 
 # the face rig's panel rectangles in the saved 1280x720 image (crowd_kms.c, g_labFace):

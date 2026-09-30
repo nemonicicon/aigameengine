@@ -38,6 +38,29 @@ the receipt had been hashing heap history. The slots and the pose scratch are `c
 the A/B is the standing test for this class: **two `MALLOC_PERTURB_` runs, identical hashes, or
 there is an uninitialised read.** The build matrix runs it on every push.
 
+## The tape
+
+`REVA_RECORD=<file>` writes the pad and keyboard state after the polls, one line a frame:
+frame, both sticks, the trigger, eight buttons, the start edge, the mouse delta, manual, keyboard,
+first-person. `REVA_REPLAY=<file>` writes it back at the same point and ignores the hardware. Under
+`REVA_FIXEDSTEP` a replay IS the recorded session, and its `[simhash]` lines are the receipt.
+
+The test that admitted it (09-30, DANCER SHOWCASE, Clanker as the hero, 500 frames): run A held W
+through `REVA_KBSIM` and recorded; run B replayed the tape with no input at all; run C had nothing.
+A and B hashed identically at every checkpoint; C differed. So a replay reproduces a session, and
+the input demonstrably drove the sim. What this buys: any bug you can reproduce by hand is a
+regression test now. Record it, keep the tape beside the scene files, assert the hash in the matrix.
+Live (no fixed step) a replay is approximate, because frames may carry a different number of ticks.
+
+## Twelve doors, every push
+
+The build matrix boots every game mode headless with no content, auto-confirms its menus, shoots
+frame 400 at 640x360 and fails the push if a door dies or draws black (`anim_bench/litcheck.py`).
+All twelve pass on 09-30. That sweep is what exposed the HUD: every readout was laid out in pixels
+for a 1280-wide window and ran off a 640-wide one, and would have off a composite CRT. The overlay
+draws on a 1280-wide virtual canvas now, its height following the aspect; at 1280x720 the frame is
+byte-identical to before (the diff is the HUD's own wall clock and nothing else).
+
 ## The Raspberry Pi 4, by the numbers
 
 | | Pi 4 (VideoCore VI) | where from |

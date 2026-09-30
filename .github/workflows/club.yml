@@ -42,17 +42,25 @@ jobs:
           diff out/perturb85/hash.txt out/perturb170/hash.txt && echo "receipt: identical across fill bytes"
           # the receipt itself, for comparing this runner against any other machine's run of the same command
           cat out/perturb85/hash.txt
-      - name: the frame is not black
+      - name: every door boots and draws (12 modes, headless, no content)
         run: |
-          python3 - <<'EOF'
-          from PIL import Image; import glob, sys
-          bad=0
-          for f in sorted(glob.glob('out/lab/cam*.png')):
-              im=Image.open(f).convert('L'); h=im.histogram(); lit=sum(h[40:])/float(im.width*im.height)
-              print(f, im.size, 'lit fraction %.3f'%lit)
-              if lit<0.02: bad+=1
-          sys.exit(1 if bad or not glob.glob('out/lab/cam*.png') else 0)
-          EOF
+          # each game mode auto-confirmed, one frame at 400; a door that dies or draws black fails the push
+          fail=0
+          for M in 0 1 2 3 4 5 6 7 8 9 10 11; do
+            mkdir -p out/door$M
+            REVA_TIER=low REVA_WINDOWED=1 REVA_FIXEDSTEP=30 REVA_AUTOMODE=$M REVA_AUTOVAR=0 REVA_AUTOPICK=0 REVA_SIMHASH=200 \
+              REVA_SHOT=400 REVA_SHOT_PATH=$PWD/out/door$M/f.ppm \
+              timeout 600 xvfb-run -a -s "-screen 0 640x360x24" stdbuf -o0 -e0 \
+              reva_native/crowd_linux 40 $PWD/out/packs select 640x360 > out/door$M/engine.log 2>&1; E=$?
+            R=$(python3 reva_native/anim_bench/litcheck.py out/door$M/f.ppm --min 0.005 || true)
+            echo "door $M: exit=$E | $R | $(grep -m1 '^MODE:' out/door$M/engine.log) | $(grep -m1 '(shot)' out/door$M/engine.log)"
+            case "$R" in *OK*) ;; *) fail=1;; esac
+          done
+          exit $fail
+      - name: the lab frame is not black
+        run: |
+          ls out/lab/cam*.png
+          for f in out/lab/cam*.png; do python3 reva_native/anim_bench/litcheck.py "$f"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

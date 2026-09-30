@@ -2867,6 +2867,37 @@ static void jsPoll(double tsec){
  * the menus); REVA_NOMOUSEGRAB=1 keeps the cursor free for windowed work. */
 static int g_kbActive=0;                 /* keyboard/mouse used: the HUD shows key hints */
 static float g_mdx=0.f, g_mdy=0.f;       /* this frame's mouse delta, pixels (RTS cursor) */
+/* ---- THE TAPE (2026-09-30): input record and replay -----------------------------------------
+ * With the sim on whole ticks, the pad and keyboard state per frame is the only thing that makes
+ * one session differ from another. REVA_RECORD=<file> writes it after the polls, one line a frame;
+ * REVA_REPLAY=<file> writes it back at the same point, and the pad and keyboard are ignored. Under
+ * REVA_FIXEDSTEP a replay is the recorded session exactly, and its [simhash] lines are the receipt:
+ * any bug you can reproduce by hand is a regression test. It writes straight past the shot
+ * instruments' input lock (that lock is for hardware), and past the AUTOA pulse, which it captures.
+ * Live (no fixed step) a replay is approximate: frames may carry a different number of ticks. */
+static FILE*g_tapeRec=0,*g_tapeRep=0; static int g_tapeDone=0;
+static void inputTape(double tsec){
+    static int init=0;
+    if(!init){ init=1; const char*r=getenv("REVA_RECORD"); const char*q=getenv("REVA_REPLAY");
+        if(r&&r[0]){ g_tapeRec=fopen(r,"w");
+            if(g_tapeRec){ fprintf(g_tapeRec,"# reva input tape v1  tick %.4f ms  fixedstep %.4f ms  (frame lx ly rx ry rt A B X Y LB RB St Bk edge mdx mdy manual kb fpv)\n",g_tickMs,g_fixedStepMs); printf("[tape] RECORDING %s\n",r); }
+            else printf("[tape] cannot write %s\n",r); }
+        if(q&&q[0]){ g_tapeRep=fopen(q,"r");
+            if(g_tapeRep){ int c=fgetc(g_tapeRep); if(c=='#'){ while(c!='\n'&&c!=EOF) c=fgetc(g_tapeRep); } else ungetc(c,g_tapeRep);
+                           printf("[tape] REPLAY %s -- the pad and keyboard are ignored%s\n",q,(g_fixedStepMs>0.0)?"":" (live: approximate, set REVA_FIXEDSTEP for the exact session)"); }
+            else printf("[tape] cannot read %s\n",q); }
+        fflush(stdout); }
+    if(g_tapeRep&&!g_tapeDone){ char ln[320]; unsigned long fr; float lx,ly,rx,ry,rt,mdx,mdy; int a,b,x,y,lb,rb,st,bk,ed,man,kb,fpv;
+        if(fgets(ln,sizeof ln,g_tapeRep)&&sscanf(ln,"%lu %f %f %f %f %f %d %d %d %d %d %d %d %d %d %f %f %d %d %d",
+                 &fr,&lx,&ly,&rx,&ry,&rt,&a,&b,&x,&y,&lb,&rb,&st,&bk,&ed,&mdx,&mdy,&man,&kb,&fpv)==20){
+            g_lx=lx; g_ly=ly; g_rx=rx; g_ry=ry; g_rt=rt; g_btnA=a; g_btnB=b; g_btnX=x; g_btnY=y; g_btnLB=lb; g_btnRB=rb;
+            g_btnStart=st; g_btnBack=bk; g_startEdge=ed; g_mdx=mdx; g_mdy=mdy;
+            if(man&&!g_manual) g_inT=tsec;
+            g_manual=man; g_kbActive=kb; g_fpv=fpv; }
+        else { g_tapeDone=1; printf("[tape] replay ended at frame %lu -- neutral from here\n",g_frameNo); fflush(stdout);
+               g_lx=g_ly=g_rx=g_ry=g_rt=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=g_startEdge=0; g_mdx=g_mdy=0.f; } }
+    if(g_tapeRec){ fprintf(g_tapeRec,"%lu %.9g %.9g %.9g %.9g %.9g %d %d %d %d %d %d %d %d %d %.9g %.9g %d %d %d\n",
+        g_frameNo,g_lx,g_ly,g_rx,g_ry,g_rt,g_btnA,g_btnB,g_btnX,g_btnY,g_btnLB,g_btnRB,g_btnStart,g_btnBack,g_startEdge,g_mdx,g_mdy,g_manual,g_kbActive,g_fpv); } }
 static float g_mLook=0.f, g_mPitch=0.f;  /* integrated look, mapped onto the right stick */
 static void kbPoll(double tsec){
     /* ⛔ THE CAPTURE LOCK SWALLOWED THE BENCH'S OWN KEYBOARD. capLocked() exists so a stray
@@ -14915,6 +14946,7 @@ int main(int argc,char**argv){
           if(aper==-2){ const char*e=getenv("REVA_AUTOA"); aper=e?atoi(e):0; }
           if(aper>0&&g_mode>=MODE_BR&&g_gameT>2.f&&!g_pause){ aF++;
               g_btnA=((aF%aper)<3)?1:0; } }   /* WRITE both edges: padless jsPoll never clears, the latch ate the pulses */
+        inputTape(tsec);   /* ⭐ THE TAPE: record what the polls decided, or replace it with a recorded session */
         double btF0=beatPLL(tsec);   /* one beat clock for floor + dancers this frame */
         g_btF=(float)btF0;
         /* GAME-LAYER INPUT POLICY, before anything reads g_manual this frame: action modes
@@ -19401,6 +19433,10 @@ int main(int argc,char**argv){
         postEnd(W,H,g_tone);   /* ⭐ resolve the 3D frame to the screen: bloom, FXAA, the knee (09-11). The HUD lands sharp on top. */
         /* HUD — the terminal readout returns (green/pink CRT text, top-right) */
         int labClean=(g_mode==MODE_ANIM&&!getenv("REVA_ANIMHUD"));   /* REVA_ANIMHUD=1 puts the readouts back */
+        /* ⭐ THE HUD CANVAS (2026-09-30). Every readout was laid out in pixels for a 1280-wide window and ran off a
+         * 640-wide one (and would off a composite CRT). The overlay now draws on a 1280-wide virtual canvas whose
+         * height follows the aspect: at 1280x720 it is pixel-identical to before, elsewhere it scales. */
+        const float HW=1280.f, HH=1280.f*(float)H/(float)W;
         { void drawText(float x,float y,float sc,const char*txt,float r4,float g4,float b4,float a4){
               static float tv2[24000];
               int nq=stb_easy_font_print(0,0,(char*)txt,NULL,fontBuf,sizeof fontBuf);
@@ -19408,7 +19444,7 @@ int main(int argc,char**argv){
               for(int i2=0;i2<nq&&nv<23000;i2++)
                   for(int k2=0;k2<6;k2++){ float*vv=(float*)(fontBuf+i2*64+idx[k2]*16);
                       tv2[nv++]=x+vv[0]*sc; tv2[nv++]=y+vv[1]*sc; }
-              glUseProgram(uProg); glUniform2f(uScr,(float)W,(float)H); glUniform4f(uCol,r4,g4,b4,a4);
+              glUseProgram(uProg); glUniform2f(uScr,HW,HH); glUniform4f(uCol,r4,g4,b4,a4);
               glBindBuffer(GL_ARRAY_BUFFER,hudVbo); glBufferData(GL_ARRAY_BUFFER,nv*4,tv2,GL_DYNAMIC_DRAW);
               glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
               for(int k2=1;k2<5;k2++) glDisableVertexAttribArray(k2);
@@ -19422,22 +19458,22 @@ int main(int argc,char**argv){
                   /* A SCRIM. The words landed on whoever was standing at the bottom of
                    * the frame -- kaeli's midriff ate a whole line in the two-shot. Four
                    * stacked bands fake the gradient a single flat uCol cannot. */
-                  { static float bd[12]; float y0=(float)H-146.f, st=36.5f;
-                    glUseProgram(uProg); glUniform2f(uScr,(float)W,(float)H);
+                  { static float bd[12]; float y0=HH-146.f, st=36.5f;
+                    glUseProgram(uProg); glUniform2f(uScr,HW,HH);
                     glBindBuffer(GL_ARRAY_BUFFER,hudVbo);
                     for(int b6=0;b6<4;b6++){
                         float ya=y0+b6*st, yb=ya+st+1.f;
-                        bd[0]=0;bd[1]=ya; bd[2]=(float)W;bd[3]=ya; bd[4]=(float)W;bd[5]=yb;
-                        bd[6]=0;bd[7]=ya; bd[8]=(float)W;bd[9]=yb; bd[10]=0;bd[11]=yb;
+                        bd[0]=0;bd[1]=ya; bd[2]=HW;bd[3]=ya; bd[4]=HW;bd[5]=yb;
+                        bd[6]=0;bd[7]=ya; bd[8]=HW;bd[9]=yb; bd[10]=0;bd[11]=yb;
                         glUniform4f(uCol,0.f,0.f,0.f,0.10f+0.17f*(float)b6);
                         glBufferData(GL_ARRAY_BUFFER,sizeof bd,bd,GL_DYNAMIC_DRAW);
                         glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
                         for(int k6=1;k6<5;k6++) glDisableVertexAttribArray(k6);
                         glDrawArrays(GL_TRIANGLES,0,6); } }
                   float sc9=2.4f; float w9=6.0f*sc9*(float)strlen(tx);
-                  float lim9=(float)W-110.f;
+                  float lim9=HW-110.f;
                   if(w9>lim9){ sc9*=lim9/w9; w9=lim9; }   /* long lines shrink to fit, never run off */
-                  float x9=((float)W-w9)*0.5f, y9=(float)H-62.f;
+                  float x9=(HW-w9)*0.5f, y9=HH-62.f;
                   /* ⭐ BY SLOT, NOT BY "IS IT REVA". Three speakers need three colours --
                    * the audience tracks who is talking in a dark room by hue before they
                    * read a word of it. reva cyan (hers since CLUB NIGHT), kaeli warm,
@@ -19506,28 +19542,28 @@ int main(int argc,char**argv){
               for(int f9=0;f9<3;f9++) if(g_feedT[f9]>0.f)   /* the kill feed under the HUD lines */
                   drawText(40,246+f9*17,1.2f,g_feed[f9],1.0f,0.95f,0.85f,fminf(1.f,g_feedT[f9])*0.9f);
               if(g_kbActive&&!g_skate&&!labClean)   /* the keyboard legend, only once a key has been touched */
-                  drawText(40,(float)H-58.f,1.15f,
+                  drawText(40,HH-58.f,1.15f,
                       "WASD MOVE   MOUSE LOOK   LMB/SPACE ACT   RMB/E BOLT   Q SPECIAL   SHIFT LOCK   ESC MENU",
                       0.45f,0.85f,0.95f,0.62f);
               if(GM.msgT>0.f&&g_mode!=MODE_ANIM){ float pu=0.75f+0.25f*sinf((float)tsec*8.f);
                   float bs=2.9f; int bw=(int)(stb_easy_font_width(GM.msg)*bs);
-                  drawText(((float)W-bw)*0.5f,(float)H*0.30f,bs,GM.msg,1.0f*pu,0.48f*pu,0.88f*pu,0.96f); }
+                  drawText((HW-bw)*0.5f,HH*0.30f,bs,GM.msg,1.0f*pu,0.48f*pu,0.88f*pu,0.96f); }
               if(g_mode==MODE_ARCADE&&ARC_CAB==0&&!g_pause){
                   static const char*BN[4]={"A","B","X","Y"};
                   static const float BC[4][3]={{0.3f,1.0f,0.4f},{1.0f,0.3f,0.3f},{0.35f,0.55f,1.0f},{1.0f,0.9f,0.25f}};
-                  float hitY=(float)H*0.62f, ppb=(float)H*0.16f;
-                  for(int c9=0;c9<4;c9++){ float cx=(float)W*0.5f+((float)c9-1.5f)*56.f;
+                  float hitY=HH*0.62f, ppb=HH*0.16f;
+                  for(int c9=0;c9<4;c9++){ float cx=HW*0.5f+((float)c9-1.5f)*56.f;
                       drawText(cx-10.f,hitY,2.2f,"[ ]",0.4f,0.42f,0.5f,0.8f);
-                      drawText(cx-22.f,(float)H*0.62f-4.f*ppb-24.f,1.2f,BN[c9],BC[c9][0]*0.6f,BC[c9][1]*0.6f,BC[c9][2]*0.6f,0.5f); }
+                      drawText(cx-22.f,HH*0.62f-4.f*ppb-24.f,1.2f,BN[c9],BC[c9][0]*0.6f,BC[c9][1]*0.6f,BC[c9][2]*0.6f,0.5f); }
                   for(int k9=0;k9<GM.seqN;k9++){ int idx=(GM.seqHead+k9)%8;
                       float dy=(GM.seqBt[idx]-g_btF)*ppb;
                       if(dy<-0.4f*ppb||dy>4.2f*ppb) continue;
                       int b9=GM.seq[idx];
-                      float cx=(float)W*0.5f+((float)b9-1.5f)*56.f;
+                      float cx=HW*0.5f+((float)b9-1.5f)*56.f;
                       drawText(cx-3.f,hitY-dy,2.4f,BN[b9],BC[b9][0],BC[b9][1],BC[b9][2],0.95f); } }
               /* ---- RIFT RAVAGERS field: the whole cab lives on this overlay ---- */
               if(g_mode==MODE_ARCADE&&ARC_CAB==2&&!g_pause){
-                  float ux=(float)W/1280.f, uy=(float)H/720.f;
+                  float ux=1.f, uy=HH/720.f;   /* the canvas IS 1280 wide */
                   for(int b9=0;b9<24;b9++){ if(!(GM.count&(1<<b9))) continue;
                       int r9=b9/6;
                       float ix=(GM.ax+(b9%6)*64.f)*ux, iy=(GM.az+r9*46.f)*uy;
@@ -19543,9 +19579,9 @@ int main(int argc,char**argv){
           /* ---- THE START MENU OVERLAY: dim the club, three doors ---- */
           if(g_pause){
               { static float dim[12];
-                dim[0]=0;dim[1]=0; dim[2]=(float)W;dim[3]=0; dim[4]=(float)W;dim[5]=(float)H;
-                dim[6]=0;dim[7]=0; dim[8]=(float)W;dim[9]=(float)H; dim[10]=0;dim[11]=(float)H;
-                glUseProgram(uProg); glUniform2f(uScr,(float)W,(float)H);
+                dim[0]=0;dim[1]=0; dim[2]=HW;dim[3]=0; dim[4]=HW;dim[5]=HH;
+                dim[6]=0;dim[7]=0; dim[8]=HW;dim[9]=HH; dim[10]=0;dim[11]=HH;
+                glUseProgram(uProg); glUniform2f(uScr,HW,HH);
                 glUniform4f(uCol,0.01f,0.005f,0.03f,0.62f);
                 glBindBuffer(GL_ARRAY_BUFFER,hudVbo);
                 glBufferData(GL_ARRAY_BUFFER,sizeof dim,dim,GL_DYNAMIC_DRAW);
@@ -19554,19 +19590,19 @@ int main(int argc,char**argv){
                 glDrawArrays(GL_TRIANGLES,0,6); }
               { const char*ttl="PAUSED";
                 float sc9=4.4f; float tw=stb_easy_font_width((char*)ttl)*sc9;
-                drawText(((float)W-tw)*0.5f,(float)H*0.26f,sc9,ttl,0.49f,0.98f,1.0f,0.95f); }
+                drawText((HW-tw)*0.5f,HH*0.26f,sc9,ttl,0.49f,0.98f,1.0f,0.95f); }
               { static const char*PM[3]={"BACK TO THE FLOOR","MAIN MENU","QUIT"};
                 for(int m9=0;m9<3;m9++){
                     float sc9=(m9==g_pauseSel)?2.8f:2.1f;
                     char pl[48]; snprintf(pl,sizeof pl,(m9==g_pauseSel)?"> %s <":"%s",PM[m9]);
                     float tw=stb_easy_font_width(pl)*sc9;
                     float pu=(m9==g_pauseSel)?(0.75f+0.25f*sinf((float)tsec*6.f)):1.f;
-                    if(m9==g_pauseSel) drawText(((float)W-tw)*0.5f,(float)H*0.42f+m9*56.f,sc9,pl,1.0f*pu,0.48f*pu,0.88f*pu,0.97f);
-                    else drawText(((float)W-tw)*0.5f,(float)H*0.42f+m9*56.f,sc9,pl,0.55f,0.60f,0.66f,0.85f); } }
+                    if(m9==g_pauseSel) drawText((HW-tw)*0.5f,HH*0.42f+m9*56.f,sc9,pl,1.0f*pu,0.48f*pu,0.88f*pu,0.97f);
+                    else drawText((HW-tw)*0.5f,HH*0.42f+m9*56.f,sc9,pl,0.55f,0.60f,0.66f,0.85f); } }
               { const char*hint=g_kbActive?"W/S PICK   SPACE OR CLICK CONFIRM   ESC CLOSES"
                                           :"STICK PICK   A CONFIRM   START OR B CLOSE";
                 float sc9=1.5f; float tw=stb_easy_font_width((char*)hint)*sc9;
-                drawText(((float)W-tw)*0.5f,(float)H*0.74f,sc9,hint,0.22f,1.0f,0.54f,0.75f); } }
+                drawText((HW-tw)*0.5f,HH*0.74f,sc9,hint,0.22f,1.0f,0.54f,0.75f); } }
           if(g_chord[0]){   /* bottom-center musinfo: pink chord over cyan band line */
               int cw=(int)(strlen(g_chord)*8*2.0f);
               drawText((720-cw)/2,406,2.0f,g_chord,1.0f,0.48f,0.88f,0.95f); }

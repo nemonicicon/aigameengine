@@ -59,6 +59,12 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
 - **The uninitialised-memory test:** two runs with `MALLOC_PERTURB_=85` and `=170` must print identical
   `[simhash]` lines. They did not, once: the crowd slots were `malloc`'d and three fields were read before
   spawn ever set them. `calloc` the arrays the sim reads; the build matrix runs the A/B on every push.
+- **The tape: `REVA_RECORD=<file>` / `REVA_REPLAY=<file>`.** The pad and keyboard state after the polls, one
+  line a frame; a replay writes it back at the same point and ignores the hardware. Under `REVA_FIXEDSTEP` a
+  replay IS the session (verified: replay hashes identical to the recording, a no-input control differs).
+  Any bug you can reproduce by hand is now a regression test: record it, keep the tape, assert the hash.
+- **The HUD draws on a 1280-wide canvas** (`HW`/`HH` in the HUD block), never in screen pixels: at 1280x720
+  it is pixel-identical to before; at 640 wide or on a composite CRT it scales instead of running off.
 - **`REVA_TIER=pi|low|mid|high|ultra|auto`** (default `high` = the old look). A rung is the 3D render scale
   (a sub-rect of the post target, upsampled by the post quad), the sun map (boot only), bloom, FXAA and the
   cloth substeps. `auto` measures and moves; never under `REVA_FIXEDSTEP`. The lab always draws 1:1.

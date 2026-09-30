@@ -18,14 +18,23 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/stat.h>
-#ifdef _WIN32
+/* [linux-sdl port 2026-09-30] The Windows path was never Windows: it is "SDL2 supplies the
+ * window, the GLES context and the pad", plus four Windows-only calls (_execv/_putenv/_chdir and
+ * the PHOSPHOR handoff). REVA_SDL names the SDL platform; _WIN32 implies it, and -DREVA_SDL builds
+ * the same path on Linux (Mesa EGL/GLES, Xvfb or a real desktop). Without it: KMS on the Pi. */
+#if defined(_WIN32) && !defined(REVA_SDL)
+#define REVA_SDL 1
+#endif
+#ifdef REVA_SDL
 /* [win32 port 2026-08-21] The Pi presents by taking DRM master on card1 and page-flipping GBM
  * buffers. Windows has no KMS, so SDL2 supplies the window, the GLES2 context (via ANGLE) and
  * the gamepad. EGL/GLES2 headers stay common -- ANGLE ships both. The 251 GL calls and all the
  * scene logic are untouched; only ~45 lines of platform code differ. */
 #include <SDL2/SDL.h>
+#ifdef _WIN32
 #include <process.h>   /* _execv: the start menu's MAIN MENU relaunch */
 #include <direct.h>    /* _chdir: the PHOSPHOR grade-A handoff */
+#endif
 #else
 #include <linux/joystick.h>
 #include <xf86drm.h>
@@ -2810,7 +2819,7 @@ static int capLocked(void){
     return v; }
 static void jsPoll(double tsec){
     if(capLocked()) return;
-#ifdef _WIN32
+#ifdef REVA_SDL
     /* [win32 port] Same state, same semantics, via SDL_GameController. The F310 in
      * XInput mode reports triggers as 0..32767 here (not the -32767..32767 the raw
      * joystick node gives), so RT needs /32767 rather than the (v+32767)/65534 form. */
@@ -2901,7 +2910,7 @@ static void kbPoll(double tsec){
      * had not been told to walk. A simulated key is deliberate; only hardware is locked. */
     { static const char*ksim=(const char*)1; if(ksim==(const char*)1) ksim=getenv("REVA_KBSIM");
       if(capLocked()&&!ksim) return; }
-#ifdef _WIN32
+#ifdef REVA_SDL
     const Uint8*ks=SDL_GetKeyboardState(NULL);
     if(!ks) return;
     /* REVA_KBSIM=<chars> holds keys down for the bench (w a s d, space, e, q, m = mouse
@@ -2958,7 +2967,7 @@ static void kbPoll(double tsec){
 #endif
 }
 
-#ifdef _WIN32
+#ifdef REVA_SDL
 /* ================= CHARACTER SELECT (jacob 08-25: "a character select screen with reva
  * and kaeli as a start") =============================================================
  * Runs BEFORE the crowd loads: its own scene on the shared GL context, its own little
@@ -13570,7 +13579,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
 }
 
 /* ---------- KMS flip machinery ---------- */
-#ifndef _WIN32
+#ifndef REVA_SDL
 static struct gbm_bo *g_prevBo=NULL; static unsigned g_prevFb=0;
 static struct gbm_bo *g_prev2Bo=NULL; static unsigned g_prev2Fb=0;
 #endif   /* pipelined flips keep TWO retired bos alive */
@@ -13601,7 +13610,7 @@ int main(int argc,char**argv){
     srand(g_bench?12345u:(unsigned)time(NULL));
     signal(SIGINT,onsig); signal(SIGTERM,onsig);
 
-#ifdef _WIN32
+#ifdef REVA_SDL
     /* [win32] SDL2 window + GLES2 context. No mode enumeration -- the window IS the mode.
      * argv[4]=WxH still forces a size, matching the bench path. */
     int W = g_benchW>0 ? g_benchW : 1280;
@@ -13735,7 +13744,7 @@ int main(int argc,char**argv){
     /* WHAT ARE WE PLAYING, AND AS WHOM: mode select first, then the character select
      * (argv[3] names a pack outright; absent or "select", the screen decides). Windows
      * only; on the Pi the argv behavior is unchanged and REVA_MODE/REVA_SKATE pick modes. */
-#ifdef _WIN32
+#ifdef REVA_SDL
     g_mode=modeSelect(g_win,W,H);
     saveLoad(); atexit(saveFlush);   /* the club remembers: see THE SAVE FILE above */
     saveSetI("last.mode",g_mode); saveSetI("last.variant",g_modeVariant); saveSetI("nights",saveGetI("nights",0)+1);
@@ -13757,7 +13766,7 @@ int main(int argc,char**argv){
     if(g_mode==MODE_SKATE||g_mode==MODE_SCOOT){ g_skate=1; printf("SKATE PHYSICS ON (%s)\n",MODE_NAME[g_mode]); }
     char heroPick[512]={0};
     if(argc>3&&strcmp(argv[3],"select")) snprintf(heroPick,sizeof heroPick,"%s",argv[3]);
-#ifdef _WIN32
+#ifdef REVA_SDL
     else { const char*pk=charSelect(g_win,W,H); if(pk) snprintf(heroPick,sizeof heroPick,"%s",pk); }
 #endif
 
@@ -14807,7 +14816,7 @@ int main(int argc,char**argv){
         uVP=PR[i].uVP; uModel=PR[i].uModel; uBind=PR[i].uBind; uPal=PR[i].uPal; uTint=PR[i].uTint; uUse=PR[i].uUse; g_curNrmLoc=PR[i].uNrm; } }while(0)
 
     double t0=now_ms(), lastStat=t0; long frames=0; int first=1;
-#ifndef _WIN32
+#ifndef REVA_SDL
     drmEventContext evctx; memset(&evctx,0,sizeof evctx);
     evctx.version=2; evctx.page_flip_handler=flipHandler;
 #endif
@@ -19463,7 +19472,7 @@ int main(int argc,char**argv){
            * On a PROGRESSIVE mode the loop already renders whole frames -- halving
            * there is the same lie inverted, so the divisor follows the mode. */
           snprintf(ln,sizeof ln,"SOC %.1fC  FLD %.0f  FPS %.0f",g_soc,fpsAvg,
-#ifdef _WIN32
+#ifdef REVA_SDL
               fpsAvg);   /* [win32] a window is always progressive: no field halving */
 #else
               fpsAvg*((mode.flags&DRM_MODE_FLAG_INTERLACE)?0.5f:1.0f));
@@ -19589,7 +19598,7 @@ int main(int argc,char**argv){
           glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST); curProg=-1; }
         if(g_bench) glFinish();   /* make the GPU actually finish so the number means something */
         workAcc+=now_ms()-frameT0; workN++;
-#ifdef _WIN32
+#ifdef REVA_SDL
         /* HEADLESS FRAME DUMP: REVA_SHOT=<frame> writes that presented frame to
          * REVA_SHOT_PATH (default /tmp/reva-shot.ppm) and exits, so a change can be
          * judged on pixels without taking over the desktop. Off unless asked for. */

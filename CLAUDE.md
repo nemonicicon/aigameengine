@@ -21,6 +21,17 @@ the engine prints `FATAL: no packs` until a character is baked into `reva_native
   Microsoft Store `python` alias. ⛔ The Windows console is cp1252: a script that prints a non-ASCII
   glyph dies unless it reconfigures stdout to UTF-8.
 
+## Build & run (Linux, 2026-09-30)
+- `reva_native/build_linux.sh` → `crowd_linux`: the SDL platform (`-DREVA_SDL`) on Mesa. `_WIN32` implies
+  `REVA_SDL`; without either the file is the Pi's KMS renderer. Deps: `libsdl2-dev libgles-dev libegl-dev
+  libstb-dev`; headless adds `xvfb libgl1-mesa-dri` (llvmpipe renders every pass the club has).
+- Run: `REVA_WINDOWED=1 xvfb-run -a -s "-screen 0 1280x720x24" stdbuf -o0 ./crowd_linux 400 packs select`.
+  ⛔ Without `stdbuf -o0` a piped log is block-buffered and ends at the kill with nothing in it.
+- Lab bench: `.claude/skills/run-reva/linux_lab.py <pack> <clip> <outdir>` — one body, the four lab cams,
+  a PNG per angle. `driver.py` is still Windows-only (taskkill, crowd.exe).
+- ⛔ `holly.hlm` (the venue-screen head) is content: a missing one now logs `NO HEAD MODEL` and the floor
+  runs with dark screens instead of dying in `load_model`.
+
 ## Headless verification instruments (env, all off by default)
 `REVA_FIXEDSTEP=<fps>` replaces wall time with one virtual step per rendered frame (and pins the crowd's
 seed) — it is what makes any capture comparable. `REVA_SHOT=<frame>` ARMS a capture (`REVA_SHOT_PATH`

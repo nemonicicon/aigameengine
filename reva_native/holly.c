@@ -17,6 +17,12 @@
 //   ./holly [udp-port]
 
 #define _GNU_SOURCE
+/* [linux-sdl port 2026-09-30] The DRM/GBM half is the STANDALONE renderer only. holly_fbo.c
+ * (inside the club) needs the model + shader half on any platform: Windows, or Linux built
+ * with -DREVA_SDL, where the club presents through SDL and no KMS device is open. */
+#if defined(_WIN32) || defined(REVA_SDL)
+#define HOLLY_NO_KMS 1
+#endif
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
@@ -25,7 +31,7 @@
 #endif
 #include <errno.h>
 #include <fcntl.h>
-#ifndef _WIN32
+#ifndef HOLLY_NO_KMS
 #include <gbm.h>
 #endif
 #include <math.h>
@@ -40,10 +46,10 @@
 #endif
 #include <time.h>
 #include <unistd.h>
-#ifndef _WIN32
+#ifndef HOLLY_NO_KMS
 #include <xf86drm.h>
 #endif
-#ifndef _WIN32
+#ifndef HOLLY_NO_KMS
 #include <xf86drmMode.h>
 #endif
 
@@ -255,7 +261,7 @@ static void shape_weights(const Model *m, float open, float wide, float seal, fl
   for (uint32_t i = m->morph_count; i < MAX_MORPHS; i++) out[i] = 0;
 }
 
-#ifndef _WIN32   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
+#ifndef HOLLY_NO_KMS   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
 // -------------------------------------------------------------- display ----
 
 typedef struct {
@@ -463,7 +469,7 @@ static void display_finish(Display *d) {
   close(d->fd);
 }
 
-#endif   /* !_WIN32 */
+#endif   /* !HOLLY_NO_KMS */
 // ------------------------------------------------------------- shaders ----
 
 static const char *HEAD_VS =
@@ -611,7 +617,7 @@ static GLuint link_program(const char *vs, const char *fs) {
   return p;
 }
 
-#ifndef _WIN32   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
+#ifndef HOLLY_NO_KMS   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
 // ---------------------------------------------------------------- mouth ----
 
 // Three floats behind a magic number. Deliberately not JSON: the sender is ours
@@ -649,7 +655,7 @@ static bool mouth_poll(int sock, Mouth *out) {
   return got;
 }
 
-#endif   /* !_WIN32 */
+#endif   /* !HOLLY_NO_KMS */
 // ----------------------------------------------------------- interior ----
 
 // A dental arch, as a slice of a torus. A straight bar across the mouth reads
@@ -707,7 +713,7 @@ static const float RIG_PRESS = 0.012f;
 static const float RIG_EDGE = 0.05f, RIG_EDGE_SHARP = 1.5f, RIG_LIFT = 1.1f;
 static const float CAMERA_Z = 5.4f, DISPLAY_ASPECT = 4.0f / 3.0f;
 
-#ifndef _WIN32   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
+#ifndef HOLLY_NO_KMS   /* [win32 port 2026-08-21] standalone-only: holly_fbo.c uses the model+shader half offscreen */
 int main(int argc, char **argv) {
   int port = argc > 1 ? atoi(argv[1]) : DEFAULT_PORT;
   signal(SIGINT, on_signal);
@@ -965,4 +971,4 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-#endif   /* !_WIN32 */
+#endif   /* !HOLLY_NO_KMS */

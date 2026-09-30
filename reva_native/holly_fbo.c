@@ -34,6 +34,14 @@ int holly_fbo_init(int w, int h, const char *model_path) {
   H.w = w > 0 ? w : 160;
   H.h = h > 0 ? h : 120;
 
+  /* [2026-09-30] holly.hlm is CONTENT (not in the repo). load_model() die()s on a missing file,
+   * which took the whole club down on a checkout that has the engine and no head -- while every
+   * caller already treats a failed init as "no screens tonight" (holly_fbo_texture()==0). Say it
+   * loudly and let the floor run. */
+  { const char *mp = model_path ? model_path : "holly.hlm";
+    FILE *probe = fopen(mp, "rb");
+    if (!probe) { fprintf(stderr, "[holly] ⛔ NO HEAD MODEL: %s (%s) -- venue screens stay dark\n", mp, strerror(errno)); return 0; }
+    fclose(probe); }
   H.model = load_model(model_path ? model_path : "holly.hlm");
   H.rigged = H.model.morph_count > 0;
   fprintf(stderr, "[holly] model %u verts, %u tris, %ux%u texture%s\n", H.model.vertex_count,

@@ -21,6 +21,7 @@ reva_native/crowd_kms
 reva_native/crowd_bench
 reva_native/first_pixel
 reva_native/skin_one
+reva_native/crowd_linux
 *.jpg
 *.png
 

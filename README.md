@@ -69,6 +69,26 @@ So **the engine boots to `FATAL: no packs` until you bake a character** (below).
 5. Run: `REVA_WINDOWED=1 ./crowd.exe 400 packs select` (fullscreen without `REVA_WINDOWED`), or drive it
    headless with `.claude/skills/run-reva/driver.py` (`build`, `lab`, `bench`, `scene`, `up`/`--live`).
 
+## Quick start (Linux)
+
+The same file builds against SDL2 + Mesa with `-DREVA_SDL` (the Windows path was always "SDL2 supplies the
+window and the GLES context"; only the `_execv`/PHOSPHOR handoff lines are Win32). No GPU needed: Mesa's
+llvmpipe under Xvfb renders every pass the club has, at 30 fps fixed-step.
+
+```bash
+sudo apt-get install libsdl2-dev libgles-dev libegl-dev libstb-dev xvfb libgl1-mesa-dri
+pip install numpy Pillow
+mkdir -p reva_native/packs
+python3 skate_src/glb2rpack_anim.py godot/characters/clanker/clanker.glb reva_native/packs/v1_clanker.rpack --keepnames
+reva_native/build_linux.sh                        # -> reva_native/crowd_linux
+cd reva_native && REVA_WINDOWED=1 xvfb-run -a -s "-screen 0 1280x720x24" stdbuf -o0 ./crowd_linux 400 packs select
+# one body, four lab cameras, a PNG per angle:
+python3 .claude/skills/run-reva/linux_lab.py reva_native/packs/v1_clanker.rpack z_rm_sk_ride out/clanker_lab
+```
+
+`REVA_SHOT`, `REVA_FIXEDSTEP` and the rest of the instruments work unchanged; `driver.py` is still the
+Windows driver. The Pi build (KMS/DRM, no SDL) is what you get without `-DREVA_SDL`.
+
 ## Where to start reading
 
 - `CLAUDE.md` — the build, the instruments (`REVA_*` environment switches) and the laws.

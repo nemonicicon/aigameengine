@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """autoweights.py -- bind a mesh to its skeleton, in the house (homecoming H4).
 
-    autoweights.py in.glb out.glb [--rigid-pieces]
+    autoweights.py in.glb out.glb [--rigid-pieces | --hybrid-pieces]
+
+--rigid-pieces: every index-connected piece rides one bone. --hybrid-pieces: pieces of the WELDED
+mesh; a piece that spans one bone rides it rigidly, a piece that spans a joint (a limb modelled as
+one tube, a torso along its spine) is smooth over exactly the bones it spans.
 
 Distance-with-visibility weighting, Pinocchio-flavored: per vertex, candidate bones
 score by distance to the bone's capsule segment; a candidate whose path from vertex to
@@ -94,16 +98,33 @@ def main():
     for i, n in enumerate(gj["nodes"]):
         for c in n.get("children", []):
             if i in heads and c in heads: kids[i].append(c)
-    # bone segments in mesh space: head -> mean of children (leaf: short stub upward
-    # from the parent direction)
+    # bone segments in mesh space: head -> mean of children. A LEAF takes its END NODE as the tail
+    # (a plain child node named *End* -- statue2body writes HeadEnd / *HandEnd / *ToeEnd, Mixamo writes
+    # *_End): ⛔ the old leaf rule was a 2 cm stub pointing world-UP, so a hand's claw or fist sat equally
+    # far from the forearm's end and the hand's stub and was split between them by a coin toss
+    # (Kanden, 10-05). Only with no end node does the stub remain.
+    ends = defaultdict(list)
+    for i, n in enumerate(gj["nodes"]):
+        if i in heads or "mesh" in n or n.get("children"):
+            continue
+        if "end" not in n.get("name", "").lower():
+            continue
+        for p, pn in enumerate(gj["nodes"]):
+            if i in pn.get("children", []) and p in heads:
+                ends[p].append(i)
     segs = []
     for bi, j in enumerate(joints):
         h = heads[j]
         if kids[j]:
             t = [sum(heads[c][k] for c in kids[j]) / len(kids[j]) for k in range(3)]
+        elif ends[j]:
+            t = [sum(W[c][12 + k] for c in ends[j]) / len(ends[j]) for k in range(3)]
         else:
             t = [h[0], h[1] + 0.02, h[2]]
         segs.append((bi, h, t))
+    _jn = [gj["nodes"][j].get("name", "?") for j in joints]
+    print("leaf tails from end nodes: %s" % (", ".join("%s->%s" % (_jn[bi], gj["nodes"][ends[j][0]].get("name"))
+                                                       for bi, j in enumerate(joints) if not kids[j] and ends[j]) or "none"))
     print("skeleton: %d joints, %d segments" % (len(joints), len(segs)))
 
     # ---- BVH over triangles for the visibility gate ----
@@ -241,14 +262,118 @@ def main():
         names = [gj["nodes"][j].get("name", "?") for j in joints]
         print("rigid pieces: %d pieces -> %s" % (len(pick), ", ".join("%s %d" % (names[b], n) for b, n in sorted(census.items(), key=lambda kv: -kv[1]))))
 
+    # ⭐ --hybrid-pieces (10-05, Kanden round 2): RIGID where a piece is one plate, SMOOTH where a
+    # piece is a limb that bends. Kanden's statue is 16 physical pieces, and his upper arm and forearm
+    # are ONE of them: --rigid-pieces can only ride that whole arm on one bone, so a straightened
+    # elbow left the forearm at its old angle; plain smooth weights let the arm bones reach into the
+    # torso's shoulder pads and drag them. Here:
+    #   * a piece is a connected component of the WELDED mesh -- coincident vertices merged. ⛔ The
+    #     index graph splits every UV / normal seam: 414 "pieces" on Kanden, 690 on Noxus, where the
+    #     bodies have 16 and 19, and --rigid-pieces rode the fragments of one plate on different bones.
+    #   * per piece, the census: each vertex's NEAREST bone segment. A bone the piece SPANS owns
+    #     >= 10 % of it and those vertices cover >= half the bone's length (5..95 % of their
+    #     projections). A piece that spans one bone (or none) rides its top owner, weight 1: a fist,
+    #     a cannon ring, a thigh, a shin -- the joint near its end does not make it bend.
+    #   * a piece that spans two or more bones is a limb across a joint (the arm tube: upper arm +
+    #     forearm + the clavicle at its top) or a trunk (the torso along the spine): smooth weights
+    #     over THOSE bones only (inverse 4th power: the blend stays near the joint), two Laplacian
+    #     passes inside the piece. The pads never see an arm bone; the arm never sees the hip.
+    if "--hybrid-pieces" in sys.argv:
+        import numpy as np
+        Pa = np.array(P, dtype=float)
+        nv = len(Pa)
+        diag = float(np.linalg.norm(Pa.max(0) - Pa.min(0))) or 1.0
+        parent = list(range(nv))
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]; a = parent[a]
+            return a
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb: parent[rb] = ra
+        for (a, b, c) in tris:
+            union(a, b); union(a, c)
+        weld = {}
+        for vi, key in enumerate(map(tuple, np.round(Pa / (diag * 1e-5)).astype(np.int64))):
+            if key in weld: union(weld[key], vi)
+            else: weld[key] = vi
+        root = np.array([find(v) for v in range(nv)])
+        H = np.array([s[1] for s in segs], dtype=float); Tt = np.array([s[2] for s in segs], dtype=float)
+        D = np.empty((nv, len(segs))); U = np.empty((nv, len(segs)))
+        for si in range(len(segs)):
+            ab = Tt[si] - H[si]; l2 = float(ab @ ab) or 1e-12
+            u = np.clip((Pa - H[si]) @ ab / l2, 0.0, 1.0)
+            D[:, si] = np.linalg.norm(Pa - (H[si] + u[:, None] * ab), axis=1); U[:, si] = u
+        near = D.argmin(1)
+        names = [gj["nodes"][j].get("name", "?") for j in joints]
+        wadj = defaultdict(set)
+        for (a, b, c) in tris:
+            wadj[a] |= {b, c}; wadj[b] |= {a, c}; wadj[c] |= {a, b}
+        by_root = defaultdict(list)
+        for vi in range(nv): by_root[root[vi]].append(vi)
+        # welded neighbours: coincident copies share their neighbourhoods
+        twins = defaultdict(list)
+        for vi, key in enumerate(map(tuple, np.round(Pa / (diag * 1e-5)).astype(np.int64))): twins[key].append(vi)
+        for grp in twins.values():
+            if len(grp) > 1:
+                allnb = set().union(*(wadj[v] for v in grp))
+                for v in grp: wadj[v] = allnb - {v}
+        JN2, WN2 = [None] * nv, [None] * nv
+        report = []
+        for r, vs in sorted(by_root.items(), key=lambda kv: -len(kv[1])):
+            vs = np.array(vs); n = len(vs)
+            cnt = np.bincount(near[vs], minlength=len(segs))
+            spans = []
+            for si in np.argsort(-cnt):
+                if cnt[si] < max(1, 0.10 * n): break
+                uu = U[vs[near[vs] == si], si]
+                if np.percentile(uu, 95) - np.percentile(uu, 5) >= 0.5: spans.append(int(si))
+            top = int(np.argmax(cnt))
+            if len(spans) <= 1:
+                b = spans[0] if spans else top
+                for v in vs: JN2[v], WN2[v] = [b, 0, 0, 0], [1.0, 0.0, 0.0, 0.0]
+                report.append((n, 'rigid %s' % names[b]))
+                continue
+            sp = np.array(spans)
+            w = 1.0 / (D[np.ix_(vs, sp)] ** 4 + 1e-10)
+            w /= w.sum(1, keepdims=True)
+            loc = {v: i for i, v in enumerate(vs)}
+            for _pass in range(2):
+                w2 = w.copy()
+                for i, v in enumerate(vs):
+                    nb = [loc[x] for x in wadj[v] if x in loc]
+                    if nb: w2[i] = 0.6 * w[i] + 0.4 * w[nb].mean(0)
+                w = w2 / w2.sum(1, keepdims=True)
+            for i, v in enumerate(vs):
+                order = np.argsort(-w[i])[:4]
+                ws = w[i][order]; ws = ws / ws.sum()
+                jj = [int(sp[o]) for o in order] + [0] * (4 - len(order))
+                ww = [float(x) for x in ws] + [0.0] * (4 - len(order))
+                JN2[v], WN2[v] = jj, ww
+            report.append((n, 'SMOOTH over %s' % '+'.join(names[s] for s in spans)))
+        frag = list(range(nv))
+        def ffind(a):
+            while frag[a] != a:
+                frag[a] = frag[frag[a]]; a = frag[a]
+            return a
+        for (a, b, c) in tris:
+            for x in (b, c):
+                ra, rx = ffind(a), ffind(x)
+                if ra != rx: frag[rx] = ra
+        print("hybrid pieces: %d welded pieces (the index graph alone splits them into %d fragments)"
+              % (len(by_root), len(set(ffind(v) for v in range(nv)))))
+        for n, what in report:
+            print("  piece %5d verts: %s" % (n, what))
+        JN, WN = JN2, WN2
+
     # one smoothing pass over the mesh graph (none for rigid pieces)
     adj = defaultdict(set)
     for (a, b, c) in tris:
         adj[a] |= {b, c}; adj[b] |= {a, c}; adj[c] |= {a, b}
     JN2, WN2 = [], []
-    if "--rigid-pieces" in sys.argv:
+    if "--rigid-pieces" in sys.argv or "--hybrid-pieces" in sys.argv:
         JN2, WN2 = JN, WN
-    for vi in range(len(P) if "--rigid-pieces" not in sys.argv else 0):
+    for vi in range(len(P) if "--rigid-pieces" not in sys.argv and "--hybrid-pieces" not in sys.argv else 0):
         acc = defaultdict(float)
         for bi, w in zip(JN[vi], WN[vi]): acc[bi] += w*0.6
         nn = adj[vi] or {vi}

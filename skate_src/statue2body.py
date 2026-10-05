@@ -243,6 +243,26 @@ def rig(src, dst, facing=None, marks=None):
     for (nm, par, tail) in CHAIN:
         if par:
             gj["nodes"][idx[par]].setdefault("children", []).append(idx[nm])
+    # ⭐ THE TAILS SURVIVE (10-05, Kanden round 2). A leaf joint's direction lived only in the marks
+    # file: the 22 joints carry no tail, so autoweights gave each hand a 2 cm stub pointing UP and the
+    # T-pose solver never aimed a hand at all -- Kanden's fist stayed cocked on a dead-straight arm.
+    # HeadEnd / LeftHandEnd / RightHandEnd / LeftToeEnd / RightToeEnd are written as plain END NODES:
+    # children of their bone, NOT skin joints (the skin stays 22), the Mixamo *_End convention.
+    # autoweights takes one as its bone's tail; tpose aims the bone at it.
+    for (nm, par, tail) in CHAIN:
+        if any(t == tail for (t, _p, _tl) in CHAIN) or tail not in L:
+            continue
+        w, pw = L[tail], L[nm]
+        gj["nodes"].append({"name": tail, "translation": [w[0]-pw[0], w[1]-pw[1], w[2]-pw[2]]})
+        gj["nodes"][idx[nm]].setdefault("children", []).append(len(gj["nodes"]) - 1)
+    # ⭐ HeadFront (optional mark): a point straight in front of the FACE. A statue's head can be turned
+    # on its body -- Kanden's faces +z while his torso faces 15 deg off it, so squaring the body turned
+    # his face 18 deg away -- and no joint position says which way a head looks. tpose.py turns the head
+    # so Head -> HeadFront points forward. A plain node like the ends (not *End*: it is no bone's tail).
+    if marks and "HeadFront" in given:
+        w, pw = given["HeadFront"], L["Head"]
+        gj["nodes"].append({"name": "HeadFront", "translation": [w[0]-pw[0], w[1]-pw[1], w[2]-pw[2]]})
+        gj["nodes"][idx["Head"]].setdefault("children", []).append(len(gj["nodes"]) - 1)
     scene = gj["scenes"][gj.get("scene", 0)]
     scene["nodes"].append(idx["Hips"])
     # inverse binds: pure translations
@@ -310,7 +330,8 @@ def rig(src, dst, facing=None, marks=None):
                                        "target": {"node": idx["Hips"], "path": "translation"}}]}]
     gj["buffers"][0]["byteLength"] = len(bin_)
     write_glb(gj, bin_, dst)
-    print("rigged: 22 joints -> %s" % dst)
+    print("rigged: 22 joints + %d plain nodes (%s) -> %s" % (
+        len(gj["nodes"]) - base - len(CHAIN), " ".join(n["name"] for n in gj["nodes"][base + len(CHAIN):]), dst))
 
 if __name__ == "__main__":
     cmd, src, dst = sys.argv[1], sys.argv[2], sys.argv[3]

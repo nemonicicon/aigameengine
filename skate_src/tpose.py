@@ -17,7 +17,11 @@ its write:
 The solve is aim-based, parent-first, with the authoring kit's own primitives (authorlib
 aim_bone: shortest arc, so the roll of a bone changes as little as it can). Each limb is aimed
 at the direction a T-pose gives it, the side taken from where the hand or foot actually IS, not
-from the name. Baking: new world matrices W' from the posed locals; a vertex goes through its
+from the name. Since Kanden (10-05, round 2): the pelvis is first SQUARED to the hip line (a
+statue's stance is turned); a bent elbow or knee straightens with its ROLL set (elbow points
+back, kneecaps forward, the same on both sides); a hand is aimed at its End node; a foot keeps
+its statue pitch (flat) and turns to face forward; a HeadFront node turns the face forward; and
+the tool lifts the pelvis so the lowest vertex stands where the statue's stood. Baking: new world matrices W' from the posed locals; a vertex goes through its
 old palette into rig space and comes back out of the new one, so the body does not move -- its
 REST moves to meet it. Inverse binds become inv(W'), the bind matrix identity, and every clip
 that lacked a rotation track for a bone the solve moved gets one holding the OLD rest, so an
@@ -37,7 +41,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, 'author'))
 import rpackwrite as RW
-from authorlib import fk_world, aim_bone, qmul, qinv, qnorm, qrot, q_between, q_axis_angle
+from authorlib import fk_world, aim_bone, rotate_bone_world, qmul, qinv, qnorm, qrot, q_between, q_axis_angle
 import retarget
 
 CANON_KEYS = ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'head',
@@ -168,6 +172,56 @@ def _len(v):
     return math.sqrt(sum(x * x for x in v))
 
 
+def _unit(v):
+    L = _len(v) or 1.0
+    return [x / L for x in v]
+
+
+def _dot(a, b):
+    return sum(a[k] * b[k] for k in range(3))
+
+
+def _cross(a, b):
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+
+def _perp(v, axis):
+    """the part of v perpendicular to the unit axis"""
+    d = _dot(v, axis)
+    return [v[k] - d * axis[k] for k in range(3)]
+
+
+def _bend(nodes, qov, a, b, c):
+    """(bend angle in degrees, the joint's convex-side direction) of the chain a-b-c as posed now: for a
+    knee the convex side is the kneecap, for an elbow the point of the elbow"""
+    wp, _ = fk_world(nodes, qov)
+    u, f = _unit(_dir(wp[a], wp[b])), _unit(_dir(wp[b], wp[c]))
+    ang = math.degrees(math.acos(max(-1.0, min(1.0, _dot(u, f)))))
+    return ang, _unit(_perp([u[k] - f[k] for k in range(3)], u))
+
+
+def aim_pole(nodes, bone, child, target_dir, pole_now, pole_target, q_override=None):
+    """aim_bone with the ROLL decided: a new local q for `bone` so bone->child points along target_dir
+    AND the direction pole_now (a world direction riding on the bone, e.g. a kneecap) ends up as
+    close to pole_target as the aim allows. Shortest arc first, then the twist about the new axis."""
+    wp, wq = fk_world(nodes, q_override)
+    p = nodes[bone]["parent"]
+    rp = wq[p] if p >= 0 else [0, 0, 0, 1]
+    cur = _dir(wp[bone], wp[child])
+    A1 = q_between(cur, target_dir)
+    t = _unit(target_dir)
+    a = _perp(qrot(A1, pole_now), t)
+    b = _perp(pole_target, t)
+    if _len(a) < 1e-6 or _len(b) < 1e-6:
+        A = A1
+    else:
+        a, b = _unit(a), _unit(b)
+        ang = math.atan2(_dot(_cross(a, b), t), _dot(a, b))
+        A = qmul(q_axis_angle(t, ang), A1)
+    rl = (q_override or {}).get(bone, nodes[bone]["q"])
+    return qnorm(qmul(qinv(rp), qmul(A, qmul(rp, rl))))
+
+
 def solve_tpose(nodes, RM, facing=None, report=print):
     """Return {node: local q} posing the resolved limbs into a T-pose. facing: the world axis the
     body faces, auto-detected from the toes when None. Bones the map lacks are left alone, loudly."""
@@ -198,12 +252,61 @@ def solve_tpose(nodes, RM, facing=None, report=print):
             return
         qov[bone] = aim_bone(nodes, bone, child, target, qov)
 
-    # 1. the spine, up: pelvis is left where it is (it is the root of the pose), each spine bone
-    #    aims at the next, the last at the neck, the neck at the head
+    def aim_limb(bone, child, tip, target, pole_target, what):
+        """aim bone->child at target; when the joint at `child` is bent (> 15 deg), with the ROLL
+        set so the joint's convex side faces pole_target. Shortest-arc aims leave each limb's roll
+        to its stance: Kanden's two arms came out of one statue rolled 45 deg apart (10-05)."""
+        if bone < 0 or child < 0 or bone == child:
+            return
+        if tip >= 0 and tip != child:
+            ang, pole = _bend(nodes, qov, bone, child, tip)
+            if ang > 15.0:
+                qov[bone] = aim_pole(nodes, bone, child, target, pole, pole_target, qov)
+                if report:
+                    report('  %s: bent %.0f deg, its %s turned to %s' % (names[bone], ang, what, pole_target))
+                return
+        aim(bone, child, target)
+
+    # 0. SQUARE THE BODY (10-05, Kanden round 2): a statue mid-stance is turned -- Kanden's torso
+    #    15 deg about y and 2.6 deg over, his hips with it -- and a T-pose that straightens limbs on a
+    #    turned body puts one arm and one leg ahead of the other. The pelvis turns so the hip line
+    #    (right hip -> left hip) lies along x; everything rides it. Only a TURN is corrected (< 45 deg):
+    #    a body facing the other way is the importers' --yaw, never this
+    pel, tl, tr = RM.get('pelvis', -1), RM.get('thigh_l', -1), RM.get('thigh_r', -1)
+    if pel >= 0 and tl >= 0 and tr >= 0:
+        h = _unit(_dir(wp[tr], wp[tl]))
+        want = [fz, 0.0, 0.0]               # his left is +x when he faces +z
+        off = math.degrees(math.acos(max(-1.0, min(1.0, _dot(h, want)))))
+        if 0.5 < off < 45.0:
+            p = nodes[pel]['parent']
+            rp = wq[p] if p >= 0 else [0, 0, 0, 1]
+            qov[pel] = qnorm(qmul(qinv(rp), qmul(q_between(h, want), qmul(rp, nodes[pel]['q']))))
+            if report:
+                report('  square: the hip line was %.1f deg off x (turned %+.1f, tilted %+.1f) -- the pelvis squared to it'
+                       % (off, math.degrees(math.atan2(h[2], h[0])), math.degrees(math.asin(max(-1.0, min(1.0, h[1]))))))
+        elif report and off >= 45.0:
+            report('  square: the hip line is %.0f deg off x -- NOT a turn; left alone (wrong facing? --yaw)' % off)
+
+    # 1. the spine, up: each spine bone aims at the next, the last at the neck, the neck at the head
     sp = [RM[k] for k in ('spine_01', 'spine_02', 'spine_03') if RM[k] >= 0]
     chain = sp + ([RM['neck_01']] if RM['neck_01'] >= 0 else []) + ([RM['head']] if RM['head'] >= 0 else [])
     for a, b in zip(chain, chain[1:]):
         aim(a, b, up)
+    # 1b. the FACE forward: a head turned on its body stays turned when the body is squared (Kanden's
+    #     faced +z on a torso turned 15 deg; squared, his face looked 18 deg to his left). A HeadFront
+    #     node (statue2body writes one from the mark) says where the face points; the head turns about
+    #     the vertical until it points along the facing. No HeadFront: the head keeps its turn.
+    head = RM['head']
+    front = next((i for i, nd in enumerate(nodes) if nd['parent'] == head and 'front' in nd['name'].lower()), -1) if head >= 0 else -1
+    if front >= 0:
+        wp2, _ = fk_world(nodes, qov)
+        f = _dir(wp2[head], wp2[front])
+        turn = math.atan2(0.0, fz) - math.atan2(f[0], f[2])
+        turn = math.atan2(math.sin(turn), math.cos(turn))
+        if abs(math.degrees(turn)) < 60.0:
+            qov[head] = rotate_bone_world(nodes, head, [0.0, 1.0, 0.0], turn, qov)
+            if report:
+                report('  %s: the face looked %+.0f deg off the facing -- turned to face %sz' % (names[head], -math.degrees(turn), '+' if fz > 0 else '-'))
     # 2. the arms: the side is where the hand IS (names lie, mirrored exports exist)
     for s in 'lr':
         ua, la, hd, cl = RM['upperarm_' + s], RM['lowerarm_' + s], RM['hand_' + s], RM['clavicle_' + s]
@@ -217,21 +320,25 @@ def solve_tpose(nodes, RM, facing=None, report=print):
             # the clavicle straight out to the side too: a twisted stance pulls one shoulder back
             # (Noxus, 10-05) and a T-pose with one arm behind the other is not a T-pose
             aim(cl, ua, out)
-        aim(ua, la, out)
+        # the elbow's point faces BACK: arms out, palms down -- the same roll on both sides
+        aim_limb(ua, la, hd, out, [0.0, 0.0, -fz], 'elbow point')
         aim(la, hd, out)
         if hd >= 0:
+            # the hand along the forearm: aimed at its END NODE (the fist's far side, a cannon's tip)
             tip = _far_child(nodes, names, hd, 'end')
             if tip >= 0:
                 aim(hd, tip, out)
-    # 3. the legs, straight down; the foot forward
+            elif report:
+                report('  %s: no end node -- the hand keeps its bend (rig it with a HandEnd)' % names[hd])
+    # 3. the legs, straight down, the kneecaps forward; the foot forward and FLAT
     for s in 'lr':
         th, ca, ft, bl = RM['thigh_' + s], RM['calf_' + s], RM['foot_' + s], RM['ball_' + s]
         if th < 0:
             continue
-        aim(th, ca, [0.0, -1.0, 0.0])
+        aim_limb(th, ca, ft, [0.0, -1.0, 0.0], [0.0, 0.0, fz], 'kneecap')
         aim(ca, ft, [0.0, -1.0, 0.0])
         if ft >= 0 and bl >= 0 and bl != ft:
-            wp2, _ = fk_world(nodes, qov)
+            wp2, wq2 = fk_world(nodes, qov)
             d = _dir(wp2[ft], wp2[bl])
             shin = _len(_dir(wp2[ca], wp2[ft])) if ca >= 0 else 0.0
             if _len(d) > 0.5 * shin and shin > 0:
@@ -243,7 +350,17 @@ def solve_tpose(nodes, RM, facing=None, report=print):
                 if tip >= 0 and tip != bl:
                     aim(bl, tip, [0.0, -0.3, fz])
             else:
-                aim(ft, bl, [0.0, min(0.0, d[1]) if _len(d) > 1e-9 else 0.0, fz * abs(d[2]) if abs(d[2]) > 1e-6 else fz])
+                # ⛔ the old aim kept the drop the foot had AFTER the shin was straightened (Kanden's left
+                # shin leaned 30 deg: the foot came out pitched by it) and dropped the sideways part of
+                # a splayed foot from its length (steeper still). The foot keeps its STATUE orientation
+                # in the world -- the sole lay flat on the ground there -- turned about y to face forward
+                d0 = _dir(wp[ft], wp[bl])
+                turn = math.atan2(0.0, fz) - math.atan2(d0[0], d0[2])
+                want = qmul(q_axis_angle([0.0, 1.0, 0.0], turn), wq[ft])
+                p = nodes[ft]['parent']
+                qov[ft] = qnorm(qmul(qinv(wq2[p]) if p >= 0 else [0, 0, 0, 1], want))
+                if report:
+                    report('  %s: turned %+.0f deg to face %sz, its statue pitch kept (sole flat)' % (names[ft], math.degrees(turn), '+' if fz > 0 else '-'))
     if report:
         report('  tpose: %d bones re-aimed' % len(qov))
     return qov
@@ -271,6 +388,45 @@ def symmetrise(nodes, RM, report=print):
     return tov
 
 
+def ground_lift(nodes, RM, qov, tov, report=print, meshes=None):
+    """Straight legs are longer than bent ones: Kanden's T-pose put his soles 0.24 BELOW the floor he
+    stood on (10-05). The pelvis is lifted so the body's LOWEST VERTEX stands where the statue's stood
+    (meshes given: the posed skin is measured), else so the lowest joint of each foot chain (ankle,
+    ball, toe end) does -- ⛔ joints alone left Noxus's claws 0.28 under the floor, his mesh reaches
+    below his toe joints. Returns tov with the pelvis entry set."""
+    tov = dict(tov or {})
+    pel = RM.get('pelvis', -1)
+    if pel < 0:
+        return tov
+    names = [nd['name'] for nd in nodes]
+    wp0, _ = fk_world(nodes)
+    wp1, wq1 = fk_world(nodes, qov, tov)
+    drops = []
+    if meshes:
+        import proofrender
+        posed = [dict(nd, q=list(qov.get(i, nd['q'])), t=list(tov.get(i, nd['t']))) for i, nd in enumerate(nodes)]
+        drops.append(float(proofrender.skinned(nodes, meshes)[0][:, 1].min() - proofrender.skinned(posed, meshes)[0][:, 1].min()))
+    else:
+        for s in 'lr':
+            chain = [RM.get(k + '_' + s, -1) for k in ('foot', 'ball')]
+            if chain[-1] >= 0:
+                chain.append(_far_child(nodes, names, chain[-1], 'end'))
+            chain = [c for c in chain if c >= 0]
+            if chain:
+                drops.append(min(wp0[c][1] for c in chain) - min(wp1[c][1] for c in chain))
+    if not drops or max(drops) < 1e-4:
+        return tov
+    dy = max(drops)
+    p = nodes[pel]['parent']
+    loc = qrot(qinv(wq1[p]), [0.0, dy, 0.0]) if p >= 0 else [0.0, dy, 0.0]
+    t = list(tov.get(pel, nodes[pel]['t']))
+    tov[pel] = [t[k] + loc[k] for k in range(3)]
+    if report:
+        report('  ground: straight legs are longer -- the pelvis lifted %.3f so the %s stands where it stood'
+               % (dy, 'lowest vertex' if meshes else 'lowest foot joint'))
+    return tov
+
+
 def measure(nodes, RM, qov=None, report=print):
     """The receipt: each limb's angle off its T-pose axis, in degrees. Returns {bone key: deg}."""
     wp, _ = fk_world(nodes, qov)
@@ -290,6 +446,10 @@ def measure(nodes, RM, qov=None, report=print):
         out['clavicle_' + s] = ang(RM['clavicle_' + s], RM['upperarm_' + s], [sx, 0, 0])
         out['upperarm_' + s] = ang(RM['upperarm_' + s], RM['lowerarm_' + s], [sx, 0, 0])
         out['lowerarm_' + s] = ang(RM['lowerarm_' + s], RM['hand_' + s], [sx, 0, 0])
+        if RM['hand_' + s] >= 0:
+            tip = _far_child(nodes, [nd['name'] for nd in nodes], RM['hand_' + s], 'end')
+            if tip >= 0:
+                out['hand_' + s] = ang(RM['hand_' + s], tip, [sx, 0, 0])
         out['thigh_' + s] = ang(RM['thigh_' + s], RM['calf_' + s], [0, -1, 0])
         out['calf_' + s] = ang(RM['calf_' + s], RM['foot_' + s], [0, -1, 0])
     sp = [RM[k] for k in ('spine_01', 'spine_02', 'spine_03', 'neck_01', 'head') if RM[k] >= 0]
@@ -507,6 +667,7 @@ def main(argv):
     print('  after:')
     measure(nodes, RM, qov)
     tov = symmetrise(nodes, RM) if '--symmetric' in argv else None
+    tov = ground_lift(nodes, RM, qov, tov, meshes=meshes)
     bake_tpose(nodes, meshes, clips, qov, tov=tov)
     # statue2body's two-frame 'tpose' stub (there so a baker finds a clip) would replay the OLD pose
     # through its hold tracks: it becomes a two-frame hold of the NEW rest, so the lab shows the T-pose

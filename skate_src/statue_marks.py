@@ -21,6 +21,11 @@ says, not where a guess says.
 marks.txt: `Name x y z` per line (# comments), names from statue2body's CHAIN (Hips Spine Spine1 Spine2
 Neck Head HeadEnd Left/RightShoulder Arm ForeArm Hand HandEnd Left/RightUpLeg Leg Foot ToeBase ToeEnd),
 in THIS frame (the pack's rig space, what the sheets show). Unlisted joints keep the rigger's laws.
+The tails (HeadEnd, *HandEnd, *ToeEnd) become End nodes: the hand is aimed and bound along them, so
+put HandEnd at the far side of the fist / claw / cannon. Optional HeadFront: a point straight in front
+of the face -- the T-pose turns the head to face forward (a head turned on its body, Kanden 10-05).
+Measure joints INSIDE the limbs: where two pieces meet, on the tubes' own axes (see
+design/tpose_import.md, round 2); proofrender.py --marks over the raw pack is the check.
 """
 import sys, os, math
 HERE = os.path.dirname(os.path.abspath(__file__))

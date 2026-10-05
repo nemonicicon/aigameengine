@@ -18,7 +18,8 @@ Brawl trophies (.brres, high-poly statues) and the same hunters as DS exports (.
 | `skate_src/tpose.py` | `canon_map` (the club's canon + a Nintendo / generic bone-name matcher + `--map`), `solve_tpose` (aim each limb along its T-pose axis with the authoring kit's shortest-arc primitives, parent-first, the side read from where the hand IS), `bake_tpose` (skin re-baked in the pose, inverse binds rebuilt, hold tracks for clips that drove the old rest), `measure` (the angle table), `cloud_sheet` (front / side / top with the skeleton). Also a tool on a finished pack, with `--dae` / `--glb` |
 | `skate_src/statue_marks.py` | gridded per-part sheets, a slab census, a marks overlay: the instrument for rigging a statue by MEASURED joints |
 | `skate_src/statue2body.py --marks file --facing +z` | the landmark rigger takes measured joints and an operator's facing assertion |
-| `skate_src/statue2tpose.py` | the whole statue chain in one command: import → strip → rig (marks) → autoweights → bake → T-pose → .rpack / .dae / .glb + sheet |
+| `skate_src/statue2tpose.py` | the whole statue chain in one command: import → strip → rig (marks) → autoweights → bake → T-pose → .rpack / .dae / .glb + sheet; `--hybrid` (round 2) |
+| `skate_src/tpose_receipt.py` | the numbers behind a proof sheet: each limb's mesh against its own bone line, left vs right, and the welded pieces against the bones — PASS / FAIL (round 2) |
 
 ## The receipts (each one a test that could have failed)
 
@@ -88,12 +89,73 @@ Brawl trophies (.brres, high-poly statues) and the same hunters as DS exports (.
   controllers, no animations. The DS skeletons the trophies are meant to wear have to come from an
   export that keeps them, or from the raw DS files and a reader for them (next build).
 
+## Round 2: "Kanden is still not in a T-pose" (10-05)
+
+jacob, on the first Kanden proof sheet. The solver's table read 0.0° off axis on every limb and the
+BONES were a perfect T — the arm MESH hung off them: the forearm angled down from the elbow, the fist
+curled up, a lobe of upper arm under the shoulder. Every cause was measured before it was changed
+(the instruments are in this repo; Kanden's marks instrument lives with his deliverable):
+
+- ⛔ **An angle table measures what the solver placed.** `tpose_receipt.py` measures where the MESH
+  went: per limb bone, the centroid of the vertices it dominates against the bone's own line, the
+  left/right mirror of those centroids, and (binding-independent) the welded pieces of each limb
+  against its bone line. The shipped Kanden failed 11 rows (perp up to 0.158, mirror dz up to 0.156);
+  round 2 passes all of them (worst perp 0.040, worst mirror 0.034).
+- ⛔ **Marks in the air.** The first marks put the elbows 9 cm OUTSIDE the arms (LeftForeArm beside
+  the upper arm) and the shoulders on top of the pads; mirroring the marks into the file's frame
+  (x,z → −x,−z) also put the TOES BEHIND THE HEELS — the feet were aimed backwards. Distance binding
+  then gave the real arm to whatever bone was near. Round 2 MEASURES every joint from the pieces:
+  connected components of the welded mesh (16 on Kanden: torso+head, two arm tubes, two fists, two
+  thighs, shins, feet, five cannon rings); a joint is where two pieces meet (the contact ring of
+  thigh and shin is the knee) or the corner of two tube axes (the elbow).
+- ⛔ **A tube's axis is not its PCA.** Kanden's forearm is a short, wide bracer: its PCA axis swung
+  15° between iterations and the elbow→wrist line ran 25° off the bracer — straightened, the
+  forearm crossed its bone like a diagonal (seen from above, +0.06 in front at the elbow, −0.04
+  behind at the wrist). The axis from the SURFACE NORMALS (the direction they are all perpendicular
+  to) is stable to a few degrees; the elbow goes to the corner of the upper-arm and forearm axes.
+- **Mirror copies share joints.** Thigh, shin and foot are exact mirror copies (ICP with a
+  reflection: 3 mm mean), the upper-arm and forearm parts too: each side's joints are mapped into
+  the other's piece and averaged. The torso is bilaterally symmetric about its OWN plane (mirror +
+  ICP: turned 15.2°, tilted 2.6°): spine joints on it, hips and shoulders symmetric through it.
+- ⛔ **A leaf bone had no direction.** The 22 joints carry no tails: autoweights gave each hand a
+  2 cm stub pointing world-UP (the fist split between forearm and hand by a coin toss) and the solver
+  never aimed a hand. `statue2body` now writes the tails as plain END NODES (HeadEnd, *HandEnd,
+  *ToeEnd: not skin joints, the skin stays 22); autoweights uses one as its bone's tail, tpose aims
+  the hand at it.
+- ⛔ **The index graph splits plates at UV seams.** 414 "pieces" on Kanden and 690 on Noxus where
+  the bodies have 16 and 19: `--rigid-pieces` rode fragments of ONE plate on different bones, and
+  plain smooth weights (visibility gate and smoothing over the index graph) gave seam copies
+  different weights — the shipped Kanden had 257 seams torn open by > 1 cm, Noxus 681.
+  `--hybrid-pieces` (driver `--hybrid`) welds coincident vertices: a piece that spans one bone rides
+  it rigidly (fist, ring, thigh, shin); a piece that spans a joint — owns ≥ 10 % and covers ≥ half
+  of two or more bones (Kanden's arm tube, his torso along the spine) — is smooth over exactly
+  those bones (inverse 4th power, two Laplacian passes inside the piece). Round 2: 0 torn seams.
+- **A turned statue is squared first.** The pelvis turns so the hip line lies along x (only a turn
+  < 45°; a body facing the other way is still the importers' `--yaw`). Kanden: 15.3°.
+- **A bent limb straightens with its roll decided** (`aim_pole`): elbow points back, kneecaps
+  forward, the same on both sides. Shortest arcs left his two arms rolled 45° apart.
+- ⛔ **The foot kept the wrong pitch.** The old aim took the foot's drop AFTER the shin was
+  straightened and dropped the sideways part of a splayed foot: X3D's feet came out 9° toes-up.
+  The foot now keeps its statue orientation in the world (sole flat) and turns about y to face
+  forward (Kanden's right foot: 54°).
+- ⛔ **Straight legs are longer.** The T-pose put Kanden's soles 0.24 under his floor: the tool
+  lifts the pelvis so the lowest vertex stands where the statue's stood.
+- **A head turned on its body** stays turned when the body is squared (Kanden's faced +z on a torso
+  facing −15°: squared, 18° to his left). Optional mark `HeadFront` (a point in front of the face,
+  measured from the head cone's elongated slices) → a plain node; the solver turns the head to face
+  forward. Its HeadEnd sits at the CROWN, so the back of the head binds to the Head bone rather
+  than blending with the spine (the straight spine runs along the front of his head).
+
+`statue2tpose.py Kanden.brres kanden --height 1.9 --marks kanden_marks.txt --facing +z --hybrid`
+
 ## What the T-pose is, exactly
 
-Facing +Z, Y up. Upper arm and forearm along ±X (the side from the hand's own position, not its
-name), the hand along the same axis, the clavicle levelled but keeping its reach; thigh and shin
-along −Y; the foot aimed forward along the facing, keeping its own drop; the spine chain and neck
-along +Y; the pelvis and root untouched. Solved with `authorlib.aim_bone`, parent-first, so the roll
-of every bone changes as little as the shortest arc allows. Baked: a vertex goes through its old
-palette into rig space and back out through the new one, so the body does not move — its rest
-moves to meet it; inverse binds become inv(W'), the bind matrix identity.
+Facing +Z, Y up. The pelvis squared to the hip line, then the spine chain and neck along +Y and the
+face (if a HeadFront says where it looks) forward. Upper arm and forearm along ±X (the side from
+the hand's own position, not its name) with the elbow point back, the hand along the same axis (at
+its End node), the clavicle levelled but keeping its reach; thigh and shin along −Y with the
+kneecap forward; the foot keeping its own statue pitch, turned to face forward; the pelvis lifted so
+the lowest vertex stands where it stood. Solved with `authorlib.aim_bone` (and `aim_pole` where a
+joint is bent), parent-first. Baked: a vertex goes through its old palette into rig space and back
+out through the new one, so the body does not move — its rest moves to meet it; inverse binds
+become inv(W'), the bind matrix identity.

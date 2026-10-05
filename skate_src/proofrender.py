@@ -145,6 +145,11 @@ def render(nodes, meshes, textures, path, bones=True, size=900, RM=None, marks=N
             for i, nd in enumerate(nodes):
                 if nd['parent'] >= 0 and nd.get('kind', 1) == 1:
                     d2.line([proj(W[i][12:15]), proj(W[nd['parent']][12:15])], fill=(230, 90, 30), width=2)
+                elif nd['parent'] >= 0 and 'end' in nd.get('name', '').lower() and nodes[nd['parent']].get('kind', 1) == 1:
+                    # a leaf bone's END NODE (statue2body's HandEnd / ToeEnd / HeadEnd): the hand's own line
+                    d2.line([proj(W[i][12:15]), proj(W[nd['parent']][12:15])], fill=(230, 90, 30), width=2)
+                    u, v = proj(W[i][12:15])
+                    d2.ellipse([u - 2, v - 2, u + 2, v + 2], fill=(230, 90, 30))
             if RM:
                 for key in ('upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r', 'thigh_l', 'calf_l', 'thigh_r', 'calf_r', 'pelvis', 'head'):
                     k = RM.get(key, -1)

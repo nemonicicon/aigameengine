@@ -58,6 +58,28 @@ Brawl trophies (.brres, high-poly statues) and the same hunters as DS exports (.
   `tpose` stub is a clip too, so the lab played the crouch and the receipt looked like a failed bake.
   The stub is now rewritten as a hold of the NEW rest. The receipt for a T-pose is the lab with that
   clip, or the lab with no clip at all (the rest pose).
+- ⛔ **The lab is no proof sheet.** jacob, on the first lab frames: "doesent look like a t pose. and
+  its dark." Night lighting, perspective cameras, 640-pixel tiles. `proofrender.py` is the proof:
+  front, BACK and side, orthographic, lit, the body's own texture lifted, a ground line and a scale
+  bar. The back view exists because the next thing he said was "thats the back of the model not the
+  front": on Kanden BOTH slab tests (chest −0.056, foot −0.200) pointed the wrong way, and my 180°
+  turn put his back to the lens. The operator decides facing from the lit render; the heuristics are
+  reported, never trusted, on a non-human body.
+- ⛔ **Smooth weights smear a body of plates.** With distance weights Noxus's hood took a share of
+  each arm bone and the T-pose stretched it into a cape between the claws. `autoweights.py
+  --rigid-pieces` (driver `--rigid`): every connected piece of mesh goes whole to the bone its
+  vertices favour, weight 1 — what the Wii's own single-bind objects do. Gaps at joints, never smears.
+- ⛔ **Measure the pieces, not the cloud.** The marks that finally bound Noxus came from the
+  connected pieces of his parts (union-find over the triangles, centre, box, long axis): the arms
+  object splits into a right upper arm pulled BACK behind the torso and a left arm crossing in front
+  of the chest, which no sheet of dots had shown. The nearest-segment support census (which bone each
+  vertex would take by distance) is the check: a bone with 0 vertices is a joint placed in air.
+- **Digitigrade legs.** Noxus's ankle is raised and his foot bone is as long as his shin. A foot bone
+  longer than half the shin is aimed straight down with the rest of the leg (he stands tall on his
+  toes) and the toe bone carries the forward direction; a human foot keeps its own drop.
+- **Symmetric limbs.** Hand-measured joints put the two sides centimetres apart and the T-pose read
+  as a stance; `--symmetric` sets each limb bone's length to the mean of the two sides (clavicle,
+  upper arm, forearm, hand, thigh, shin, metatarsus) before the bake.
 - ⛔ **A terminated xvfb-run leaves the engine running.** Three `crowd_linux` and three `Xvfb` from
   finished labs were alive at once, and a queue waiting for "no engine" waited for ever.
   `linux_lab.py` now starts the engine in its own session and kills the group.

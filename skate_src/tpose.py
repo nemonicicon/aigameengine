@@ -27,7 +27,7 @@ The scene shape is rpackwrite's: nodes [{name,parent,kind,t,q,s}] parent-first, 
 [{pos,nrm,uv,idx,joints,weights,boneMap,ibm,bind,...}], clips [(name,fps,frames,{(node,type):floats})].
 
 As a tool:  tpose.py <pack.rpack> <out.rpack> [--map pelvis=Hip,upperarm_l=ArmL1,...] [--bones]
-                     [--dae out.dae] [--glb out.glb]
+                     [--symmetric] [--proof out.png] [--dae out.dae] [--glb out.glb]
             puts a finished pack's body into a T-pose (append-only is NOT possible here: the
             vertex buffers change, so it writes a new pack through rpackwrite), and the same body
             as COLLADA (PNGs beside it) and/or binary glTF for Blender, Godot, anything.
@@ -214,11 +214,9 @@ def solve_tpose(nodes, RM, facing=None, report=print):
         sx = 1.0 if wp2[probe][0] - wp2[RM['pelvis'] if RM['pelvis'] >= 0 else 0][0] >= 0 else -1.0
         out = [sx, 0.0, 0.0]
         if cl >= 0:
-            # level the clavicle: keep its outward reach, drop its vertical component
-            d = _dir(wp2[cl], wp2[ua])
-            flat = [d[0], 0.0, d[2]]
-            if _len(flat) > 1e-6 and (d[0] * sx) > 0:
-                aim(cl, ua, flat)
+            # the clavicle straight out to the side too: a twisted stance pulls one shoulder back
+            # (Noxus, 10-05) and a T-pose with one arm behind the other is not a T-pose
+            aim(cl, ua, out)
         aim(ua, la, out)
         aim(la, hd, out)
         if hd >= 0:
@@ -235,10 +233,42 @@ def solve_tpose(nodes, RM, facing=None, report=print):
         if ft >= 0 and bl >= 0 and bl != ft:
             wp2, _ = fk_world(nodes, qov)
             d = _dir(wp2[ft], wp2[bl])
-            aim(ft, bl, [0.0, min(0.0, d[1]) if _len(d) > 1e-9 else 0.0, fz * abs(d[2]) if abs(d[2]) > 1e-6 else fz])
+            shin = _len(_dir(wp2[ca], wp2[ft])) if ca >= 0 else 0.0
+            if _len(d) > 0.5 * shin and shin > 0:
+                # DIGITIGRADE (Noxus, 10-05): the ankle is raised and the foot bone is as long as the
+                # shin -- a metatarsus. Straight down, like the rest of the leg: the creature stands
+                # tall on its toes, and the toe bone below carries the forward direction
+                aim(ft, bl, [0.0, -1.0, 0.0])
+                tip = _far_child(nodes, names, bl, 'end')
+                if tip >= 0 and tip != bl:
+                    aim(bl, tip, [0.0, -0.3, fz])
+            else:
+                aim(ft, bl, [0.0, min(0.0, d[1]) if _len(d) > 1e-9 else 0.0, fz * abs(d[2]) if abs(d[2]) > 1e-6 else fz])
     if report:
         report('  tpose: %d bones re-aimed' % len(qov))
     return qov
+
+
+def symmetrise(nodes, RM, report=print):
+    """Equal LIMB LENGTHS left and right: each limb child's local translation is rescaled to the mean
+    of the two sides (upper arm -> forearm, forearm -> hand, thigh -> calf, calf -> foot). Hand-measured
+    marks put the two sides a few centimetres apart and the T-pose read as a stance (10-05). Returns
+    {node: t} overrides for bake_tpose."""
+    tov = {}
+    for (par, child) in (('clavicle', 'upperarm'), ('upperarm', 'lowerarm'), ('lowerarm', 'hand'), ('thigh', 'calf'), ('calf', 'foot'), ('foot', 'ball')):
+        a, b = RM.get(child + '_l', -1), RM.get(child + '_r', -1)
+        pa, pb = RM.get(par + '_l', -1), RM.get(par + '_r', -1)
+        if min(a, b, pa, pb) < 0 or nodes[a]['parent'] != pa or nodes[b]['parent'] != pb:
+            continue
+        la, lb = _len(nodes[a]['t']), _len(nodes[b]['t'])
+        if la < 1e-9 or lb < 1e-9:
+            continue
+        mean = 0.5 * (la + lb)
+        tov[a] = [v * mean / la for v in nodes[a]['t']]
+        tov[b] = [v * mean / lb for v in nodes[b]['t']]
+        if report and abs(la - lb) > 1e-6:
+            report('  symmetric: %s %.3f / %.3f -> %.3f' % (child, la, lb, mean))
+    return tov
 
 
 def measure(nodes, RM, qov=None, report=print):
@@ -257,6 +287,7 @@ def measure(nodes, RM, qov=None, report=print):
         return math.degrees(math.acos(max(-1.0, min(1.0, c))))
     for s in 'lr':
         sx = 1.0 if (RM['hand_' + s] >= 0 and wp[RM['hand_' + s]][0] >= wp[RM['pelvis']][0]) or (RM['hand_' + s] < 0 and s == 'l') else -1.0
+        out['clavicle_' + s] = ang(RM['clavicle_' + s], RM['upperarm_' + s], [sx, 0, 0])
         out['upperarm_' + s] = ang(RM['upperarm_' + s], RM['lowerarm_' + s], [sx, 0, 0])
         out['lowerarm_' + s] = ang(RM['lowerarm_' + s], RM['hand_' + s], [sx, 0, 0])
         out['thigh_' + s] = ang(RM['thigh_' + s], RM['calf_' + s], [0, -1, 0])
@@ -271,13 +302,15 @@ def measure(nodes, RM, qov=None, report=print):
 
 
 # ----------------------------------------------------------------- the bake
-def bake_tpose(nodes, meshes, clips, qov, report=print):
-    """Re-rest the rig in the pose qov: the skin is baked in it, the inverse binds rebuilt, the
-    rest q replaced. Clips get a hold track for every moved bone they do not drive."""
-    if not qov:
+def bake_tpose(nodes, meshes, clips, qov, report=print, tov=None):
+    """Re-rest the rig in the pose qov (+ translation overrides tov): the skin is baked in it, the
+    inverse binds rebuilt, the rest replaced. Clips get a hold track for every moved bone they do
+    not drive."""
+    tov = tov or {}
+    if not qov and not tov:
         return
     W0 = RW.world_matrices(nodes)
-    posed = [dict(nd, q=list(qov.get(i, nd['q']))) for i, nd in enumerate(nodes)]
+    posed = [dict(nd, q=list(qov.get(i, nd['q'])), t=list(tov.get(i, nd['t']))) for i, nd in enumerate(nodes)]
     W1 = RW.world_matrices(posed)
     moved = 0.0
     for m in meshes:
@@ -324,11 +357,17 @@ def bake_tpose(nodes, meshes, clips, qov, report=print):
             if (b, 0) not in tracks:
                 tracks[(b, 0)] = list(nodes[b]['q']) * frames
                 added += 1
+        for b, t1 in tov.items():
+            if (b, 1) not in tracks:
+                tracks[(b, 1)] = list(nodes[b]['t']) * frames
+                added += 1
         if added and report:
             report('  clip %s: %d hold track(s) added for bones the T-pose moved' % (nm, added))
     for i, nd in enumerate(nodes):
         if i in qov:
             nd['q'] = list(qov[i])
+        if i in tov:
+            nd['t'] = list(tov[i])
     if report:
         report('  bake: rest pose is now the T-pose; the farthest vertex moved %.4f in mesh space (expected: the pose change)' % moved)
 
@@ -467,7 +506,8 @@ def main(argv):
     qov = solve_tpose(nodes, RM)
     print('  after:')
     measure(nodes, RM, qov)
-    bake_tpose(nodes, meshes, clips, qov)
+    tov = symmetrise(nodes, RM) if '--symmetric' in argv else None
+    bake_tpose(nodes, meshes, clips, qov, tov=tov)
     # statue2body's two-frame 'tpose' stub (there so a baker finds a clip) would replay the OLD pose
     # through its hold tracks: it becomes a two-frame hold of the NEW rest, so the lab shows the T-pose
     if any(c[0] == 'tpose' for c in clips):
@@ -482,6 +522,10 @@ def main(argv):
     sheet = os.path.splitext(dst)[0] + '_tpose.png'
     cloud_sheet(meshes, nodes, sheet, RM=RM)
     print('  sheet %s -- LOOK at it' % sheet)
+    if '--proof' in argv:
+        import proofrender
+        proofrender.render(nodes, meshes, textures, argv[argv.index('--proof') + 1], bones=True, RM=RM)
+        print('  proof %s -- front and side, lit, orthographic' % argv[argv.index('--proof') + 1])
     if '--dae' in argv:
         import daelib
         daelib.write_dae(argv[argv.index('--dae') + 1], nodes, meshes, clips, textures, names)

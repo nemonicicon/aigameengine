@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """autoweights.py -- bind a mesh to its skeleton, in the house (homecoming H4).
 
-    autoweights.py in.glb out.glb
+    autoweights.py in.glb out.glb [--rigid-pieces]
 
 Distance-with-visibility weighting, Pinocchio-flavored: per vertex, candidate bones
 score by distance to the bone's capsule segment; a candidate whose path from vertex to
@@ -214,12 +214,41 @@ def main():
         JN.append([b for b, w in ws]); WN.append([w for b, w in ws])
     print("bound %d verts (visibility refused %d bone-candidates)" % (len(P), refused))
 
-    # one smoothing pass over the mesh graph
+    # ⭐ --rigid-pieces (10-05): a body built of PLATES rides its bones rigidly. Each connected
+    # piece of mesh (union-find over the triangles) goes whole to the bone its vertices favour, weight
+    # 1, no smoothing. Noxus's trophy is 300 armour pieces: with smooth distance weights his hood took
+    # some of each arm bone and the T-pose stretched it into a cape between the claws. A plate that
+    # bridges a joint stays rigid (a gap, never a smear) -- what the Wii's own single-bind objects did.
+    if "--rigid-pieces" in sys.argv:
+        parent = list(range(len(P)))
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]; a = parent[a]
+            return a
+        for (a, b, c) in tris:
+            ra, rb, rc = find(a), find(b), find(c)
+            parent[rb] = ra; parent[find(rc)] = find(ra)
+        votes = defaultdict(lambda: defaultdict(float))
+        for vi in range(len(P)):
+            r = find(vi)
+            for bi, w in zip(JN[vi], WN[vi]):
+                votes[r][bi] += w
+        pick = {r: max(v.items(), key=lambda kv: kv[1])[0] for r, v in votes.items()}
+        JN = [[pick[find(vi)], 0, 0, 0] for vi in range(len(P))]
+        WN = [[1.0, 0.0, 0.0, 0.0] for _ in range(len(P))]
+        census = defaultdict(int)
+        for r, b in pick.items(): census[b] += 1
+        names = [gj["nodes"][j].get("name", "?") for j in joints]
+        print("rigid pieces: %d pieces -> %s" % (len(pick), ", ".join("%s %d" % (names[b], n) for b, n in sorted(census.items(), key=lambda kv: -kv[1]))))
+
+    # one smoothing pass over the mesh graph (none for rigid pieces)
     adj = defaultdict(set)
     for (a, b, c) in tris:
         adj[a] |= {b, c}; adj[b] |= {a, c}; adj[c] |= {a, b}
     JN2, WN2 = [], []
-    for vi in range(len(P)):
+    if "--rigid-pieces" in sys.argv:
+        JN2, WN2 = JN, WN
+    for vi in range(len(P) if "--rigid-pieces" not in sys.argv else 0):
         acc = defaultdict(float)
         for bi, w in zip(JN[vi], WN[vi]): acc[bi] += w*0.6
         nn = adj[vi] or {vi}

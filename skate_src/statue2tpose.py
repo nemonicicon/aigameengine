@@ -3,7 +3,7 @@
 body, in one command: the chain that put Noxus and Kanden into T-poses on 2026-10-05.
 
     statue2tpose.py <in.brres|.dae|.glb> <outstem> [--height 1.9] [--yaw 180] [--marks marks.txt]
-                    [--facing +z] [--pick SUBSTR] [--model NAME] [--nearest] [--up z] [--unit 0.01]
+                    [--facing +z] [--rigid] [--pick SUBSTR] [--model NAME] [--nearest] [--up z] [--unit 0.01]
 
   1. the importer      brres2rpack / dae2rpack (--notpose, --height, --yaw, --glb): the body in rig
                        space at club height, facing +z, as <outstem>_raw.rpack + .glb
@@ -14,7 +14,8 @@ body, in one command: the chain that put Noxus and Kanden into T-poses on 2026-1
                        the operator measured off statue_marks.py's sheets (a hunter mid-stance breaks
                        the laws; see that file). --facing +z asserts the facing when the chest test
                        reads a hunch backwards
-  4. autoweights       distance + visibility binding, top 4 influences
+  4. autoweights       distance + visibility binding, top 4 influences; --rigid binds each connected
+                       PIECE whole to one bone (a body of armour plates: Noxus)
   5. glb2rpack_anim    the rigged body as a pack (--keepnames)
   6. tpose             limbs re-aimed, skin re-baked in the T-pose: <outstem>_tpose.rpack / .dae /
                        .glb, and <outstem>_tpose_tpose.png -- LOOK at it, then render it in the lab
@@ -66,9 +67,9 @@ def main(argv):
     if marks: a += ['--marks', marks]
     if facing: a += ['--facing', facing]
     run(a, 'rig (landmarks%s)' % (' + measured marks' if marks else ''))
-    run([os.path.join(HERE, 'author', 'autoweights.py'), stem + '_rig.glb', stem + '_bound.glb'], 'autoweights')
+    run([os.path.join(HERE, 'author', 'autoweights.py'), stem + '_rig.glb', stem + '_bound.glb'] + (['--rigid-pieces'] if '--rigid' in argv else []), 'autoweights' + (' (rigid pieces)' if '--rigid' in argv else ''))
     run([os.path.join(HERE, 'glb2rpack_anim.py'), stem + '_bound.glb', stem + '_body.rpack', '--keepnames'], 'bake the rigged body')
-    run([os.path.join(HERE, 'tpose.py'), stem + '_body.rpack', stem + '_tpose.rpack', '--dae', stem + '_tpose.dae', '--glb', stem + '_tpose.glb'], 'T-pose')
+    run([os.path.join(HERE, 'tpose.py'), stem + '_body.rpack', stem + '_tpose.rpack', '--symmetric', '--proof', stem + '_proof.png', '--dae', stem + '_tpose.dae', '--glb', stem + '_tpose.glb'], 'T-pose')
     print('=== done: %s_tpose.rpack / .dae / .glb; sheet %s_tpose_tpose.png -- LOOK, then the lab' % (stem, stem))
     return 0
 

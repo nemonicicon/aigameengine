@@ -40,9 +40,12 @@ def main():
                              % (seq[0], clip, cam, shot))
     shots = [os.path.join(outdir, "cam%d_%d.ppm" % (c, i)) for i, c in enumerate(cams)]
     write_ctl(cams[0], shots[0])
+    # ⛔ ITS OWN SESSION, SO THE KILL REACHES THE ENGINE. xvfb-run is a shell script; terminating it
+    # left crowd_linux and Xvfb alive (three of each after a morning's labs, 10-05) -- and anything
+    # that waits for "no engine running" waited for ever. killpg at the end takes the whole group.
     pr = subprocess.Popen(["xvfb-run", "-a", "-s", "-screen 0 %sx24" % res, "stdbuf", "-o0", "-e0",
                            EXE, "400", os.path.dirname(pack), pack, res],
-                          cwd=NATIVE, env=env, stdout=log, stderr=subprocess.STDOUT)
+                          cwd=NATIVE, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     def wait(path, secs):
         t0 = time.time()
         while time.time() - t0 < secs:
@@ -57,6 +60,11 @@ def main():
         for cam, p in zip(cams[1:], shots[1:]):
             write_ctl(cam, p)
             print("cam %d: %s" % (cam, "ok" if wait(p, 60) else "NO FRAME"))
+    import signal
+    try:
+        os.killpg(pr.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
     pr.terminate()
     try: pr.wait(5)
     except subprocess.TimeoutExpired: pr.kill()

@@ -110,6 +110,7 @@ before claiming anything renders. Boot costs ~250 frames; capture below ~300 and
 
 ## Where the knowledge is
 `design/engine_capabilities.md` (every capability and the failure that exposed it),
+`design/tpose_import.md` (.brres / .dae in, any body into a T-pose, a statue rigged by measured marks — 10-05),
 `design/animation_principles.md`, `animation_authoring.md`, `skating.md`, `cloth.md`, `faces.md`,
 `scene_direction.md`, `cinematography.md`, `the_set.md`, `stop_motion.md`; the skills in
 `.claude/skills/` (run-reva, film-craft, build-the-capability, robot-neko — its LESSONS LEDGER).

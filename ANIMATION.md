@@ -26,6 +26,10 @@ can be played by ANY body; it is retargeted through the canon (`REVA_NOFINGERS=1
 |---|---|
 | `skate_src/glb2rpack_anim.py in.glb out.rpack --keepnames` | a rigged, animated GLB → a pack (skin, clips, textures, morphs with `--morphs`) |
 | `skate_src/glb2rpack.py` | a static prop GLB → a pack |
+| `skate_src/brres2rpack.py in.brres out.rpack` / `brres2dae.py` | a Wii BRRES (.brres, or inside .szs/.arc): MDL0 skin + mixes, TEX0 decoded, CHR0 clips → a pack / a COLLADA for Blender, T-POSED where the rig has limbs (`design/tpose_import.md`) |
+| `skate_src/dae2rpack.py in.dae out.rpack` | a COLLADA body or prop → a pack, T-posed; `--up z` / `--unit` when the asset block lies; `--dae` / `--glb` write it back out |
+| `skate_src/statue2tpose.py in.brres\|.dae\|.glb outstem --height 1.9 --marks m.txt` | a STATUE (no limb skeleton: a Brawl trophy) → rigged and T-posed in one command; the joints measured off `statue_marks.py`'s sheets |
+| `skate_src/tpose.py pack out.rpack [--dae --glb]` | any rigged pack's body re-rested into a T-pose (the skin re-baked, inverse binds rebuilt, clips kept playing as authored) |
 | `skate_src/bvh2rpack.py` | BVH mocap → clips |
 | `skate_src/kaeli/ue_export_gltf.py`, `ue_export_anim_gltf.py`, `skate_src/anima/` | HEADLESS Unreal Engine → glTF: any UE project's characters, weapons, props and animations (a shim project when the source project has no Python plugin) |
 | `skate_src/reva2/rig_reva.py` | rig an UNRIGGED character mesh (a Meshy/AI-generated body): joints from the mesh's own cross-sections, weights, a preview (`REVA_PREVIEW=<dir>`) — read its comments on where the first recipe hung the arm joints |

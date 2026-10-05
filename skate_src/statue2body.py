@@ -68,7 +68,7 @@ def strip(src, dst):
     write_glb(gj, bin_, dst)
     print("stripped statue -> %s (%d ghost joints removed)" % (dst, len(dead)))
 
-def rig(src, dst):
+def rig(src, dst, facing=None, marks=None):
     gj, bin_ = read_glb(src)
     # ⛔ EVERY PRIMITIVE OF THE BODY, NOT primitives[0] OF meshes[0]. A glTF primitive is
     # one MATERIAL's slice of a mesh, so on a Character Creator body with six materials the
@@ -114,7 +114,15 @@ def rig(src, dst):
     chest = meanz(slab(0.70, 0.78)) - meanz(slab(0.60, 0.66))
     foot = meanz(slab(0.0, 0.05, +1)) - meanz(slab(0.22, 0.30, +1))
     print("facing: chest %+.4f  foot %+.4f  (both must be positive: forward is +Z)" % (chest, foot))
-    assert chest > 0 and foot > 0, "statue does not face +Z -- refusing to rig it backwards"
+    if facing is None:
+        assert chest > 0 and foot > 0, "statue does not face +Z -- refusing to rig it backwards (looked at it? rig ... --facing +z)"
+    else:
+        # ⛔ THE OPERATOR LOOKED. The anatomy test is for humans; a hunched alien with a back crest
+        # (Noxus, 10-05) reads chest-backwards while his toes point +Z. --facing +z is an assertion
+        # made from the cloud sheet, printed so a log never hides that the test was overridden.
+        # A statue that faces -Z is not rigged backwards: turn it first (the importers' --yaw 180).
+        assert facing.lower() in ("+z", "z"), "--facing %s: turn the statue to face +Z first (--yaw 180), then rig" % facing
+        print("facing: OVERRIDDEN by --facing +z (chest %+.4f foot %+.4f) -- the operator looked at the sheet" % (chest, foot))
 
     # the arm band: widest slab 60-90%
     best, armY = 0.0, H * 0.75
@@ -156,6 +164,41 @@ def rig(src, dst):
     L["Neck"] = (nk[0], H*0.865, nk[2])
     hd = cent(slab(0.88, 1.0)) if slab(0.88, 1.0) else (0, H*0.94, 0)
     L["Head"] = (nk[0], H*0.90, hd[2]); L["HeadEnd"] = (nk[0], H*1.00, hd[2])
+
+    # ⭐ MEASURED MARKS (10-05): `--marks file` -- joints the operator measured off statue_marks.py's
+    # sheets, in the GLB's own frame; shifted here exactly as the mesh is. A hunter ripped mid-stance
+    # breaks every law above (the band found Noxus's chest, not his curled blade-arms), and a law that
+    # cannot describe a body must not place its skeleton. Chain ends that were not measured are
+    # derived from the measured joint below them; everything else keeps the laws.
+    if marks:
+        given = {}
+        for nm, (mx, my, mz) in marks.items():
+            given[nm] = (mx - cx, my - ymin, mz - cz)
+        def _ext(a, b, f):
+            return (b[0] + (b[0] - a[0]) * f, b[1] + (b[1] - a[1]) * f, b[2] + (b[2] - a[2]) * f)
+        for s in ("Left", "Right"):
+            if s+"Hand" in given and s+"HandEnd" not in given and s+"ForeArm" in given:
+                given[s+"HandEnd"] = _ext(given[s+"ForeArm"], given[s+"Hand"], 0.35)
+            if s+"ToeBase" in given and s+"ToeEnd" not in given and s+"Foot" in given:
+                given[s+"ToeEnd"] = _ext(given[s+"Foot"], given[s+"ToeBase"], 0.4)
+            if s+"Foot" in given and s+"ToeBase" not in given:
+                f = given[s+"Foot"]
+                given[s+"ToeBase"] = (f[0], max(0.0, f[1] - 0.6 * f[1]), f[2] + 0.5 * f[1] + 0.05 * H)
+                given[s+"ToeEnd"] = _ext(f, given[s+"ToeBase"], 0.4)
+        if "Head" in given and "HeadEnd" not in given and "Neck" in given:
+            given["HeadEnd"] = _ext(given["Neck"], given["Head"], 1.0)
+        if "Hips" in given and "Neck" in given and not any(k in given for k in ("Spine", "Spine1", "Spine2")):
+            h, n = given["Hips"], given["Neck"]
+            for nm, f in (("Spine", 0.25), ("Spine1", 0.5), ("Spine2", 0.78)):
+                given[nm] = (h[0] + (n[0] - h[0]) * f, h[1] + (n[1] - h[1]) * f, h[2] + (n[2] - h[2]) * f)
+        for s in ("Left", "Right"):
+            if s+"Arm" in given and s+"Shoulder" not in given and "Spine2" in given:
+                a, sp = given[s+"Arm"], given["Spine2"]
+                given[s+"Shoulder"] = (sp[0] + (a[0] - sp[0]) * 0.45, sp[1] + (a[1] - sp[1]) * 0.6, sp[2] + (a[2] - sp[2]) * 0.5)
+        for nm in list(L):
+            if nm in given:
+                L[nm] = given[nm]
+        print("marks: %d measured joints placed (%s); the laws placed the rest" % (len(given), " ".join(sorted(given))))
 
     # ---- write: re-centre mesh positions to the grounded frame, add joint nodes ----
     # ⛔ EVERY MESH MOVES, NOT ONE PRIMITIVE. This used to write back into
@@ -271,4 +314,13 @@ def rig(src, dst):
 
 if __name__ == "__main__":
     cmd, src, dst = sys.argv[1], sys.argv[2], sys.argv[3]
-    (strip if cmd == "strip" else rig)(src, dst)
+    if cmd == "strip":
+        strip(src, dst)
+    else:
+        facing = sys.argv[sys.argv.index("--facing") + 1] if "--facing" in sys.argv else None
+        marks = None
+        if "--marks" in sys.argv:
+            sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0] or ".")
+            from statue_marks import read_marks
+            marks = read_marks(sys.argv[sys.argv.index("--marks") + 1])
+        rig(src, dst, facing, marks)

@@ -423,6 +423,19 @@ sick bay (`sets/sickbay.set`, written by `skate_src/ship/build_sickbay.py`):
 A prop's instance stands on its ROOT NODE (the baker's origin), not on its lowest vertex, so pieces built in room
 coordinates -- a ceiling at 2.9 m, a hood hanging from it -- all go in at `0 0 0` and stay where they were built.
 
+### SETS BUILT BY CODE: `skate_src/setkit.py` (10-23)
+
+The kit every set builder draws with, split out of build_sickbay.py, which re-exports it: the six builders that borrow
+it through `import build_sickbay as sb` run unchanged, and a shim writes `sb.A = sb.Atlas()` through to the kit. One
+ATLAS per set (swatches from `PAL`, boxes painted with PIL); primitives that keep ONE NORMAL PER POSITION, because the
+ink is an inverted hull and it cracks wherever a position carries two (`rbox`, `lathe` with support loops at its
+corners, `rod`, `tube`; `quad` and `disc_tex` for what the ink never sees); a Trek room's `walls()` (`ceil=` its
+height), `door_frame()`, `screen()` and the LCARS painters; `write_glb`. `python skate_src/setkit.py --selftest` checks
+each promise beside a control that breaks it and bakes its test room through glb2rpack. The split was proven by
+building all seven set builders before and after: 120 glbs and atlases and 135 set files, byte for byte.
+⛔ Start a new atlas by REBINDING the kit's (`setkit.A = setkit.Atlas()`, or `sb.A = ...`): a local `A = Atlas()` is an
+atlas nobody draws into.
+
 ## THE SHIP AND THE SKY (THE WORLD AT THE END OF TIME, 10-22 → 10-23)
 
 The lines chapters 1-3 added (engine_capabilities.md sections 41-46):

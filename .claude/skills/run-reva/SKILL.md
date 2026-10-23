@@ -277,7 +277,8 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
 - ⭐ **Read a take's LOG before its frames**: `STUCK` (a walk the furniture held, placed), `NOT FOUND`, `standing body
   out of obstacle` (the contact pass moved a body), a `[walk] ... -> mark` with no `arrived`, `[set] actor N ... wears`.
   Then `skate_src/robot_neko/scenesheet.py MP4 SCN OUT.png` -- one frame per line -- and LOOK at every tile;
-  `reva_native/scenes/join_chapter.py` joins a chapter's takes in order with an index of where each scene starts.
+  `reva_native/scenes/join_chapter.py` joins a chapter's takes in order with an index of where each scene starts
+  (`--take`/`--script`/`--label` name the files by `{n}`; its docstring has chapter 2's whole line).
 - ⛔ **Judge a POSE in profile, at eye level, beside a standing body.** From a high wide I reported seated extras
   as standing and a fix was asked for; a profile lens showed all seven sitting on their stools (10-23).
 - ⛔ **On Windows, `subprocess` resolves the exe from the PARENT's PATH**, not the `env=`

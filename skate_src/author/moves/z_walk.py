@@ -19,7 +19,7 @@ S = stride as a fraction of the leg (hip to ankle at rest). Rig units throughout
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rpack import Rpack, append_clips, drop_clip
-from authorlib import rig_map, fk_world, solve_limb, hold_world_rotation, rotate_bone_world, translate_node_world, qnorm
+from authorlib import rig_map, fk_world, solve_limb, hold_world_rotation, rotate_bone_world, translate_node_world, qnorm, aim_bone
 
 FPS, DUR = 30.0, 1.20
 X, Y, Z = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
@@ -53,11 +53,20 @@ def main(argv):
     rest_foot = {s: list(wp[legs[s][2]]) for s in legs}
     rest_fq = {s: list(wq[legs[s][2]]) for s in legs}
     print("w_walk: leg %.3f rig  stride %.3f  lift %.3f  bob %.3f  floor %.3f" % (L, S, lift, bob, floor))
+    # ⭐ (10-22, reva) --hang DEG: the arms swing from HANGING, not from an A-pose rest (see z_gest.py)
+    base = {}
+    if "--hang" in argv:
+        hd = math.radians(float(argv[argv.index("--hang") + 1]))
+        for s_, sx_ in (("l", 1.0), ("r", -1.0)):
+            ua_, la_, ha_ = RM["upperarm_" + s_], RM["lowerarm_" + s_], RM["hand_" + s_]
+            base[ua_] = aim_bone(nodes, ua_, la_, [math.sin(hd) * sx_, -math.cos(hd), 0.03], base)
+            base[la_] = aim_bone(nodes, la_, ha_, [math.sin(hd) * sx_ * 0.8, -math.cos(math.radians(12.0)), math.sin(math.radians(12.0))], base)
+        print("w_walk: arms hang %.0f degrees off the body (--hang)" % math.degrees(hd))
     frames = int(round(DUR * FPS)) + 1          # the last frame IS the first (the club's loops carry it, like z_rm_sk_ride)
     qs, ts = [], []
     for f in range(frames):
         ph = f / float(frames - 1)
-        q, t = {}, {}
+        q, t = dict(base), {}
         # the pelvis: bob (lowest at double support, ph 0 and 0.5), sway toward the stance leg, a little yaw
         dy = -bob * 0.5 * (1.0 + math.cos(4 * math.pi * ph))
         sway = 0.02 * L * math.sin(2 * math.pi * ph)          # +x at ph 0.25 (left leg in stance from 0..0.6 -> weight left)

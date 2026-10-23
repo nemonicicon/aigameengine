@@ -78,6 +78,10 @@ def build(a):
     prepend, so it is not optional and not left to the caller."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     out = "crowd_new.exe"
+    # ⛔ (10-22) A RUNNING crowd_new.exe CANNOT BE OVERWRITTEN: `looks` / `up` leave a live window holding it, and the
+    # link then dies with nothing but "ld returned 1 exit status". Close it first.
+    if os.path.exists(LIVE):
+        down(a)
     # ⛔ On Windows, subprocess resolves the EXE from the PARENT's PATH -- the env=
     # you hand it is only inherited by the child. Passing "gcc" here fails with
     # WinError 2 even though env["PATH"] starts with mingw64. Name it absolutely; the
@@ -273,7 +277,10 @@ def _live_shot(a, ctl_text, crop=None, scale=None):
     elif (a.env or []) != rec.get("env", []):
         why = "this shot's --env differs from the live window's"
     else:
-        newer = [f for f in glob.glob(os.path.join(NATIVE, "packs", "*.rpack")) if os.path.getmtime(f) > rec["t0"]]
+        # ⛔ (10-22) AND THE SET PROPS: the engine caches a prop pack by NAME across set loads, so a rebaked ship
+        # (props/mf_*.rpack) kept drawing the old one in a window booted before the bake
+        newer = [f for f in glob.glob(os.path.join(NATIVE, "packs", "*.rpack")) + glob.glob(os.path.join(NATIVE, "props", "*.rpack"))
+                 if os.path.getmtime(f) > rec["t0"]]
         if newer:
             why = "%s changed on disk after the live window booted" % os.path.basename(newer[0])
     if why:
@@ -622,6 +629,48 @@ def marks(a):
     return 0
 
 
+def looks(a):
+    """⭐ (10-22) A SET FROM EVERY CAMERA IN ONE BOOT. jacob, after a day of one engine boot per camera (~25 s each, so a
+    five-camera look spent two minutes booting): "we should batch more work into builds to save on overall build
+    time". `looks` boots -- or reuses -- ONE live window, grabs every camera of the set from it (~2-4 s each: the first
+    waits --settle for the set to load, the rest only for the lens), and tiles them into one sheet, each frame labelled
+    ABOVE itself. Cameras `name=ex,ey,ez,ax,ay,az,fov;...` in club units, or in METRES with --metres (x1.75).
+    One frame a camera: motion is `bench`'s or a scene's job."""
+    from PIL import Image, ImageDraw, ImageFont
+    U = 1.75 if a.metres else 1.0
+    stem = os.path.splitext(os.path.abspath(a.out))[0]
+    shots = []
+    for spec in [c.strip() for c in a.cams.split(";") if c.strip()]:
+        name, _, nums = spec.partition("=")
+        try:
+            v = [float(x) for x in nums.split(",")]
+        except ValueError:
+            v = []
+        if len(v) != 7:
+            print("looks: camera '%s' wants name=ex,ey,ez,ax,ay,az,fov" % spec); return 1
+        cam = "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d" % tuple([x * U for x in v[:6]] + [int(v[6])])
+        a2 = argparse.Namespace(**vars(a))
+        a2.out = "%s_%s.png" % (stem, name.strip())
+        if shots: a2.settle = min(a.settle, 0.8)          # same set, only the lens moves
+        t0 = time.time()
+        if _live_shot(a2, "face=0 grid=0 dqs=0 set=%s cam=%s %s" % (a.set, cam, a.light or "")) != 0: return 1
+        print("looks: %-12s %.1fs" % (name.strip(), time.time() - t0))
+        shots.append((name.strip(), a2.out))
+    ims = [(n, Image.open(p).convert("RGB")) for n, p in shots]
+    w, h = ims[0][1].size; tw, th = w // 2, h // 2
+    cols = max(1, min(a.cols, len(ims))); rows = (len(ims) + cols - 1) // cols
+    try: font = ImageFont.truetype("arialbd.ttf", 22)
+    except Exception: font = ImageFont.load_default()
+    sheet = Image.new("RGB", (cols * (tw + 6) + 6, rows * (th + 38) + 6), (20, 24, 34)); d = ImageDraw.Draw(sheet)
+    for k, (n, im) in enumerate(ims):
+        x = 6 + (k % cols) * (tw + 6); y = 6 + (k // cols) * (th + 38)
+        d.rectangle((x, y, x + tw - 1, y + 31), fill=(30, 60, 110)); d.text((x + 8, y + 4), n, font=font, fill=(255, 255, 255))
+        sheet.paste(im.resize((tw, th), Image.LANCZOS), (x, y + 32))
+    sheet.save(stem + "_sheet.png")
+    print("looks: %d cameras of '%s' from one window -> %s_sheet.png   <-- LOOK AT IT" % (len(ims), a.set, stem))
+    return 0
+
+
 def main():
     # ⛔ argparse writes help to a cp1252 stdout here, so ONE non-ascii glyph in a help
     # string takes the whole command down with a UnicodeEncodeError. Same trap packcheck
@@ -669,6 +718,14 @@ def main():
     sp = sub.add_parser("lab"); common(sp)
     sp.add_argument("--ctl", default="face=0 grid=0 dqs=0 clip=z_upright partner=off")
     sp.set_defaults(fn=lab)
+
+    sp = sub.add_parser("looks"); common(sp)
+    sp.add_argument("--set", required=True, help="the set to shoot")
+    sp.add_argument("--cams", required=True, help="name=ex,ey,ez,ax,ay,az,fov;...  (club units, or --metres)")
+    sp.add_argument("--metres", action="store_true", help="camera numbers in METRES (x1.75)")
+    sp.add_argument("--light", default="", help="more ctl for every shot, e.g. 'sun=40,150,1.2 sky=0.4,0.5,0.6 shadow=0'")
+    sp.add_argument("--cols", type=int, default=3)
+    sp.set_defaults(fn=looks)
 
     sp = sub.add_parser("face"); common(sp)
     sp.add_argument("--panel", choices=list(PANELS), default="mouth")

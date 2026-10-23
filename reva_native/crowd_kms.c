@@ -174,8 +174,20 @@ typedef struct {
     /* H1 (homecoming): SECONDARY-MOTION CHAINS -- tails, ponytails, braids, ears --
      * mined by name at load, simmed by verlet at runtime. A chain is a linear run of
      * matching bones; chB = node indices root-out, chLen = rest link lengths. */
-    int nCh; short chB[8][14]; signed char chN[8]; float chLen[8][14];
+    /* ⭐ 8 -> 32 (09-29, REVA): her shag's five chains, her ponytail's three, her jacket's five and her bandana's
+     * three are sixteen -- and the 8 was a silent cap (a busy rig just lost its later chains). The miner says so
+     * now when a body reaches it. */
+    #define CHMAXC 32
+    int nCh; short chB[CHMAXC][14]; signed char chN[CHMAXC]; float chLen[CHMAXC][14];
     int nJg; short jgRoot[4], jgTip[4];   /* ⭐ JIGGLE BONES (jacob: "kaeli is supposed to have breast jiggle physics") */
+    /* ⭐ STRETCH BONES (09-29): a garment HELD BETWEEN TWO MOVING PARTS -- REVA's off-shoulder jacket, its body a band
+     * from one elbow round her back to the other. Weighted to the arms and the spine by blending, linear-blend
+     * skinning put the band half way between where each would carry it: a flap stood out of her back in every pose
+     * (jacob's friend: "its sticking to the rig its not the model its the rig thats messing it up"). A bone named
+     * Stretch_<x> keeps its head where its parent carries it (an elbow), turns to point at the head of Anchor_<x> (a
+     * point on her back, on the spine), and STRETCHES along that line by the distance over its rest distance -- a
+     * Stretch To constraint, the rig of choice for a drape between two limbs. LBS only (DQS cannot scale). */
+    int nSt; short stB[8], stA[8]; float stLen[8], stDir[8][3];
     /* H2 (homecoming): DUAL-QUATERNION SKINNING eligibility, audited at load. A mesh
      * qualifies when its rest palette (world_rest x IBM) is rigid up to ONE uniform
      * scale (spread <= 2%) -- that scale folds into the shader as dqS. Packs with
@@ -202,7 +214,79 @@ typedef struct {
     int fmJaw;                             /* THE JAW BONE (skate_src/author/jaw.py) */
     int fmInterior;                        /* the mouth-interior MESH (teeth/tongue/cavity) */
     float mouthBind[6];   /* lip line in BIND space (x,y,z) + half-width + face height + TILT */
+    /* ⭐ THE WARDROBE (09-29, jacob: "id like the clothing to be modular, reva is also a seamstress"). A body built
+     * by the atelier (skate_src/reva902) tags its meshes: `wear~<slot>~<piece>~<outfit>+<outfit>` is a piece of
+     * clothing or a hairstyle, `skin~h=a,b` is skin that pieces a and b cover. meshOff[] is what the pack's outfit
+     * leaves undrawn: pieces not worn, and skin under pieces that are (nothing pokes through a worn garment, and
+     * nothing is missing when it comes off). NULL on every body without tags. One outfit per PACK: two slots
+     * drawing the same pack wear the same clothes. */
+    unsigned char*meshOff, *meshKind, *meshPiece; unsigned long long*meshHiders;
+    int nPiece; char pieceName[64][32]; unsigned pieceOutfits[64];
+    int nOutfit; char outfitName[16][24]; int outfit; unsigned long long worn;
+    /* ⭐ THE TOON PASS (10-18, THE WORLD AT THE END OF TIME): a pack carrying a node named ToonStyle (a zero-weight
+     * bone the people builder adds) is drawn in the show's look -- a cel ramp into a cool shadow tint and an ink
+     * line (an inverted hull). Every other body in the club is untouched. REVA_NOTOON=1 is the control. */
+    int toon;
+    /* ⭐ THE SHIP'S SETS (10-18, THE WORLD AT THE END OF TIME): markers a SET PROP carries (skate_src/ship/
+     * build_sickbay.py -> glb2rpack.py --marker). ToonSet: the toon look lit as a ROOM is lit -- from above, every
+     * wall in the light, every underside in the shadow tone, cast shadows from the sun's map (toon = 2). Glow: drawn
+     * unlit at its own colour (a light panel, a screen, an emitter), no ink. NoCast: never in the sun's shadow map
+     * (a ceiling over everyone, a room's walls -- an interior's key is a cheat from the lens's side, and a wall that
+     * cast it would black out the room). Open: never a collider -- a shell or a run of fittings built in ROOM
+     * coordinates measures as one circle as wide as the room, at its centre (propSolid decides by name, and
+     * "sb_fixtures" is not a name it knows to leave open). */
+    int glow, nocast, open;
+    int mirOnly;   /* ⭐ (10-22) marker `MirrorOnly`: drawn only in reflections (a mirror's backing, seen in another) */
+    /* ⭐ (10-22) SHEER: a set prop carrying a marker node `AlphaNN` is drawn NN% opaque, blended over what is behind it
+     * (a martini glass): set props were opaque only -- the blend existed for a body's meshes, never a prop's. 0 = opaque */
+    float sheer;
+    /* ⭐ TRUE SIZE (10-18): a pack carrying a node named TrueScale was built in METRES at its real size, and keeps
+     * it -- the club's 1.75 units a metre -- instead of being normalised to the crowd's 3.15 (which blew THE WORLD
+     * AT THE END OF TIME's five-year-olds up to the height of the twelve-year-old: "kids are too big lmao"). */
+    int trueScale; float trueH;   /* trueH: its true height in club units (10-22: the gait test of a child) */
+    /* ⭐ PER-VERTEX COLLISION (10-18): a pack carrying a node named VertexCollide has its skirts (~skirt~/~cloth
+     * meshes) pushed out of its legs and its hair (wear~hair~ meshes) out of its head and neck, EVERY VERTEX, in
+     * the body vertex shaders; its hair chain joints out of the head too. The head is an ellipsoid measured from
+     * the pack's own head vertices in the head bone's frame (headC/headR, measureHead). */
+    int vcol; int headOK; float headC[3], headR[3]; float headW0[16];
 } Pack;
+static int toonOn(const void*Pv,int toon); static void toonCelSet(int on);   /* the toon pass (10-18), below */
+static void toonSetLook(int hemi,int glow);   /* the ship's sets (10-18): a room's light, a glowing panel */
+static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei verts);
+/* ⭐ (10-22) MIRRORS: "half the walls on the ship were mirrored to make the rooms seem more spacious" (Pohl) --
+ * a set's `mirror x y z yaw w h`; see mirInst */
+typedef struct { float p[3], n[3], w, h, R[16]; } Mirror;
+static Mirror g_mir[4]; static int g_nMir=0, g_mirOff=-1;
+static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,GLsizei verts,int flags);
+static void colSet(Pack*P,M4*W,unsigned mi);   /* per-vertex collision (10-18), below */
+static int g_skirtLive=0; static float g_skirtBC[3]={0,0,0}; static GLuint g_skVbo[2]={0,0};   /* THE HANGING CLOTH (10-18) */
+#define MOFF(P,mi) ((P)->meshOff&&(P)->meshOff[mi])
+static int wardFind(char tab[][32],int n,const char*nm){ for(int i=0;i<n;i++) if(!strcmp(tab[i],nm)) return i; return -1; }
+static int wardPiece(Pack*P,const char*nm){ int i=wardFind(P->pieceName,P->nPiece,nm); if(i>=0) return i;
+    if(P->nPiece>=64) return 63; snprintf(P->pieceName[P->nPiece],32,"%s",nm); P->pieceOutfits[P->nPiece]=0; return P->nPiece++; }
+static int wardOutfitFind(Pack*P,const char*nm){ for(int i=0;i<P->nOutfit;i++) if(!strcmp(P->outfitName[i],nm)) return i; return -1; }
+static int wardOutfit(Pack*P,const char*nm){ int i=wardOutfitFind(P,nm); if(i>=0) return i;
+    if(P->nOutfit>=16) return 15; snprintf(P->outfitName[P->nOutfit],24,"%s",nm); return P->nOutfit++; }
+static void wardApply(Pack*P){ if(!P||!P->meshOff) return;
+    for(unsigned m=0;m<P->nMeshes;m++)
+        P->meshOff[m]=(unsigned char)(P->meshKind[m]==2 ? (!((P->worn>>P->meshPiece[m])&1ull)||(P->meshHiders[m]&P->worn)!=0)
+                                     : P->meshKind[m]==1 ? ((P->meshHiders[m]&P->worn)!=0) : 0); }
+/* put on an outfit: every piece tagged with it, nothing else */
+static int wardWear(Pack*P,const char*outfit){ if(!P||!P->meshOff) return 0;
+    int o=wardOutfitFind(P,outfit); if(o<0){ printf("[wardrobe] %s has no outfit '%s' --",P->label,outfit);
+        for(int i=0;i<P->nOutfit;i++) printf(" %s",P->outfitName[i]); printf("\n"); fflush(stdout); return 0; }
+    P->outfit=o; P->worn=0;
+    for(int i=0;i<P->nPiece;i++) if(P->pieceOutfits[i]&(1u<<o)) P->worn|=1ull<<i;
+    wardApply(P); int n=0; for(int i=0;i<P->nPiece;i++) n+=(int)((P->worn>>i)&1ull);
+    printf("[wardrobe] %s wears '%s' (%d pieces)\n",P->label,outfit,n); fflush(stdout); return 1; }
+/* wear=+piece,-piece: one piece on or off, over whatever she has on */
+static void wardToggle(Pack*P,const char*list){ if(!P||!P->meshOff) return;
+    char tmp[256]; snprintf(tmp,sizeof tmp,"%s",list);
+    for(char*t=strtok(tmp,",");t;t=strtok(NULL,",")){ int on=1; if(*t=='-'){ on=0; t++; } else if(*t=='+') t++;
+        int i=wardFind(P->pieceName,P->nPiece,t); if(i<0){ printf("[wardrobe] %s has no piece '%s'\n",P->label,t); continue; }
+        if(on) P->worn|=1ull<<i; else P->worn&=~(1ull<<i);
+        printf("[wardrobe] %s: %s %s\n",P->label,on?"puts on":"takes off",t); }
+    fflush(stdout); wardApply(P); }
 static float g_heroMorphW[MORPH_MAX];          /* the hero's live morph weights, fed by clipSampleF */
 static float*g_morphSink=0; static int g_morphSinkN=0;
 /* quat helpers for the procedural layer */
@@ -278,6 +362,15 @@ static void chainPublish(int slot,const float*m){
 /* the mesh shader's alpha, published so drawSet's water pass can reach it */
 static GLint g_labAlpha=-1;
 static float g_chLagMax=0.f; static double g_chLagAcc=0; static long g_chLagN=0;  /* tip lag telemetry */
+/* ⭐ CLOTH MEETS THE LEGS (10-18, THE WORLD AT THE END OF TIME's robes). A cloth chain (its root named Cloth*)
+ * is pushed out of a capsule round each thigh (hip -> knee) and shin (knee -> ankle), each as thick as the body
+ * measured itself (measureBoneR: the mean distance of its own vertices from the bone's segment, x1.15 -- on the
+ * skin). The fabrication note that parked REVA 902's coat said exactly this was owed: "the coat's skirt on cloth
+ * chains with LEG CAPSULE collision". Hair does not collide (the robe is what meets a knee). REVA_CHCOLLIDE=0 is
+ * the control run; REVA_CHCOLR scales the capsules; [chdbg] reports the pushes. */
+static int g_chCol=-1; static float g_chColR=1.0f; static long g_chColN=0;
+static int g_vcolOn; static int headMats(Pack*P,M4*W,float*Mo,float*MI);
+static void measureBoneR(Pack*P); static const char*packStr(void*Pv,unsigned off);
 static void chainArc(float*m,const float*from,const float*to){
     /* rotate m's 3x3 by the shortest arc taking direction from -> to */
     float lf=sqrtf(from[0]*from[0]+from[1]*from[1]+from[2]*from[2]);
@@ -295,15 +388,38 @@ static void chainArc(float*m,const float*from,const float*to){
         float uv[3]={q[1]*v[2]-q[2]*v[1], q[2]*v[0]-q[0]*v[2], q[0]*v[1]-q[1]*v[0]};
         float uuv[3]={q[1]*uv[2]-q[2]*uv[1], q[2]*uv[0]-q[0]*uv[2], q[0]*uv[1]-q[1]*uv[0]};
         v[0]+=2.f*(q[3]*uv[0]+uuv[0]); v[1]+=2.f*(q[3]*uv[1]+uuv[1]); v[2]+=2.f*(q[3]*uv[2]+uuv[2]); } }
+static int g_stOff=-1;
+static void ctRotateTree(Pack*P,M4*W,int j,const float*axis,float ang);   /* defined with the contact pass */
+static void stretchTick(void*Pv,M4*W){
+    Pack*P=(Pack*)Pv;
+    if(g_stOff<0){ const char*e=getenv("REVA_NOSTRETCH"); g_stOff=(e&&e[0]&&e[0]!='0')?1:0; }
+    if(g_stOff||!P||!P->nSt) return;
+    for(int q=0;q<P->nSt;q++){ float*m=W[P->stB[q]]; const float*an=W[P->stA[q]];
+        const float*ld=P->stDir[q];
+        float cur[3], to[3]={an[12]-m[12],an[13]-m[13],an[14]-m[14]};
+        for(int r=0;r<3;r++) cur[r]=m[r]*ld[0]+m[4+r]*ld[1]+m[8+r]*ld[2];      /* where its rest line points now */
+        float lc=sqrtf(cur[0]*cur[0]+cur[1]*cur[1]+cur[2]*cur[2]), lt=sqrtf(to[0]*to[0]+to[1]*to[1]+to[2]*to[2]);
+        if(lc<1e-8f||lt<1e-8f) continue;
+        /* turned to the anchor -- and everything hung from it (a drape's cloth chains) turns WITH it, unscaled */
+        float ax[3]={cur[1]*to[2]-cur[2]*to[1], cur[2]*to[0]-cur[0]*to[2], cur[0]*to[1]-cur[1]*to[0]};
+        float sn=sqrtf(ax[0]*ax[0]+ax[1]*ax[1]+ax[2]*ax[2]), cs=cur[0]*to[0]+cur[1]*to[1]+cur[2]*to[2];
+        if(sn>1e-9f){ ax[0]/=sn; ax[1]/=sn; ax[2]/=sn; ctRotateTree(P,W,P->stB[q],ax,atan2f(sn,cs)); }
+        float k=lt/lc; if(k<0.2f) k=0.2f; if(k>5.f) k=5.f;   /* and stretched to reach it: this bone only */
+        float u[3]={to[0]/lt,to[1]/lt,to[2]/lt};
+        for(int c=0;c<3;c++){ float*v=&m[c*4]; float dp=(u[0]*v[0]+u[1]*v[1]+u[2]*v[2])*(k-1.f);
+            v[0]+=u[0]*dp; v[1]+=u[1]*dp; v[2]+=u[2]*dp; } } }
 static void chainSim(void*Pv,M4*world,int who){
     Pack*P=(Pack*)Pv;
     /* ⛔ ONE STATE PER CAST SLOT, not per hero/partner (ROBOT NEKO ep 2). With [2] every partner
      * passed who=1, so in a three-hander slot 2 reseeded slot 1's braids on every call and
      * neither body's hair ever simulated. Indexed by g_castI; sized to SCN_MAXCAST (asserted). */
-    static float sp[CH_SLOTS][8][14][3], pp[CH_SLOTS][8][14][3];
+    static float sp[CH_SLOTS][CHMAXC][14][3], pp[CH_SLOTS][CHMAXC][14][3];
     static void* seeded[CH_SLOTS];
     static unsigned stampOf[CH_SLOTS];
     if(!g_chainsOn||!P||!P->nCh||who<0||who>=CH_SLOTS) return;
+    if(g_chCol<0){ const char*e=getenv("REVA_CHCOLLIDE"); g_chCol=!(e&&e[0]=='0');
+        const char*r=getenv("REVA_CHCOLR"); if(r&&*r) g_chColR=(float)atof(r);
+        printf("[chains] cloth vs legs: %s (capsules x%.2f)\n",g_chCol?"ON":"OFF (REVA_CHCOLLIDE=0)",g_chColR); fflush(stdout); }
     /* ⛔ ONE STEP PER FRAME PER SLOT. An actor is drawn once per PANEL -- the bench's four-angle sheet draws
      * it four times a frame -- and every call used to be a verlet step, so the hair would have swung four
      * times as fast on a sheet as in a take. A second call in the same frame poses from the state it has. */
@@ -338,6 +454,9 @@ static void chainSim(void*Pv,M4*world,int who){
     float grav=-CLUB_UNITS_PER_S2*g_chGrav*dtf*dtf/(wsc>1e-6f?wsc:(P->scale>1e-6f?P->scale:1.f));
     for(int c=0;c<P->nCh;c++){
         int n=P->chN[c]; if(n<2) continue;
+        /* ⭐ STIFF HAIR (10-18): a chain whose root is named *Stiff* springs to its pose 3x harder (a bob) */
+        float sKc=sK; { const char*rn9=packStr(P,P->nodes[P->chB[c][0]].name);
+            if(rn9&&(strstr(rn9,"Stiff")||strstr(rn9,"stiff"))){ sKc=sK*3.f; if(sKc>0.9f) sKc=0.9f; } }
         float a[14][3];
         for(int i=0;i<n;i++){ float*w=&world[P->chB[c][i]][12]; a[i][0]=w[0]; a[i][1]=w[1]; a[i][2]=w[2]; }
         if(seeded[who]!=(void*)P){
@@ -359,7 +478,7 @@ static void chainSim(void*Pv,M4*world,int who){
         if(!g_stepHeld&&adv) for(int i=1;i<n;i++){ float np[3], step[3];
             for(int k=0;k<3;k++){
                 float vel=(sp[who][c][i][k]-pp[who][c][i][k])*dmp;
-                step[k]=vel+(a[i][k]-sp[who][c][i][k])*sK-gdir[k]*grav; }
+                step[k]=vel+(a[i][k]-sp[who][c][i][k])*sKc-gdir[k]*grav; }
             /* \u26d4 CLAMP THE STEP TO THE LINK. gravity alone is ~0.165 rig units per frame
              * (-2.4/scale * dt^2 * 60) and Anima's braid links are ~0.04, so a node was being
              * thrown four segment-lengths in one step -- past the point where a distance
@@ -384,6 +503,72 @@ static void chainSim(void*Pv,M4*world,int who){
                 float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(dl<1e-8f) continue;
                 float r=L/dl;
                 for(int k=0;k<3;k++) sp[who][c][i][k]=sp[who][c][i-1][k]+d[k]*r; } }
+        /* ⭐ HAIR NEVER INWARD (10-18): a VertexCollide pack's hair joints never nearer the head's centre (in the
+         * ellipsoid's normalised frame) than the animated pose puts them -- the pose carries hair rigid on the head */
+        if(!g_stepHeld&&adv&&P->vcol&&g_vcolOn!=0){
+            const char*rn=packStr(P,P->nodes[P->chB[c][0]].name);
+            float Mo[16],MI[16];
+            if(rn&&(strstr(rn,"Hair")||strstr(rn,"hair"))&&headMats(P,world,Mo,MI)){ int pushed=0;
+                for(int i=1;i<n;i++){ float*x=sp[who][c][i]; float u[3], ua[3];
+                    for(int r=0;r<3;r++){ u[r]=MI[r]*x[0]+MI[4+r]*x[1]+MI[8+r]*x[2]+MI[12+r];
+                                          ua[r]=MI[r]*a[i][0]+MI[4+r]*a[i][1]+MI[8+r]*a[i][2]+MI[12+r]; }
+                    float L=sqrtf(u[0]*u[0]+u[1]*u[1]+u[2]*u[2]), La=0.995f*sqrtf(ua[0]*ua[0]+ua[1]*ua[1]+ua[2]*ua[2]);
+                    if(L<La&&L>1e-5f){ for(int r=0;r<3;r++) u[r]*=La/L;
+                        for(int r=0;r<3;r++) x[r]=Mo[r]*u[0]+Mo[4+r]*u[1]+Mo[8+r]*u[2]+Mo[12+r];
+                        pushed++; } }
+                if(pushed){ g_chColN+=pushed;
+                    for(int i=1;i<n;i++){ float d[3]; float L=P->chLen[c][i]; if(L<1e-7f) continue;
+                        for(int k=0;k<3;k++) d[k]=sp[who][c][i][k]-sp[who][c][i-1][k];
+                        float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(dl<1e-8f) continue;
+                        float r=L/dl;
+                        for(int k=0;k<3;k++) sp[who][c][i][k]=sp[who][c][i-1][k]+d[k]*r; } } } }
+        /* ⭐ CLOTH MEETS THE LEGS (10-18): out of the thigh and shin capsules, then the lengths put back.
+         * ⛔ NOT on a VertexCollide pack: there the vertex shader drapes every vertex, and a joint pushed out here
+         * swung the chain's fixed length up like a flap hinged at the hip -- the hem rose to the knee and left a flat
+         * underside (a line across the leg, a box from the side) the shader could never pull back down */
+        if(!g_stepHeld&&adv&&g_chCol&&!(P->vcol&&g_vcolOn!=0)){
+            const char*rn=packStr(P,P->nodes[P->chB[c][0]].name);
+            if(rn&&(strstr(rn,"Cloth")||strstr(rn,"cloth"))){
+                if(!P->boneRok) measureBoneR(P);
+                int sa[4],sb[4]; float sr[4]; int ns=0;
+                const int segs[4][3]={{12,13,-1},{13,-2,-1},{14,15,-1},{15,-3,-1}};
+                for(int q=0;q<4;q++){ int A=P->pb[segs[q][0]];
+                    int B=segs[q][1]>=0?P->pb[segs[q][1]]:(segs[q][1]==-2?P->footL:P->footR);
+                    float rr=P->boneR[segs[q][0]];
+                    if(A>=0&&B>=0&&(unsigned)A<P->nNodes&&(unsigned)B<P->nNodes&&rr>0.f){
+                        sa[ns]=A; sb[ns]=B; sr[ns]=rr*g_chColR; ns++; } }
+                int pushed=0;
+                for(int i=1;i<n;i++){ float*x=sp[who][c][i];
+                    for(int q=0;q<ns;q++){ const float*A=&world[sa[q]][12], *B=&world[sb[q]][12];
+                        float e[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]};
+                        float el=e[0]*e[0]+e[1]*e[1]+e[2]*e[2], t=0.f;
+                        if(el>1e-12f){ t=((x[0]-A[0])*e[0]+(x[1]-A[1])*e[1]+(x[2]-A[2])*e[2])/el;
+                            if(t<0.f) t=0.f; if(t>1.f) t=1.f; }
+                        float cpt[3]={A[0]+e[0]*t,A[1]+e[1]*t,A[2]+e[2]*t};
+                        float d[3]={x[0]-cpt[0],x[1]-cpt[1],x[2]-cpt[2]};
+                        float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+                        if(dl<sr[q]){
+                            /* THE TENT (10-18): out along the joint's own way out of the body, not radially */
+                            int hp=P->pb[0]; float nv[3]={0.f,0.f,0.f}, nl=0.f;
+                            if(hp>=0&&(unsigned)hp<P->nNodes){ nv[0]=x[0]-world[hp][12]; nv[2]=x[2]-world[hp][14];
+                                nl=sqrtf(nv[0]*nv[0]+nv[2]*nv[2]); }
+                            if(nl<1e-6f){ if(dl>1e-7f){ float kk=sr[q]/dl; for(int k=0;k<3;k++) x[k]=cpt[k]+d[k]*kk; } }
+                            else { nv[0]/=nl; nv[2]/=nl;
+                                float eel=sqrtf(el>1e-12f?el:1e-12f), eu[3]={e[0]/eel,e[1]/eel,e[2]/eel};
+                                float dq=d[0]*eu[0]+d[1]*eu[1]+d[2]*eu[2], dn=nv[0]*eu[0]+nv[2]*eu[2];
+                                float qp[3]={d[0]-eu[0]*dq,d[1]-eu[1]*dq,d[2]-eu[2]*dq};
+                                float np[3]={nv[0]-eu[0]*dn,-eu[1]*dn,nv[2]-eu[2]*dn};
+                                float a9=np[0]*np[0]+np[1]*np[1]+np[2]*np[2], b9=qp[0]*np[0]+qp[1]*np[1]+qp[2]*np[2];
+                                float c9=qp[0]*qp[0]+qp[1]*qp[1]+qp[2]*qp[2]-sr[q]*sr[q];
+                                float s9=(a9>1e-4f)?(-b9+sqrtf(fmaxf(b9*b9-a9*c9,0.f)))/a9:(sr[q]-dl);
+                                if(s9>0.f){ x[0]+=nv[0]*s9; x[2]+=nv[2]*s9; } }
+                            pushed++; } } }
+                if(pushed){ g_chColN+=pushed;
+                    for(int i=1;i<n;i++){ float d[3]; float L=P->chLen[c][i]; if(L<1e-7f) continue;
+                        for(int k=0;k<3;k++) d[k]=sp[who][c][i][k]-sp[who][c][i-1][k];
+                        float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(dl<1e-8f) continue;
+                        float r=L/dl;
+                        for(int k=0;k<3;k++) sp[who][c][i][k]=sp[who][c][i-1][k]+d[k]*r; } } } }
         { float dx=a[n-1][0]-sp[who][c][n-1][0], dy=a[n-1][1]-sp[who][c][n-1][1], dz=a[n-1][2]-sp[who][c][n-1][2];
           float lag=sqrtf(dx*dx+dy*dy+dz*dz);
           if(lag>g_chLagMax) g_chLagMax=lag; g_chLagAcc+=lag; g_chLagN++; }
@@ -396,9 +581,9 @@ static void chainSim(void*Pv,M4*world,int who){
       if(dbg<0){ const char*e=getenv("REVA_CHDBG"); dbg=(e&&e[0]=='1')?1:0; }
       if(dbg&&P->nCh){ static double acc=0; acc+=g_chDt;
         if(acc-lastP>1.0){ lastP=acc;
-          printf("[chdbg] tip lag: max %.4f mean %.4f rig-u over %ld samples\n",
-                 g_chLagMax,(float)(g_chLagN?g_chLagAcc/g_chLagN:0),g_chLagN);
-          fflush(stdout); g_chLagMax=0; g_chLagAcc=0; g_chLagN=0; } } }
+          printf("[chdbg] tip lag: max %.4f mean %.4f rig-u over %ld samples; cloth pushed off the legs %ld times\n",
+                 g_chLagMax,(float)(g_chLagN?g_chLagAcc/g_chLagN:0),g_chLagN,g_chColN);
+          fflush(stdout); g_chLagMax=0; g_chLagAcc=0; g_chLagN=0; g_chColN=0; } } }
     seeded[who]=(void*)P; }
 /* column frame [X Y Z] -> quaternion (xyzw), Shepperd -- P5 canonical frames */
 static void m3q(const float*X,const float*Y,const float*Z,float*q){
@@ -1018,12 +1203,25 @@ static Pack loadPack(const char*path){
      * not ears (a name you didn't audit is a name that will lie). A chain starts at a
      * matching bone whose parent does not match and walks matching children. */
     P.nCh=0;
+    P.toon=0; P.trueScale=0; P.trueH=0.f; P.vcol=0; P.headOK=0; P.glow=0; P.nocast=0; P.open=0; P.sheer=0.f; P.mirOnly=0;
+    for(unsigned i=0;i<P.nNodes;i++){ const char*nm9=packStr(&P,P.nodes[i].name);
+        if(!strcmp(nm9,"ToonStyle")&&P.toon<1) P.toon=1;
+        if(!strcmp(nm9,"ToonSet")) P.toon=2;
+        if(!strcmp(nm9,"Glow")) P.glow=1;
+        if(!strcmp(nm9,"NoCast")) P.nocast=1;
+        if(!strcmp(nm9,"Open")) P.open=1;
+        if(!strcmp(nm9,"MirrorOnly")) P.mirOnly=1;
+        if(!strncmp(nm9,"Alpha",5)&&nm9[5]>='0'&&nm9[5]<='9') P.sheer=(float)atoi(nm9+5)/100.f;
+        if(!strcmp(nm9,"TrueScale")) P.trueScale=1;
+        if(!strcmp(nm9,"VertexCollide")) P.vcol=1; }
     { const unsigned N=P.nNodes;
-      #define CHNAME(nm) (strstr(nm,"tail")||strstr(nm,"pony")||strstr(nm,"braid")|| \
+      /* ⭐ "cloth" (09-29): a garment's free panel -- REVA's jacket hanging at her elbows, her bandana -- is a
+       * chain like a ponytail: rooted in the body, swung by the same solver. Godot's ClubHair mines it too. */
+      #define CHNAME(nm) (strstr(nm,"tail")||strstr(nm,"pony")||strstr(nm,"braid")||strstr(nm,"cloth")|| \
           strstr(nm,"hair")||strstr(nm,"bang")||strstr(nm,"tress")||strstr(nm,"ribbon")|| \
           (strstr(nm,"ear")&&!strstr(nm,"arm")&&!strstr(nm,"rear")&&!strstr(nm,"spear")&& \
            !strstr(nm,"beard")&&!strstr(nm,"heart")&&!strstr(nm,"gear")))
-      for(unsigned i=0;i<N&&P.nCh<8;i++){
+      for(unsigned i=0;i<N&&P.nCh<CHMAXC;i++){
         char lo[96]; const char*s0=packStr(&P,P.nodes[i].name); unsigned k;
         for(k=0;k<95&&s0[k];k++) lo[k]=(char)((s0[k]>='A'&&s0[k]<='Z')?s0[k]+32:s0[k]); lo[k]=0;
         if(!CHNAME(lo)) continue;
@@ -1047,7 +1245,7 @@ static Pack loadPack(const char*path){
               for(k=0;k<95&&s2[k];k++) lc[k]=(char)((s2[k]>='A'&&s2[k]<='Z')?s2[k]+32:s2[k]); lc[k]=0;
               if(CHNAME(lc)){ starts[nStarts++]=(int)j; anyKid=1; } }
           if(!anyKid){ starts[0]=-1; nStarts=1; } }
-        for(int sIdx=0;sIdx<nStarts&&P.nCh<8;sIdx++){
+        for(int sIdx=0;sIdx<nStarts&&P.nCh<CHMAXC;sIdx++){
         int n=0; unsigned cur=i;
         int first=starts[sIdx];
         while(n<14){ P.chB[P.nCh][n++]=(short)cur;
@@ -1063,6 +1261,8 @@ static Pack loadPack(const char*path){
             float dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2];
             P.chLen[P.nCh][q9]=sqrtf(dx*dx+dy*dy+dz*dz); }
         P.chN[P.nCh]=(signed char)n; P.nCh++; } }
+      if(P.nCh>=CHMAXC){ printf("[chains] \u26d4 %s: the %d-chain budget is FULL -- later chains were not mined\n",
+                                P.label[0]?P.label:path,CHMAXC); fflush(stdout); }
       #undef CHNAME
     }
     /* ---- ⭐ JIGGLE BONES: a bone named for soft mass (breast) whose parent is not, and its first such child as
@@ -1082,6 +1282,24 @@ static Pack loadPack(const char*path){
         P.jgRoot[P.nJg]=(short)i; P.jgTip[P.nJg]=(short)tip; P.nJg++; }
     if(P.nJg){ printf("[jiggle] %s: %d jiggle bone(s) --",P.label[0]?P.label:path,P.nJg);
         for(int q=0;q<P.nJg;q++) printf(" %s",packStr(&P,P.nodes[P.jgRoot[q]].name)); printf("\n"); fflush(stdout); }
+    /* ---- ⭐ STRETCH BONES: Stretch_<x> and its Anchor_<x>, their rest line in the stretch bone's own frame ---- */
+    P.nSt=0;
+    for(unsigned i=0;i<P.nNodes&&P.nSt<8;i++){ const char*s0=packStr(&P,P.nodes[i].name);
+        if(strncmp(s0,"Stretch_",8)) continue;
+        char want[96]; snprintf(want,sizeof want,"Anchor_%s",s0+8);
+        int a=-1; for(unsigned j=0;j<P.nNodes;j++) if(!strcmp(packStr(&P,P.nodes[j].name),want)){ a=(int)j; break; }
+        if(a<0){ printf("[stretch] \u26d4 %s: %s has no %s -- it stays a plain bone\n",P.label[0]?P.label:path,s0,want);
+            fflush(stdout); continue; }
+        float*m=world[i]; float d[3]={world[a][12]-m[12],world[a][13]-m[13],world[a][14]-m[14]};
+        float L=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(L<1e-6f) continue;
+        float loc[3];                                    /* the rest line, in the bone's own (possibly scaled) frame */
+        for(int c=0;c<3;c++){ float cl2=m[c*4]*m[c*4]+m[c*4+1]*m[c*4+1]+m[c*4+2]*m[c*4+2]; if(cl2<1e-12f) cl2=1.f;
+            loc[c]=(m[c*4]*d[0]+m[c*4+1]*d[1]+m[c*4+2]*d[2])/cl2; }
+        P.stB[P.nSt]=(short)i; P.stA[P.nSt]=(short)a; P.stLen[P.nSt]=L;
+        P.stDir[P.nSt][0]=loc[0]; P.stDir[P.nSt][1]=loc[1]; P.stDir[P.nSt][2]=loc[2]; P.nSt++; }
+    if(P.nSt){ printf("[stretch] %s: %d stretch bone(s) --",P.label[0]?P.label:path,P.nSt);
+        for(int q=0;q<P.nSt;q++) printf(" %s->%s (%.3f)",packStr(&P,P.nodes[P.stB[q]].name),packStr(&P,P.nodes[P.stA[q]].name),P.stLen[q]);
+        printf("\n"); fflush(stdout); }
     /* ---- H2: the DQS audit, while the rest FK is still alive ---- */
     P.dqsOK=1;
     for(unsigned mi=0;mi<P.nMeshes&&mi<8;mi++){ PMesh*M=&P.meshes[mi];
@@ -1096,6 +1314,7 @@ static Pack loadPack(const char*path){
         if(mn<1e-6f||mx/mn>1.02f){ P.dqsOK=0; }
         else P.meshDqS[mi]=acc/(float)nb; }
     if(P.nMeshes>8) P.dqsOK=0;
+    if(P.nSt) P.dqsOK=0;                  /* a stretch is a SCALE: dual quaternions cannot carry it */
     free(world);
     float span=(mxy-mny); P.scale=(span>1e-4f)?(3.15f/(span*1.13f)):1.0f;
     P.cx=(mnx+mxx)*0.5f; P.cz=(mnz+mxz)*0.5f; P.mny=mny;
@@ -1137,6 +1356,9 @@ static Pack loadPack(const char*path){
     /* THE GIANTESS, ON PURPOSE (jacob keeps her giant): hina's rig is HONEST now (re-seated rest,
      * measured sizing -> feet ON the floor, sane deformation); the giant is a deliberate 2.3x. */
     if(strstr(P.label,"hina")) P.scale*=2.3f;
+    if(P.trueScale){ P.scale=1.75f;                 /* TRUE SIZE: metres -> club units, never normalised */
+        P.trueH=(mxy-mny)*1.75f;
+        printf("[size] %s: TRUE SIZE, %.2f m -> %.2f club units tall\n",P.label,(mxy-mny),(mxy-mny)*1.75f); fflush(stdout); }
     P.avoidR=2.4f*fminf(3.f,fmaxf(1.f,P.effH/3.15f));   /* the giantess gets giantess clearance */
     P.walkIdx=-1;
     for(unsigned c=0;c<P.nClips;c++){ const char*nm=packStr(&P,P.clips[c].name);
@@ -1441,6 +1663,36 @@ static Pack loadPack(const char*path){
           free(inv); }
         free(tm); free(tt); free(tf); free(ord);
         printf("[alpha] %s: %u blended mesh(es) moved last%c",P.label,nb,10); fflush(stdout); } }
+    /* ⭐ THE WARDROBE (09-29): read the tags AFTER the reorder above -- a per-mesh array built before it would be
+     * the fifth one to point at the wrong meshes. */
+    P.meshOff=P.meshKind=P.meshPiece=NULL; P.meshHiders=NULL; P.nPiece=0; P.nOutfit=0; P.outfit=-1; P.worn=0;
+    { int any=0; for(unsigned m=0;m<P.nMeshes;m++){ const char*n=packStr(&P,P.meshes[m].name);
+          if(n&&(!strncmp(n,"wear~",5)||!strncmp(n,"skin~h=",7))){ any=1; break; } }
+      if(any){
+        P.meshOff=(unsigned char*)calloc(P.nMeshes,1); P.meshKind=(unsigned char*)calloc(P.nMeshes,1);
+        P.meshPiece=(unsigned char*)calloc(P.nMeshes,1); P.meshHiders=(unsigned long long*)calloc(P.nMeshes,sizeof(unsigned long long));
+        for(unsigned m=0;m<P.nMeshes;m++){ const char*n=packStr(&P,P.meshes[m].name); if(!n) continue;
+            char tmp[256];
+            if(!strncmp(n,"wear~",5)){                        /* wear~slot~piece~o1+o2[~h=a,b] */
+                snprintf(tmp,sizeof tmp,"%s",n+5); char*d=strchr(tmp,'.'); if(d) *d=0;
+                char*pc=strchr(tmp,'~'); if(!pc) continue; *pc++=0;
+                char*of=strchr(pc,'~'); if(of) *of++=0;
+                /* ⭐ A GARMENT UNDER A GARMENT (09-29, the suit man): the part of a shirt a jacket covers is its own
+                 * mesh, `~h=jacket` -- drawn only while the shirt is worn AND the jacket is not. Layers never poke
+                 * through each other, and the shirt is whole again in shirtsleeves */
+                char*hd=of?strstr(of,"~h="):NULL; if(hd){ *hd=0; hd+=3; }
+                int id=wardPiece(&P,pc); P.meshKind[m]=2; P.meshPiece[m]=(unsigned char)id;
+                if(of) for(char*t=strtok(of,"+");t;t=strtok(NULL,"+")) P.pieceOutfits[id]|=1u<<wardOutfit(&P,t);
+                if(hd){ char hb[128]; snprintf(hb,sizeof hb,"%s",hd);
+                    for(char*t=strtok(hb,",");t;t=strtok(NULL,",")) P.meshHiders[m]|=1ull<<wardPiece(&P,t); } }
+            else if(!strncmp(n,"skin~h=",7)){                /* skin~h=a,b */
+                snprintf(tmp,sizeof tmp,"%s",n+7); char*d=strchr(tmp,'.'); if(d) *d=0;
+                P.meshKind[m]=1;
+                for(char*t=strtok(tmp,",");t;t=strtok(NULL,",")) P.meshHiders[m]|=1ull<<wardPiece(&P,t); } }
+        printf("[wardrobe] %s: %d pieces, %d outfit(s):",P.label[0]?P.label:path,P.nPiece,P.nOutfit);
+        for(int i=0;i<P.nOutfit;i++) printf(" %s",P.outfitName[i]); printf("\n"); fflush(stdout);
+        const char*e=getenv("REVA_OUTFIT");
+        if(!(e&&e[0]&&wardWear(&P,e))&&P.nOutfit) wardWear(&P,P.outfitName[0]); } }
     /* ⛔ AND IT MUST HAPPEN BEFORE THE VBOs ARE BUILT. P.vbo is indexed by mesh
      * POSITION, so reordering P.meshes afterwards leaves every mesh drawing with
      * another mesh's vertex buffers. Her face came apart into floating slabs with
@@ -1880,7 +2132,7 @@ static void drawProp(Pack*P,const float*model,GLint uModel,GLint uPal,GLint uBin
     if(!idInit){ idInit=1; for(int b=0;b<MAXB;b++) memcpy(idN+b*16,ident,64); }
     glUniformMatrix4fv(uModel,1,GL_FALSE,model);
     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-        if(!(M->flags&4)||M->boneCount>MAXB) continue;
+        if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
         glUniformMatrix4fv(uPal,(GLsizei)(M->boneCount?M->boneCount:1),GL_FALSE,idN);
         glUniformMatrix4fv(uBind,1,GL_FALSE,(float*)(P->pk+M->offBind));
@@ -1893,8 +2145,19 @@ static void drawProp(Pack*P,const float*model,GLint uModel,GLint uPal,GLint uBin
         else glDisableVertexAttribArray(4);
         { int tx=P->meshTex[mi]; if(tx>=0) glBindTexture(GL_TEXTURE_2D,P->tex[tx]); nrmBind(P,mi); }
         if(g_propMC.uTint>=0) propMeshColour(P,mi);   /* ⭐ ep 12: per-mesh colour and glow, for a held primitive */
-        if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
-        else glDrawArrays(GL_TRIANGLES,0,M->verts); }
+        GLint shA9=-1;   /* ⭐ (10-22) a SHEER prop: blended, not depth-writing, at its marker's opacity */
+        if(P->sheer>0.f&&P->sheer<1.f){ GLint pr9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr9); shA9=glGetUniformLocation((GLuint)pr9,"uAlpha");
+            glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); if(shA9>=0) glUniform1f(shA9,P->sheer); }
+        { int toon9=P->glow?0:toonOn(P,P->toon); toonCelSet(toon9); colSet(P,NULL,mi);
+          int look9=(toon9&&P->toon==2)||P->glow; if(look9) toonSetLook(toon9&&P->toon==2,P->glow);
+        if(M->idxCount) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]);
+        if(!P->mirOnly){   /* ⭐ (10-22) a MirrorOnly prop shows only in reflections: a mirror's backing, seen in another */
+        if(M->idxCount) glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0);
+        else glDrawArrays(GL_TRIANGLES,0,M->verts);
+          toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); }
+          mirInst(uModel,toon9,packStr(P,M->name),M->idxCount,M->verts,1|((P->mirOnly||P->sheer>0.f)?2:0));
+          if(look9) toonSetLook(0,0); }
+        if(P->sheer>0.f&&P->sheer<1.f){ if(shA9>=0) glUniform1f(shA9,1.f); glDisable(GL_BLEND); glDepthMask(GL_TRUE); } }
 }
 
 /* ================= THE SKATEPARK ==================================================
@@ -3012,7 +3275,7 @@ static const char* charSelect(SDL_Window*win,int W,int H){
          * bind-space position bounds are the character's real extent. */
         float mnx=1e9f,mxx=-1e9f,mny=1e9f,mxy=-1e9f,mnz=1e9f,mxz=-1e9f; int any=0;
         for(unsigned m=0;m<cp[i].nMeshes;m++){ PMesh*M=&cp[i].meshes[m];
-            if(!(M->flags&4)||M->boneCount>MAXB) continue;
+            if(!(M->flags&4)||M->boneCount>MAXB||MOFF(&cp[i],m)) continue;
             meshAlphaState(M);
             float*pp=(float*)(cp[i].pk+M->offPos);
             for(unsigned v=0;v<M->verts;v++){ float x=pp[v*3],y=pp[v*3+1],z=pp[v*3+2];
@@ -3158,7 +3421,7 @@ static const char* charSelect(SDL_Window*win,int W,int H){
             float lcv[NLIGHT*3]={hot?1.15f:0.10f,hot?0.55f:0.05f,hot?1.30f:0.12f,
                           0.10f,0.04f,0.16f, 0.10f,0.04f,0.16f, 0,0,0, 0,0,0, 0,0,0};
             for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-                if(!(M->flags&4)||M->boneCount>MAXB) continue;
+                if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
                 glUniformMatrix4fv(suModel,1,GL_FALSE,model);
                 glUniform3fv(suTint,1,tint);
@@ -3180,8 +3443,10 @@ static const char* charSelect(SDL_Window*win,int W,int H){
                 glBindBuffer(GL_ARRAY_BUFFER,b[3]); glEnableVertexAttribArray(3); glVertexAttribPointer(3,4,GL_UNSIGNED_BYTE,GL_TRUE,0,0);
                 if(M->flags&2){ glBindBuffer(GL_ARRAY_BUFFER,b[5]); glEnableVertexAttribArray(4); glVertexAttribPointer(4,2,GL_FLOAT,GL_FALSE,0,0); }
                 else glDisableVertexAttribArray(4);
+                { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,world,mi);
                 if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
-                else glDrawArrays(GL_TRIANGLES,0,M->verts); } }
+                else glDrawArrays(GL_TRIANGLES,0,M->verts);
+                  toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); } } }
         /* text overlay */
         { static char fb2[48000]; static float tv2[24000];
           glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -3409,6 +3674,9 @@ static int modeSelect(SDL_Window*win,int W,int H){
     glDeleteProgram(tp); glDeleteBuffers(1,&tvbo);
     return done;
 }
+#endif
+#ifdef _WIN32
+#include "lighthouse.c"   /* ⭐ 10-12 R.E.V.A.: door 11 is the real game's start menu */
 #endif
 
 /* ================= THE SKATER: PHYSICS, TRICKS, POINTS ==============================
@@ -4099,6 +4367,7 @@ typedef struct { int pk, clip, board;
                  int   moving;                 /* the locomotion clip is up */
                  float navX[128], navZ[128]; int navN, navI;   /* the path the grid gave her */
                  int   threat;                 /* who she is fleeing / hunting (-1 none, -2 the hero) */
+                 unsigned long long worn;      /* ⭐ (10-23) the pieces she wears (`outfit=`), put on as she is drawn */
                  } SetActor;
 static SetActor g_setA[SET_MAXA]; static int g_setNA=0;
 
@@ -4599,6 +4868,577 @@ static void watStep(Water*W,float dt){
         for(int k=0;k<3;k++) W->nrm[i][k]=n[k]/L; } }
 
 
+/* ---- SPACE (10-22, THE WORLD AT THE END OF TIME: the New Mayflower) --------------------------------------------------
+ * A set that is a place in deep space says `space`, and its sky is BLACK with the stars drawn at infinity: procedural,
+ * tens of thousands, most faint, "from firebox red to sapphire and white" (the book, p23), dense in a Milky Way haze
+ * along a great circle (`milkyway nx ny nz strength`, the band's pole), and up to eight NAMED stars (`star dx dy dz r g b
+ * size_deg [halo]` -- the flare star, the destination), each a core and a glow. A ship at its true size outruns a lens's
+ * 900 u, so `far <u>` lets a space set be seen whole. A set may carry its own light too: `sun elev azim I [r g b]` and
+ * `sky r g b`, applied as it loads (the ctl line's own sun=/sky= still win).
+ * ⛔ NOT the day sky with its colours turned down: that sky is a gradient with a CLOUD DECK, and it drew grey clouds
+ * behind the ship in deep space. */
+static int g_setSpace=0; static float g_setFar=0.f;
+static float g_starDir[8][4], g_starCol[8][4]; static int g_nStar=0;
+static float g_starFl[8][3];   /* (10-22) a named star's flare: delay, rise, peak (peak 0 = none) */
+static float g_milky[4]={0.f,1.f,0.f,0.f};
+static GLuint g_spaceProg=0, g_spaceVB=0;
+static GLint  g_spVP=-1,g_spEye=-1,g_spStar=-1,g_spStarC=-1,g_spNStar=-1,g_spMilky=-1,g_spPix=-1;
+static void spaceSkyDraw(void){
+    if(!g_spaceProg){
+        const char*vs=
+          "attribute vec3 p;\n"
+          "uniform mat4 vp; uniform vec3 uEye;\n"
+          "varying vec3 vdir;\n"
+          "void main(){ vec3 wp=uEye+p*90.0; vdir=p; gl_Position=vp*vec4(wp,1.0); }\n";
+        const char*fs=
+          "precision highp float;\n"
+          "varying vec3 vdir;\n"
+          "uniform vec4 uStar[8]; uniform vec4 uStarC[8]; uniform float uNStar; uniform vec4 uMilky; uniform float uPix;\n"
+          "float h1(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }\n"
+          "float vn(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n"
+          "  return mix(mix(mix(h1(i),h1(i+vec3(1,0,0)),f.x),mix(h1(i+vec3(0,1,0)),h1(i+vec3(1,1,0)),f.x),f.y),\n"
+          "             mix(mix(h1(i+vec3(0,0,1)),h1(i+vec3(1,0,1)),f.x),mix(h1(i+vec3(0,1,1)),h1(i+vec3(1,1,1)),f.x),f.y),f.z); }\n"
+          "vec3 h3(vec3 p){ return fract(sin(vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6))))*43758.5453); }\n"
+          "vec3 scol(float t){ vec3 r=vec3(1.0,0.42,0.22), w=vec3(1.0,0.96,0.90), b=vec3(0.40,0.56,1.0);\n"
+          "  return t<0.5 ? mix(r,w,t*2.0) : mix(w,b,(t-0.5)*2.0); }\n"
+          /* a star field on the cube's six faces (no pole pinch): one chance of a star per cell, kept off the cell's
+           * edges so it never needs its neighbours; most faint, a few bright, every colour from red to blue */
+          "vec3 field(vec3 d, float N, float dens, float seed){\n"
+          "  vec3 a=abs(d); vec2 uv; float face;\n"
+          "  if(a.x>=a.y&&a.x>=a.z){ uv=d.yz/a.x; face=d.x>0.0?0.0:1.0; }\n"
+          "  else if(a.y>=a.z){ uv=d.xz/a.y; face=d.y>0.0?2.0:3.0; }\n"
+          "  else { uv=d.xy/a.z; face=d.z>0.0?4.0:5.0; }\n"
+          "  vec2 g=(uv*0.5+0.5)*N; vec2 cell=floor(g); vec2 f=g-cell;\n"
+          "  vec3 r=h3(vec3(cell,face*13.0+seed));\n"
+          "  if(r.x>dens) return vec3(0.0);\n"
+          "  vec2 sp=0.2+0.6*r.yz;\n"
+          "  float dist=length(f-sp)*2.0/N/(1.0+dot(uv,uv));\n"
+          "  float b=pow(h1(vec3(cell.yx,face+seed*1.7)),5.0);\n"
+          "  float rad=uPix*(0.6+1.7*b);\n"
+          "  float k=1.0-smoothstep(rad*0.35,rad,dist);\n"
+          "  return scol(h1(vec3(cell,face+seed+7.7)))*k*(0.32+1.9*b); }\n"
+          "void main(){\n"
+          "  vec3 d=normalize(vdir);\n"
+          "  vec3 c=field(d,240.0,0.075,1.0)+field(d,96.0,0.05,5.0);\n"
+          "  float mm=dot(d,uMilky.xyz); float band=exp(-mm*mm/0.03)*uMilky.w;\n"
+          "  float gr=(0.45+0.55*vn(d*7.0))*(0.55+0.45*vn(d*19.0+3.1));\n"
+          "  c+=vec3(0.60,0.64,0.78)*band*gr*0.30;\n"
+          "  c+=field(d,420.0,0.22,9.0)*band*gr*0.55;\n"
+          "  for(int i=0;i<8;i++){\n"
+          "    if(float(i)>=uNStar) break;\n"
+          "    float ang=acos(clamp(dot(d,uStar[i].xyz),-1.0,1.0));\n"
+          "    float core=1.0-smoothstep(uStar[i].w*0.55,uStar[i].w,ang);\n"
+          "    float halo=uStarC[i].a*exp(-ang/(uStar[i].w*3.5));\n"
+          "    c+=uStarC[i].rgb*(core*1.6+halo*0.8); }\n"
+          "  gl_FragColor=vec4(c,1.0); }\n";
+        GLuint pr=glCreateProgram();
+        glAttachShader(pr,sh(GL_VERTEX_SHADER,vs));
+        glAttachShader(pr,sh(GL_FRAGMENT_SHADER,fs));
+        glBindAttribLocation(pr,0,"p");
+        glLinkProgram(pr);
+        GLint ok=0; glGetProgramiv(pr,GL_LINK_STATUS,&ok);
+        if(!ok){ char log[512]; glGetProgramInfoLog(pr,512,NULL,log);
+                 printf("[space] LINK FAILED: %s%c",log,10); fflush(stdout); g_spaceProg=(GLuint)-1; return; }
+        g_spaceProg=pr;
+        g_spVP=glGetUniformLocation(pr,"vp");       g_spEye=glGetUniformLocation(pr,"uEye");
+        g_spStar=glGetUniformLocation(pr,"uStar");  g_spStarC=glGetUniformLocation(pr,"uStarC");
+        g_spNStar=glGetUniformLocation(pr,"uNStar"); g_spMilky=glGetUniformLocation(pr,"uMilky");
+        g_spPix=glGetUniformLocation(pr,"uPix");
+        static const float C[]={
+            -1,-1,-1,  1,-1,-1,  1, 1,-1, -1,-1,-1,  1, 1,-1, -1, 1,-1,
+            -1,-1, 1, -1, 1, 1,   1, 1, 1, -1,-1, 1,  1, 1, 1,  1,-1, 1,
+            -1,-1,-1, -1, 1,-1,  -1, 1, 1, -1,-1,-1, -1, 1, 1, -1,-1, 1,
+             1,-1,-1,  1,-1, 1,   1, 1, 1,  1,-1,-1,  1, 1, 1,  1, 1,-1,
+            -1, 1,-1,  1, 1,-1,   1, 1, 1, -1, 1,-1,  1, 1, 1, -1, 1, 1,
+            -1,-1,-1, -1,-1, 1,   1,-1, 1, -1,-1,-1,  1,-1, 1,  1,-1,-1 };
+        glGenBuffers(1,&g_spaceVB);
+        glBindBuffer(GL_ARRAY_BUFFER,g_spaceVB);
+        glBufferData(GL_ARRAY_BUFFER,sizeof C,C,GL_STATIC_DRAW);
+        printf("[space] star sky ready%c",10); fflush(stdout); }
+    if(g_spaceProg==(GLuint)-1) return;
+    GLint prev=0; glGetIntegerv(GL_CURRENT_PROGRAM,&prev);
+    glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); glDisable(GL_BLEND);   /* infinitely far, as the day sky is */
+    glUseProgram(g_spaceProg);
+    glUniformMatrix4fv(g_spVP,1,GL_FALSE,g_watVP);
+    glUniform3fv(g_spEye,1,g_camPos);
+    /* (10-22) A FLARE: from its delay after the set loaded, brighter by its peak over its rise, swollen, its colour
+     * going to the flare star's blue-white -- a K-5's orange flashing white-blue */
+    { float sd9[8][4], sc9[8][4]; memcpy(sd9,g_starDir,sizeof sd9); memcpy(sc9,g_starCol,sizeof sc9);
+      static const float BW9[3]={0.86f,0.93f,1.0f};
+      for(int i=0;i<g_nStar&&i<8;i++) if(g_starFl[i][2]>0.f){
+          float e=(g_setT-g_starFl[i][0])/fmaxf(g_starFl[i][1],0.01f); e=e<0.f?0.f:(e>1.f?1.f:e); e=e*e*(3.f-2.f*e);
+          float pk=1.f+(g_starFl[i][2]-1.f)*e;
+          for(int k=0;k<3;k++) sc9[i][k]=(g_starCol[i][k]*(1.f-e)+BW9[k]*e)*pk;
+          sc9[i][3]=g_starCol[i][3]*(1.f+2.f*e); sd9[i][3]=g_starDir[i][3]*(1.f+1.5f*e); }
+      glUniform4fv(g_spStar,8,&sd9[0][0]); glUniform4fv(g_spStarC,8,&sc9[0][0]); }
+    glUniform1f(g_spNStar,(float)g_nStar); glUniform4fv(g_spMilky,1,g_milky);
+    { GLint vp9[4]; glGetIntegerv(GL_VIEWPORT,vp9); float fov9=(g_camOn&&g_camFov>0.f)?g_camFov:42.f;
+      glUniform1f(g_spPix,fov9*0.0174533f/(float)(vp9[3]>0?vp9[3]:720)); }   /* a star is a pixel or two at any lens */
+    glBindBuffer(GL_ARRAY_BUFFER,g_spaceVB);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+    glDrawArrays(GL_TRIANGLES,0,36);
+    glDepthMask(GL_TRUE); glEnable(GL_DEPTH_TEST);
+    glUseProgram((GLuint)prev); }
+
+/* ---- BEAMS (10-22, THE WORLD AT THE END OF TIME: "the haze of ions streaming from the drive jets fuzzed everything.
+ * Including the star they were heading for", p24) ------------------------------------------------------------------------
+ * `beam x y z dx dy dz length r0 r1 r g b k [fade [thin]]` (u) in a set: a glowing VOLUME along a line -- a drive's ion plume, a
+ * light shaft, a projector's throw. Its density is a gaussian tube whose radius runs r0 -> r1 along its length, thinned
+ * as it spreads ((r0/r)^thin: 2, the default, is the same flux through a wider tube; less keeps a far plume visible)
+ * and faded by (1-s/L)^fade (default 1); drawn ADDITIVE
+ * after every opaque thing, so it lights what is behind it and never darkens it. Each pixel INTEGRATES the density
+ * along its own ray (between the ray's entry and exit of the tube's bound, in steps sized to the plume where they
+ * are; k per u of it, saturating as 1-exp), so it reads as a volume from any side -- and a lens looking DOWN the plume sees it gather into its vanishing
+ * point, which is the book's shot. The bound is a box drawn by its BACK faces, so a lens inside the plume still sees
+ * it, and a solid thing between the lens and the box's far side hides the beam along that ray.
+ * ⛔ A solid thing INSIDE the box hides ALL of the beam along its rays, the part in front of it too: this ANGLE
+ * context has no OES_depth_texture, so the march cannot stop at the surface. Up to 8. */
+#define BEAM_MAX 8
+static float g_beamA[BEAM_MAX][3], g_beamU[BEAM_MAX][3], g_beamL[BEAM_MAX], g_beamR[BEAM_MAX][2], g_beamC[BEAM_MAX][3],
+             g_beamK[BEAM_MAX], g_beamF[BEAM_MAX], g_beamT[BEAM_MAX];
+static int g_nBeam=0;
+static GLuint g_beamProg=0, g_beamVB=0;
+static GLint g_bmVP=-1,g_bmEye=-1,g_bmA=-1,g_bmU=-1,g_bmV=-1,g_bmW=-1,g_bmL=-1,g_bmR=-1,g_bmC=-1,g_bmK=-1,g_bmF=-1,g_bmT=-1;
+static void beamDraw(const float*vp){
+    if(g_nBeam<=0) return;
+    if(!g_beamProg){
+        const char*vs=
+          "attribute vec3 p;\n"
+          "uniform mat4 vp; uniform vec3 uA,uU,uV,uW,uR; uniform float uL;\n"
+          "varying vec3 vW;\n"
+          "void main(){ vW=uA+uU*((p.z*0.5+0.5)*uL)+(uV*p.x+uW*p.y)*uR.z; gl_Position=vp*vec4(vW,1.0); }\n";
+        const char*fs=
+          "precision highp float;\n"
+          "varying vec3 vW;\n"
+          "uniform vec3 uEye,uA,uU,uC,uR; uniform float uL,uK,uF,uT;\n"
+          "void main(){\n"
+          "  vec3 D=vW-uEye; float tM=length(D); D/=tM;\n"
+          "  vec3 o=uEye-uA; float du=dot(D,uU), ou=dot(o,uU);\n"
+          "  vec3 dp=D-du*uU, op=o-ou*uU;\n"
+          "  float a=dot(dp,dp), b=2.0*dot(dp,op), c=dot(op,op)-uR.z*uR.z;\n"
+          "  float t0=0.0, t1=tM;\n"
+          "  if(a>1e-9){ float q=b*b-4.0*a*c; if(q<=0.0) discard; q=sqrt(q);\n"
+          "    t0=max(t0,(-b-q)/(2.0*a)); t1=min(t1,(-b+q)/(2.0*a)); }\n"
+          "  else if(c>0.0) discard;\n"
+          "  if(abs(du)>1e-6){ float ta=-ou/du, tb=(uL-ou)/du; t0=max(t0,min(ta,tb)); t1=min(t1,max(ta,tb)); }\n"
+          "  else if(ou<0.0||ou>uL) discard;\n"
+          "  if(t1<=t0) discard;\n"
+          /* ⛔ 40 EVEN STEPS across the bound (sized for the plume's FAR end, 2.5 x r1) came back as a string of
+           * beads at the nozzle, where the plume is 3.5 u across and a step was 70. Each step is now 0.4 of the
+           * plume's radius where the sample is, and outside it a stride toward its 2.6 r skin (sphere-traced, 0.75
+           * of the way: the cone is wider ahead): a crossing near the nozzle takes ~30 steps, the length of the
+           * plume seen down its axis ~50. Density at each step's middle. */
+          "  float t=t0, acc=0.0;\n"
+          "  for(int i=0;i<128;i++){ if(t>=t1) break;\n"
+          "    vec3 q=o+D*t; float s=dot(q,uU); float r=mix(uR.x,uR.y,clamp(s/uL,0.0,1.0)); float d=length(q-s*uU);\n"
+          "    float h=min(max(0.4*r,0.75*(d-2.6*r)),t1-t);\n"
+          "    q=o+D*(t+0.5*h); s=dot(q,uU); vec3 rr=q-s*uU; float x=clamp(s/uL,0.0,1.0); r=mix(uR.x,uR.y,x);\n"
+          "    acc+=exp(-dot(rr,rr)/(r*r))*pow(uR.x/r,uT)*pow(1.0-x,uF)*smoothstep(0.0,0.004,x)*h;\n"
+          "    t+=h; }\n"
+          "  gl_FragColor=vec4(uC*(1.0-exp(-uK*acc)),1.0); }\n";
+        GLuint pr=glCreateProgram();
+        glAttachShader(pr,sh(GL_VERTEX_SHADER,vs));
+        glAttachShader(pr,sh(GL_FRAGMENT_SHADER,fs));
+        glBindAttribLocation(pr,0,"p");
+        glLinkProgram(pr);
+        GLint ok=0; glGetProgramiv(pr,GL_LINK_STATUS,&ok);
+        if(!ok){ char log[512]; glGetProgramInfoLog(pr,512,NULL,log);
+                 printf("[beam] LINK FAILED: %s%c",log,10); fflush(stdout); g_beamProg=(GLuint)-1; return; }
+        g_beamProg=pr;
+        g_bmVP=glGetUniformLocation(pr,"vp"); g_bmEye=glGetUniformLocation(pr,"uEye");
+        g_bmA=glGetUniformLocation(pr,"uA");  g_bmU=glGetUniformLocation(pr,"uU");
+        g_bmV=glGetUniformLocation(pr,"uV");  g_bmW=glGetUniformLocation(pr,"uW");
+        g_bmL=glGetUniformLocation(pr,"uL");  g_bmR=glGetUniformLocation(pr,"uR");
+        g_bmC=glGetUniformLocation(pr,"uC");  g_bmK=glGetUniformLocation(pr,"uK");
+        g_bmF=glGetUniformLocation(pr,"uF");  g_bmT=glGetUniformLocation(pr,"uT");
+        /* the bound: a unit box, every face wound CCW seen from OUTSIDE, so culling GL_FRONT draws the faces behind */
+        float C[36*3]; int n=0;
+        static const float UV[4][2]={{-1.f,-1.f},{1.f,-1.f},{1.f,1.f},{-1.f,1.f}};
+        static const int T[6]={0,1,2, 0,2,3};
+        for(int ax=0;ax<3;ax++) for(int sg=-1;sg<=1;sg+=2){
+            int b=(ax+1)%3, c=(ax+2)%3; float q[4][3];
+            for(int k=0;k<4;k++){ q[k][ax]=(float)sg; q[k][b]=UV[k][0]; q[k][c]=UV[k][1]; }
+            for(int j=0;j<6;j++){ int k=T[(sg>0)?j:5-j]; memcpy(C+n*3,q[k],12); n++; } }
+        glGenBuffers(1,&g_beamVB);
+        glBindBuffer(GL_ARRAY_BUFFER,g_beamVB);
+        glBufferData(GL_ARRAY_BUFFER,sizeof C,C,GL_STATIC_DRAW);
+        printf("[beam] volume pass ready%c",10); fflush(stdout); }
+    if(g_beamProg==(GLuint)-1) return;
+    GLint prev=0; glGetIntegerv(GL_CURRENT_PROGRAM,&prev);
+    GLboolean cull=glIsEnabled(GL_CULL_FACE); GLint cf=GL_BACK; glGetIntegerv(GL_CULL_FACE_MODE,&cf);
+    glUseProgram(g_beamProg);
+    glUniformMatrix4fv(g_bmVP,1,GL_FALSE,vp);
+    glUniform3fv(g_bmEye,1,g_camEye);
+    glEnable(GL_DEPTH_TEST); glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_ONE);
+    glEnable(GL_CULL_FACE); glCullFace(GL_FRONT);
+    glBindBuffer(GL_ARRAY_BUFFER,g_beamVB);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+    for(int k=1;k<=4;k++) glDisableVertexAttribArray(k);
+    for(int i=0;i<g_nBeam;i++){
+        const float*U=g_beamU[i];
+        float rf[3]={0.f,1.f,0.f}; if(fabsf(U[1])>0.9f){ rf[0]=1.f; rf[1]=0.f; }
+        float V[3]={U[1]*rf[2]-U[2]*rf[1], U[2]*rf[0]-U[0]*rf[2], U[0]*rf[1]-U[1]*rf[0]};
+        float lv=sqrtf(V[0]*V[0]+V[1]*V[1]+V[2]*V[2]); V[0]/=lv; V[1]/=lv; V[2]/=lv;
+        float W[3]={U[1]*V[2]-U[2]*V[1], U[2]*V[0]-U[0]*V[2], U[0]*V[1]-U[1]*V[0]};
+        glUniform3fv(g_bmA,1,g_beamA[i]); glUniform3fv(g_bmU,1,U);
+        glUniform3fv(g_bmV,1,V); glUniform3fv(g_bmW,1,W);
+        glUniform1f(g_bmL,g_beamL[i]);
+        glUniform3f(g_bmR,g_beamR[i][0],g_beamR[i][1],2.5f*fmaxf(g_beamR[i][0],g_beamR[i][1]));
+        glUniform3fv(g_bmC,1,g_beamC[i]); glUniform1f(g_bmK,g_beamK[i]); glUniform1f(g_bmF,g_beamF[i]); glUniform1f(g_bmT,g_beamT[i]);
+        glDrawArrays(GL_TRIANGLES,0,36); }
+    /* ⛔ HAND EVERYTHING BACK: the passes after this one assume opaque, depth-writing, their own program */
+    glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+    glCullFace((GLenum)cf); if(!cull) glDisable(GL_CULL_FACE);
+    glUseProgram((GLuint)prev); }
+
+/* ---- THE STAR (10-22, THE WORLD AT THE END OF TIME, chapter 1: WAN-TO'S STAR) ------------------------------------------
+ * jacob: "chapter 1 might be the most important in the entire book, to set the scene". Wan-To lives in "the interior of a
+ * medium-sized G-3 star" (p2): just under a million miles across, 6,000-7,000 K at its surface and "just a touch variable"
+ * (p47), its core at fifteen million degrees (p5); a photon escapes by radiation for the first FOUR-FIFTHS of the way out and
+ * by CONVECTION -- cells of hot gas rising, cooling ones falling back -- in the outer fifth (p4); its poles turn slower than
+ * its equator (p5); its magnetic field lines twist, loop below the surface and here and there rise above it to make sunspots
+ * (p5), and a sunspot is a patch only "a couple of thousand Kelvin" cooler, dark only by comparison (p49). Wan-To is plasma,
+ * his pieces thousands of miles apart, held together by "the network of neutrinos that served him for neurons" (p6).
+ * Set lines (u):
+ *   starbody x y z radius [tempK] [cutdeg] [cutaz] [seed]   the star; cutdeg > 0 opens a wedge (centred on azimuth cutaz,
+ *                                                          about +y, 0 = toward +z) down to the core, to show its layers
+ *   starspot lat lon size_deg                              a sunspot on the turning surface (16)
+ *   starloop lat1 lon1 lat2 lon2 height [thick]            a magnetic loop between two footpoints; height, thick in radii (24)
+ *   starweb nodes [seed] [xray]                            WAN-TO: his pieces and the neutrino threads between them (32);
+ *                                                          xray 1 (default) draws them through the star, as neutrinos go
+ * OUR FILL: the core's size (a quarter of the radius), the colours (a warm grade of the true temperatures), the granules'
+ * scale, the loops' pink, Wan-To's cyan. The clock is the exposure clock, so a held exposure holds the star. */
+#define STB_SPOTS 16
+#define STB_LOOPS 24
+#define STB_WEB   32
+typedef struct { int on; float c[3], R, T, cutA0, cutW, seed; float st[3]; int nSpot; float spot[STB_SPOTS][4];
+                 int nLoop; float loop[STB_LOOPS][6]; int webN, webX; float webSeed; int dirty; } StarBody;
+static StarBody g_stb;
+static float g_stbT=0.f;
+static GLuint g_stbProgS=0,g_stbProgF=0,g_stbProgC=0,g_stbProgL=0,g_stbProgW=0;
+static GLuint g_stbSphVB=0,g_stbSphIB=0,g_stbFaceVB=0,g_stbQuadVB=0,g_stbLoopVB=0,g_stbWebVB=0;
+static int g_stbSphN=0,g_stbFaceN=0,g_stbLoopOff[STB_LOOPS+1];
+static float g_stbWebP[STB_WEB][3]; static int g_stbWebL[STB_WEB*3][2]; static int g_stbWebNL=0;
+/* ⛔ sh() DIES on a compile error; a new effect should fail loudly and draw nothing, not take the take down */
+static GLuint stbSh(GLenum ty,const char*src){ GLuint s=glCreateShader(ty); glShaderSource(s,1,&src,NULL); glCompileShader(s);
+    GLint ok=0; glGetShaderiv(s,GL_COMPILE_STATUS,&ok);
+    if(!ok){ char lg[1024]; glGetShaderInfoLog(s,1024,NULL,lg); printf("[star] SHADER FAILED: %s%c",lg,10); fflush(stdout); return 0; }
+    return s; }
+static GLuint stbProg(const char*vs,const char*fs,const char*a0,const char*a1,const char*a2){
+    GLuint v=stbSh(GL_VERTEX_SHADER,vs), f=stbSh(GL_FRAGMENT_SHADER,fs);
+    if(!v||!f) return (GLuint)-1;
+    GLuint p=glCreateProgram(); glAttachShader(p,v); glAttachShader(p,f);
+    if(a0) glBindAttribLocation(p,0,a0);
+    if(a1) glBindAttribLocation(p,1,a1);
+    if(a2) glBindAttribLocation(p,2,a2);
+    glLinkProgram(p); GLint ok=0; glGetProgramiv(p,GL_LINK_STATUS,&ok);
+    if(!ok){ char lg[1024]; glGetProgramInfoLog(p,1024,NULL,lg); printf("[star] LINK FAILED: %s%c",lg,10); fflush(stdout); return (GLuint)-1; }
+    return p; }
+static const char*STB_COMMON=
+  "float h1(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }\n"
+  "vec3 h3(vec3 p){ return fract(sin(vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6))))*43758.5453); }\n"
+  "float vn(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n"
+  "  return mix(mix(mix(h1(i),h1(i+vec3(1.0,0.0,0.0)),f.x),mix(h1(i+vec3(0.0,1.0,0.0)),h1(i+vec3(1.0,1.0,0.0)),f.x),f.y),\n"
+  "             mix(mix(h1(i+vec3(0.0,0.0,1.0)),h1(i+vec3(1.0,0.0,1.0)),f.x),mix(h1(i+vec3(0.0,1.0,1.0)),h1(i+vec3(1.0,1.0,1.0)),f.x),f.y),f.z); }\n"
+  /* the GRANULES: cells of hot gas (a cellular noise whose feature points wander, so the cells boil), F1 and F2 */
+  "vec2 worley(vec3 p,float t){ vec3 i=floor(p), f=fract(p); float d1=8.0, d2=8.0;\n"
+  "  for(int z=-1;z<=1;z++) for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){\n"
+  "    vec3 g=vec3(float(x),float(y),float(z)); vec3 o=h3(i+g); o=0.5+0.42*sin(t*0.55+6.2831*o);\n"
+  "    float d=length(g+o-f); if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }\n"
+  "  return vec2(d1,d2); }\n"
+  /* a black body's colour (Helland's fit), for a temperature in K */
+  "vec3 bb(float T){ float t=clamp(T,1000.0,40000.0)/100.0;\n"
+  "  float r=t<=66.0?1.0:clamp(1.292936*pow(t-60.0,-0.1332048),0.0,1.0);\n"
+  "  float g=t<=66.0?clamp(0.3900816*log(t)-0.6318414,0.0,1.0):clamp(1.1298909*pow(t-60.0,-0.0755148),0.0,1.0);\n"
+  "  float b=t>=66.0?1.0:(t<=19.0?0.0:clamp(0.5432068*log(t-10.0)-1.1962541,0.0,1.0));\n"
+  "  return vec3(r,g,b); }\n";
+static void stbBuildMeshes(void){
+    /* the sphere: a latitude-longitude grid, 128 x 256, unit radius (32-bit indices) */
+    const int NL=128, NO=256; int nv=(NL+1)*(NO+1);
+    float*V=(float*)malloc((size_t)nv*12); unsigned*I=(unsigned*)malloc((size_t)NL*NO*6*4); int k=0, m=0;
+    for(int a=0;a<=NL;a++){ float th=3.14159265f*(float)a/NL; for(int b=0;b<=NO;b++){ float ph=6.2831853f*(float)b/NO;
+        V[k++]=sinf(th)*sinf(ph); V[k++]=cosf(th); V[k++]=sinf(th)*cosf(ph); } }
+    for(int a=0;a<NL;a++) for(int b=0;b<NO;b++){ unsigned i0=(unsigned)(a*(NO+1)+b), i1=i0+1, i2=i0+(unsigned)(NO+1), i3=i2+1;
+        I[m++]=i0; I[m++]=i2; I[m++]=i1; I[m++]=i1; I[m++]=i2; I[m++]=i3; }
+    glGenBuffers(1,&g_stbSphVB); glBindBuffer(GL_ARRAY_BUFFER,g_stbSphVB); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)nv*12,V,GL_STATIC_DRAW);
+    glGenBuffers(1,&g_stbSphIB); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,g_stbSphIB); glBufferData(GL_ELEMENT_ARRAY_BUFFER,(GLsizeiptr)m*4,I,GL_STATIC_DRAW);
+    g_stbSphN=m; free(V); free(I);
+    /* a quad for the corona, two triangles of corners */
+    static const float Q[]={-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1};
+    glGenBuffers(1,&g_stbQuadVB); glBindBuffer(GL_ARRAY_BUFFER,g_stbQuadVB); glBufferData(GL_ARRAY_BUFFER,sizeof Q,Q,GL_STATIC_DRAW);
+    glGenBuffers(1,&g_stbFaceVB); glGenBuffers(1,&g_stbLoopVB); glGenBuffers(1,&g_stbWebVB); }
+/* the two CUT FACES of the wedge: half-discs in the planes at azimuth a0 and a0+w (fans from the core) */
+static void stbBuildFaces(void){
+    const int NS=96; float V[2*NS*3*3]; int k=0;
+    for(int f=0;f<2;f++){ float az=g_stb.cutA0+(f?g_stb.cutW:0.f), sx=sinf(az), sz=cosf(az);
+        for(int i=0;i<NS;i++){ float b0=-1.5707963f+3.1415926f*(float)i/NS, b1=-1.5707963f+3.1415926f*(float)(i+1)/NS;
+            V[k++]=0.f; V[k++]=0.f; V[k++]=0.f;
+            V[k++]=sx*cosf(b0); V[k++]=sinf(b0); V[k++]=sz*cosf(b0);
+            V[k++]=sx*cosf(b1); V[k++]=sinf(b1); V[k++]=sz*cosf(b1); } }
+    glBindBuffer(GL_ARRAY_BUFFER,g_stbFaceVB); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)k*4,V,GL_STATIC_DRAW); g_stbFaceN=k/3; }
+static void stbLatLon(float lat,float lon,float*o){ float a=lat*0.0174533f, b=lon*0.0174533f;
+    o[0]=cosf(a)*sinf(b); o[1]=sinf(a); o[2]=cosf(a)*cosf(b); }
+/* the LOOPS: each an arch between its footpoints, three strands wound round it (the field lines TWIST, p5) */
+static void stbBuildLoops(void){
+    const int NA=40, NR=6, NSTR=3; int per=NA*NR*6*NSTR; float*V=(float*)malloc((size_t)g_stb.nLoop*per*8*4); int k=0;
+    for(int l=0;l<g_stb.nLoop;l++){ g_stbLoopOff[l]=k/8;
+        float A[3],B[3]; stbLatLon(g_stb.loop[l][0],g_stb.loop[l][1],A); stbLatLon(g_stb.loop[l][2],g_stb.loop[l][3],B);
+        float H=g_stb.loop[l][4], th=g_stb.loop[l][5]>0.f?g_stb.loop[l][5]:0.006f;
+        float om=acosf(fmaxf(-1.f,fminf(1.f,A[0]*B[0]+A[1]*B[1]+A[2]*B[2]))); if(om<1e-4f) om=1e-4f;
+        float C[NA+1][3];
+        for(int i=0;i<=NA;i++){ float t=(float)i/NA, s0=sinf((1.f-t)*om)/sinf(om), s1=sinf(t*om)/sinf(om), lift=1.f+H*sinf(3.1415926f*t);
+            for(int q=0;q<3;q++) C[i][q]=(A[q]*s0+B[q]*s1)*lift; }
+        for(int st=0;st<NSTR;st++) for(int i=0;i<NA;i++) for(int j=0;j<NR;j++){
+            int ii[2]={i,i+1}, jj[2]={j,j+1}; float P4[2][2][3], N4[2][2][3];
+            for(int a=0;a<2;a++){ int c=ii[a]; float T[3]; int c0=c>0?c-1:c, c1=c<NA?c+1:c;
+                for(int q=0;q<3;q++) T[q]=C[c1][q]-C[c0][q];
+                float tl=sqrtf(T[0]*T[0]+T[1]*T[1]+T[2]*T[2])+1e-9f; for(int q=0;q<3;q++) T[q]/=tl;
+                float Rv[3]={C[c][0],C[c][1],C[c][2]}; float rl=sqrtf(Rv[0]*Rv[0]+Rv[1]*Rv[1]+Rv[2]*Rv[2])+1e-9f; for(int q=0;q<3;q++) Rv[q]/=rl;
+                float E1[3]={Rv[1]*T[2]-Rv[2]*T[1],Rv[2]*T[0]-Rv[0]*T[2],Rv[0]*T[1]-Rv[1]*T[0]};
+                float el=sqrtf(E1[0]*E1[0]+E1[1]*E1[1]+E1[2]*E1[2])+1e-9f; for(int q=0;q<3;q++) E1[q]/=el;
+                float E2[3]={T[1]*E1[2]-T[2]*E1[1],T[2]*E1[0]-T[0]*E1[2],T[0]*E1[1]-T[1]*E1[0]};
+                float tw=6.2831853f*(1.5f*(float)c/NA+(float)st/NSTR);   /* the strand's place round the arch, winding */
+                float off[3]; for(int q=0;q<3;q++) off[q]=(E1[q]*cosf(tw)+E2[q]*sinf(tw))*th*1.6f;
+                for(int b=0;b<2;b++){ float an=6.2831853f*(float)jj[b]/NR;
+                    for(int q=0;q<3;q++){ N4[a][b][q]=E1[q]*cosf(an)+E2[q]*sinf(an); P4[a][b][q]=C[c][q]+off[q]+N4[a][b][q]*th; } } }
+            static const int TR[6][2]={{0,0},{1,0},{1,1},{0,0},{1,1},{0,1}};
+            for(int v=0;v<6;v++){ int a=TR[v][0], b=TR[v][1];
+                V[k++]=P4[a][b][0]; V[k++]=P4[a][b][1]; V[k++]=P4[a][b][2];
+                V[k++]=N4[a][b][0]; V[k++]=N4[a][b][1]; V[k++]=N4[a][b][2];
+                V[k++]=(float)ii[a]/NA; V[k++]=(float)st; } } }
+    g_stbLoopOff[g_stb.nLoop]=k/8;
+    glBindBuffer(GL_ARRAY_BUFFER,g_stbLoopVB); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(k>0?k:8)*4,V,GL_STATIC_DRAW); free(V); }
+/* WAN-TO: his pieces across the star (a quarter of the way out to nine-tenths), each held to its nearest by a thread */
+static void stbBuildWeb(void){
+    unsigned r=(unsigned)(g_stb.webSeed*7919.f)+12345u; g_stbWebNL=0;
+    for(int i=0;i<g_stb.webN;i++){ float p[3], l2;
+        do { for(int q=0;q<3;q++){ r=r*1664525u+1013904223u; p[q]=((r>>8)&0xffff)/32767.5f-1.f; } l2=p[0]*p[0]+p[1]*p[1]+p[2]*p[2]; } while(l2>0.81f||l2<0.0625f);
+        memcpy(g_stbWebP[i],p,12); }
+    for(int i=0;i<g_stb.webN;i++){ int b1=-1,b2=-1; float d1=9.f,d2=9.f;
+        for(int j=0;j<g_stb.webN;j++){ if(j==i) continue; float d=0.f; for(int q=0;q<3;q++){ float e=g_stbWebP[i][q]-g_stbWebP[j][q]; d+=e*e; }
+            if(d<d1){ d2=d1; b2=b1; d1=d; b1=j; } else if(d<d2){ d2=d; b2=j; } }
+        int nb[2]={b1,b2};
+        for(int e=0;e<2;e++){ int j=nb[e]; if(j<0) continue; int dup=0;
+            for(int z=0;z<g_stbWebNL;z++) if((g_stbWebL[z][0]==j&&g_stbWebL[z][1]==i)||(g_stbWebL[z][0]==i&&g_stbWebL[z][1]==j)) dup=1;
+            if(!dup&&g_stbWebNL<STB_WEB*3){ g_stbWebL[g_stbWebNL][0]=i; g_stbWebL[g_stbWebNL][1]=j; g_stbWebNL++; } } } }
+static void stbInitGL(void){
+    if(g_stbProgS) return;
+    static char fsS[9000], fsF[9000], fsC[6000];
+    const char*vsS=
+      "attribute vec3 p; uniform mat4 vp; uniform vec3 uC, uS; uniform float uR;\n"
+      "varying vec3 vQ; varying vec3 vW;\n"
+      "void main(){ vQ=p; vW=uC+p*uR*uS; gl_Position=vp*vec4(vW,1.0); }\n";   /* uS: the stretch (10-22) */
+    snprintf(fsS,sizeof fsS,"precision highp float;\n%s%s",STB_COMMON,
+      "varying vec3 vQ; varying vec3 vW;\n"
+      "uniform vec3 uEye; uniform float uTime, uTemp, uGrade, uExpo, uRot, uNSpot; uniform vec2 uCut; uniform vec4 uSpot[16];\n"
+      "float fil(vec3 p,vec3 S){ vec3 up=abs(S.y)<0.95?vec3(0.0,1.0,0.0):vec3(1.0,0.0,0.0); vec3 e1=normalize(cross(S,up)), e2=cross(S,e1);\n"
+      "  vec3 t=p-S*dot(p,S); return 0.5+0.5*sin(44.0*atan(dot(t,e2),dot(t,e1)+1e-6)); }\n"
+      "void main(){\n"
+      "  vec3 q=normalize(vQ);\n"
+      "  if(uCut.y>0.0){ float d=mod(atan(q.x,q.z)-uCut.x+12.5663706,6.2831853); if(d<uCut.y) discard; }\n"
+      /* the poles turn slower than the equator (p5) */
+      "  float ang=uTime*uRot*(1.0-0.3*q.y*q.y); float ca=cos(ang), sa=sin(ang);\n"
+      "  vec3 p=vec3(ca*q.x-sa*q.z,q.y,sa*q.x+ca*q.z);\n"
+      "  vec2 w=worley(p*40.0,uTime); vec2 w2=worley(p*115.0+vec3(3.1),uTime*1.4);\n"
+      "  float lane=smoothstep(0.015,0.13,w.y-w.x), lane2=smoothstep(0.02,0.12,w2.y-w2.x), body=pow(1.0-smoothstep(0.0,0.8,w.x),1.5);\n"
+      "  float sg=vn(p*6.0+vec3(0.0,uTime*0.03,0.0));\n"
+      "  float T=uTemp*(0.91+0.17*body+0.06*(sg-0.5))-1000.0*(1.0-lane)-170.0*(1.0-lane2);\n"
+      /* a sunspot: 'a couple of thousand Kelvin' cooler (p49) -- the umbra, and the penumbra's filaments */
+      "  for(int i=0;i<16;i++){ if(float(i)>=uNSpot) break;\n"
+      "    float d=acos(clamp(dot(p,uSpot[i].xyz),-1.0,1.0)), z=uSpot[i].w;\n"
+      "    float um=1.0-smoothstep(0.30*z,0.42*z,d), pen=1.0-smoothstep(0.78*z,1.0*z,d);\n"
+      "    T-=2000.0*um+(650.0+550.0*fil(p,uSpot[i].xyz))*(pen-um); }\n"
+      /* the limb: darker, and cooler so redder */
+      "  float mu=clamp(dot(normalize(uEye-vW),q),0.0,1.0);\n"
+      "  float I=0.30+0.70*pow(mu,0.5);\n"
+      "  vec3 col=bb(T*(0.86+0.14*mu)*uGrade)*I*uExpo;\n"
+      "  gl_FragColor=vec4(col,1.0); }\n");
+    snprintf(fsF,sizeof fsF,"precision highp float;\n%s%s",STB_COMMON,
+      "varying vec3 vQ; varying vec3 vW;\n"
+      "uniform float uTime, uExpo;\n"
+      "void main(){\n"
+      "  float r=length(vQ); float hs=length(vQ.xz); float th=atan(vQ.y,hs+1e-6);\n"
+      "  vec3 col;\n"
+      "  if(r<0.25){\n"
+      /* the CORE (our fill: a quarter of the radius): fifteen million degrees (p5), seething */
+      "    float n=vn(vQ*14.0+vec3(0.0,0.0,uTime*0.9))*0.6+vn(vQ*31.0-vec3(uTime*1.3))*0.4;\n"
+      "    col=mix(vec3(1.0,0.94,0.78),vec3(1.0,1.0,0.97),n)*(1.05-0.25*r/0.25);\n"
+      "  } else if(r<0.8){\n"
+      /* the RADIATIVE ZONE, four-fifths of the way out (p4): a photon's pinball walk from particle to particle */
+      "    float u=(r-0.25)/0.55; col=mix(vec3(1.0,0.86,0.52),vec3(1.0,0.62,0.22),u)*(0.92+0.08*vn(vQ*9.0+vec3(uTime*0.2)));\n"
+      "    vec2 g=vec2(hs,vQ.y)*70.0; vec2 c=floor(g); float tick=floor(uTime*7.0);\n"
+      "    vec3 hp=h3(vec3(c,tick)); vec2 sp=c+0.15+0.7*hp.xy;\n"
+      "    float dot1=1.0-smoothstep(0.10,0.22,length(g-sp));\n"
+      "    col=mix(col,vec3(1.0,1.0,0.95),dot1*step(0.55,hp.z));\n"
+      "  } else {\n"
+      /* the CONVECTION ZONE, the outer fifth (p4): rolling cells -- hot gas rising, cooled gas falling back */
+      "    float v=(r-0.8)/0.2; float u=(th+1.5707963)/3.1415926*15.0+0.45*sin(th*5.0+1.3)+0.25*sin(th*11.0+uTime*0.05); float ci=floor(u), fu=fract(u);\n"
+      "    float sgn=mod(ci,2.0)<1.0?1.0:-1.0;\n"
+      "    float psi=sin(3.1415926*fu)*sin(3.1415926*v);\n"
+      "    float band=0.5+0.5*sin(6.2831853*(psi*3.0-sgn*uTime*0.35+0.15*vn(vec3(fu*4.0,v*4.0,ci+uTime*0.1))));\n"
+      "    float heat=0.5+0.5*sgn*cos(3.1415926*fu);\n"
+      "    col=mix(vec3(0.86,0.30,0.08),vec3(1.0,0.78,0.32),heat)*(0.84+0.16*band);\n"
+      "  }\n"
+      /* ink between the layers, the diagram's lines */
+      "  float ink=min(min(abs(r-0.25),abs(r-0.8)),abs(r-1.0));\n"
+      "  col*=mix(0.25,1.0,smoothstep(0.003,0.008,ink));\n"
+      "  gl_FragColor=vec4(col*uExpo,1.0); }\n");
+    g_stbProgS=stbProg(vsS,fsS,"p",NULL,NULL);
+    g_stbProgF=stbProg(vsS,fsF,"p",NULL,NULL);
+    const char*vsC=
+      "attribute vec2 c; uniform mat4 vp; uniform vec3 uC, uRt, uUp; uniform float uR;\n"
+      "varying vec2 vC;\n"
+      "void main(){ vC=c*2.6; vec3 w=uC+(uRt*c.x+uUp*c.y)*uR*2.6; gl_Position=vp*vec4(w,1.0); }\n";
+    snprintf(fsC,sizeof fsC,"precision highp float;\n%s%s",STB_COMMON,
+      "varying vec2 vC; uniform float uTime, uTemp, uGrade;\n"
+      "void main(){\n"
+      "  float rho=length(vC); if(rho<0.97) discard;\n"
+      "  float a=atan(vC.y,vC.x);\n"
+      "  float x=max(rho-1.0,0.0);\n"
+      /* the corona -- thrillingly diffuse (p4) -- in streamers */
+      "  float str=0.55+0.45*vn(vec3(a*3.0,x*2.5-uTime*0.04,1.7));\n"
+      "  float cor=exp(-x*4.2)*0.55*str*smoothstep(0.97,1.0,rho);\n"
+      /* the chromosphere's ring and its spicules -- the 'speculae' (p4) -- a hair's height above the limb */
+      "  float ring=exp(-x*90.0)*0.9;\n"
+      "  float spi=step(0.62,h1(vec3(floor(a*260.0),3.0,0.0)))*(1.0-smoothstep(0.0,0.035,x))*0.8;\n"
+      "  vec3 col=bb(uTemp*uGrade*1.15)*cor+vec3(1.0,0.38,0.42)*(ring+spi*0.7);\n"
+      "  gl_FragColor=vec4(col,1.0); }\n");
+    g_stbProgC=stbProg(vsC,fsC,"c",NULL,NULL);
+    const char*vsL=
+      "attribute vec3 p; attribute vec3 n; attribute vec2 s;\n"
+      "uniform mat4 vp; uniform vec3 uC; uniform float uR, uAng;\n"
+      "varying vec3 vN; varying vec3 vW; varying vec2 vS;\n"
+      "void main(){ float ca=cos(uAng), sa=sin(uAng);\n"
+      "  vec3 q=vec3(ca*p.x-sa*p.z,p.y,sa*p.x+ca*p.z); vec3 nn=vec3(ca*n.x-sa*n.z,n.y,sa*n.x+ca*n.z);\n"
+      "  vW=uC+q*uR; vN=nn; vS=s; gl_Position=vp*vec4(vW,1.0); }\n";
+    const char*fsL=
+      "precision highp float;\n"
+      "varying vec3 vN; varying vec3 vW; varying vec2 vS; uniform vec3 uEye; uniform float uTime, uPh;\n"
+      "void main(){ float f=abs(dot(normalize(vN),normalize(uEye-vW))); f=pow(f,1.4);\n"
+      "  float pulse=0.55+0.45*sin(vS.x*26.0-uTime*2.4+uPh+vS.y*2.1);\n"
+      "  vec3 col=mix(vec3(1.0,0.36,0.42),vec3(1.0,0.72,0.36),0.5+0.5*sin(vS.x*3.14159))*pulse*f*0.85;\n"
+      "  gl_FragColor=vec4(col,1.0); }\n";
+    g_stbProgL=stbProg(vsL,fsL,"p","n","s");
+    const char*vsW=
+      "attribute vec3 p; attribute vec2 uv; attribute vec4 col; uniform mat4 vp;\n"
+      "varying vec2 vUV; varying vec4 vCol;\n"
+      "void main(){ vUV=uv; vCol=col; gl_Position=vp*vec4(p,1.0); }\n";
+    const char*fsW=
+      "precision mediump float;\n"
+      "varying vec2 vUV; varying vec4 vCol;\n"
+      "void main(){ float d=length(vUV); float a=exp(-d*d*3.5)*(1.0-smoothstep(0.85,1.0,d));\n"
+      "  gl_FragColor=vec4(mix(vCol.rgb,vec3(1.0),exp(-d*d*20.0)*0.7),vCol.a*a); }\n";
+    g_stbProgW=stbProg(vsW,fsW,"p","uv","col");
+    stbBuildMeshes();
+    printf("[star] passes %s%s%s%s%s%c",g_stbProgS==(GLuint)-1?"SURFACE-FAILED ":"surface ",g_stbProgF==(GLuint)-1?"FACES-FAILED ":"faces ",
+           g_stbProgC==(GLuint)-1?"CORONA-FAILED ":"corona ",g_stbProgL==(GLuint)-1?"LOOPS-FAILED ":"loops ",g_stbProgW==(GLuint)-1?"WEB-FAILED":"web",10);
+    fflush(stdout); }
+static void stbUse(GLuint pr,const float*vp){ glUseProgram(pr);
+    GLint l;
+    if((l=glGetUniformLocation(pr,"vp"))>=0) glUniformMatrix4fv(l,1,GL_FALSE,vp);
+    if((l=glGetUniformLocation(pr,"uC"))>=0) glUniform3fv(l,1,g_stb.c);
+    if((l=glGetUniformLocation(pr,"uR"))>=0) glUniform1f(l,g_stb.R);
+    /* ⭐ (10-22) the PARTICLE RACK (3.3-13): drawn out along x over its rise, thinned the other ways, heaving */
+    if((l=glGetUniformLocation(pr,"uS"))>=0){ float sx=1.f;
+        if(g_stb.st[0]!=1.f){ float e=(g_setT-g_stb.st[2])/fmaxf(g_stb.st[1],0.01f); e=e<0.f?0.f:(e>1.f?1.f:e); e=e*e*(3.f-2.f*e);
+            sx=1.f+(g_stb.st[0]-1.f)*e; sx*=1.f+0.035f*e*sinf(g_stbT*2.3f)+0.02f*e*sinf(g_stbT*5.1f+1.3f); }
+        float sy=1.f/sqrtf(fmaxf(sx,0.05f)); glUniform3f(l,sx,sy*(1.f+0.02f*(sx-1.f)*sinf(g_stbT*3.7f)),sy); }
+    if((l=glGetUniformLocation(pr,"uEye"))>=0) glUniform3fv(l,1,g_camEye);
+    if((l=glGetUniformLocation(pr,"uTime"))>=0) glUniform1f(l,g_stbT);
+    if((l=glGetUniformLocation(pr,"uTemp"))>=0) glUniform1f(l,g_stb.T);
+    if((l=glGetUniformLocation(pr,"uGrade"))>=0) glUniform1f(l,0.70f);   /* OUR grade: a warm white balance on the true temperatures */
+    /* "just a touch variable" (p47): a slow breath in its light */
+    if((l=glGetUniformLocation(pr,"uExpo"))>=0) glUniform1f(l,1.12f*(1.f+0.025f*sinf(g_stbT*0.37f)));
+    /* ⛔ 0.006 rad/s carried a spot a third of the way round in a few minutes of screen time; a star turns in weeks */
+    if((l=glGetUniformLocation(pr,"uRot"))>=0) glUniform1f(l,0.0006f); }
+static void starDraw(const float*vp){
+    if(!g_stb.on) return;
+    stbInitGL();
+    float dt=(float)g_animDtS; if(dt>0.1f) dt=0.1f; if(dt<0.f) dt=0.f; g_stbT+=dt;
+    if(g_stb.dirty){ g_stb.dirty=0; stbBuildFaces(); if(g_stb.nLoop>0) stbBuildLoops(); if(g_stb.webN>0) stbBuildWeb(); }
+    GLint prev=0; glGetIntegerv(GL_CURRENT_PROGRAM,&prev);
+    GLboolean cull=glIsEnabled(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDisable(GL_BLEND);
+    for(int k=1;k<=4;k++) glDisableVertexAttribArray(k);
+    /* 1. the surface (the wedge discarded), 2. the cut faces -- opaque, depth-writing */
+    if(g_stbProgS!=(GLuint)-1){ stbUse(g_stbProgS,vp);
+        GLint l=glGetUniformLocation(g_stbProgS,"uCut"); if(l>=0) glUniform2f(l,g_stb.cutA0,g_stb.cutW);
+        if((l=glGetUniformLocation(g_stbProgS,"uNSpot"))>=0) glUniform1f(l,(float)g_stb.nSpot);
+        if(g_stb.nSpot>0&&(l=glGetUniformLocation(g_stbProgS,"uSpot"))>=0){ float sp[STB_SPOTS*4];
+            for(int i=0;i<g_stb.nSpot;i++){ stbLatLon(g_stb.spot[i][0],g_stb.spot[i][1],sp+i*4); sp[i*4+3]=g_stb.spot[i][2]*0.0174533f; }
+            glUniform4fv(l,g_stb.nSpot,sp); }
+        glBindBuffer(GL_ARRAY_BUFFER,g_stbSphVB); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,g_stbSphIB); glDrawElements(GL_TRIANGLES,g_stbSphN,GL_UNSIGNED_INT,0); }
+    if(g_stb.cutW>0.f&&g_stbProgF!=(GLuint)-1){ stbUse(g_stbProgF,vp);
+        glBindBuffer(GL_ARRAY_BUFFER,g_stbFaceVB); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+        glDrawArrays(GL_TRIANGLES,0,g_stbFaceN); }
+    /* 3. the corona, 4. the loops -- additive, depth-tested, not written */
+    glDepthMask(GL_FALSE); glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_ONE);
+    if(g_stbProgC!=(GLuint)-1){ stbUse(g_stbProgC,vp);
+        float f[3]={g_stb.c[0]-g_camEye[0],g_stb.c[1]-g_camEye[1],g_stb.c[2]-g_camEye[2]}; float fl=sqrtf(f[0]*f[0]+f[1]*f[1]+f[2]*f[2])+1e-6f;
+        for(int q=0;q<3;q++) f[q]/=fl;
+        float up0[3]={0.f,1.f,0.f}; if(fabsf(f[1])>0.95f){ up0[0]=1.f; up0[1]=0.f; }
+        float rt[3]={f[1]*up0[2]-f[2]*up0[1],f[2]*up0[0]-f[0]*up0[2],f[0]*up0[1]-f[1]*up0[0]}; float rl=sqrtf(rt[0]*rt[0]+rt[1]*rt[1]+rt[2]*rt[2]);
+        for(int q=0;q<3;q++) rt[q]/=rl;
+        float up[3]={rt[1]*f[2]-rt[2]*f[1],rt[2]*f[0]-rt[0]*f[2],rt[0]*f[1]-rt[1]*f[0]};
+        GLint l; if((l=glGetUniformLocation(g_stbProgC,"uRt"))>=0) glUniform3fv(l,1,rt);
+        if((l=glGetUniformLocation(g_stbProgC,"uUp"))>=0) glUniform3fv(l,1,up);
+        glBindBuffer(GL_ARRAY_BUFFER,g_stbQuadVB); glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
+        glDrawArrays(GL_TRIANGLES,0,6); }
+    if(g_stb.nLoop>0&&g_stbProgL!=(GLuint)-1){ stbUse(g_stbProgL,vp);
+        glBindBuffer(GL_ARRAY_BUFFER,g_stbLoopVB);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,32,(void*)0);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,32,(void*)12);
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,32,(void*)24);
+        GLint la=glGetUniformLocation(g_stbProgL,"uAng"), lp=glGetUniformLocation(g_stbProgL,"uPh");
+        for(int i=0;i<g_stb.nLoop;i++){ float mlat=0.5f*(g_stb.loop[i][0]+g_stb.loop[i][2])*0.0174533f, sl=sinf(mlat);
+            if(la>=0) glUniform1f(la,g_stbT*0.0006f*(1.f-0.3f*sl*sl));   /* the loop turns with the surface under it */
+            if(lp>=0) glUniform1f(lp,(float)i*1.7f);
+            glDrawArrays(GL_TRIANGLES,g_stbLoopOff[i],g_stbLoopOff[i+1]-g_stbLoopOff[i]); }
+        glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); }
+    /* 5. WAN-TO: his pieces and the threads between them -- blended over, through the star when xray (neutrinos
+     *    pass through everything), a pulse running down every thread */
+    if(g_stb.webN>0&&g_stbWebNL>0&&g_stbProgW!=(GLuint)-1){
+        static float vb[(STB_WEB+STB_WEB*3*8)*6*9]; int n=0;
+        float f[3]={g_stb.c[0]-g_camEye[0],g_stb.c[1]-g_camEye[1],g_stb.c[2]-g_camEye[2]}; float fl=sqrtf(f[0]*f[0]+f[1]*f[1]+f[2]*f[2])+1e-6f;
+        for(int q=0;q<3;q++) f[q]/=fl;
+        float up0[3]={0.f,1.f,0.f}; if(fabsf(f[1])>0.95f){ up0[0]=1.f; up0[1]=0.f; }
+        float rt[3]={f[1]*up0[2]-f[2]*up0[1],f[2]*up0[0]-f[0]*up0[2],f[0]*up0[1]-f[1]*up0[0]}; float rl=sqrtf(rt[0]*rt[0]+rt[1]*rt[1]+rt[2]*rt[2]);
+        for(int q=0;q<3;q++) rt[q]/=rl;
+        float up[3]={rt[1]*f[2]-rt[2]*f[1],rt[2]*f[0]-rt[0]*f[2],rt[0]*f[1]-rt[1]*f[0]};
+        const float CY[3]={0.32f,0.90f,1.0f};
+        #define STB_V(P,U,V,A) do{ float*o_=vb+n*9; o_[0]=(P)[0]; o_[1]=(P)[1]; o_[2]=(P)[2]; o_[3]=(U); o_[4]=(V); o_[5]=CY[0]; o_[6]=CY[1]; o_[7]=CY[2]; o_[8]=(A); n++; }while(0)
+        for(int e=0;e<g_stbWebNL;e++){ float A[3],B[3]; for(int q=0;q<3;q++){ A[q]=g_stb.c[q]+g_stbWebP[g_stbWebL[e][0]][q]*g_stb.R; B[q]=g_stb.c[q]+g_stbWebP[g_stbWebL[e][1]][q]*g_stb.R; }
+            float d[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]};
+            float s[3]={d[1]*f[2]-d[2]*f[1],d[2]*f[0]-d[0]*f[2],d[0]*f[1]-d[1]*f[0]}; float sl=sqrtf(s[0]*s[0]+s[1]*s[1]+s[2]*s[2])+1e-6f;
+            float w=g_stb.R*0.010f; for(int q=0;q<3;q++) s[q]=s[q]/sl*w;
+            float ph=fmodf(g_stbT*0.55f+(float)e*0.37f,1.f);
+            for(int k=0;k<8;k++){ float t0=(float)k/8.f, t1=(float)(k+1)/8.f;
+                float a0=0.30f+0.70f*expf(-(t0-ph)*(t0-ph)*60.f), a1=0.30f+0.70f*expf(-(t1-ph)*(t1-ph)*60.f);
+                float P0[3],P1[3],Q0[3],Q1[3]; for(int q=0;q<3;q++){ float x0=A[q]+d[q]*t0, x1=A[q]+d[q]*t1; P0[q]=x0-s[q]; Q0[q]=x0+s[q]; P1[q]=x1-s[q]; Q1[q]=x1+s[q]; }
+                STB_V(P0,0.f,-1.f,a0*0.75f); STB_V(P1,0.f,-1.f,a1*0.75f); STB_V(Q1,0.f,1.f,a1*0.75f);
+                STB_V(P0,0.f,-1.f,a0*0.75f); STB_V(Q1,0.f,1.f,a1*0.75f); STB_V(Q0,0.f,1.f,a0*0.75f); } }
+        for(int i=0;i<g_stb.webN;i++){ float C[3]; for(int q=0;q<3;q++) C[q]=g_stb.c[q]+g_stbWebP[i][q]*g_stb.R;
+            float sz=g_stb.R*(0.045f+0.012f*sinf(g_stbT*2.1f+(float)i)); float c4[4][3];
+            static const float CS[4][2]={{-1,-1},{1,-1},{1,1},{-1,1}};
+            for(int k=0;k<4;k++) for(int q=0;q<3;q++) c4[k][q]=C[q]+(rt[q]*CS[k][0]+up[q]*CS[k][1])*sz;
+            STB_V(c4[0],-1.f,-1.f,0.95f); STB_V(c4[1],1.f,-1.f,0.95f); STB_V(c4[2],1.f,1.f,0.95f);
+            STB_V(c4[0],-1.f,-1.f,0.95f); STB_V(c4[2],1.f,1.f,0.95f); STB_V(c4[3],-1.f,1.f,0.95f); }
+        #undef STB_V
+        stbUse(g_stbProgW,vp);
+        if(g_stb.webX) glDisable(GL_DEPTH_TEST);
+        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glBindBuffer(GL_ARRAY_BUFFER,g_stbWebVB); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)n*36,vb,GL_STREAM_DRAW);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,36,(void*)0);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,36,(void*)12);
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_FLOAT,GL_FALSE,36,(void*)20);
+        glDrawArrays(GL_TRIANGLES,0,n);
+        glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glEnable(GL_DEPTH_TEST); }
+    glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+    if(cull) glEnable(GL_CULL_FACE);
+    glUseProgram((GLuint)prev); }
+
 /* ---- THE SKYBOX PASS ---------------------------------------------------------------
  * jacob: "we need a real skybox" and "we can see the end of the envirmonet".
  * ⭐ ONE PASS, BOTH PROBLEMS. The ground runs out (28x28 tiles plus one of run-off), and
@@ -4613,6 +5453,7 @@ static GLint  g_skVP=-1,g_skEye=-1,g_skSunDir=-1,g_skSunCol=-1,g_skSunI=-1,
               g_skZen=-1,g_skHz=-1,g_skGnd=-1,g_skT=-1;
 
 static void skyDraw(void){
+    if(g_setSpace){ spaceSkyDraw(); return; }   /* ⭐ 10-22: deep space has no clouds */
     if(!g_skyProg){
         const char*vs=
           "attribute vec3 p;\n"
@@ -5122,6 +5963,8 @@ static int setLoad(const char*name){
     g_setNRt=0;              /* ⭐ ep 10: a set's routes go with it */
     pipeClear();             /* ⭐ ep 11: and its half-pipes */
     g_setNL=0;
+    g_setSpace=0; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0;
+    memset(&g_stb,0,sizeof g_stb);   /* ⭐ 10-22: and Wan-To's star */   /* ⭐ 10-22: and its space */
     /* ⛔ A SET OWNS ITS CLOTH. Leaving the last level's curtains up is the same class of
      * bug as the club's own lamp sprites hanging over the road in a day sheet. */
     for(int q=0;q<g_nScl;q++) g_scl[q].used=0;
@@ -5316,6 +6159,85 @@ static int setParse(const char*name,int depth){
                 if(id>=0&&g_nSetSnd<16) g_setSnd[g_nSetSnd++]=id;
                 printf("[set] sound %s at %.1f,%.1f,%.1f gain %.2f%s -> %s\n",nm,sx,sy,sz,sg,lp?" loop":"",id>=0?"playing":"NOT PLAYED"); }
             continue; }
+        /* ⭐ 10-22: SPACE, its stars, its reach, its own light (see spaceSkyDraw) */
+        if(!strncmp(ln,"space",5)&&(ln[5]==0||ln[5]==' '||ln[5]=='\n'||ln[5]=='\r')){
+            g_setSpace=1; printf("[set] space: a black sky, the stars at infinity\n"); continue; }
+        if(!strncmp(ln,"far ",4)){ float fr9=0.f;
+            if(sscanf(ln,"far %f",&fr9)==1&&fr9>0.f){ g_setFar=fr9; printf("[set] far plane %.0f u\n",fr9); } continue; }
+        if(!strncmp(ln,"milkyway ",9)){ float a9,b9,c9,s9=1.f; int n9=sscanf(ln,"milkyway %f %f %f %f",&a9,&b9,&c9,&s9);
+            float l9=sqrtf(a9*a9+b9*b9+c9*c9);
+            if(n9>=3&&l9>1e-6f){ g_milky[0]=a9/l9; g_milky[1]=b9/l9; g_milky[2]=c9/l9; g_milky[3]=(n9>=4)?s9:1.f; }
+            continue; }
+        if(!strncmp(ln,"star ",5)){ float dx,dy,dz,r9,g9,b9,sz9,hl9=1.f;
+            int n9=sscanf(ln,"star %f %f %f %f %f %f %f %f",&dx,&dy,&dz,&r9,&g9,&b9,&sz9,&hl9);
+            float l9=sqrtf(dx*dx+dy*dy+dz*dz);
+            if(n9>=7&&l9>1e-6f&&g_nStar<8){
+                g_starDir[g_nStar][0]=dx/l9; g_starDir[g_nStar][1]=dy/l9; g_starDir[g_nStar][2]=dz/l9;
+                g_starDir[g_nStar][3]=sz9*0.0174533f;
+                g_starCol[g_nStar][0]=r9; g_starCol[g_nStar][1]=g9; g_starCol[g_nStar][2]=b9; g_starCol[g_nStar][3]=hl9;
+                g_starFl[g_nStar][0]=g_starFl[g_nStar][1]=g_starFl[g_nStar][2]=0.f;
+                { const char*fq=strstr(ln," flare "); float fd=0.f,fr=1.f,fp=0.f;   /* (10-22) */
+                  if(fq&&sscanf(fq+7,"%f %f %f",&fd,&fr,&fp)==3&&fp>0.f){ g_starFl[g_nStar][0]=fd; g_starFl[g_nStar][1]=fr; g_starFl[g_nStar][2]=fp;
+                      printf("[set] star %d flares at +%.1fs over %.1fs, x%.1f\n",g_nStar,fd,fr,fp); } }
+                g_nStar++; }
+            else if(n9>=7&&g_nStar>=8) printf("[set] star cap is 8 -- ignoring\n");
+            continue; }
+        /* ⭐ 10-22: WAN-TO'S STAR (see starDraw) */
+        if(!strncmp(ln,"starbody ",9)){ float v9[8]={0.f,0.f,0.f,0.f,6500.f,0.f,180.f,1.f};
+            int n9=sscanf(ln,"starbody %f %f %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5,v9+6,v9+7);
+            if(n9>=4&&v9[3]>0.f){ g_stb.on=1; memcpy(g_stb.c,v9,12); g_stb.R=v9[3]; g_stb.T=v9[4];
+                g_stb.st[0]=1.f; g_stb.st[1]=1.f; g_stb.st[2]=0.f;
+                { const char*sq=strstr(ln," stretch "); float k9=1.f,r9=1.f,d9=0.f;   /* ⭐ (10-22) the particle rack */
+                  if(sq&&sscanf(sq+9,"%f %f %f",&k9,&r9,&d9)>=2&&k9>0.f){ g_stb.st[0]=k9; g_stb.st[1]=r9; g_stb.st[2]=d9;
+                      printf("[set] starbody stretched x%.2f over %.1fs from +%.1fs\n",k9,r9,d9); } }
+                g_stb.cutW=v9[5]*0.0174533f; g_stb.cutA0=(v9[6]-0.5f*v9[5])*0.0174533f; g_stb.seed=v9[7]; g_stb.dirty=1;
+                printf("[set] starbody at %.0f,%.0f,%.0f radius %.0f u, %.0f K%s\n",v9[0],v9[1],v9[2],v9[3],v9[4],v9[5]>0.f?", cut open":""); }
+            else printf("[set] starbody: wants x y z radius [tempK] [cutdeg] [cutaz] [seed] -- IGNORED\n");
+            continue; }
+        if(!strncmp(ln,"starspot ",9)){ float v9[3]; if(sscanf(ln,"starspot %f %f %f",v9,v9+1,v9+2)==3&&g_stb.nSpot<STB_SPOTS){
+                memcpy(g_stb.spot[g_stb.nSpot++],v9,12); } else printf("[set] starspot: wants lat lon size_deg, at most %d -- IGNORED\n",STB_SPOTS);
+            continue; }
+        if(!strncmp(ln,"starloop ",9)){ float v9[6]={0,0,0,0,0.1f,0.f};
+            int n9=sscanf(ln,"starloop %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5);
+            if(n9>=5&&g_stb.nLoop<STB_LOOPS){ memcpy(g_stb.loop[g_stb.nLoop++],v9,24); g_stb.dirty=1; }
+            else printf("[set] starloop: wants lat1 lon1 lat2 lon2 height [thick], at most %d -- IGNORED\n",STB_LOOPS);
+            continue; }
+        if(!strncmp(ln,"starweb ",8)){ float v9[3]={0.f,1.f,1.f}; int n9=sscanf(ln,"starweb %f %f %f",v9,v9+1,v9+2);
+            if(n9>=1){ g_stb.webN=(int)v9[0]; if(g_stb.webN>STB_WEB) g_stb.webN=STB_WEB; g_stb.webSeed=v9[1]; g_stb.webX=(v9[2]!=0.f); g_stb.dirty=1;
+                printf("[set] starweb: %d pieces of him%s\n",g_stb.webN,g_stb.webX?", seen through the star":""); }
+            continue; }
+        if(!strncmp(ln,"mirror ",7)){ float v9[6];   /* ⭐ 10-22: MIRRORS -- see mirInst */
+            if(sscanf(ln,"mirror %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5)==6&&g_nMir<4){
+                Mirror*M9=&g_mir[g_nMir++]; float a9=v9[3]*3.14159265f/180.f;
+                M9->p[0]=v9[0]; M9->p[1]=v9[1]; M9->p[2]=v9[2];
+                M9->n[0]=sinf(a9); M9->n[1]=0.f; M9->n[2]=cosf(a9); M9->w=v9[4]; M9->h=v9[5];
+                /* the reflection through the plane n.x = n.p: x' = x - 2 (n.x - d) n, column-major */
+                float d9=M9->n[0]*M9->p[0]+M9->n[2]*M9->p[2]; float*R9=M9->R; memset(R9,0,sizeof M9->R);
+                for(int i9=0;i9<3;i9++) for(int j9=0;j9<3;j9++) R9[j9*4+i9]=(i9==j9?1.f:0.f)-2.f*M9->n[i9]*M9->n[j9];
+                for(int i9=0;i9<3;i9++) R9[12+i9]=2.f*d9*M9->n[i9];
+                R9[15]=1.f;
+                printf("[set] mirror %d at %.2f %.2f %.2f facing %.0f deg, %.2f x %.2f\n",g_nMir-1,v9[0],v9[1],v9[2],v9[3],v9[4],v9[5]); }
+            else printf("[set] mirror: want `mirror x y z yaw w h` (and 4 at most) -- %s\n",ln);
+            continue; }
+        if(!strncmp(ln,"beam ",5)){ float v9[15]; v9[13]=1.f; v9[14]=2.f;   /* ⭐ 10-22: a glowing volume (see beamDraw) */
+            int n9=sscanf(ln,"beam %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5,v9+6,v9+7,
+                          v9+8,v9+9,v9+10,v9+11,v9+12,v9+13,v9+14);
+            float l9=(n9>=6)?sqrtf(v9[3]*v9[3]+v9[4]*v9[4]+v9[5]*v9[5]):0.f;
+            if(n9>=13&&l9>1e-6f&&v9[6]>0.f&&v9[7]>0.f&&v9[8]>0.f&&g_nBeam<BEAM_MAX){ int b9=g_nBeam++;
+                for(int k=0;k<3;k++){ g_beamA[b9][k]=v9[k]; g_beamU[b9][k]=v9[3+k]/l9; g_beamC[b9][k]=v9[9+k]; }
+                g_beamL[b9]=v9[6]; g_beamR[b9][0]=v9[7]; g_beamR[b9][1]=v9[8]; g_beamK[b9]=v9[12]; g_beamF[b9]=v9[13]; g_beamT[b9]=v9[14];
+                printf("[set] beam %d from %.1f,%.1f,%.1f along %.2f,%.2f,%.2f for %.0f u, radius %.1f -> %.1f, k %.3f\n",
+                       b9,v9[0],v9[1],v9[2],g_beamU[b9][0],g_beamU[b9][1],g_beamU[b9][2],v9[6],v9[7],v9[8],v9[12]); }
+            else printf("[set] beam: wants x y z dx dy dz length r0 r1 r g b k [fade [thin]], at most %d -- IGNORED\n",BEAM_MAX);
+            continue; }
+        if(!strncmp(ln,"sun ",4)){ float el9=45.f,az9=30.f,it9=1.f,r9=1.f,g9=0.97f,b9=0.90f;
+            int n9=sscanf(ln,"sun %f %f %f %f %f %f",&el9,&az9,&it9,&r9,&g9,&b9);
+            if(n9>=3){ float e9=el9*0.0174532925f, a9=az9*0.0174532925f;
+                g_sun[0]=cosf(e9)*sinf(a9); g_sun[1]=sinf(e9); g_sun[2]=cosf(e9)*cosf(a9); g_sun[3]=it9;
+                if(n9>=6){ g_sunC[0]=r9; g_sunC[1]=g9; g_sunC[2]=b9; }
+                printf("[set] sun elev %.1f azim %.1f I %.2f\n",el9,az9,it9); }
+            continue; }
+        if(!strncmp(ln,"sky ",4)){ sscanf(ln,"sky %f %f %f",&g_sky[0],&g_sky[1],&g_sky[2]); continue; }
         if(!strncmp(ln,"light ",6)){
             float lx,ly,lz,lr,lg,lb,lpw=1.f,lrc=0.f;
             int nl=sscanf(ln,"light %f %f %f %f %f %f %f %f",&lx,&ly,&lz,&lr,&lg,&lb,&lpw,&lrc);
@@ -5331,7 +6253,14 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"actor ",6)){
             char ap[64],ac[64],ab[64]; float ax,ay,az,ayw,asc,art=1.f,asp=0.f,aln=0.f;
             ab[0]=0;
-            int na=sscanf(ln,"actor %63s %63s %f %f %f %f %f %f %f %f %63s",
+            /* ⭐ (10-23) `outfit=<name>` anywhere on the line is what this actor WEARS -- an extra wore her pack's first
+             * outfit (Billy in his freezer shift beside Freddy in day clothes, 2.22). Taken out of the line before the
+             * positional read, where an 11th token is the board's name. */
+            char lb9[512], of9[32]; of9[0]=0; snprintf(lb9,sizeof lb9,"%s",ln);
+            { char*q9=strstr(lb9," outfit="); if(q9){ char*v9=q9+8; int k9=0;
+                  while(v9[k9]&&v9[k9]!=' '&&v9[k9]!='\t'&&v9[k9]!='\n'&&v9[k9]!='\r'&&k9<31){ of9[k9]=v9[k9]; k9++; }
+                  of9[k9]=0; for(char*w9=q9;w9<v9+k9;w9++) *w9=' '; } }
+            int na=sscanf(lb9,"actor %63s %63s %f %f %f %f %f %f %f %f %63s",
                           ap,ac,&ax,&ay,&az,&ayw,&asc,&art,&asp,&aln,ab);
             if(na<7||g_setNA>=SET_MAXA) continue;
             int pi2=setPack(ap); if(pi2<0) continue;
@@ -5346,6 +6275,15 @@ static int setParse(const char*name,int depth){
             A->home[0]=ax; A->home[1]=az;
             actorClip(A,AP2,ac,g_setNA-1,asp>0.f);
             A->pk=pi2; A->board=(na>=11&&ab[0])?setPack(ab):-1;
+            /* her outfit: the pack's own (its first) unless the line names one */
+            A->worn=AP2->worn;
+            if(of9[0]&&AP2->meshOff){ int o9=wardOutfitFind(AP2,of9);
+                if(o9<0){ printf("[set] actor %d (%s): no outfit '%s' --",g_setNA-1,ap,of9);
+                          for(int i9=0;i9<AP2->nOutfit;i9++) printf(" %s",AP2->outfitName[i9]); printf("\n"); }
+                else { unsigned long long w9=0;
+                       for(int i9=0;i9<AP2->nPiece;i9++) if(AP2->pieceOutfits[i9]&(1u<<o9)) w9|=1ull<<i9;
+                       A->worn=w9; printf("[set] actor %d (%s) wears '%s'\n",g_setNA-1,ap,of9); }
+                fflush(stdout); }
             A->x=ax; A->y=ay; A->z=az; A->yaw=ayw; A->sc=asc;
             A->rate=(na>=8)?art:1.f; A->spd=(na>=9)?asp:0.f; A->len=(na>=10)?aln:0.f;
             /* clip "skate" is not a clip: it is the procedural rider */
@@ -5356,6 +6294,9 @@ static int setParse(const char*name,int depth){
             A->footY[0]=A->footY[1]=A->footSpread=0.f;
             /* stagger the phases, or a row of skaters pumps in lockstep like a chorus */
             A->phase=(double)(g_setNA*13%97); A->travel=(float)(g_setNA*7%23)*(aln>0.f?aln/23.f:0.f);
+            /* ⭐ a z_rm_ clip starts at its first frame (10-18): it is a move with a beginning, and two bodies posed
+             * TOGETHER (the boys' huddle: an arm over the other's back) must play in step */
+            if(!strncmp(ac,"z_rm_",5)) A->phase=0.0;
             continue; }
         /* ⭐ screen x y z yaw pitch w h -- a live Holly panel in the world (ep 8) */
         if(!strncmp(ln,"screen ",7)){
@@ -5432,6 +6373,7 @@ static int setParse(const char*name,int depth){
             float sc9=sqrtf(I->m[0]*I->m[0]+I->m[1]*I->m[1]+I->m[2]*I->m[2]);
             printf("[set] room %s: a place, not an obstacle -- no circle collider (it would have been r %.1f)\n",
                    stem,Q->propR*sc9*0.78f); fflush(stdout); }
+        else if(Q->open){}   /* ⭐ the Open marker (10-18): never a collider */
         else if((strstr(stem,"wall")||strstr(stem,"window"))&&!strstr(stem,"attic")){
             float sc9=sqrtf(I->m[0]*I->m[0]+I->m[1]*I->m[1]+I->m[2]*I->m[2]);
             int alongX=(Q->propEx>=Q->propEz);
@@ -5816,6 +6758,11 @@ static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*
                      GLint uModel,GLint uPal,GLint uBind,GLint uDqS);
 
 static const char*g_actorOver=NULL; static float g_actorOverW=1.f;   /* the layer for the actor being drawn (09-11) */
+/* ⭐ A SET ACTOR'S MORPHS (10-18): the hero and the scene partner always blended their clip's morph tracks; a set actor
+ * never did, so a boy asleep in a warming pan could not shut his eyes. The actor being drawn hands its weights here. */
+static float*g_actorMorphW=NULL; static int*g_actorMorphWas=NULL;
+static void morphBlend(Pack*P,float*wts,int*wasAct);   /* below */
+static void jiggleTick(Pack*P,M4*W,const float*model,int slot);   /* the soft mass, defined with the ragdoll */
 static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*model,
                       GLint mModel,GLint mPal,GLint mBind,float*pal,
                       const SkPose*sk,float*footOut,float plantMix,
@@ -5836,7 +6783,12 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
      * was written after it and had quietly gone back to the nearest-frame memcpy, which
      * is a stair-step at any capture rate that is not the bake rate. */
     if(dnP&&dnC>=0&&(unsigned)dnC<dnP->nClips) donorPoseF(dnP,dnC,phase,P,Q);
-    else if(clip>=0&&(unsigned)clip<P->nClips) clipSampleF(P,&P->clips[clip],phase,T,Q,S);
+    else if(clip>=0&&(unsigned)clip<P->nClips){
+        float*sink9=g_morphSink; int sinkN9=g_morphSinkN;
+        if(g_actorMorphW&&P->nMorph){ memset(g_actorMorphW,0,sizeof(float)*MORPH_MAX); g_morphSink=g_actorMorphW; g_morphSinkN=P->nMorph; }
+        clipSampleF(P,&P->clips[clip],phase,T,Q,S);
+        g_morphSink=sink9; g_morphSinkN=sinkN9; }
+    if(g_actorMorphW&&g_actorMorphWas&&P->nMorph) morphBlend(P,g_actorMorphW,g_actorMorphWas);   /* the eyes shut before the draw */
     /* ⭐ THE UPPER-BODY LAYER (09-11): the caller names it in g_actorOver for the length of the call */
     if(g_actorOver&&g_actorOver[0]) poseOverlay(P,Q,g_actorOver,overPhase(P,g_actorOver,(double)g_setT),g_actorOverW);
     /* A SKATER IS POSED, NOT PLAYED. Measure the body's own leg length off the REST
@@ -5882,6 +6834,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
         wmsApply(P,T,Q,W,wms,wdt,g_wms); }
     for(unsigned i=0;i<P->nNodes;i++){ M4 loc; m4_trs(loc,T[i],Q[i],S[i]);
         if(P->nodes[i].parent<0) memcpy(W[i],loc,64); else m4_mul(W[i],W[P->nodes[i].parent],loc); }
+    stretchTick(P,W);                                         /* ⭐ a drape held between two limbs (09-29) */
     if(g_actorChainSlot>=0) chainSim(P,W,g_actorChainSlot);   /* ⭐ her hair swings on the pose just solved (09-27) */
     /* THE FEET, MEASURED. The board is placed from these, so they are the contract --
      * and REVA_SKDBG prints them, which is what turns "her feet look wrong" into a
@@ -5942,13 +6895,14 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
             mdl[13]+=((restFoot-ftY)*eff + SK_DECK_H)*plantMix; } }
     glUniformMatrix4fv(mModel,1,GL_FALSE,mdl);
     if(g_actorChainSlot>=0) chainPublish(g_actorChainSlot,mdl);   /* her chains feel where she goes */
+    if(g_actorChainSlot>=0) jiggleTick(P,W,mdl,g_actorChainSlot);  /* ⭐ and her soft mass springs (09-29) */
     /* ⭐ AND IF IT IS STANDING IN WATER, THE WATER KNOWS. The push scales with speed, so
      * standing still barely marks the surface, wading leaves a wake and arriving fast
      * makes a splash -- all three out of one multiply, because the body already knows how
      * fast it is going. waterDisturb ignores anything outside a pool's footprint. */
     if(g_nWat) waterDisturb(mdl[12],mdl[13],mdl[14],0.85f,0.010f*(float)g_chDt*60.f);
     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-        if(!(M->flags&4)||M->boneCount>MAXB) continue;
+        if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
         /* the palette is the bone's world matrix times its INVERSE BIND -- skipping the
          * inverse bind leaves every vertex at its bone's origin, which is a pile of
@@ -5969,7 +6923,8 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
             sunStash(P,(int)mi,pal,(int)M->boneCount,mdl,0);   /* ⭐ the neighbours cast (09-11) */
             glUniformMatrix4fv(mPal,(GLsizei)M->boneCount,GL_FALSE,pal);
             glUniformMatrix4fv(mBind,1,GL_FALSE,(float*)(P->pk+M->offBind)); }
-        GLuint*b2=&P->vbo[mi*6];
+        GLuint bs9[6]; GLuint*b2=&P->vbo[mi*6];
+        if(isCloth9==2){ memcpy(bs9,b2,sizeof bs9); bs9[0]=g_skVbo[0]; bs9[1]=g_skVbo[1]; b2=bs9; }   /* hanging cloth: its own buffers */
         glBindBuffer(GL_ARRAY_BUFFER,b2[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
         if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b2[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
         glBindBuffer(GL_ARRAY_BUFFER,b2[2]); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
@@ -5980,8 +6935,10 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
           if(tx>=0){ glBindTexture(GL_TEXTURE_2D,P->tex[tx]); glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
           else { float c9[3]; meshTintOf(P,mi,c9); glUniform1f(uUse,0.f); glUniform3f(uTint,c9[0],c9[1],c9[2]); }
           nrmBind(P,mi); }
+        { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,W,mi);
         if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b2[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
         else glDrawArrays(GL_TRIANGLES,0,M->verts);
+          toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); mirInst(mModel,toon9,packStr(P,M->name),M->idxCount,M->verts,0); }
         glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
         /* ⛔ AFTER THE DRAW. Restoring the matrix BEFORE it is what made the garment
          * vanish here: clothPrep leaves an IDENTITY model so world-space particles draw
@@ -5993,9 +6950,11 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
 
 static void actorsTick(float dt){
     g_actorDt=dt;
+    int capWait9=0;
     { static int gate=-1;
       if(gate<0) gate=(getenv("REVA_SHOT")&&!getenv("REVA_SCENEFPS"))?1:0;
-      if(!gate||g_capBegun) g_setT+=dt; }
+      if(!gate||g_capBegun) g_setT+=dt;
+      capWait9=(gate&&!g_capBegun); }
     for(int i=0;i<g_setNA;i++){ SetActor*A=&g_setA[i];
         Pack*P=&g_setPk[A->pk];
         /* ---- Z7a THE CUES. The last cue whose time has passed is the one playing. ---- */
@@ -6039,10 +6998,22 @@ static void actorsTick(float dt){
         if((A->nWp||A->mindOn)&&A->cspd>0.02f){
             Pack*gp=A->dnP?A->dnP:P; int gc=A->dnP?A->dnC:A->clip;
             if(gc>=0) grate=A->rate*gaitRate(gp,gc,A->cspd); }
+        /* ⭐ a z_rm_ clip is a move with a BEGINNING (10-18): under a capture it waits for the shot, as the set clock does,
+         * so a burst opens on its first frame (a boy waking, not a boy already awake) */
+        { const char*cn9=(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)?packStr(A->dnP,A->dnP->clips[A->dnC].name)
+                        :((A->clip>=0&&(unsigned)A->clip<P->nClips)?packStr(P,P->clips[A->clip].name):"");
+          if(capWait9&&cn9&&!strncmp(cn9,"z_rm_",5)) grate=0.f; }
         if(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)
             A->phase+=dt*A->dnP->clips[A->dnC].fps*grate;
         else if(A->clip>=0&&(unsigned)A->clip<P->nClips)
             A->phase+=dt*P->clips[A->clip].fps*grate;
+        /* ⭐ A z_rm_ TRANSITION ON A SET ACTOR PLAYS ONCE AND HOLDS (10-18) -- a boy waking in a pan does not fall back
+         * asleep and wake again every eight seconds. A z_rm_ LOOP (the boys' huddle) still loops. */
+        { Pack*cp9=NULL; PClip*c9=NULL;
+          if(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips){ cp9=A->dnP; c9=&A->dnP->clips[A->dnC]; }
+          else if(A->clip>=0&&(unsigned)A->clip<P->nClips){ cp9=P; c9=&P->clips[A->clip]; }
+          if(c9&&c9->frames>1&&!strncmp(packStr(cp9,c9->name),"z_rm_",5)&&A->phase>(double)(c9->frames-1)
+             &&clipHoldsEnd(cp9,c9,100+i,packStr(cp9,c9->name))) A->phase=(double)(c9->frames-1); }
         if(A->spd>0.f&&A->len>0.f){ A->travel+=A->spd*dt;
             while(A->travel>A->len) A->travel-=A->len; }
         if(A->skate) A->phase+=dt*30.0; }
@@ -6064,7 +7035,7 @@ static void actorsTick(float dt){
  *   ctl shadow=0|1 (default: on whenever a sun is up), shadowext=<units>; REVA_SHADOW=0. */
 #define SUNMAP g_sunMap   /* the ladder sets it at boot (REVA_TIER); declared beside the tiers */
 #define NSUNCAST 96
-typedef struct { Pack*P; int mi; M4 model; float pal[MAXB*16]; } SunCast;
+typedef struct { Pack*P; int mi; M4 model; float pal[MAXB*16]; GLuint vb0, vb1; int world; } SunCast;
 static SunCast g_sunCast[NSUNCAST]; static int g_nSunCast=0, g_nSunCrowd=0;
 static int g_shadow=-1, g_shadowOn=0, g_shadowPass=0; static float g_shadowExt=28.f;
 static GLuint g_sunFbo=0,g_sunTex=0,g_sunDs=0,g_sunProg=0;
@@ -6077,7 +7048,17 @@ static void sunStash(Pack*P,int mi,const float*pal,int nb,const float*model,int 
     float dx=model[12]-g_sunFocus[0], dz=model[14]-g_sunFocus[2], lim=g_shadowExt*1.6f;
     if(dx>lim||dx<-lim||dz>lim||dz<-lim) return;       /* outside the window: cannot cast into it */
     SunCast*S=&g_sunCast[g_nSunCast++]; if(crowd) g_nSunCrowd++;
-    S->P=P; S->mi=mi; memcpy(S->model,model,64); memcpy(S->pal,pal,(size_t)nb*64); }
+    S->P=P; S->mi=mi; memcpy(S->model,model,64); memcpy(S->pal,pal,(size_t)nb*64); S->vb0=S->vb1=0; S->world=0; }
+/* ⭐ HANGING CLOTH CASTS TOO (10-18): its own buffers hold WORLD positions, so it is replayed with an identity model,
+ * palette and bind -- the body's matrix only says whether it stands inside the sun's window */
+static void sunStashW(Pack*P,int mi,GLuint vb0,GLuint vb1,int nb,const float*bodyModel){
+    if(!g_shadowOn||nb<=0||nb>MAXB||g_nSunCast>=NSUNCAST) return;
+    float dx=bodyModel[12]-g_sunFocus[0], dz=bodyModel[14]-g_sunFocus[2], lim=g_shadowExt*1.6f;
+    if(dx>lim||dx<-lim||dz>lim||dz<-lim) return;
+    static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    SunCast*S=&g_sunCast[g_nSunCast++];
+    S->P=P; S->mi=mi; memcpy(S->model,I9,64); for(int b=0;b<nb;b++) memcpy(S->pal+b*16,I9,64);
+    S->vb0=vb0; S->vb1=vb1; S->world=1; }
 
 static void actorsDraw(GLint mModel,GLint mPal,GLint mBind,float*pal,GLint uUse,GLint uTint){
     g_leadN=0;
@@ -6086,12 +7067,20 @@ static void actorsDraw(GLint mModel,GLint mPal,GLint mBind,float*pal,GLint uUse,
     glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
     for(int i=0;i<g_setNA;i++){ SetActor*A=&g_setA[i];
         Pack*P=&g_setPk[A->pk];
+        if(P->meshOff&&P->worn!=A->worn){ P->worn=A->worn; wardApply(P); }   /* ⭐ (10-23) her own outfit */
         float a=((A->nWp||A->mindOn)?A->cyaw:A->yaw)*0.0174532925f;
         float eff=A->sc*((P->scale>1e-6f)?P->scale:1.f);
         float px,pz;
+        /* ⭐ A z_rm_ CLIP OWNS ITS ROOT ON A SET ACTOR TOO (10-18), as it does on the hero and the scene cast: a boy
+         * lying in a warming pan is INSIDE the pan's collider and must not be pushed out of it, his feet are not
+         * what he stands on, and the walk's bounce has no business on a body asleep. */
+        int rmOwn9=0;
+        { const char*cn9=(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)?packStr(A->dnP,A->dnP->clips[A->dnC].name)
+                        :((A->clip>=0&&(unsigned)A->clip<P->nClips)?packStr(P,P->clips[A->clip].name):"");
+          rmOwn9=(cn9&&!strncmp(cn9,"z_rm_",5)); }
         if(A->nWp||A->mindOn){ px=A->cx; pz=A->cz; }      /* Z7a: the path owns her place -- or her mind does (09-11) */
         else { px=A->x+sinf(a)*A->travel; pz=A->z+cosf(a)*A->travel;
-               if(!A->skate) colResolve(&px,&pz,0.42f); }
+               if(!A->skate&&!rmOwn9) colResolve(&px,&pz,0.42f); }
         /* ⛔ A SKATER RIDES SIDEWAYS. The four-angle sheet caught it at once: from the
          * FRONT she was square to the direction of travel, riding down the board like a
          * snowboarder. A rider's shoulders are PERPENDICULAR to where they are going --
@@ -6118,23 +7107,25 @@ static void actorsDraw(GLint mModel,GLint mPal,GLint mBind,float*pal,GLint uUse,
          * or a lay on the floor -- the "feet" of a body on its front are above its
          * pelvis, and planting them would fight the correction that is already right.
          * A->air is a deliberate lift and a plant cancels it exactly. */
-        int gnd=(!isk && A->air<=0.001f && hipDrop>-0.001f && hipDrop<0.001f);
+        int gnd=(!isk && !rmOwn9 && A->air<=0.001f && hipDrop>-0.001f && hipDrop<0.001f);
         g_actorOver=A->over; g_actorOverW=A->overW;   /* her layer, for the length of the call (09-11) */
         { static int on9=-1; if(on9<0){ const char*e9=getenv("REVA_ACTORCHAINS"); on9=!(e9&&e9[0]=='0'); }
-          g_actorChainSlot=(on9&&P->nCh&&i<CH_ACTORS)?SCN_MAXCAST+i:-1;
+          g_actorChainSlot=(on9&&(P->nCh||P->nJg)&&i<CH_ACTORS)?SCN_MAXCAST+i:-1;
           if(on9&&P->nCh&&i>=CH_ACTORS){ static int told9=0; if(!told9){ told9=1;
               printf("[chains] actor %d and beyond carry chains but have no slot (CH_ACTORS=%d): their hair holds its pose\n",i,CH_ACTORS);
               fflush(stdout); } } }
+        { static float mw9[SET_MAXA][MORPH_MAX]; static int mwas9[SET_MAXA];
+          g_actorMorphW=(i<SET_MAXA)?mw9[i]:NULL; g_actorMorphWas=(i<SET_MAXA)?&mwas9[i]:NULL; }
         actorDraw(P,isk?-1:A->clip,isk?NULL:A->dnP,isk?-1:A->dnC,
                   A->phase,m,mModel,mPal,mBind,pal,isk?&sp:NULL,ft,pmix,
-                  &A->wms,g_actorDt,
+                  rmOwn9?NULL:&A->wms,g_actorDt,
                   /* a stable per-rider signature: the index and the pack, not a clock */
                   (float)(((i*2654435761u)^((unsigned)A->pk*40503u))%1000u)/1000.f,
                   gnd,
                   /* `look camera` resolves to wherever the lens is THIS frame */
                   A->hasLook==2 ? g_camPos : (A->hasLook==1 ? A->look : NULL),
                   CLOTH_ACTOR0+(i%(CLOTH_SLOTS-CLOTH_ACTOR0)), uUse, uTint);
-        g_actorChainSlot=-1;
+        g_actorChainSlot=-1; g_actorMorphW=NULL; g_actorMorphWas=NULL;
         /* both ends into world space, through the body's own matrix */
         { float*nq=ft+8, *hq=ft+11;
           A->neckW[0]=m[0]*nq[0]+m[4]*nq[1]+m[8]*nq[2]+m[12];
@@ -6305,7 +7296,7 @@ static void pipeDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint)
     if(cull9) glEnable(GL_CULL_FACE);
     glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
 static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
-    if(!g_setNI&&!g_nPipe) return;   /* ⭐ ep 11: a set may be only a half-pipe */
+    if(!g_setNI&&!g_nPipe&&!g_setSpace) return;   /* ⭐ ep 11: a set may be only a half-pipe -- (10-22) or only space */
     /* ⛔ CLAIM UNIT 0. drawProp binds its texture to whatever unit happens to be active,
      * and the frame has already been through a shadow pass that leaves unit 1 live. The
      * sampler reads unit 0, so the palette went to a unit nobody samples and the shader
@@ -6332,7 +7323,8 @@ static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
         SetInst*I=&g_setI[i];
         if(g_shadowPass){ /* ⭐ only what the sun window holds: a 300-unit street is mostly outside it */
             float dx=I->m[12]-g_sunFocus[0], dz=I->m[14]-g_sunFocus[2], lim=g_shadowExt*1.7f;
-            if(dx>lim||dx<-lim||dz>lim||dz<-lim) continue; }
+            if(dx>lim||dx<-lim||dz>lim||dz<-lim) continue;
+            if(g_setPk[I->pk].nocast) continue; }   /* ⭐ a ceiling, a room's walls (10-18) */
         else if(cullOn){ Pack*Q=&g_setPk[I->pk];
             float sc=sqrtf(I->m[0]*I->m[0]+I->m[1]*I->m[1]+I->m[2]*I->m[2]); if(sc<1e-6f) sc=1.f;
             float hh=Q->effH*0.5f, rr=sqrtf(Q->propR*Q->propR+hh*hh)*sc*1.25f+1.0f;   /* margin: a 23x9 px sliver of a tree at the frame edge went missing at 1.15+0.5 */
@@ -6505,6 +7497,9 @@ static int clipUpright(Pack*P,int clip){
     if(!n) return 1;
     float hipH=(float)(acc/n);
     float want=(P->effH>0.5f?P->effH:3.15f)*0.30f;   /* hips clear the ground by ~half a body; 0.30 is generous */
+    /* ⭐ (10-22) ...of THIS body: effH is a 3.15 floor, and a true-size five-year-old (1.84 u, hips ~0.9 u over his
+     * toe) failed an adult's 0.945 -- the boys' walk was refused and they glided to every mark */
+    if(P->trueScale&&P->trueH>0.5f) want=P->trueH*0.30f;
     return hipH>=want; }
 /* ---- P7: THE PARTNER -- a SECOND BODY in the lab (jacob: "lets see kaeli and reva
  * interacting. how about a high five?"). Every authored move so far has been one body
@@ -6629,6 +7624,161 @@ static int   g_labHeroHandOK=0;
  * when dq==0 -- one call site serves both paths. */
 static int g_dqs=-1;   /* env REVA_LBS=1 forces 0 */
 static GLint g_labUse=-1, g_labTint=-1;
+/* ⭐ THE TOON PASS (10-18). Four programs draw bodies (PR and PRD, opaque and cutout); their uniform locations
+ * are looked up once per program here. toonCel() before a body mesh's draw (0 for every non-toon pack: uniforms
+ * persist per program), toonInkDraw() right after it while its index buffer is still bound. */
+static float g_toonCel=0.30f, g_toonInk=0.0020f; static int g_toonOff=-1;
+static const float g_inkC[3]={0.110f,0.086f,0.118f};
+typedef struct { GLuint prog; GLint cel, inkc, ink, asp, con, ca, cb, cr, hm, hmi, bc, hmr, wy, hemi, emis; } ToonLoc;
+static ToonLoc g_tl[8]; static int g_ntl=0;
+static ToonLoc*toonLoc(void){ GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr);
+    for(int i=0;i<g_ntl;i++) if(g_tl[i].prog==(GLuint)pr) return &g_tl[i];
+    if(g_ntl>=8) return NULL;
+    ToonLoc*t=&g_tl[g_ntl++]; t->prog=(GLuint)pr;
+    t->cel=glGetUniformLocation(pr,"uCel"); t->inkc=glGetUniformLocation(pr,"uInkC");
+    t->ink=glGetUniformLocation(pr,"uInk"); t->asp=glGetUniformLocation(pr,"uAsp");
+    t->con=glGetUniformLocation(pr,"uColOn"); t->ca=glGetUniformLocation(pr,"uCapA"); t->cb=glGetUniformLocation(pr,"uCapB");
+    t->cr=glGetUniformLocation(pr,"uCapR"); t->hm=glGetUniformLocation(pr,"uHeadM"); t->hmi=glGetUniformLocation(pr,"uHeadMI");
+    t->bc=glGetUniformLocation(pr,"uBodyC"); t->hmr=glGetUniformLocation(pr,"uHeadMIR");
+    t->wy=glGetUniformLocation(pr,"uWaistY");
+    t->hemi=glGetUniformLocation(pr,"uHemi"); t->emis=glGetUniformLocation(pr,"uEmis");
+    return t; }
+/* ⭐ PER-VERTEX COLLISION (10-18). headMats: the measured head ellipsoid on the POSED head bone (rotation only --
+ * the bone's frame orthonormalised), as a matrix from the unit sphere to rig space and back. */
+static void measureHead(Pack*P);
+static int g_vcolOn=-1;
+static int headMatsM(Pack*P,const float*w,float*Mo,float*MI);
+static int headMats(Pack*P,M4*W,float*Mo,float*MI){
+    if(!P->headOK) measureHead(P);
+    int h=P->pb[5]; if(P->headOK<=0||h<0||(unsigned)h>=P->nNodes) return 0;
+    return headMatsM(P,W[h],Mo,MI); }
+static int headMatsM(Pack*P,const float*w,float*Mo,float*MI){
+    float ax[3][3];
+    for(int c=0;c<3;c++){ float l=sqrtf(w[c*4]*w[c*4]+w[c*4+1]*w[c*4+1]+w[c*4+2]*w[c*4+2]); if(l<1e-9f) return 0;
+        for(int k=0;k<3;k++) ax[c][k]=w[c*4+k]/l; }
+    const float*t=&w[12];
+    for(int k=0;k<16;k++){ Mo[k]=0.f; MI[k]=0.f; }
+    for(int c=0;c<3;c++) for(int k=0;k<3;k++) Mo[c*4+k]=ax[c][k]*P->headR[c];
+    for(int k=0;k<3;k++) Mo[12+k]=t[k]+ax[0][k]*P->headC[0]+ax[1][k]*P->headC[1]+ax[2][k]*P->headC[2];
+    Mo[15]=1.f;
+    for(int i=0;i<3;i++){ float r=P->headR[i];
+        for(int j=0;j<3;j++) MI[j*4+i]=ax[i][j]/r;
+        MI[12+i]=(-(ax[i][0]*t[0]+ax[i][1]*t[1]+ax[i][2]*t[2])-P->headC[i])/r; }
+    MI[15]=1.f;
+    return 1; }
+static void colSet(Pack*P,M4*W,unsigned mi){
+    int live9=g_skirtLive; g_skirtLive=0;   /* ⭐ this mesh is HANGING CLOTH (skirtPrep): simulated, world space */
+    ToonLoc*t=toonLoc(); if(!t||t->con<0) return;
+    if(live9){ glUniform1f(t->con,3.f); if(t->bc>=0) glUniform3f(t->bc,g_skirtBC[0],g_skirtBC[1],g_skirtBC[2]); return; }
+    if(g_vcolOn<0){ const char*e=getenv("REVA_VCOLLIDE"); g_vcolOn=!(e&&e[0]=='0');
+        printf("[vcol] per-vertex collision: %s\n",g_vcolOn?"ON (packs with a VertexCollide node)":"OFF (REVA_VCOLLIDE=0)"); fflush(stdout); }
+    float on=0.f;
+    if(P&&W&&P->vcol&&g_vcolOn&&mi<P->nMeshes){ const char*n=packStr(P,P->meshes[mi].name);
+        if(n&&(strstr(n,"~skirt~")||strstr(n,"~cloth"))) on=1.f;
+        else if(n&&!strncmp(n,"wear~hair~",10)) on=2.f; }
+    glUniform1f(t->con,on);
+    if(on<0.5f) return;
+    if(!P->boneRok) measureBoneR(P);
+    float A[12],B[12],R[4]; int nc=0;
+    for(int k=0;k<12;k++){ A[k]=0.f; B[k]=0.f; } for(int k=0;k<4;k++) R[k]=0.f;
+    if(on<1.5f){ const int segs[4][2]={{12,13},{13,-2},{14,15},{15,-3}};
+        for(int q=0;q<4;q++){ int a=P->pb[segs[q][0]];
+            int b=segs[q][1]>=0?P->pb[segs[q][1]]:(segs[q][1]==-2?P->footL:P->footR);
+            float r=P->boneR[segs[q][0]];
+            if(a>=0&&b>=0&&(unsigned)a<P->nNodes&&(unsigned)b<P->nNodes&&r>0.f){
+                /* a THIGH starts a fifth of the way down: its sphere at the hip joint reaches out of the hip */
+                float k0=(q==0||q==2)?0.2f:0.f;
+                for(int k=0;k<3;k++){ A[nc*3+k]=W[a][12+k]+(W[b][12+k]-W[a][12+k])*k0; B[nc*3+k]=W[b][12+k]; }
+                R[nc]=r*1.06f; nc++; } } }   /* a hair over the leg: the cloth rides outside the trousers */
+    else { int a=P->pb[4], b=P->pb[5]; float r=P->boneR[4];
+        if(a>=0&&b>=0&&(unsigned)a<P->nNodes&&(unsigned)b<P->nNodes&&r>0.f){
+            for(int k=0;k<3;k++){ A[k]=W[a][12+k]; B[k]=W[b][12+k]; } R[0]=r; nc=1; } }
+    { static float vr=-1.f; if(vr<0.f){ const char*e=getenv("REVA_VCOLR"); vr=(e&&*e)?(float)atof(e):1.f; }
+      for(int k=0;k<4;k++) R[k]*=vr; }   /* REVA_VCOLR: scale the capsules -- the test that the push RUNS at all */
+    glUniform3fv(t->ca,4,A); glUniform3fv(t->cb,4,B); glUniform1fv(t->cr,4,R);
+    if(t->bc>=0){ int hp=P->pb[0]; if(hp>=0&&(unsigned)hp<P->nNodes) glUniform3f(t->bc,W[hp][12],W[hp][13],W[hp][14]); }
+    if(t->wy>=0){ int sp9=P->pb[1], hp=P->pb[0];                 /* the waist: where the spine starts */
+        float wy=(sp9>=0&&(unsigned)sp9<P->nNodes)?W[sp9][13]:((hp>=0&&(unsigned)hp<P->nNodes)?W[hp][13]+0.2f:1e9f);
+        glUniform1f(t->wy,wy); }
+    { static int dbg=-1, said=0; if(dbg<0){ const char*e=getenv("REVA_VCOLDBG"); dbg=(e&&e[0]=='1'); }
+      if(dbg&&said<24){ said++;
+        printf("[vcoldbg] %s mesh %u '%s' on %.0f prog %u loc con %d ca %d cr %d | caps %d r %.3f %.3f %.3f %.3f | A0 %.3f %.3f %.3f B0 %.3f %.3f %.3f\n",
+               P->label,mi,packStr(P,P->meshes[mi].name),on,t->prog,t->con,t->ca,t->cr,nc,R[0],R[1],R[2],R[3],
+               A[0],A[1],A[2],B[0],B[1],B[2]); fflush(stdout); } }
+    if(on>1.5f){ float Mo[16],MI[16],MoR[16],MIR[16];
+        if(headMats(P,W,Mo,MI)&&headMatsM(P,P->headW0,MoR,MIR)){
+            glUniformMatrix4fv(t->hm,1,GL_FALSE,Mo); glUniformMatrix4fv(t->hmi,1,GL_FALSE,MI);
+            if(t->hmr>=0) glUniformMatrix4fv(t->hmr,1,GL_FALSE,MIR); }
+        else glUniform1f(t->con,0.f); } }   /* no head measured: no hair rule (never the cloth rule on hair) */
+static int toonOn(const void*Pv,int toon){
+    if(g_toonOff<0){ const char*e=getenv("REVA_NOTOON"); g_toonOff=(e&&*e&&*e!='0');
+        const char*c=getenv("REVA_TOONCEL"); if(c&&*c) g_toonCel=(float)atof(c);
+        const char*k=getenv("REVA_TOONINK"); if(k&&*k) g_toonInk=(float)atof(k);
+        printf("[toon] cel %.2f ink %.4f%s\n",g_toonCel,g_toonInk,g_toonOff?" -- OFF (REVA_NOTOON)":""); fflush(stdout); }
+    return Pv&&toon&&!g_toonOff; }
+static void toonCelSet(int on){ ToonLoc*t=toonLoc(); if(t&&t->cel>=0) glUniform1f(t->cel,on?g_toonCel:0.f); }
+/* ⭐ THE SHIP'S SETS (10-18). hemi: the cel cut taken on the surface's facing UP (0.5+0.5*N.y) times the sun's
+ * shadow, not on the sun's direction -- a room is lit from its ceiling, so every wall reads lit and every underside
+ * falls into the shadow tone, while the bodies keep the key. glow: uEmis 1, the surface at its own colour. Both
+ * reset to 0 after the prop. Not in the sun's own pass (its program has neither). */
+static void toonSetLook(int hemi,int glow){ if(g_shadowPass) return; ToonLoc*t=toonLoc(); if(!t) return;
+    if(t->hemi>=0) glUniform1f(t->hemi,hemi?1.f:0.f);
+    if(t->emis>=0) glUniform1f(t->emis,glow?1.f:0.f); }
+static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei verts){
+    if(!on||g_toonInk<=0.f) return;
+    if(meshName&&strstr(meshName,"~face~")) return;          /* the face's drawn shapes are decals: no line */
+    ToonLoc*t=toonLoc(); if(!t||t->ink<0||t->inkc<0) return;
+    GLint vpv[4]; glGetIntegerv(GL_VIEWPORT,vpv);
+    GLboolean cull=glIsEnabled(GL_CULL_FACE); GLint cf=GL_BACK; glGetIntegerv(GL_CULL_FACE_MODE,&cf);
+    glEnable(GL_CULL_FACE); glCullFace(GL_FRONT);
+    glUniform1f(t->ink,g_toonInk);
+    if(t->asp>=0) glUniform2f(t->asp,(float)vpv[3]/(float)(vpv[2]>0?vpv[2]:1),1.f);
+    glUniform4f(t->inkc,g_inkC[0],g_inkC[1],g_inkC[2],1.f);
+    /* ⛔ A DEPTH BIAS: where a surface and an ink hull meet at the SAME depth (two cloth walls pressed together, a
+     * fold) the hull won and drew black blotches; pushed a hair back, the surface wins and the silhouette is unchanged */
+    glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(2.5f,4.f);   /* slope-scaled: a grazing surface's depth runs fast */
+    if(idxCount) glDrawElements(GL_TRIANGLES,idxCount,GL_UNSIGNED_INT,0); else glDrawArrays(GL_TRIANGLES,0,verts);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glUniform1f(t->ink,0.f); glUniform4f(t->inkc,0.f,0.f,0.f,0.f);
+    glCullFace((GLenum)cf); if(!cull) glDisable(GL_CULL_FACE); }
+/* ⭐ (10-22) MIRRORS (engine_capabilities.md section 44). The book: "half the walls on the ship were mirrored to
+ * make the rooms seem more spacious" (p18-19); 2.9 turns on Marie-Claude catching "a glimpse of herself in the
+ * wall mirror". A mirror is an OPENING in a wall with the room's reflection behind it -- the old game-engine mirror:
+ * every body and prop in front of the glass is drawn a SECOND time through the glass's plane (its model matrix
+ * reflected), right after its own draw, from the pose already solved. No second camera, no second step of the sim
+ * (the frame is one loop that simulates as it draws -- a reflected CAMERA would have stepped every cloth twice). The
+ * depth test does the masking: the real wall round the opening hides the reflected room everywhere else, so a
+ * set's room must be closed (nothing of another room behind its mirror wall). A reflection flips the winding: the
+ * ink hull culls the other side (glFrontFace CW). Props cull BACK faces in the reflection -- the reflected copy of
+ * the mirror's own wall lies IN its plane, facing away. The model matrix is read back from the program, so the call
+ * site needs nothing but its uniform (the hanging cloth, drawn in world space, reflects the same way). One bounce:
+ * a reflection is not reflected again. REVA_NOMIRROR=1 is the control. */
+static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,GLsizei verts,int flags){
+    /* flags: 1 cull back faces (props); 2 no ink -- a mirror's backing and its glass, reflected through their OWN mirror,
+     * land just inside the room facing away, and an inverted hull drawn from behind blacked the first mirror out */
+    int cull=flags&1;
+    if(!g_nMir||g_shadowPass||uModel<0) return;
+    if(g_mirOff<0){ const char*e=getenv("REVA_NOMIRROR"); g_mirOff=(e&&e[0]!='0')?1:0;
+        if(g_mirOff) printf("[mirror] REVA_NOMIRROR: mirrors are dark openings\n"); }
+    if(g_mirOff) return;
+    GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr); if(!pr) return;
+    float cur[16]; glGetUniformfv((GLuint)pr,uModel,cur);
+    GLboolean cf0=glIsEnabled(GL_CULL_FACE);
+    static int dbg=-1, ndbg=0; if(dbg<0){ const char*e=getenv("REVA_MIRDBG"); dbg=(e&&e[0]!='0')?1:0; }
+    for(int k=0;k<g_nMir;k++){ Mirror*M=&g_mir[k];
+        float dt=(cur[12]-M->p[0])*M->n[0]+(cur[13]-M->p[1])*M->n[1]+(cur[14]-M->p[2])*M->n[2];
+        if(dbg&&ndbg<40){ ndbg++; printf("[mirror] %s prog %d uModel %d t %.2f %.2f %.2f -> mirror %d dt %.2f%s (glerr %x)\n",
+            meshName?meshName:"?",(int)pr,(int)uModel,cur[12],cur[13],cur[14],k,dt,dt<-0.5f?" SKIP":"",glGetError()); fflush(stdout); }
+        if(dt<-0.5f) continue;                     /* behind the glass: nothing of it shows in it */
+        float mm[16]; m4_mul(mm,M->R,cur);
+        glUniformMatrix4fv(uModel,1,GL_FALSE,mm);
+        glFrontFace(GL_CW);
+        if(cull){ glEnable(GL_CULL_FACE); glCullFace(GL_BACK); }
+        if(idxCount) glDrawElements(GL_TRIANGLES,idxCount,GL_UNSIGNED_INT,0); else glDrawArrays(GL_TRIANGLES,0,verts);
+        if(!(flags&2)) toonInkDraw(toon,meshName,idxCount,verts);
+        if(cull&&!cf0) glDisable(GL_CULL_FACE);
+        glFrontFace(GL_CCW); }
+    glUniformMatrix4fv(uModel,1,GL_FALSE,cur); }
 static GLint g_labMouthP=-1, g_labMouthS=-1, g_labOpen=-1;   /* the aperture, for hero AND partner */   /* the ACTIVE lab program's texture/tint locs (PR vs PRD) */
 static void skinPal(GLint loc,GLint locS,int dq,const float*mats,int n,float s){
     if(g_dqs<0){ const char*e=getenv("REVA_LBS"); g_dqs=(e&&e[0]=='1')?0:1; }
@@ -6756,11 +7906,14 @@ static void morphBlend(Pack*P,float*wts,int*wasAct){
     if(!P||!P->nMorph) return;
     { static const char*mf8=(const char*)1;      /* bench: pin one target, scene or not */
       if(mf8==(const char*)1) mf8=getenv("REVA_MORPHFORCE");
-      if(mf8){ char nm8[32]="jaw"; float v8=1.f; const char*eq=strchr(mf8,'=');
-          if(eq){ int k8=0; while(mf8+k8<eq&&k8<31){ nm8[k8]=mf8[k8]; k8++; } nm8[k8]=0; v8=(float)atof(eq+1); }
-          else v8=(float)atof(mf8);
+      /* name=v[,name=v...] (10-18: both eyelids at once) */
+      for(const char*it8=mf8;it8&&*it8;){ char nm8[32]="jaw"; float v8=1.f; const char*end8=strchr(it8,',');
+          const char*eq=strchr(it8,'='); if(eq&&end8&&eq>end8) eq=NULL;
+          if(eq){ int k8=0; while(it8+k8<eq&&k8<31){ nm8[k8]=it8[k8]; k8++; } nm8[k8]=0; v8=(float)atof(eq+1); }
+          else v8=(float)atof(it8);
           /* by NAME, so a shape split across primitives moves all of its pieces */
-          morphSetName(P,wts,nm8,v8); } }
+          morphSetName(P,wts,nm8,v8);
+          it8=end8?end8+1:NULL; } }
     int act=0; for(int m9=0;m9<P->nMorph;m9++) if(fabsf(wts[m9])>1e-3f) act=1;
     if(getenv("REVA_MORPHDBG")){ static int n9=0; if(n9<3){ n9++;
         printf("[morph:call] nMorph %d act %d wasAct %d w=[%.2f %.2f %.2f %.2f]\n",
@@ -6945,6 +8098,11 @@ typedef struct { int spk; float t0,dur; char text[192]; unsigned char env[SCN_MA
                  char hpuff[64],ppuff[64],p2puff[64],p3puff[64];       /* ⭐ ep 12: sec[,sec] exhales off the mouth; NOT sticky */
                  char hdoll[16],pdoll[16],p2doll[16],p3doll[16];       /* ⭐ THE RAGDOLL: sec into the line she goes LIMP, or `off`; NOT sticky */
                  char hover[32],pover[32],p2over[32];   /* ⭐ upper-body layers (09-11); sticky, `off` clears */
+                 char set[48];          /* ⭐ 10-22: this line plays on ANOTHER set (a cutaway); NOT sticky -- home after */
+                 char home[48];         /* ⭐ 10-22: the scene's HOME set from this line on (sticky in the compiler) */
+                 char outfit[4][24];    /* ⭐ 10-22: houtfit/poutfit/p2outfit/p3outfit -- dressed on the cut (sticky) */
+                 char roll[4][96];      /* ⭐ 10-22: hroll/proll/p2roll/p3roll -- the body's placement turned round an axis */
+                 float at[3]; int atHas;   /* ⭐ 10-22: camat=x,y,z: camorbit circles this WORLD point, not a body */
                  /* ⭐ THE REACTION SHOT. Which body the LENS treats as the subject, when
                   * that is not the one talking. -1 = the speaker, as always. Moves the
                   * camera only: the voice, the mouth and the subtitle are untouched. */
@@ -6981,11 +8139,19 @@ static float g_scnSide=1.f;             /* which side of the eyeline this setup 
 static float g_scnBrow[2]={-9.f,-9.f};  /* per body, -9 = the reactive brow */
 static float g_scnHgt=0.f;              /* ctl hgt=: raise or drop the lens off the eyeline */
 static int   g_scnStaged=-1;            /* the line whose clips are already loaded */
+static char  g_scnHome[64], g_scnAway[64]; static int g_scnHomeOK=0;   /* ⭐ 10-22: the set a scene is staged on, and the
+                                                                       * cutaway (set=) it is on now, "" at home */
+static float g_scnHomeSun[4], g_scnHomeSunC[3], g_scnHomeSky[3];
 /* WHO IS IN THIS SCENE, for the caption. Speaker indices are POSITIONAL -- 0 is the hero
  * the lab loaded -- so a name cannot be keyed on them, and four of this film's seven
  * scenes are between the two people who are not reva. */
 static char  g_scnWho[SCN_MAXCAST][16]={"REVA","KAELI","SUSAN","ARCHIVE","-"};
-static float g_partMorphW[MORPH_MAX];
+/* ⭐ EVERY BODY IN A SCENE HAS ITS OWN FACE (10-18, THE WORLD AT THE END OF TIME 2.1: Viktor, Wanda and Amelia). One
+ * array served every slot after the hero, read through each slot's own morph table: a third speaker's jaw went to
+ * whichever slot the draw loop had touched last, and slots 2-3 never blinked. Row 0 is unused (the hero keeps
+ * g_heroMorphW); g_partMorphW is the CURRENT slot's row, so every per-draw use below reads its own body's face. */
+static float g_castMorphW[SCN_MAXCAST][MORPH_MAX];
+#define g_partMorphW (g_castMorphW[(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1])
 static SDL_AudioDeviceID g_scnDev=0;   /* (09-11) unused: the scene track is a mixer voice now */
 static Uint8*g_scnWav=0; static Uint32 g_scnWavLen=0;
 static int g_scnVoice=-1;              /* the scene track's voice on the mixer (09-11) */
@@ -7627,6 +8793,7 @@ typedef struct {
     int    lapping, laps, loopSaid;   /* ⭐ hloop: circling a closed route (no braking), laps done, said it cannot */
     int    seg;                       /* ⭐ the path run this body is rolling (its line), for what comes next */
     int    rn, ri; float rx[64], rz[64];   /* ⭐ a walk ROUTED round the furniture: corners, then the mark (rtRoute) */
+    float  stuck;                           /* ⭐ (10-22) seconds of walking that went nowhere: past 0.6 it is placed */
 } Loco;
 static int wrrtRoute(int slot,float sx,float sz,float tx,float tz,float*ox,float*oz,int max);   /* defined after the audit grid */
 static Loco  g_loco[SCN_MAXCAST];
@@ -7719,6 +8886,7 @@ typedef struct {
     float mA[7], mB[7];                 /* ep 11: cammove's start and end -- eye, aim, fov */
     float d0, d1;                       /* ep 11: camorbit's world headings, degrees */
     float mt, mT;                       /* ep 11: lens seconds into the move/sweep, and its length */
+    int   wc; float wcP[3];             /* ⭐ 10-22: camorbit round a WORLD point (camat=), not a body */
 } CamTrk;
 static CamTrk g_camTrk;
 #define CAMTRK_W 6.0f                   /* rad/s: the lens spring, critically damped */
@@ -7979,6 +9147,30 @@ static void crPoint(const float*P0,const float*P1,const float*P2,const float*P3,
  * THE SAMPLES. Dense (LOCO_PSEG a segment) for the arc length, then RESAMPLED every LOCO_PDS u: a body rolls on
  * even spacing, and heading and curvature are differenced over it. ⛔ Dense samples bunch at a duplicated end
  * (zero parametric speed), and a curvature taken over those millimetres is float noise the carve would show. */
+/* ⭐ (10-22) THE ROLL. A body's whole placement -- after its mark, its walk, its lean and its half-pipe -- turned about
+ * an axis through a point, by an angle that runs at a rate: hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0]
+ * (sticky; `off` hands it back). Viktor "trotted around the barrel like a veteran" (scene 2.2): he runs in place on the
+ * mark at the drum's floor and the roll carries him round its axis at his own speed over its radius, head always to the
+ * hub -- the lens, still in the drum's frame, sees him go up the wall and over the top. The rotation is applied to the
+ * matrix the body is DRAWN with, and to its spot for the tracking lenses (locoWhere): a pan follows him round. */
+typedef struct { int on; float a[3], d[3], rate, a0, t0; char spec[96]; } CastRoll;
+static CastRoll g_castRoll[SCN_MAXCAST];
+static void rollModel(int s,float*model){
+    if(s<0||s>=SCN_MAXCAST||!g_castRoll[s].on) return;
+    CastRoll*R=&g_castRoll[s];
+    float th=R->a0+R->rate*(scnBodyT()-R->t0);
+    float c=cosf(th), sn=sinf(th), C1=1.f-c, x=R->d[0], y=R->d[1], z=R->d[2];
+    float M[9]={ c+x*x*C1,   y*x*C1+z*sn, z*x*C1-y*sn,      /* Rodrigues, column-major */
+                 x*y*C1-z*sn, c+y*y*C1,   z*y*C1+x*sn,
+                 x*z*C1+y*sn, y*z*C1-x*sn, c+z*z*C1 };
+    for(int col=0;col<3;col++){ float v[3]={model[col*4],model[col*4+1],model[col*4+2]};
+        for(int r=0;r<3;r++) model[col*4+r]=M[r]*v[0]+M[3+r]*v[1]+M[6+r]*v[2]; }
+    float p[3]={model[12]-R->a[0],model[13]-R->a[1],model[14]-R->a[2]};
+    for(int r=0;r<3;r++) model[12+r]=R->a[r]+M[r]*p[0]+M[3+r]*p[1]+M[6+r]*p[2]; }
+/* the same turn applied to a point: the spot a tracking lens follows */
+static void rollPoint(int s,float*pt){
+    float m[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, pt[0],pt[1],pt[2],1};
+    rollModel(s,m); pt[0]=m[12]; pt[1]=m[13]; pt[2]=m[14]; }
 static int locoWhere(int s,float*x,float*y,float*z,float*trav,float*vel);   /* below: where a body IS (a ragdoll's hips included) */
 static int locoPathBuild(int s,const char*spec,int haveC0,float c0x,float c0z,float vel,float trav,float*len,int*placed){
     LocoPath*LP=&g_lpath[s];
@@ -8233,7 +9425,7 @@ static void locoTick(float st8,int snap){
         if(strcmp(was[s],g_castMark[s])){
             snprintf(was[s],32,"%s",g_castMark[s]);
             SetMark*MK=markFind(g_castMark[s]);
-            L->on=0; L->path=0; L->hold=0; L->lapping=0; L->rn=0; L->ri=0;   /* ⭐ ep 10: a new mark ends a path, and lets go of where one stopped */
+            L->on=0; L->path=0; L->hold=0; L->lapping=0; L->rn=0; L->ri=0; L->stuck=0.f;   /* ⭐ ep 10: a new mark ends a path, and lets go of where one stopped */
             if(MK&&!snap&&g_castAtOK[s]){
                 float dx=MK->x-g_castAt[s][0], dz=MK->z-g_castAt[s][1], d=sqrtf(dx*dx+dz*dz);
                 if(d>30.f){ printf("[walk] slot %d: %.1fu to '%s' is not a walk -- placed\n",s,d,MK->name); fflush(stdout); }
@@ -8275,10 +9467,22 @@ static void locoTick(float st8,int snap){
                     if(fabsf(dy)>0.87f) L->v=0.f;
                     else { L->v=locoSpeed(L->v,left,st8,ride9?LOCO_RIDE:LOCO_CRUISE); if(L->v<0.f) L->v=0.f;
                            float stp=L->v*st8; if(stp>left) stp=left;
+                           float bx9=L->x, bz9=L->z;
                            L->x+=dx/left*stp; L->z+=dz/left*stp; L->trav=atan2f(dx,dz);
                            /* ⭐ THE WORLD IS SOLID while she is travelling; the final approach is the mark's own
                             * (a chair's or a bed's mark stands inside its furniture on purpose) */
-                           { float mx9=MK->x-L->x, mz9=MK->z-L->z; if(mx9*mx9+mz9*mz9>0.64f) colResolve(&L->x,&L->z,0.34f); } } }
+                           { float mx9=MK->x-L->x, mz9=MK->z-L->z; if(mx9*mx9+mz9*mz9>0.64f) colResolve(&L->x,&L->z,0.34f); }
+                           /* ⭐ (10-22) A WALK THAT CANNOT GET THERE IS PLACED, LOUDLY. With no way round the furniture
+                            * the walk goes straight, and the collider holds the walker against the first thing in the
+                            * way for the rest of the scene (Wanda outside the freezatorium's shut doors, Viktor at the
+                            * corner of the breakfast table). A third of the step for 0.6 s of walking is stuck. */
+                           { float mv9=sqrtf((L->x-bx9)*(L->x-bx9)+(L->z-bz9)*(L->z-bz9));
+                             if(stp>1e-4f&&mv9<0.33f*stp) L->stuck+=st8; else L->stuck=0.f;
+                             if(L->stuck>0.6f){
+                                 float sl9=sqrtf((MK->x-L->x)*(MK->x-L->x)+(MK->z-L->z)*(MK->z-L->z));
+                                 printf("[walk] slot %d STUCK %.2fu short of '%s' at (%.2f,%.2f) -- the furniture holds it; PLACED on the mark\n",
+                                        s,sl9,MK->name,L->x,L->z); fflush(stdout);
+                                 L->x=MK->x; L->z=MK->z; L->yaw=MK->yaw*0.0174533f; L->v=0.f; L->on=0; L->rn=0; L->ri=0; L->stuck=0.f; } } } }
                 else { L->x=MK->x; L->z=MK->z; L->v=0.f;
                        if(fabsf(dy)<0.02f){ L->on=0; printf("[walk] slot %d arrived on '%s'\n",s,MK->name); fflush(stdout); } } } }
         /* 2b. ⭐ ep 10: ROLL IT ALONG ITS PATH, by arc length -- or land it, on a snap=1 line */
@@ -8337,6 +9541,7 @@ static int locoWhere(int s,float*x,float*y,float*z,float*trav,float*vel){
     else if(g_castAtOK[s]){ *x=g_castAt[s][0]; *z=g_castAt[s][1]; *trav=g_castAt[s][2]-locoRideOff(s); *vel=0.f; }
     else return 0;
     *y=g_castFloorY[s];
+    if(s<SCN_MAXCAST&&g_castRoll[s].on){ float p9[3]={*x,*y,*z}; rollPoint(s,p9); *x=p9[0]; *y=p9[1]; *z=p9[2]; }   /* (10-22) */
     return 1; }
 /* ⭐ WHERE THE CAMERA HAND IS, in world space -- the contact pass already publishes every body's forearm ends
  * each frame, so the filmer's wrist is free and exact. CT_FAR's far end is the right hand (the grip hand). */
@@ -8378,7 +9583,8 @@ static void camTrackTick(float dt){
         return; }
     if(T->mode==4) T->mt+=dt;   /* the sweep keeps the line's time even while its body has no spot */
     float x,y,z,tr,vel;
-    if(!locoWhere(T->slot,&x,&y,&z,&tr,&vel)){
+    if(T->mode==4&&T->wc){ x=T->wcP[0]; y=T->wcP[1]; z=T->wcP[2]; tr=0.f; vel=0.f; }   /* ⭐ 10-22: a ship has no spot */
+    else if(!locoWhere(T->slot,&x,&y,&z,&tr,&vel)){
         static int said=-2;
         if(said!=T->line){ said=T->line; printf("[lens] line %d: slot %d has no spot yet -- the lens holds\n",T->line,T->slot); fflush(stdout); }
         return; }
@@ -9298,7 +10504,7 @@ static int meshIsCloth(Pack*P,unsigned mi){
  * cargo pants does not fatten her calf capsules and push her knees apart. */
 static int meshIsGarment(Pack*P,unsigned mi){
     const char*n=packStr(P,P->meshes[mi].name);
-    return n&&(strstr(n,"~cloth")||strstr(n,"~worn")); }
+    return n&&(strstr(n,"~cloth")||strstr(n,"~worn")||!strncmp(n,"wear~",5)); }
 
 /* Build the particle set and the edge list, once per body. */
 static void clothInit(Cloth*C,Pack*P,unsigned mi,float*skinned){
@@ -9568,6 +10774,49 @@ static void clothStep(Cloth*C,float*skinned,const float(*sph)[4],int nsph,float 
  * the spread of the vertices that belong to it -- a thick thigh gets a thick capsule and a
  * thin wrist does not, on any body, with nothing to tune. Done once, in REST, because a
  * radius is a property of the body and not of this frame's pose. */
+/* ⭐ THE HEAD AS AN ELLIPSOID (10-18), from the pack's own head vertices (not its hair, not its clothes), in the
+ * head bone's REST frame orthonormalised; the 2nd..98th percentile on each axis, so a nose tip or an ear rim does
+ * not swell it past the skull (it must sit just INSIDE the head: hair at rest is never pushed). */
+static int cmpf9(const void*a,const void*b){ float x=*(const float*)a, y=*(const float*)b; return (x>y)-(x<y); }
+static void measureHead(Pack*P){
+    if(P->headOK) return;
+    P->headOK=-1;
+    int h=P->pb[5]; if(h<0||(unsigned)h>=P->nNodes||P->nNodes>1024) return;
+    static M4 W[1024];
+    for(unsigned i=0;i<P->nNodes;i++){ M4 loc;
+        m4_trs(loc,P->nodes[i].t,P->nodes[i].q,P->nodes[i].s);
+        if(P->nodes[i].parent<0) memcpy(W[i],loc,64);
+        else m4_mul(W[i],W[P->nodes[i].parent],loc); }
+    float ax[3][3]; const float*w=W[h];
+    memcpy(P->headW0,W[h],64);                        /* the head bone at REST: where the hair sits on it */
+    for(int c=0;c<3;c++){ float l=sqrtf(w[c*4]*w[c*4]+w[c*4+1]*w[c*4+1]+w[c*4+2]*w[c*4+2]); if(l<1e-9f) return;
+        for(int k=0;k<3;k++) ax[c][k]=w[c*4+k]/l; }
+    static float vals[3][8192]; int nv=0;
+    for(unsigned m=0;m<P->nMeshes&&nv<8192;m++){ PMesh*M=&P->meshes[m];
+        if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB) continue;
+        if(meshIsGarment(P,m)) continue;
+        unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
+        float*rp=(float*)(P->pk+M->offPos);
+        unsigned char*jp=(unsigned char*)(P->pk+M->offJoints);
+        unsigned char*wp=(unsigned char*)(P->pk+M->offWeights);
+        unsigned step=(M->verts>6000)?(M->verts/6000):1; if(!step) step=1;
+        for(unsigned v=0;v<M->verts&&nv<8192;v+=step){
+            int best=-1, bw=-1;
+            for(int q=0;q<4;q++){ int ww=wp[v*4+q]; if(ww>bw){ bw=ww; best=jp[v*4+q]; } }
+            if(best<0||best>=(int)M->boneCount||bw<200) continue;      /* ALL head: not the neck's blend */
+            if(bm[best]!=(unsigned)h) continue;
+            float d[3]={rp[v*3]-w[12], rp[v*3+1]-w[13], rp[v*3+2]-w[14]};
+            for(int c=0;c<3;c++) vals[c][nv]=ax[c][0]*d[0]+ax[c][1]*d[1]+ax[c][2]*d[2];
+            nv++; } }
+    if(nv<64) return;
+    for(int c=0;c<3;c++){ qsort(vals[c],(size_t)nv,sizeof(float),cmpf9);
+        float lo=vals[c][nv*2/100], hi=vals[c][nv*98/100];
+        P->headC[c]=0.5f*(lo+hi); P->headR[c]=0.5f*(hi-lo)*0.96f;
+        if(P->headR[c]<1e-5f) return; }
+    P->headOK=1;
+    printf("[vcol] %s: head ellipsoid from %d verts, radii %.3f %.3f %.3f (rig u)\n",P->label,nv,
+           P->headR[0],P->headR[1],P->headR[2]); fflush(stdout); }
+
 static void measureBoneR(Pack*P){
     if(P->boneRok) return;
     P->boneRok=1;
@@ -9592,7 +10841,12 @@ static void measureBoneR(Pack*P){
     for(int c=0;c<NCANON;c++){ acc[c]=0.f; cnt[c]=0; }
     for(unsigned m=0;m<P->nMeshes;m++){
         PMesh*M=&P->meshes[m];
+        /* ⛔ SKIN UNDER CLOTHES IS STILL THE BODY (10-18). An undrawn mesh was skipped, and with a wardrobe the
+         * skin under a worn garment IS undrawn -- Amelia's undersuit hid her thighs, so they measured NOTHING and
+         * the robe had no thigh capsule to wrap over (37 of 46 bones; the shins from 14 ankle vertices). Hidden
+         * SKIN (meshKind 1) is measured; hidden anything else is not. */
         if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB) continue;
+        if(MOFF(P,m)&&!(P->meshKind&&P->meshKind[m]==1)) continue;
         if(meshIsGarment(P,m)) continue;   /* do not measure the clothes (~cloth, and ep 14's ~worn) */
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
         float*rp=(float*)(P->pk+M->offPos);
@@ -9632,9 +10886,936 @@ static void measureBoneR(Pack*P){
                P->boneR[c],cnt[c],10);
     fflush(stdout); }
 
+/* ======================== THE HANGING CLOTH (10-18) ==================================
+ * jacob, on Amelia's run with the skirt pushed out of the legs in the vertex shader: "this labcoat needs to
+ * decide if it is a physical object or not". It was not one. The skirt was SKINNED to a ring of swinging chains
+ * and each vertex was then shoved sideways out of the leg capsules -- so a knee coming up under the coat left a
+ * flat flap at the hem, the cloth below a raised knee stretched to its own hem, and a heel kicked up behind fanned
+ * the whole back of the coat out to the heel. Cloth can do none of those things.
+ * ⭐ A SKIRT IS NOW CLOTH. Every `~skirt~` mesh on a VertexCollide pack is SIMULATED, in world space:
+ *   - one particle per point of the OUTER wall. The lining is not simulated: it is drawn a wall's thickness behind
+ *     its outer point, along the outer surface's normal, so the two walls can never cross or part;
+ *   - every point with no weight on a Cloth_* chain is the WAISTBAND, and rides the skinned pose (the hips);
+ *   - the mesh's own edges do not stretch; the pair across every edge resists bending (XPBD, a fabric constant);
+ *     a TETHER holds each free point within its rest distance (along the cloth) of its nearest waistband point,
+ *     so a hem can be LIFTED by a knee but never dragged below its own length;
+ *   - gravity in this world's units (9.81 m/s^2 times the body's scale) and quadratic AIR DRAG across the cloth's
+ *     face -- a sheet moving flat-on meets the air, edge-on it does not -- so it lags and settles like fabric. The
+ *     drag is on the cloth's speed THROUGH THE AIR, and on the spot the air of her own run comes past her: the
+ *     planted foot says how fast the ground goes under her (on a path it stands still, so a body really travelling
+ *     gets no double);
+ *   - THE HIPS HOLD IT OUT: above where the thighs begin, no point comes nearer the hips' axis (in the hips' own
+ *     frame) than it was cut -- the cloth was cut to hang from the pelvis's widest point, so that cut IS the pelvis;
+ *   - THE HANDS press it IN toward the body (an arm is outside the skirt): her hand's own skin, sampled, against the
+ *     cloth's points AND its triangles (a finger is thinner than the gap between two points), down to the skin under
+ *     a pelvis point and no further;
+ *   - THE SKIN UNDER IT, the back half (buttock, backs of the thighs, calves) against the cloth cut on the back half:
+ *     off the nearest skin point's tangent plane by the undersuit and the wall -- the hidden skin included;
+ *   - out of capsules on the legs and the feet (heel to toe) at their MEASURED thickness -- plus a garment's ease
+ *     where a garment covers the leg in this outfit, a hair where it is bare -- placed where they are at each
+ *     INSTANT of the frame (16 substeps), inelastic and with friction, so the knee that lifts the cloth carries it
+ *     and never throws it.
+ * A new coat is hung on the hips in its cut shape and the body is swung into its pose from rest over half a second
+ * (a PRE-ROLL), so a knee that starts the take raised arrives under the cloth instead of starting through it.
+ * Drawn from its own buffers (two coats on two bodies are two coats), unskinned, and it casts. The chains still
+ * swing (Godot reads them); nothing here hangs on them any more.
+ *   REVA_SKIRTSIM=0 (or REVA_NOCLOTH=1): the old drape in the shader -- the control.
+ *   REVA_SKIRTDBG=1: the build report, then once a second contacts / deepest push / worst stretch and where, the
+ *   air (=2: every deep push off the skin, with the skin point that made it; =3: the planted-foot air, frame by frame).
+ *   REVA_SKBEND=<compliance> (default 1e-7: twill in broad panels; 2e-5 crumples like a shirt), REVA_SKSUB=<s>
+ *   (substep length, default 1/960), REVA_SKDRAG (default 1.3: double-walled twill), REVA_SKAIR=0, REVA_SKHANDS=0,
+ *   REVA_SKLEGM=<m> / REVA_SKLEGR=<x> (the leg margin / radius factor, default by outfit / 1.0), REVA_SKARMS=1|2
+ *   (the old arm capsules -- at the waist they crumple the coat), REVA_SKSKIN=0 / REVA_SKCONE=0 /
+ *   REVA_SKMU=<static>[,<kinetic>] for the A/B, REVA_VCOLR=<x> scales the capsules (x4: the coat balloons -- the test
+ *   that the collision runs at all). */
+#define SK_MAXV 8192
+#define SK_MAXP 4096
+#define SK_MAXE 16384
+#define SK_POOL 24
+#define SK_NCAP 16
+#define SK_BODYMAX 6000
+#define SK_HANDMAX 512
+#define SK_MAXT 8192
+typedef struct {
+    Pack*pk; int mesh, slot, seeded, warm; unsigned stamp, shStamp, used;
+    int nv, np, ne, nb, ncap0, ncone;
+    short vp[SK_MAXV];                            /* mesh vertex -> point */
+    short rep[SK_MAXP];                           /* point -> a mesh vertex sitting on it */
+    short twin[SK_MAXP]; float thick[SK_MAXP];    /* a lining point: its outer point, and how far behind (rig u) */
+    unsigned char pin[SK_MAXP], cone[SK_MAXP], back[SK_MAXP];   /* back: cut on the back half of the garment */
+    short anchor[SK_MAXP]; float tlen[SK_MAXP];   /* the tether: nearest waistband point, rest distance (rig u) */
+    float rr[SK_MAXP], pr[SK_MAXP][3];            /* rest: radius from the hips' axis, and the point itself (rig) */
+    float allowC[SK_MAXP], allowS[SK_MAXP];       /* how far INSIDE a limb's / the skin's margin it already sits at rest */
+    float cur[SK_MAXP][3], prv[SK_MAXP][3], tg0[SK_MAXP][3], tg1[SK_MAXP][3];
+    float nOut[SK_MAXP][3], nR[SK_MAXP][3], pos[SK_MAXP][3];
+    unsigned short e0[SK_MAXE], e1[SK_MAXE]; float elen[SK_MAXE];
+    unsigned short b0[SK_MAXE], b1[SK_MAXE]; float blen[SK_MAXE];
+    int nt; unsigned short tri[SK_MAXT][3];       /* the outer wall's triangles (simulated points) */
+    float osign, rsign, tmed, ax, ay, az, legM;    /* legM: off a leg, rig units (a garment's ease or a hair, + the wall) */
+    float h0inv[16], H0[16];                      /* the hips at rest (inverse); last frame's rest->world */
+    float cap0[SK_NCAP][8];
+    /* THE SKIN UNDER IT, sampled: which mesh and vertex, where it was last frame and is now, which way it faces */
+    int nbv; unsigned char bvm[SK_BODYMAX]; unsigned short bvv[SK_BODYMAX];
+    float bp0[SK_BODYMAX][3], bp1[SK_BODYMAX][3], bn1[SK_BODYMAX][3];
+    /* THE HANDS, sampled from their skin; and under a pelvis point, the body's own radius (+ clearance) */
+    int nhv; unsigned char hvm[SK_HANDMAX]; unsigned short hvv[SK_HANDMAX];
+    float hp0[SK_HANDMAX][3], hp1[SK_HANDMAX][3];
+    float floorR[SK_MAXP];
+    /* ⭐ THE FLOOR UNDER THE BODY (10-18): the plane the body stands or lies on (its model's ground: the origin
+     * plus the rest sole) -- a child lying in a warming pan hangs his shift toward the pan, and it stops there */
+    float floorY;
+    /* THE AIR OF HER OWN RUN: what the planted foot says the ground is doing under her (world u/s) */
+    float air[3], fprev[2][3], fground; int fwarm;
+    int worstE;                                   /* the most stretched edge, last step (the report) */
+    GLuint vbo[2];
+} Skirt;
+static Skirt g_sk[SK_POOL];
+static void skBodyFrame(Skirt*S,Pack*P,M4*world,const float*model,int first);
+static void skHandFrame(Skirt*S,Pack*P,M4*world,const float*model,int first);
+static int g_skirtSim=-1, g_skDbg=0, g_skArms=0, g_skSkin=1, g_skCone=1, g_skHands=1, g_skAir=1; static float g_skBend=1e-7f, g_skMuS=0.25f, g_skMuK=0.15f, g_skDrag=1.3f, g_skSub=0.00104f, g_skLegM=-1.f, g_skLegR=1.0f;
+static int g_skContacts=0; static float g_skDeep=0.f, g_skStretch=0.f;
+
+static void skClosestTri(const float*p,const float*a,const float*b,const float*c,float*u,float*v,float*w){
+    float ab[3],ac[3],ap[3]; for(int k=0;k<3;k++){ ab[k]=b[k]-a[k]; ac[k]=c[k]-a[k]; ap[k]=p[k]-a[k]; }
+    float d1=ab[0]*ap[0]+ab[1]*ap[1]+ab[2]*ap[2], d2=ac[0]*ap[0]+ac[1]*ap[1]+ac[2]*ap[2];
+    if(d1<=0.f&&d2<=0.f){ *u=1.f; *v=0.f; *w=0.f; return; }
+    float bp[3]; for(int k=0;k<3;k++) bp[k]=p[k]-b[k];
+    float d3=ab[0]*bp[0]+ab[1]*bp[1]+ab[2]*bp[2], d4=ac[0]*bp[0]+ac[1]*bp[1]+ac[2]*bp[2];
+    if(d3>=0.f&&d4<=d3){ *u=0.f; *v=1.f; *w=0.f; return; }
+    float vc=d1*d4-d3*d2;
+    if(vc<=0.f&&d1>=0.f&&d3<=0.f){ float t=d1/(d1-d3); *u=1.f-t; *v=t; *w=0.f; return; }
+    float cp[3]; for(int k=0;k<3;k++) cp[k]=p[k]-c[k];
+    float d5=ab[0]*cp[0]+ab[1]*cp[1]+ab[2]*cp[2], d6=ac[0]*cp[0]+ac[1]*cp[1]+ac[2]*cp[2];
+    if(d6>=0.f&&d5<=d6){ *u=0.f; *v=0.f; *w=1.f; return; }
+    float vb=d5*d2-d1*d6;
+    if(vb<=0.f&&d2>=0.f&&d6<=0.f){ float t=d2/(d2-d6); *u=1.f-t; *v=0.f; *w=t; return; }
+    float va=d3*d6-d5*d4;
+    if(va<=0.f&&(d4-d3)>=0.f&&(d5-d6)>=0.f){ float t=(d4-d3)/((d4-d3)+(d5-d6)); *u=0.f; *v=1.f-t; *w=t; return; }
+    float den=1.f/(va+vb+vc); *v=vb*den; *w=vc*den; *u=1.f-*v-*w; }
+static void skXf(const float*m,const float*p,float*o){
+    for(int k=0;k<3;k++) o[k]=m[k]*p[0]+m[4+k]*p[1]+m[8+k]*p[2]+m[12+k]; }
+/* an affine 4x4 (column-major) inverse; 0 if singular */
+static int skInv(const float*m,float*o){
+    float a=m[0],b=m[4],c=m[8], d=m[1],e=m[5],f=m[9], g=m[2],h=m[6],i=m[10];
+    float A=e*i-f*h, B=f*g-d*i, C=d*h-e*g, det=a*A+b*B+c*C;
+    if(fabsf(det)<1e-20f) return 0;
+    float id=1.f/det;
+    float r[3][3]={{A*id,(c*h-b*i)*id,(b*f-c*e)*id},{B*id,(a*i-c*g)*id,(c*d-a*f)*id},{C*id,(b*g-a*h)*id,(a*e-b*d)*id}};
+    for(int rr=0;rr<3;rr++) for(int cc=0;cc<3;cc++) o[cc*4+rr]=r[rr][cc];
+    o[3]=o[7]=o[11]=0.f; o[15]=1.f;
+    for(int rr=0;rr<3;rr++) o[12+rr]=-(r[rr][0]*m[12]+r[rr][1]*m[13]+r[rr][2]*m[14]);
+    return 1; }
+static int skFirstChild(Pack*P,int node,const char*want){
+    if(node<0) return -1; int any=-1;
+    for(unsigned i=0;i<P->nNodes;i++){ if(P->nodes[i].parent!=node) continue;
+        const char*nm=packStr(P,P->nodes[i].name); char lo[96]; int k=0;
+        for(;nm&&k<95&&nm[k];k++){ char c=nm[k]; lo[k]=(c>='A'&&c<='Z')?(char)(c+32):c; } lo[k]=0;
+        if(want&&strstr(lo,want)) return (int)i;
+        if(any<0) any=(int)i; }
+    return any; }
+static void skRestFK(Pack*P,M4*W){
+    for(unsigned i=0;i<P->nNodes;i++){ M4 loc; m4_trs(loc,P->nodes[i].t,P->nodes[i].q,P->nodes[i].s);
+        if(P->nodes[i].parent<0) memcpy(W[i],loc,64); else m4_mul(W[i],W[P->nodes[i].parent],loc); } }
+
+/* THE BODY, as capsules in WORLD space: A(3) B(3) radius-with-margin, kind. Same legs as the drape (colSet): the
+ * thigh from a fifth of the way down, every radius the body's own measured thickness. Margins in rig metres: off a
+ * trouser leg and the wall's own thickness; off a sleeve as well. */
+static int skCaps(Pack*P,M4*W,const float*model,float sc,float tmed,float legM,float cap[][8]){
+    if(!P->boneRok) measureBoneR(P);
+    static float vr=-1.f; if(vr<0.f){ const char*e=getenv("REVA_VCOLR"); vr=(e&&*e)?(float)atof(e):1.f; }
+    float mL=legM*sc, mA=(0.022f+tmed)*sc;
+    int n=0;
+    for(int s=0;s<2;s++){
+        int hip=P->pb[s?14:12], knee=P->pb[s?15:13], ft=s?P->footR:P->footL;
+        /* ⛔ footL/footR is the LOWEST bone under the knee -- on these rigs the TOE, not the ankle: a shin drawn to it
+         * cut diagonally through the foot, and asking the toe for its child found nothing, so the feet had no capsule
+         * at all. The ankle is the knee's own child on the way down to it. */
+        int ank=ft; while(ank>=0&&knee>=0&&P->nodes[ank].parent>=0&&P->nodes[ank].parent!=knee) ank=P->nodes[ank].parent;
+        if(ank<0||knee<0||P->nodes[ank].parent!=knee) ank=ft;
+        int toe=(ank!=ft)?ft:skFirstChild(P,ank,"toe");
+        int sh=P->pb[s?10:7], el=P->pb[s?11:8];
+        int hand=skFirstChild(P,el,"hand");
+        float rT=P->boneR[s?14:12], rS=P->boneR[s?15:13], rU=P->boneR[s?10:7], rF=P->boneR[s?11:8];
+        struct { int a,b; float k0,ext,r,m; } L[6]={
+            {hip,knee,0.2f,0.f,rT*g_skLegR,mL},   /* the thigh */
+            {knee,ank,0.f,0.f,rS*g_skLegR,mL},    /* the shin */
+            /* the foot IN ITS SHOE, heel to toe-tip: a heel kicked up behind is the first thing through a coat's back */
+            {toe,ank,-0.4f,0.35f,rS*0.85f,mL},
+            {sh,el,0.f,0.f,rU*1.06f,mA},         /* the upper arm, in its sleeve */
+            {el,hand,0.f,0.f,rF*1.06f,mA},       /* the forearm */
+            {el,hand,1.f,0.45f,rF*0.95f,mL} };   /* the hand: on past the wrist by half a forearm */
+        for(int q=0;q<6&&n<SK_NCAP;q++){ int a=L[q].a, b=L[q].b;
+            if(q>=3&&!g_skArms) continue;
+            if((q==3||q==4)&&g_skArms<2) continue;   /* REVA_SKARMS=1: the hands alone; 2: the whole arm */
+            if(a<0||b<0||(unsigned)a>=P->nNodes||(unsigned)b>=P->nNodes||L[q].r<=0.f) continue;
+            float pa[3],pb9[3];
+            for(int k=0;k<3;k++){ float A0=W[a][12+k], B0=W[b][12+k]; pa[k]=A0+(B0-A0)*L[q].k0; pb9[k]=B0+(B0-A0)*L[q].ext; }
+            skXf(model,pa,cap[n]); skXf(model,pb9,cap[n]+3);
+            cap[n][6]=L[q].r*vr*sc+L[q].m; cap[n][7]=(float)(s*6+q); n++; } }
+    return n; }
+
+/* the outer wall's normals (area-weighted, its own triangles), the lining placed behind them, then the drawn
+ * normals over every triangle, weighted by corner ANGLE as Blender weighs them (so a hem's lip still turns the
+ * outline under the hem) */
+static void skNormals(Skirt*S,const unsigned*ix,unsigned nidx,float sc){
+    int np=S->np;
+    for(int p=0;p<np;p++){ S->nOut[p][0]=S->nOut[p][1]=S->nOut[p][2]=0.f; S->nR[p][0]=S->nR[p][1]=S->nR[p][2]=0.f; }
+    for(unsigned t=0;t+2<nidx;t+=3){
+        int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+        if(S->twin[a]>=0||S->twin[b]>=0||S->twin[c]>=0) continue;
+        float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->cur[b][k]-S->cur[a][k]; v[k]=S->cur[c][k]-S->cur[a][k]; }
+        float n[3]={(u[1]*v[2]-u[2]*v[1])*S->osign,(u[2]*v[0]-u[0]*v[2])*S->osign,(u[0]*v[1]-u[1]*v[0])*S->osign};
+        for(int k=0;k<3;k++){ S->nOut[a][k]+=n[k]; S->nOut[b][k]+=n[k]; S->nOut[c][k]+=n[k]; } }
+    for(int p=0;p<np;p++){ float*n=S->nOut[p]; float l=sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
+        if(l>1e-14f){ n[0]/=l; n[1]/=l; n[2]/=l; } else { n[0]=0.f; n[1]=1.f; n[2]=0.f; } }
+    for(int p=0;p<np;p++){ int w=S->twin[p];
+        if(w<0) memcpy(S->pos[p],S->cur[p],12);
+        else for(int k=0;k<3;k++) S->pos[p][k]=S->cur[w][k]-S->nOut[w][k]*S->thick[p]*sc; }
+    for(unsigned t=0;t+2<nidx;t+=3){
+        int id[3]={S->vp[ix[t]],S->vp[ix[t+1]],S->vp[ix[t+2]]};
+        float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->pos[id[1]][k]-S->pos[id[0]][k]; v[k]=S->pos[id[2]][k]-S->pos[id[0]][k]; }
+        float n[3]={u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
+        float l=sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]); if(l<1e-14f) continue;
+        for(int k=0;k<3;k++) n[k]*=S->rsign/l;
+        for(int c=0;c<3;c++){ const float*P0=S->pos[id[c]], *P1=S->pos[id[(c+1)%3]], *P2=S->pos[id[(c+2)%3]];
+            float x[3],y[3]; for(int k=0;k<3;k++){ x[k]=P1[k]-P0[k]; y[k]=P2[k]-P0[k]; }
+            float lx=sqrtf(x[0]*x[0]+x[1]*x[1]+x[2]*x[2]), ly=sqrtf(y[0]*y[0]+y[1]*y[1]+y[2]*y[2]);
+            if(lx<1e-12f||ly<1e-12f) continue;
+            float cs=(x[0]*y[0]+x[1]*y[1]+x[2]*y[2])/(lx*ly); if(cs>1.f) cs=1.f; if(cs<-1.f) cs=-1.f;
+            float an=acosf(cs);
+            for(int k=0;k<3;k++) S->nR[id[c]][k]+=n[k]*an; } }
+    for(int p=0;p<np;p++){ float*n=S->nR[p]; float l=sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
+        if(l>1e-14f){ n[0]/=l; n[1]/=l; n[2]/=l; } else memcpy(n,S->nOut[S->twin[p]>=0?S->twin[p]:p],12); } }
+
+/* Build it once per body: weld the mesh to points, find the lining, the waistband, the edges, bends and tethers. */
+static int skirtInit(Skirt*S,Pack*P,unsigned mi){
+    PMesh*M=&P->meshes[mi];
+    char mnm[96]; { const char*n9=packStr(P,M->name); snprintf(mnm,sizeof mnm,"%s",n9?n9:"?"); }   /* packStr's buffer is reused */
+    S->pk=P; S->mesh=(int)mi; S->seeded=-1; S->warm=0;
+    if(M->verts>SK_MAXV||!M->idxCount||!(M->flags&1)||M->boneCount>MAXB||P->nNodes>1024){
+        printf("[skirt] !! %s '%s': %u verts (cap %d), %u indices, normals %d -- NOT simulated\n",P->label,mnm,M->verts,SK_MAXV,
+               M->idxCount,M->flags&1); fflush(stdout); return 0; }
+    int nv=(int)M->verts; S->nv=nv;
+    float*rp=(float*)(P->pk+M->offPos), *rn=(float*)(P->pk+M->offNorm), *bd=(float*)(P->pk+M->offBind);
+    unsigned char*jp=(unsigned char*)(P->pk+M->offJoints), *wp=(unsigned char*)(P->pk+M->offWeights);
+    unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
+    unsigned*ix=(unsigned*)(P->pk+M->offIdx);
+    static float bq[SK_MAXV][3], bn[SK_MAXV][3], cw[SK_MAXV];
+    static unsigned char chainB[MAXB];
+    for(unsigned b=0;b<M->boneCount;b++){ unsigned nd=bm[b]; const char*nm=(nd<P->nNodes)?packStr(P,P->nodes[nd].name):NULL;
+        chainB[b]=(nm&&!strncmp(nm,"Cloth_",6))?1:0; }
+    float lo[3]={1e9f,1e9f,1e9f}, hi[3]={-1e9f,-1e9f,-1e9f};
+    for(int v=0;v<nv;v++){
+        for(int k=0;k<3;k++){ bq[v][k]=bd[k]*rp[v*3]+bd[4+k]*rp[v*3+1]+bd[8+k]*rp[v*3+2]+bd[12+k];
+                              bn[v][k]=bd[k]*rn[v*3]+bd[4+k]*rn[v*3+1]+bd[8+k]*rn[v*3+2];
+                              if(bq[v][k]<lo[k]) lo[k]=bq[v][k]; if(bq[v][k]>hi[k]) hi[k]=bq[v][k]; }
+        float c=0.f; for(int q=0;q<4;q++){ int j=jp[v*4+q]; if(j<(int)M->boneCount&&chainB[j]) c+=wp[v*4+q]/255.f; }
+        cw[v]=c; }
+    float diag=sqrtf((hi[0]-lo[0])*(hi[0]-lo[0])+(hi[1]-lo[1])*(hi[1]-lo[1])+(hi[2]-lo[2])*(hi[2]-lo[2]));
+    float eps2=(diag*2e-5f)*(diag*2e-5f);
+    /* weld: a vertex split for its UVs is still one piece of cloth */
+    static float pn[SK_MAXP][3], pcw[SK_MAXP];
+    int np=0;
+    for(int v=0;v<nv;v++){ int f=-1;
+        for(int p=np-1;p>=0;p--){ float dx=bq[v][0]-S->pr[p][0], dy=bq[v][1]-S->pr[p][1], dz=bq[v][2]-S->pr[p][2];
+            if(dx*dx+dy*dy+dz*dz<=eps2){ f=p; break; } }
+        if(f<0){ if(np>=SK_MAXP){ printf("[skirt] !! %s '%s': over %d points -- NOT simulated\n",P->label,mnm,SK_MAXP); fflush(stdout); return 0; }
+                 f=np++; memcpy(S->pr[f],bq[v],12); pn[f][0]=pn[f][1]=pn[f][2]=0.f; pcw[f]=0.f; S->rep[f]=(short)v; }
+        S->vp[v]=(short)f; for(int k=0;k<3;k++) pn[f][k]+=bn[v][k]; if(cw[v]>pcw[f]) pcw[f]=cw[v]; }
+    S->np=np;
+    for(unsigned t=0;t<M->idxCount;t++) if(ix[t]>=(unsigned)nv){ printf("[skirt] !! %s '%s': index out of range -- NOT simulated\n",P->label,mnm); return 0; }
+    /* the hips at rest: the axis the cloth hangs round, and the frame its cut is held in */
+    static M4 RW[1024]; skRestFK(P,RW);
+    int hp=P->pb[0];
+    static const float I16[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    if(hp>=0){ S->ax=RW[hp][12]; S->ay=RW[hp][13]; S->az=RW[hp][14]; if(!skInv(RW[hp],S->h0inv)) memcpy(S->h0inv,I16,64); }
+    else { S->ax=S->ay=S->az=0.f; memcpy(S->h0inv,I16,64); }
+    /* OUTER or LINING, by which way the mesh's own normals face round the hips; a lining point is the outer point
+     * nearest it, a wall's thickness away */
+    static unsigned char outer[SK_MAXP]; static float tk[SK_MAXP]; int nOut=0, nIn=0, nSingle=0;
+    for(int p=0;p<np;p++){ float rx=S->pr[p][0]-S->ax, rz=S->pr[p][2]-S->az;
+        outer[p]=(pn[p][0]*rx+pn[p][2]*rz>0.f)?1:0; nOut+=outer[p]; S->rr[p]=sqrtf(rx*rx+rz*rz); }
+    for(int p=0;p<np;p++){ S->twin[p]=-1; S->thick[p]=0.f; if(outer[p]) continue;
+        int best=-1; float b2=1e30f;
+        for(int q=0;q<np;q++){ if(!outer[q]) continue;
+            float dx=S->pr[p][0]-S->pr[q][0], dy=S->pr[p][1]-S->pr[q][1], dz=S->pr[p][2]-S->pr[q][2], d2=dx*dx+dy*dy+dz*dz;
+            if(d2<b2){ b2=d2; best=q; } }
+        if(best>=0){ S->twin[p]=(short)best; S->thick[p]=sqrtf(b2); tk[nIn++]=S->thick[p]; } }
+    S->tmed=0.f; if(nIn){ qsort(tk,(size_t)nIn,sizeof(float),cmpf9); S->tmed=tk[nIn/2]; }
+    for(int p=0;p<np;p++) if(S->twin[p]>=0&&S->thick[p]>3.f*S->tmed+1e-6f){ S->twin[p]=-1; nSingle++; nIn--; }   /* not a lining: its own cloth */
+    /* THE EDGES among the simulated points (deduped), and across each the pair of opposite points: the bend */
+    #define SKH 15
+    static int hh[1<<SKH]; static unsigned short opp0[SK_MAXE], opp1[SK_MAXE];
+    for(int i=0;i<(1<<SKH);i++) hh[i]=-1;
+    S->ne=0; S->nt=0; int drop=0;
+    for(unsigned t=0;t+2<M->idxCount;t+=3){
+        int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+        if(a==b||b==c||a==c||S->twin[a]>=0||S->twin[b]>=0||S->twin[c]>=0) continue;
+        if(S->nt<SK_MAXT){ S->tri[S->nt][0]=(unsigned short)a; S->tri[S->nt][1]=(unsigned short)b; S->tri[S->nt][2]=(unsigned short)c; S->nt++; }
+        int tri[3][3]={{a,b,c},{b,c,a},{c,a,b}};
+        for(int k=0;k<3;k++){ int i=tri[k][0], j=tri[k][1], o=tri[k][2]; if(i>j){ int tm=i; i=j; j=tm; }
+            unsigned key=((unsigned)i<<16)|(unsigned)j, h=(key*2654435761u)>>(32-SKH); int seen=-1;
+            while(hh[h]>=0){ int e=hh[h]; if(S->e0[e]==i&&S->e1[e]==j){ seen=e; break; } h=(h+1)&((1u<<SKH)-1u); }
+            if(seen>=0){ if(opp1[seen]==65535&&o!=opp0[seen]) opp1[seen]=(unsigned short)o; continue; }
+            if(S->ne>=SK_MAXE){ drop++; continue; }
+            hh[h]=S->ne; S->e0[S->ne]=(unsigned short)i; S->e1[S->ne]=(unsigned short)j;
+            opp0[S->ne]=(unsigned short)o; opp1[S->ne]=65535;
+            float dx=S->pr[j][0]-S->pr[i][0], dy=S->pr[j][1]-S->pr[i][1], dz=S->pr[j][2]-S->pr[i][2];
+            S->elen[S->ne]=sqrtf(dx*dx+dy*dy+dz*dz); S->ne++; } }
+    #undef SKH
+    S->nb=0;
+    for(int e=0;e<S->ne&&S->nb<SK_MAXE;e++){ if(opp1[e]==65535) continue; int i=opp0[e], j=opp1[e];
+        float dx=S->pr[j][0]-S->pr[i][0], dy=S->pr[j][1]-S->pr[i][1], dz=S->pr[j][2]-S->pr[i][2];
+        S->b0[S->nb]=(unsigned short)i; S->b1[S->nb]=(unsigned short)j; S->blen[S->nb]=sqrtf(dx*dx+dy*dy+dz*dz); S->nb++; }
+    if(drop){ printf("[skirt] !! %s '%s': %d edges over the cap -- NOT simulated\n",P->label,mnm,drop); fflush(stdout); return 0; }
+    /* THE WAISTBAND: no weight on a chain */
+    int nPin=0, nFree=0;
+    for(int p=0;p<np;p++){ S->pin[p]=0; if(S->twin[p]>=0) continue; if(pcw[p]<0.02f){ S->pin[p]=1; nPin++; } else nFree++; }
+    if(!nPin||!nFree){ float y0=1e9f,y1=-1e9f; nPin=nFree=0;
+        for(int p=0;p<np;p++) if(S->twin[p]<0){ if(S->pr[p][1]<y0) y0=S->pr[p][1]; if(S->pr[p][1]>y1) y1=S->pr[p][1]; }
+        for(int p=0;p<np;p++) if(S->twin[p]<0){ S->pin[p]=(S->pr[p][1]>y1-(y1-y0)*0.10f)?1:0; nPin+=S->pin[p]; nFree+=!S->pin[p]; }
+        printf("[skirt] %s '%s': no Cloth_ chain weights -- the top tenth is the waistband\n",P->label,mnm); }
+    if(!nPin||!nFree){ printf("[skirt] !! %s '%s': nothing to hang (%d pinned, %d free) -- NOT simulated\n",P->label,mnm,nPin,nFree); fflush(stdout); return 0; }
+    /* THE TETHERS: the shortest way along the cloth from each free point to the waistband (Dijkstra on its edges) */
+    { static int start[SK_MAXP+1], adj[2*SK_MAXE]; static float adjL[2*SK_MAXE], dist[SK_MAXP]; static unsigned char done[SK_MAXP];
+      for(int p=0;p<=np;p++) start[p]=0;
+      for(int e=0;e<S->ne;e++){ start[S->e0[e]+1]++; start[S->e1[e]+1]++; }
+      for(int p=0;p<np;p++) start[p+1]+=start[p];
+      static int fill[SK_MAXP]; for(int p=0;p<np;p++) fill[p]=start[p];
+      for(int e=0;e<S->ne;e++){ int i=S->e0[e], j=S->e1[e];
+          adj[fill[i]]=j; adjL[fill[i]++]=S->elen[e]; adj[fill[j]]=i; adjL[fill[j]++]=S->elen[e]; }
+      for(int p=0;p<np;p++){ dist[p]=1e30f; done[p]=0; S->anchor[p]=-1; S->tlen[p]=0.f;
+          if(S->twin[p]<0&&S->pin[p]){ dist[p]=0.f; S->anchor[p]=(short)p; } }
+      for(;;){ int u=-1; float bdist=1e29f;
+          for(int p=0;p<np;p++) if(!done[p]&&dist[p]<bdist){ bdist=dist[p]; u=p; }
+          if(u<0) break; done[u]=1;
+          for(int k=start[u];k<start[u+1];k++){ int q=adj[k]; float nd=dist[u]+adjL[k];
+              if(nd<dist[q]){ dist[q]=nd; S->anchor[q]=S->anchor[u]; } } }
+      for(int p=0;p<np;p++) S->tlen[p]=(dist[p]<1e29f)?dist[p]:0.f; }
+    /* which way round the triangles go: the outer wall's normals must leave the body, the drawn ones agree with the
+     * mesh's own */
+    { float so=0.f, sr=0.f;
+      for(unsigned t=0;t+2<M->idxCount;t+=3){
+          int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+          float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->pr[b][k]-S->pr[a][k]; v[k]=S->pr[c][k]-S->pr[a][k]; }
+          float n[3]={u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
+          for(int q=0;q<3;q++){ unsigned vv=ix[t+q]; sr+=n[0]*bn[vv][0]+n[1]*bn[vv][1]+n[2]*bn[vv][2]; }
+          if(S->twin[a]<0&&S->twin[b]<0&&S->twin[c]<0){
+              float cx=(S->pr[a][0]+S->pr[b][0]+S->pr[c][0])/3.f-S->ax, cz=(S->pr[a][2]+S->pr[b][2]+S->pr[c][2])/3.f-S->az;
+              so+=n[0]*cx+n[2]*cz; } }
+      S->osign=(so<0.f)?-1.f:1.f; S->rsign=(sr<0.f)?-1.f:1.f; }
+    /* THE PELVIS ZONE: rest heights above where the thigh capsules begin */
+    { float ylow=-1e9f;
+      for(int s=0;s<2;s++){ int a=P->pb[s?14:12], b=P->pb[s?15:13];
+          if(a>=0&&b>=0){ float y=RW[a][13]+(RW[b][13]-RW[a][13])*0.2f; if(y>ylow) ylow=y; } }
+      int nc=0; for(int p=0;p<np;p++){ S->cone[p]=(S->twin[p]<0&&!S->pin[p]&&S->pr[p][1]>ylow&&ylow>-1e8f)?1:0; nc+=S->cone[p]; }
+      S->ncone=nc; }
+    /* ⭐ THE SKIN UNDER IT (10-18): every vertex of the body's skin -- "skin", and the skin HIDDEN under a garment
+     * ("skin~h=...") -- from half the skirt's length below its hem up to its waistband, at rest. The capsules are the
+     * fast limbs; this is the SHAPE: the buttock and the back of the thigh pushed through the coat whenever a leg
+     * swung back, because no capsule starts that high on the thigh (its sphere would stand out of the hip). */
+    /* ⛔ NOT THE ARMS. The rest pose hangs the arms at the hips, so "skin from the hem to the waist" took in the
+     * forearms and hands -- and a hand swinging past shoved the coat 4-5 cm out of its way. An arm is outside the
+     * skirt; its skin is not what the skirt lies on. A vertex belongs to the arm when its strongest bone hangs off a
+     * clavicle or an upper arm. */
+    static unsigned char armN[1024];
+    for(unsigned i=0;i<P->nNodes&&i<1024;i++){ armN[i]=0;
+        for(int a=(int)i,h9=0;a>=0&&h9<64;a=P->nodes[a].parent,h9++)
+            if(a==P->pb[6]||a==P->pb[7]||a==P->pb[9]||a==P->pb[10]){ armN[i]=(a>=0); break; } }
+    /* ⛔ AND ONLY THE BACK OF HER. Over the whole body it wadded the front panel up in the hip crease whenever a knee
+     * rose: there the skin folds, and the nearest skin point's tangent plane is the underside of the belly or the top
+     * of the thigh -- it shoved the cloth down into the thigh, the thigh shoved it back, and the panel balled up at
+     * her hip (with the layer off it hung as a panel). The front is the thigh capsule and the hips' rule; the skin
+     * keeps the BACK: the buttock and the back of the thigh. Forward is heel to toe, at rest. */
+    float fwd[2]={0.f,1.f};
+    { int ft=P->footL, kn=P->pb[13]; int an=ft;
+      while(an>=0&&kn>=0&&P->nodes[an].parent>=0&&P->nodes[an].parent!=kn) an=P->nodes[an].parent;
+      if(an>=0&&ft>=0&&an!=ft){ float fx=RW[ft][12]-RW[an][12], fz=RW[ft][14]-RW[an][14], fl=sqrtf(fx*fx+fz*fz);
+          if(fl>1e-6f){ fwd[0]=fx/fl; fwd[1]=fz/fl; } } }
+    /* ⛔ AND ONLY THE BACK OF THE CLOTH MEETS IT. A closed shift's FRONT, pulled back between the legs by a stride,
+     * found the backs of the thighs as its nearest skin -- facing away from it -- and was shoved 35 mm back through the
+     * leg every substep (stretch x8 on the boys at 16 substeps; it hid at 8). Cloth cut on the front half never meets
+     * this layer; the legs' capsules and the hips keep it. */
+    for(int p=0;p<np;p++) S->back[p]=((S->pr[p][0]-S->ax)*fwd[0]+(S->pr[p][2]-S->az)*fwd[1]<0.f)?1:0;
+    { float y0=1e9f,y1=-1e9f; for(int p=0;p<np;p++){ if(S->pr[p][1]<y0) y0=S->pr[p][1]; if(S->pr[p][1]>y1) y1=S->pr[p][1]; }
+      float ylo=y0-0.5f*(y1-y0), yhi=y1+0.02f*(y1-y0);
+      int cand=0;
+      for(int pass=0;pass<2;pass++){ int stride=(pass==0)?1:(cand/SK_BODYMAX+1), k9=0; if(pass==1) S->nbv=0;
+          for(unsigned m=0;m<P->nMeshes&&m<255;m++){ PMesh*Mb=&P->meshes[m];
+              const char*nm=packStr(P,Mb->name);
+              if(m==mi||!nm||strncmp(nm,"skin",4)||!(Mb->flags&4)||!Mb->boneCount||Mb->boneCount>MAXB||Mb->verts>65535) continue;
+              float*brp=(float*)(P->pk+Mb->offPos), *bbd=(float*)(P->pk+Mb->offBind);
+              unsigned short*bbm=(unsigned short*)(P->pk+Mb->offBoneMap);
+              unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+              for(unsigned v=0;v<Mb->verts;v++){
+                  float y=bbd[1]*brp[v*3]+bbd[5]*brp[v*3+1]+bbd[9]*brp[v*3+2]+bbd[13];
+                  if(y<ylo||y>yhi) continue;
+                  { float x=bbd[0]*brp[v*3]+bbd[4]*brp[v*3+1]+bbd[8]*brp[v*3+2]+bbd[12], z=bbd[2]*brp[v*3]+bbd[6]*brp[v*3+1]+bbd[10]*brp[v*3+2]+bbd[14];
+                    if((x-S->ax)*fwd[0]+(z-S->az)*fwd[1]>0.f) continue;       /* the front half: not this layer's */
+                    /* ⛔ AND ONLY SKIN THAT FACES BACK. The inner thighs face each other across the crotch, and a cloth
+                     * point in front of that gap took whichever thigh was nearer as its plane -- 6 cm "inside" one,
+                     * then the other: the tight freezer shift balled up round his hips standing STILL. A buttock, the
+                     * back of a thigh, a calf face backward; that is what this layer is for. */
+                    if(Mb->flags&1){ float*bnp=(float*)(P->pk+Mb->offNorm);
+                        float nx=bbd[0]*bnp[v*3]+bbd[4]*bnp[v*3+1]+bbd[8]*bnp[v*3+2], ny=bbd[1]*bnp[v*3]+bbd[5]*bnp[v*3+1]+bbd[9]*bnp[v*3+2],
+                              nz=bbd[2]*bnp[v*3]+bbd[6]*bnp[v*3+1]+bbd[10]*bnp[v*3+2], nl=sqrtf(nx*nx+ny*ny+nz*nz)+1e-12f;
+                        if(-(nx*fwd[0]+nz*fwd[1])<0.35f*nl) continue; } }
+                  { int bj=-1, bw=-1; for(int q=0;q<4;q++) if(bwp[v*4+q]>bw){ bw=bwp[v*4+q]; bj=bjp[v*4+q]; }
+                    if(bj>=0&&bj<(int)Mb->boneCount){ unsigned nd=bbm[bj]; if(nd<P->nNodes&&nd<1024&&armN[nd]) continue; } }
+                  if(pass==0){ cand++; continue; }
+                  if((k9++)%stride) continue;
+                  if(S->nbv<SK_BODYMAX){ S->bvm[S->nbv]=(unsigned char)m; S->bvv[S->nbv]=(unsigned short)v; S->nbv++; } } } } }
+    /* ⭐ AT REST THE COLLISION MOVES NOTHING (the drape's law). A garment is cut with its own ease, and a tight one -- the
+     * freezer shift, 4 mm at the hips -- sits INSIDE the margins a loose coat needs: the solver shoved it off the body
+     * on its first frame, against its own waistband, and wadded it up round his hips (stretch x6, kids x13). So each
+     * point is measured against the body at REST, and however far it already sits inside a margin is its own
+     * allowance: the body only ever pushes cloth it has MOVED into. */
+    { static const float I16b[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+      if(!P->boneRok) measureBoneR(P);
+      /* ⭐ THE LEGS AS THEY ARE (10-18). The capsules were the measured radius (already 15% outside the skin) x1.06 and
+       * then 1.2 cm more -- a boy's thigh 60% fatter than it is: his tight shift could not go round both legs mid-stride
+       * and rode up to his hips (at 8 substeps it stretched instead, which hid it). Now: the measured radius, and off it
+       * a garment's ease where a garment covers the leg in this outfit (the leg's skin is HIDDEN), a hair where it is
+       * bare -- then the wall. */
+      { int tl=P->pb[12], tr=P->pb[14], bestM=-1, bestN=0;
+        for(unsigned m=0;m<P->nMeshes;m++){ PMesh*Mb=&P->meshes[m]; const char*nm=packStr(P,Mb->name);
+            if(m==mi||!nm||strncmp(nm,"skin",4)||!Mb->boneCount||Mb->boneCount>MAXB) continue;
+            unsigned short*bbm=(unsigned short*)(P->pk+Mb->offBoneMap);
+            unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+            int n=0; for(unsigned v=0;v<Mb->verts;v++){ int bj=-1, bw=-1; for(int q=0;q<4;q++) if(bwp[v*4+q]>bw){ bw=bwp[v*4+q]; bj=bjp[v*4+q]; }
+                if(bj>=0&&bj<(int)Mb->boneCount&&((int)bbm[bj]==tl||(int)bbm[bj]==tr)) n++; }
+            if(n>bestN){ bestN=n; bestM=(int)m; } }
+        int covered=(bestM>=0&&MOFF(P,(unsigned)bestM))?1:0;
+        S->legM=((g_skLegM>=0.f)?g_skLegM:(covered?0.006f:0.002f))+S->tmed;
+        printf("[skirt] %s: the legs are %s under it -- capsules at their measured thickness, %.1f mm off%c",
+               P->label,covered?"COVERED (a garment's ease)":"BARE",S->legM*1000.f,10); }
+      float capR[SK_NCAP][8]; int ncr=skCaps(P,RW,I16b,1.f,S->tmed,S->legM,capR);
+      int nA=0, nS=0; float aMax=0.f, sMax=0.f;
+      for(int p=0;p<np;p++){ S->allowC[p]=0.f; S->allowS[p]=0.f; if(S->twin[p]>=0||S->pin[p]) continue;
+          for(int c=0;c<ncr;c++){ const float*A=capR[c], *B=capR[c]+3;
+              float e[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]}, e2=e[0]*e[0]+e[1]*e[1]+e[2]*e[2];
+              float t=(e2>1e-12f)?((S->pr[p][0]-A[0])*e[0]+(S->pr[p][1]-A[1])*e[1]+(S->pr[p][2]-A[2])*e[2])/e2:0.f;
+              if(t<0.f) t=0.f; if(t>1.f) t=1.f;
+              float dx=S->pr[p][0]-(A[0]+e[0]*t), dy=S->pr[p][1]-(A[1]+e[1]*t), dz=S->pr[p][2]-(A[2]+e[2]*t);
+              float in=capR[c][6]-sqrtf(dx*dx+dy*dy+dz*dz);
+              if(in>S->allowC[p]) S->allowC[p]=in; }
+          if(S->allowC[p]>0.f){ nA++; if(S->allowC[p]>aMax) aMax=S->allowC[p]; } }
+      if(S->nbv){ skBodyFrame(S,P,RW,I16b,1);
+          float clr=0.008f+S->tmed, rad=0.05f;
+          for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]) continue; int best=-1; float bd=rad*rad;
+              for(int i=0;i<S->nbv;i++){ float dx=S->pr[p][0]-S->bp1[i][0], dy=S->pr[p][1]-S->bp1[i][1], dz=S->pr[p][2]-S->bp1[i][2];
+                  float d2=dx*dx+dy*dy+dz*dz; if(d2<bd){ bd=d2; best=i; } }
+              if(best<0) continue;
+              float d=(S->pr[p][0]-S->bp1[best][0])*S->bn1[best][0]+(S->pr[p][1]-S->bp1[best][1])*S->bn1[best][1]+(S->pr[p][2]-S->bp1[best][2])*S->bn1[best][2];
+              if(d<clr){ S->allowS[p]=clr-d; nS++; if(clr-d>sMax) sMax=clr-d; } } }
+      printf("[skirt] %s: at rest %d points sit inside a limb's margin (up to %.1f mm) and %d inside the skin's (up to %.1f mm) -- allowed, never pushed\n",
+             P->label,nA,aMax*1000.f,nS,sMax*1000.f); }
+    /* ⭐ THE HANDS (10-18). jacob's crops: her hand hanging at her hip, its lower half INSIDE the coat -- the side panel
+     * flares past where the hand swings. An arm is outside the skirt, so a hand only ever presses the cloth IN, toward
+     * the body, and the body stops it: under a pelvis point the cloth may go down to the skin's own radius plus the
+     * undersuit and the wall (floorR), never through her. The hand is its own skin, sampled (a capsule round a hand
+     * is a fat sausage that shoves cloth 4 cm away from fingers 1 cm thick). */
+    { static unsigned char handN[1024];
+      int hl=skFirstChild(P,P->pb[8],"hand"), hr=skFirstChild(P,P->pb[11],"hand");
+      for(unsigned i=0;i<P->nNodes&&i<1024;i++){ handN[i]=0;
+          for(int a=(int)i,h9=0;a>=0&&h9<64;a=P->nodes[a].parent,h9++) if(a==hl||a==hr){ handN[i]=(a>=0); break; } }
+      int cand=0;
+      for(int pass=0;pass<2;pass++){ int stride=(pass==0)?1:(cand/256+1), k9=0; if(pass==1) S->nhv=0;   /* ~256: a hand sampled every centimetre or so */
+          for(unsigned m=0;m<P->nMeshes&&m<255;m++){ PMesh*Mb=&P->meshes[m];
+              const char*nm=packStr(P,Mb->name);
+              if(m==mi||!nm||strncmp(nm,"skin",4)||!(Mb->flags&4)||!Mb->boneCount||Mb->boneCount>MAXB||Mb->verts>65535) continue;
+              unsigned short*bbm=(unsigned short*)(P->pk+Mb->offBoneMap);
+              unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+              for(unsigned v=0;v<Mb->verts;v++){
+                  int bj=-1, bw=-1; for(int q=0;q<4;q++) if(bwp[v*4+q]>bw){ bw=bwp[v*4+q]; bj=bjp[v*4+q]; }
+                  if(bj<0||bj>=(int)Mb->boneCount) continue;
+                  unsigned nd=bbm[bj]; if(nd>=P->nNodes||nd>=1024||!handN[nd]) continue;
+                  if(pass==0){ cand++; continue; }
+                  if((k9++)%stride) continue;
+                  if(S->nhv<SK_HANDMAX){ S->hvm[S->nhv]=(unsigned char)m; S->hvv[S->nhv]=(unsigned short)v; S->nhv++; } } } }
+      /* the body under each pelvis point, at rest: the skin's largest radius from the hips' axis near its angle and
+       * height (the arms left out: at rest they hang at the hips) */
+      float y0=1e9f,y1=-1e9f; for(int p=0;p<np;p++){ if(S->pr[p][1]<y0) y0=S->pr[p][1]; if(S->pr[p][1]>y1) y1=S->pr[p][1]; }
+      float hwin=0.04f*(y1-y0), clr=0.006f+S->tmed;
+      static float sk3[24000][3]; int ns=0;
+      for(unsigned m=0;m<P->nMeshes&&m<255;m++){ PMesh*Mb=&P->meshes[m];
+          const char*nm=packStr(P,Mb->name);
+          if(m==mi||!nm||strncmp(nm,"skin",4)||!(Mb->flags&4)||!Mb->boneCount||Mb->boneCount>MAXB) continue;
+          float*brp=(float*)(P->pk+Mb->offPos), *bbd=(float*)(P->pk+Mb->offBind);
+          unsigned short*bbm=(unsigned short*)(P->pk+Mb->offBoneMap);
+          unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+          for(unsigned v=0;v<Mb->verts&&ns<24000;v++){
+              float y=bbd[1]*brp[v*3]+bbd[5]*brp[v*3+1]+bbd[9]*brp[v*3+2]+bbd[13];
+              if(y<y0-hwin||y>y1+hwin) continue;
+              int bj=-1, bw=-1; for(int q=0;q<4;q++) if(bwp[v*4+q]>bw){ bw=bwp[v*4+q]; bj=bjp[v*4+q]; }
+              if(bj>=0&&bj<(int)Mb->boneCount){ unsigned nd=bbm[bj]; if(nd<P->nNodes&&nd<1024&&armN[nd]) continue; }
+              sk3[ns][0]=bbd[0]*brp[v*3]+bbd[4]*brp[v*3+1]+bbd[8]*brp[v*3+2]+bbd[12]; sk3[ns][1]=y;
+              sk3[ns][2]=bbd[2]*brp[v*3]+bbd[6]*brp[v*3+1]+bbd[10]*brp[v*3+2]+bbd[14]; ns++; } }
+      int nfl=0; float room=0.f;
+      for(int p=0;p<np;p++){ S->floorR[p]=S->rr[p]*0.985f; if(!S->cone[p]) continue;
+          float th=atan2f(S->pr[p][0]-S->ax,S->pr[p][2]-S->az), best=-1.f;
+          for(int i=0;i<ns;i++){ if(fabsf(sk3[i][1]-S->pr[p][1])>hwin) continue;
+              float dx=sk3[i][0]-S->ax, dz=sk3[i][2]-S->az, dth=atan2f(dx,dz)-th;
+              while(dth>3.14159265f) dth-=6.28318531f; while(dth<-3.14159265f) dth+=6.28318531f;
+              if(fabsf(dth)>0.12f) continue;
+              float r=sqrtf(dx*dx+dz*dz); if(r>best) best=r; }
+          if(best>0.f&&best+clr<S->floorR[p]){ S->floorR[p]=best+clr; nfl++; room+=S->rr[p]*0.985f-S->floorR[p]; } }
+      printf("[skirt] %s: %d hand points; %d pelvis points may be pressed in toward the body, %.1f mm on average\n",
+             P->label,S->nhv,nfl,nfl?room/(float)nfl*1000.f:0.f); }
+    int nFreeT=0; float tmax=0.f; for(int p=0;p<np;p++) if(S->twin[p]<0&&!S->pin[p]){ nFreeT+=(S->anchor[p]>=0); if(S->tlen[p]>tmax) tmax=S->tlen[p]; }
+    printf("[skirt] %s '%s': %d verts -> %d points (%d outer, %d lining %.1f mm behind, %d single), %d edges, %d bends, "
+           "%d waistband, %d free (%d tethered, longest %.2f m), %d in the pelvis zone, %d skin points under it, normals %+.0f/%+.0f\n",
+           P->label,mnm,nv,np,nOut,nIn,S->tmed*1000.f,nSingle,S->ne,S->nb,nPin,nFree,nFreeT,tmax,S->ncone,S->nbv,S->osign,S->rsign);
+    fflush(stdout);
+    S->seeded=1;
+    return 1; }
+
+/* the skin under the cloth, this frame, in world space (and last frame's kept for the substeps between) */
+static void skBodyFrame(Skirt*S,Pack*P,M4*world,const float*model,int first){
+    if(!S->nbv) return;
+    if(!first) memcpy(S->bp0,S->bp1,sizeof(float)*3*(size_t)S->nbv);
+    static float bpal[MAXB*16]; int curM=-1;
+    for(int i=0;i<S->nbv;i++){ int m=S->bvm[i]; PMesh*Mb=&P->meshes[m];
+        if(m!=curM){ curM=m; unsigned short*bm=(unsigned short*)(P->pk+Mb->offBoneMap); float*ibm=(float*)(P->pk+Mb->offIBM);
+            for(unsigned b=0;b<Mb->boneCount;b++){ M4 pm; m4_mul(pm,world[bm[b]<P->nNodes?bm[b]:0],*(M4*)(ibm+b*16)); memcpy(bpal+b*16,pm,64); } }
+        unsigned v=S->bvv[i];
+        float*brp=(float*)(P->pk+Mb->offPos), *bnp=(float*)(P->pk+Mb->offNorm), *bbd=(float*)(P->pk+Mb->offBind);
+        unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+        float bq[3], nq[3]={0,1,0};
+        for(int k=0;k<3;k++) bq[k]=bbd[k]*brp[v*3]+bbd[4+k]*brp[v*3+1]+bbd[8+k]*brp[v*3+2]+bbd[12+k];
+        if(Mb->flags&1) for(int k=0;k<3;k++) nq[k]=bbd[k]*bnp[v*3]+bbd[4+k]*bnp[v*3+1]+bbd[8+k]*bnp[v*3+2];
+        float acc[3]={0,0,0}, nac[3]={0,0,0}, ws=0.f;
+        for(int q=0;q<4;q++){ float w=bwp[v*4+q]/255.f; if(w<=0.f) continue; const float*pm=bpal+bjp[v*4+q]*16;
+            for(int k=0;k<3;k++){ acc[k]+=w*(pm[k]*bq[0]+pm[4+k]*bq[1]+pm[8+k]*bq[2]+pm[12+k]); nac[k]+=w*(pm[k]*nq[0]+pm[4+k]*nq[1]+pm[8+k]*nq[2]); }
+            ws+=w; }
+        if(ws<1e-4f){ memcpy(acc,bq,12); memcpy(nac,nq,12); }
+        skXf(model,acc,S->bp1[i]);
+        float wn[3]; for(int k=0;k<3;k++) wn[k]=model[k]*nac[0]+model[4+k]*nac[1]+model[8+k]*nac[2];
+        float l=sqrtf(wn[0]*wn[0]+wn[1]*wn[1]+wn[2]*wn[2]); if(l<1e-12f){ wn[0]=0.f; wn[1]=1.f; wn[2]=0.f; l=1.f; }
+        for(int k=0;k<3;k++) S->bn1[i][k]=wn[k]/l; }
+    if(first) memcpy(S->bp0,S->bp1,sizeof(float)*3*(size_t)S->nbv); }
+
+/* the hands, this frame, in world space (last frame's kept for the substeps between) */
+static void skHandFrame(Skirt*S,Pack*P,M4*world,const float*model,int first){
+    if(!S->nhv) return;
+    if(!first) memcpy(S->hp0,S->hp1,sizeof(float)*3*(size_t)S->nhv);
+    static float hpal[MAXB*16]; int curM=-1;
+    for(int i=0;i<S->nhv;i++){ int m=S->hvm[i]; PMesh*Mb=&P->meshes[m];
+        if(m!=curM){ curM=m; unsigned short*bm=(unsigned short*)(P->pk+Mb->offBoneMap); float*ibm=(float*)(P->pk+Mb->offIBM);
+            for(unsigned b=0;b<Mb->boneCount;b++){ M4 pm; m4_mul(pm,world[bm[b]<P->nNodes?bm[b]:0],*(M4*)(ibm+b*16)); memcpy(hpal+b*16,pm,64); } }
+        unsigned v=S->hvv[i];
+        float*brp=(float*)(P->pk+Mb->offPos), *bbd=(float*)(P->pk+Mb->offBind);
+        unsigned char*bjp=(unsigned char*)(P->pk+Mb->offJoints), *bwp=(unsigned char*)(P->pk+Mb->offWeights);
+        float bq[3]; for(int k=0;k<3;k++) bq[k]=bbd[k]*brp[v*3]+bbd[4+k]*brp[v*3+1]+bbd[8+k]*brp[v*3+2]+bbd[12+k];
+        float acc[3]={0,0,0}, ws=0.f;
+        for(int q=0;q<4;q++){ float w=bwp[v*4+q]/255.f; if(w<=0.f) continue; const float*pm=hpal+bjp[v*4+q]*16;
+            for(int k=0;k<3;k++) acc[k]+=w*(pm[k]*bq[0]+pm[4+k]*bq[1]+pm[8+k]*bq[2]+pm[12+k]); ws+=w; }
+        if(ws<1e-4f) memcpy(acc,bq,12);
+        skXf(model,acc,S->hp1[i]); }
+    if(first) memcpy(S->hp0,S->hp1,sizeof(float)*3*(size_t)S->nhv); }
+
+/* ONE FRAME: N substeps; the waistband, the hips' frame and the body's capsules all interpolated through it */
+/* "in toward the body": the world-horizontal line from the hips' centre (a STANDING body's radial). A LYING body does
+ * not use it -- see the hand pass. */
+static int skRadial(const float*x,const float*hc,float*m){
+    float mx=x[0]-hc[0], mz=x[2]-hc[2], ml=sqrtf(mx*mx+mz*mz); if(ml<1e-6f) return 0;
+    m[0]=mx/ml; m[1]=0.f; m[2]=mz/ml; return 1; }
+static void skirtStep(Skirt*S,float dtFull,float sc,float cap1[][8],int ncap,const float*H1,const float*air){
+    Pack*P9=S->pk;
+    if(dtFull>0.034f) dtFull=0.034f;
+    if(dtFull<1e-4f) return;
+    int N=(int)ceilf(dtFull/g_skSub); if(N<2) N=2; if(N>32) N=32;
+    float h=dtFull/(float)N, gy=9.81f*sc*h*h;
+    float damp=expf(-0.4f*h);                     /* still air: a small loss */
+    /* 1/2 rho Cd / (mass per area), per world unit: twill DOUBLE-WALLED (the outer and its lining, ~450 g/m^2), Cd ~1.
+     * 3.6 (one layer) blew the coat out nearly level behind her at a 3.5 m/s run -- a cape in a gale; 1.3 trails it
+     * at ~45 degrees, the coat of someone running */
+    float cq=g_skDrag/sc;
+    float aB=g_skBend/(h*h);
+    int np=S->np, nc=(ncap<S->ncap0)?ncap:S->ncap0;
+    int contacts=0; float deep=0.f;
+    for(int s=0;s<N;s++){
+        float a0=(float)s/(float)N, a1=(float)(s+1)/(float)N;
+        for(int p=0;p<np;p++){ if(S->twin[p]>=0) continue;
+            if(S->pin[p]){ for(int k=0;k<3;k++){ S->prv[p][k]=S->tg0[p][k]+(S->tg1[p][k]-S->tg0[p][k])*a0;
+                                                 S->cur[p][k]=S->tg0[p][k]+(S->tg1[p][k]-S->tg0[p][k])*a1; } continue; }
+            float v[3]; for(int k=0;k<3;k++) v[k]=(S->cur[p][k]-S->prv[p][k])*damp;
+            /* the drag is on the cloth's speed THROUGH THE AIR: on the spot, the air of her own run comes past her */
+            { const float*n=S->nOut[p]; float vn=(v[0]-air[0]*h)*n[0]+(v[1]-air[1]*h)*n[1]+(v[2]-air[2]*h)*n[2];
+              float keep=1.f/(1.f+cq*fabsf(vn));       /* implicit quadratic drag: v -> v/(1+cq|v|h), v in u per substep */
+              for(int k=0;k<3;k++) v[k]-=n[k]*vn*(1.f-keep); }
+            for(int k=0;k<3;k++) S->prv[p][k]=S->cur[p][k];
+            S->cur[p][0]+=v[0]; S->cur[p][1]+=v[1]-gy; S->cur[p][2]+=v[2]; }
+        /* the cloth does not stretch */
+        for(int e=0;e<S->ne;e++){ int i=S->e0[e], j=S->e1[e];
+            float d[3]; for(int k=0;k<3;k++) d[k]=S->cur[j][k]-S->cur[i][k];
+            float L=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(L<1e-9f) continue;
+            float wi=S->pin[i]?0.f:1.f, wj=S->pin[j]?0.f:1.f, ws=wi+wj; if(ws<=0.f) continue;
+            float c=(L-S->elen[e]*sc)/(L*ws);
+            for(int k=0;k<3;k++){ S->cur[i][k]+=wi*c*d[k]; S->cur[j][k]-=wj*c*d[k]; } }
+        /* it resists folding, softly */
+        for(int e=0;e<S->nb;e++){ int i=S->b0[e], j=S->b1[e];
+            float d[3]; for(int k=0;k<3;k++) d[k]=S->cur[j][k]-S->cur[i][k];
+            float L=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(L<1e-9f) continue;
+            float wi=S->pin[i]?0.f:1.f, wj=S->pin[j]?0.f:1.f, ws=wi+wj; if(ws<=0.f) continue;
+            float dl=-(L-S->blen[e]*sc)/(ws+aB);
+            for(int k=0;k<3;k++){ float n=d[k]/L; S->cur[i][k]-=wi*n*dl; S->cur[j][k]+=wj*n*dl; } }
+        /* and a hem is never further from the waistband than its cloth reaches */
+        for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]) continue; int a=S->anchor[p]; if(a<0) continue;
+            float d[3]; for(int k=0;k<3;k++) d[k]=S->cur[p][k]-S->cur[a][k];
+            float L=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]), Lm=S->tlen[p]*sc;
+            if(L>Lm&&L>1e-9f){ float f=Lm/L; for(int k=0;k<3;k++) S->cur[p][k]=S->cur[a][k]+d[k]*f; } }
+        /* the hips' frame at this instant */
+        float Hm[16]; for(int k=0;k<16;k++) Hm[k]=S->H0[k]+(H1[k]-S->H0[k])*a1;
+        /* out of the body, where the body is at this instant -- last, so it wins. Four passes, in this order:
+         *  0 THE HIPS HOLD IT OUT: in the hips' rest frame, never nearer their axis than it was cut,
+         *  1 THE HANDS press it IN toward the body (an arm is outside the skirt), down to the skin under a pelvis
+         *    point and no further -- after the hips, so a hand on the hip wins over the cut; the old arm capsules
+         *    (REVA_SKARMS) run here too, opt-in,
+         *  2 THE SKIN UNDER IT: off the nearest back-facing skin point's tangent plane by the undersuit and the wall,
+         *  3 THE LEGS -- each pushes the cloth out of itself the shortest way.
+         * Every push is a MOVE, never a throw: the velocity it would add off the surface is taken back out. */
+        /* ⭐ THE FLOOR (10-18): nothing goes below the plane the body stands or lies on -- a boy's shift in a warming
+         * pan falls onto the pan and stays there. Inelastic, with the same friction as every contact. FIRST, so the
+         * body's passes have the last word: where the cloth is SQUEEZED between a body lying on it and the floor, it
+         * goes out of the body (and under the floor, where nobody sees it) instead of fighting both every substep. */
+        { float fy=S->floorY+0.002f*sc;
+          for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]||S->cur[p][1]>=fy) continue;
+            float pen=fy-S->cur[p][1]; S->cur[p][1]=fy;
+            float rx=S->cur[p][0]-S->prv[p][0], rz=S->cur[p][2]-S->prv[p][2], lt=sqrtf(rx*rx+rz*rz);
+            if(lt>1e-9f){ float f=(lt<g_skMuS*pen)?1.f:fminf(g_skMuK*pen/lt,1.f); S->cur[p][0]-=rx*f; S->cur[p][2]-=rz*f; }
+            if(S->cur[p][1]>S->prv[p][1]) S->prv[p][1]=S->cur[p][1];
+            contacts++; } }
+        for(int pass=0;pass<4;pass++){
+          if(pass==2){
+            if(S->nbv&&g_skSkin){ float rad=0.05f*sc, clr=(0.008f+S->tmed)*sc, inv=1.f/rad;
+                static int head[4096]; static int nxt[SK_BODYMAX]; static float bpI[SK_BODYMAX][3];
+                for(int hh9=0;hh9<4096;hh9++) head[hh9]=-1;
+                for(int i=0;i<S->nbv;i++){
+                    for(int k=0;k<3;k++) bpI[i][k]=S->bp0[i][k]+(S->bp1[i][k]-S->bp0[i][k])*a1;
+                    int cx=(int)floorf(bpI[i][0]*inv), cy=(int)floorf(bpI[i][1]*inv), cz=(int)floorf(bpI[i][2]*inv);
+                    unsigned hh9=((unsigned)cx*73856093u^(unsigned)cy*19349663u^(unsigned)cz*83492791u)&4095u; nxt[i]=head[hh9]; head[hh9]=i; }
+                for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]||!S->back[p]) continue; float*x=S->cur[p];
+                    int cx=(int)floorf(x[0]*inv), cy=(int)floorf(x[1]*inv), cz=(int)floorf(x[2]*inv), best=-1; float bd=rad*rad;
+                    for(int dz=-1;dz<=1;dz++) for(int dy=-1;dy<=1;dy++) for(int dx=-1;dx<=1;dx++){
+                        unsigned hh9=((unsigned)(cx+dx)*73856093u^(unsigned)(cy+dy)*19349663u^(unsigned)(cz+dz)*83492791u)&4095u;
+                        for(int i=head[hh9];i>=0;i=nxt[i]){ float ex=x[0]-bpI[i][0], ey=x[1]-bpI[i][1], ez=x[2]-bpI[i][2], d2=ex*ex+ey*ey+ez*ez;
+                            if(d2<bd){ bd=d2; best=i; } } }
+                    if(best<0) continue;
+                    const float*bn=S->bn1[best];
+                    float d=(x[0]-bpI[best][0])*bn[0]+(x[1]-bpI[best][1])*bn[1]+(x[2]-bpI[best][2])*bn[2];
+                    float clrP=clr-S->allowS[p]*sc; if(d>=clrP) continue;
+                    if(d<clrP-1.5f*clr) continue;   /* deep under one point's plane is a wrong plane, not a contact */
+                    float push=clrP-d;
+                    { static int dbg9=-1, said9=0; if(dbg9<0){ const char*e=getenv("REVA_SKIRTDBG"); dbg9=(e&&e[0]=='2'); }
+                      if(dbg9&&push>0.015f*sc&&said9<40){ said9++; PMesh*Mb=&P9->meshes[S->bvm[best]];
+                        printf("[skirtdbg] skin push %.1f mm: point %d (rest y %.3f, pin %d cone %d) <- skin '%s' v%u at (%.3f %.3f %.3f) n (%.2f %.2f %.2f) d %.1f mm\n",
+                               push/sc*1000.f,p,S->pr[p][1],S->pin[p],S->cone[p],packStr(P9,Mb->name),S->bvv[best],
+                               bpI[best][0],bpI[best][1],bpI[best][2],bn[0],bn[1],bn[2],d/sc*1000.f); } }
+                    for(int k=0;k<3;k++) x[k]+=bn[k]*push;
+                    /* inelastic, as below: put back on the skin, never thrown off it */
+                    float r2[3]; for(int k=0;k<3;k++) r2[k]=(x[k]-S->prv[p][k])-(S->bp1[best][k]-S->bp0[best][k])/(float)N;
+                    float vn=r2[0]*bn[0]+r2[1]*bn[1]+r2[2]*bn[2]; if(vn>0.f) for(int k=0;k<3;k++) S->prv[p][k]+=bn[k]*vn;
+                    contacts++; if(push>deep) deep=push; } }
+            continue; }
+          if(pass==0){
+            if(S->ncone&&g_skCone){ float Hi[16];
+                if(skInv(Hm,Hi)) for(int p=0;p<np;p++){ if(!S->cone[p]) continue;
+                    float r[3]; skXf(Hi,S->cur[p],r);
+                    float rx=r[0]-S->ax, rz=r[2]-S->az, rad=sqrtf(rx*rx+rz*rz), want=S->rr[p]*0.985f;
+                    if(rad<want&&rad>1e-6f){ float f=want/rad, xo[3]={S->cur[p][0],S->cur[p][1],S->cur[p][2]};
+                        r[0]=S->ax+rx*f; r[2]=S->az+rz*f; skXf(Hm,r,S->cur[p]);
+                        /* a move, not a throw: and it no longer heads INTO her */
+                        float dn[3]={S->cur[p][0]-xo[0],S->cur[p][1]-xo[1],S->cur[p][2]-xo[2]}, dl=sqrtf(dn[0]*dn[0]+dn[1]*dn[1]+dn[2]*dn[2]);
+                        for(int k=0;k<3;k++) S->prv[p][k]+=dn[k];
+                        if(dl>1e-9f){ float vel[3]={S->cur[p][0]-S->prv[p][0],S->cur[p][1]-S->prv[p][1],S->cur[p][2]-S->prv[p][2]};
+                            float vn=(vel[0]*dn[0]+vel[1]*dn[1]+vel[2]*dn[2])/dl; if(vn<0.f) for(int k=0;k<3;k++) S->prv[p][k]+=dn[k]/dl*vn; } } } }
+            continue; }
+          if(pass==1&&S->nhv&&g_skHands){ float rh=(0.006f+S->tmed)*sc;      /* off the hand's own skin: a hair and the wall */
+            static float hpI[SK_HANDMAX][3]; float lo[3]={1e9f,1e9f,1e9f}, hi[3]={-1e9f,-1e9f,-1e9f};
+            for(int i=0;i<S->nhv;i++) for(int k=0;k<3;k++){ hpI[i][k]=S->hp0[i][k]+(S->hp1[i][k]-S->hp0[i][k])*a1;
+                if(hpI[i][k]-rh<lo[k]) lo[k]=hpI[i][k]-rh; if(hpI[i][k]+rh>hi[k]) hi[k]=hpI[i][k]+rh; }
+            float hc[3]; { float h3[3]={S->ax,S->ay,S->az}; skXf(Hm,h3,hc); }
+            float Hi[16]; int hasHi=skInv(Hm,Hi);
+            /* ⭐ A LYING BODY'S HANDS ARE SOLID, NOT PRESSING (10-18). "Press the coat IN toward the body" is a hand on a
+             * STANDING body's hip, gravity holding the cloth against it. A boy lying in a warming pan with his hands on the
+             * pan beside his thighs is a different contact: along the world line it dragged his shift up toward his waist,
+             * and along his own radial it drove the drape into his thighs against the leg capsules (stretch x8). Lying (the
+             * hips' up more than 60 degrees off the world's), cloth goes OUT of the hand the shortest way. */
+            int lying9=0; { float hl=sqrtf(Hm[4]*Hm[4]+Hm[5]*Hm[5]+Hm[6]*Hm[6]); if(hl>1e-9f&&fabsf(Hm[5]/hl)<0.5f) lying9=1; }
+            for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]) continue; float*x=S->cur[p];
+                if(x[0]<lo[0]||x[0]>hi[0]||x[1]<lo[1]||x[1]>hi[1]||x[2]<lo[2]||x[2]>hi[2]) continue;
+                float m[3]={0.f,1.f,0.f}; if(!lying9&&!skRadial(x,hc,m)) continue;
+                float xo[3]={x[0],x[1],x[2]}; int hit=0;
+                for(int i=0;i<S->nhv;i++){
+                    float d[3]={x[0]-hpI[i][0],x[1]-hpI[i][1],x[2]-hpI[i][2]}, d2=d[0]*d[0]+d[1]*d[1]+d[2]*d[2];
+                    if(d2>=rh*rh) continue;
+                    if(lying9){ float dl=sqrtf(d2), nn[3]={0.f,1.f,0.f};       /* out of the hand, the shortest way */
+                        if(dl>1e-6f){ nn[0]=d[0]/dl; nn[1]=d[1]/dl; nn[2]=d[2]/dl; }
+                        for(int k=0;k<3;k++) x[k]+=nn[k]*(rh-dl); hit=1; continue; }
+                    float dm=d[0]*m[0]+d[2]*m[2], s2=dm+sqrtf(fmaxf(rh*rh-(d2-dm*dm),0.f));   /* in along the radial, out of the sphere's far side */
+                    if(s2>0.f){ x[0]-=m[0]*s2; x[2]-=m[2]*s2; hit=1; } }
+                if(!hit) continue;
+                if(!lying9&&S->cone[p]&&hasHi){ float r[3]; skXf(Hi,x,r);        /* no deeper than the body under it */
+                    float rx=r[0]-S->ax, rz=r[2]-S->az, rad=sqrtf(rx*rx+rz*rz);
+                    if(rad<S->floorR[p]&&rad>1e-6f){ float f=S->floorR[p]/rad; r[0]=S->ax+rx*f; r[2]=S->az+rz*f; skXf(Hm,r,x); } }
+                float dn[3]={x[0]-xo[0],x[1]-xo[1],x[2]-xo[2]}, dl=sqrtf(dn[0]*dn[0]+dn[1]*dn[1]+dn[2]*dn[2]);
+                for(int k=0;k<3;k++) S->prv[p][k]+=dn[k];                          /* moved, not thrown */
+                if(dl>1e-9f){ float vel[3]={x[0]-S->prv[p][0],x[1]-S->prv[p][1],x[2]-S->prv[p][2]};
+                    float vn=(vel[0]*dn[0]+vel[1]*dn[1]+vel[2]*dn[2])/dl; if(vn<0.f) for(int k=0;k<3;k++) S->prv[p][k]+=dn[k]/dl*vn; }
+                contacts++; if(dl>deep) deep=dl; }
+            /* ⭐ AND THE HAND'S SKIN AGAINST THE CLOTH'S TRIANGLES (10-18). A finger is thinner than the gap between two
+             * cloth points (2-3 cm): pushed only point by point, her fingertips came through the coat at the hip as
+             * islands. Every hand point stays rh OUTSIDE (along the way out from the hips) any outer triangle it lies
+             * over; the triangle's corners go in by their barycentric share, moved, not thrown. A hand point far BEHIND
+             * a triangle (the open front's panel swinging past a hand in the gap) is not this contact. */
+            if(!lying9) for(int t=0;t<S->nt;t++){ int ia=S->tri[t][0], ib=S->tri[t][1], ic=S->tri[t][2];
+                float*A=S->cur[ia], *B=S->cur[ib], *C=S->cur[ic];
+                float tl[3],tu[3]; for(int k=0;k<3;k++){ tl[k]=fminf(A[k],fminf(B[k],C[k]))-rh; tu[k]=fmaxf(A[k],fmaxf(B[k],C[k]))+rh; }
+                if(tu[0]<lo[0]||tl[0]>hi[0]||tu[1]<lo[1]||tl[1]>hi[1]||tu[2]<lo[2]||tl[2]>hi[2]) continue;
+                float iA=S->pin[ia]?0.f:1.f, iB=S->pin[ib]?0.f:1.f, iC=S->pin[ic]?0.f:1.f;
+                if(iA+iB+iC<=0.f) continue;
+                for(int i=0;i<S->nhv;i++){ const float*c=hpI[i];
+                    if(c[0]<tl[0]||c[0]>tu[0]||c[1]<tl[1]||c[1]>tu[1]||c[2]<tl[2]||c[2]>tu[2]) continue;
+                    float u,v,w; skClosestTri(c,A,B,C,&u,&v,&w);
+                    float q[3]; for(int k=0;k<3;k++) q[k]=u*A[k]+v*B[k]+w*C[k];
+                    float m[3]; if(!skRadial(q,hc,m)) continue;
+                    float d[3]={c[0]-q[0],c[1]-q[1],c[2]-q[2]};
+                    float sd=d[0]*m[0]+d[2]*m[2], dp2=d[0]*d[0]+d[1]*d[1]+d[2]*d[2]-sd*sd;
+                    if(dp2>rh*rh||sd>=rh||sd<-3.f*rh) continue;
+                    float den=u*u*iA+v*v*iB+w*w*iC; if(den<1e-6f) continue;
+                    float push=(rh-sd)/den, gA=u*iA*push, gB=v*iB*push, gC=w*iC*push;
+                    for(int k=0;k<3;k++){ float dk=m[k];
+                        A[k]-=dk*gA; S->prv[ia][k]-=dk*gA; B[k]-=dk*gB; S->prv[ib][k]-=dk*gB; C[k]-=dk*gC; S->prv[ic][k]-=dk*gC; }
+                    contacts++; } }
+            /* ⭐ A LYING BODY'S HAND AGAINST THE CLOTH'S TRIANGLES (10-18, second round). jacob, on Viktor asleep in the
+             * pan with his hands beside his thighs: "more collision issues, this should be simple, shouldnt be hapeneing,
+             * if collision was working right". The lying hand pass pushed cloth POINTS out of the hand, and a finger is
+             * thinner than the 2-3 cm between two of them: the hem of his shift ran through his fingers. Every hand point
+             * now stays rh off any outer triangle near it, the triangle moved AWAY from it the shortest way -- over a hand
+             * lying under the hem, under a hand resting on top -- by its corners' barycentric shares, moved, not thrown.
+             * REVA_SKLYTRI=0 is the control. */
+            { static int lt9=-1; if(lt9<0){ const char*e=getenv("REVA_SKLYTRI"); lt9=!(e&&e[0]=='0'); }
+              if(lying9&&lt9) for(int t=0;t<S->nt;t++){ int ia=S->tri[t][0], ib=S->tri[t][1], ic=S->tri[t][2];
+                float*A=S->cur[ia], *B=S->cur[ib], *C=S->cur[ic];
+                float tl[3],tu[3]; for(int k=0;k<3;k++){ tl[k]=fminf(A[k],fminf(B[k],C[k]))-rh; tu[k]=fmaxf(A[k],fmaxf(B[k],C[k]))+rh; }
+                if(tu[0]<lo[0]||tl[0]>hi[0]||tu[1]<lo[1]||tl[1]>hi[1]||tu[2]<lo[2]||tl[2]>hi[2]) continue;
+                float iA=S->pin[ia]?0.f:1.f, iB=S->pin[ib]?0.f:1.f, iC=S->pin[ic]?0.f:1.f;
+                if(iA+iB+iC<=0.f) continue;
+                for(int i=0;i<S->nhv;i++){ const float*c=hpI[i];
+                    if(c[0]<tl[0]||c[0]>tu[0]||c[1]<tl[1]||c[1]>tu[1]||c[2]<tl[2]||c[2]>tu[2]) continue;
+                    float u,v,w; skClosestTri(c,A,B,C,&u,&v,&w);
+                    float q[3]; for(int k=0;k<3;k++) q[k]=u*A[k]+v*B[k]+w*C[k];
+                    float d[3]={q[0]-c[0],q[1]-c[1],q[2]-c[2]}, dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+                    if(dl>=rh) continue;
+                    float n[3];
+                    if(dl>1e-7f){ n[0]=d[0]/dl; n[1]=d[1]/dl; n[2]=d[2]/dl; }
+                    else { float e1[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]}, e2[3]={C[0]-A[0],C[1]-A[1],C[2]-A[2]};   /* ON it: up */
+                        n[0]=e1[1]*e2[2]-e1[2]*e2[1]; n[1]=e1[2]*e2[0]-e1[0]*e2[2]; n[2]=e1[0]*e2[1]-e1[1]*e2[0];
+                        float nl=sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]); if(nl<1e-12f) continue;
+                        if(n[1]<0.f) nl=-nl; for(int k=0;k<3;k++) n[k]/=nl; }
+                    float den=u*u*iA+v*v*iB+w*w*iC; if(den<1e-6f) continue;
+                    float push=(rh-dl)/den, gA=u*iA*push, gB=v*iB*push, gC=w*iC*push;
+                    for(int k=0;k<3;k++){ float dk=n[k];
+                        A[k]+=dk*gA; S->prv[ia][k]+=dk*gA; B[k]+=dk*gB; S->prv[ib][k]+=dk*gB; C[k]+=dk*gC; S->prv[ic][k]+=dk*gC; }
+                    contacts++; } } }
+            /* and no corner deeper than the body under it */
+            if(hasHi&&!lying9) for(int p=0;p<np;p++){ if(!S->cone[p]) continue; float r[3]; skXf(Hi,S->cur[p],r);
+                float rx=r[0]-S->ax, rz=r[2]-S->az, rad=sqrtf(rx*rx+rz*rz);
+                if(rad<S->floorR[p]&&rad>1e-6f){ float f=S->floorR[p]/rad, xo[3]={S->cur[p][0],S->cur[p][1],S->cur[p][2]};
+                    r[0]=S->ax+rx*f; r[2]=S->az+rz*f; skXf(Hm,r,S->cur[p]);
+                    for(int k=0;k<3;k++) S->prv[p][k]+=S->cur[p][k]-xo[k]; } } }
+          if(pass==1&&!g_skArms) continue;
+          for(int c=0;c<nc;c++){
+            int arm=((int)cap1[c][7])%6>=3; if(arm!=(pass==1)) continue;   /* pass 1 the arm capsules (opt-in), pass 3 the legs */
+            float A[3],B[3],Ap[3],Bp[3], r=cap1[c][6];
+            for(int k=0;k<3;k++){ A[k]=S->cap0[c][k]+(cap1[c][k]-S->cap0[c][k])*a1;   B[k]=S->cap0[c][3+k]+(cap1[c][3+k]-S->cap0[c][3+k])*a1;
+                                  Ap[k]=S->cap0[c][k]+(cap1[c][k]-S->cap0[c][k])*a0;  Bp[k]=S->cap0[c][3+k]+(cap1[c][3+k]-S->cap0[c][3+k])*a0; }
+            float e[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]}, e2=e[0]*e[0]+e[1]*e[1]+e[2]*e[2];
+            float lo[3],hi[3]; for(int k=0;k<3;k++){ lo[k]=fminf(A[k],B[k])-r; hi[k]=fmaxf(A[k],B[k])+r; }
+            for(int p=0;p<np;p++){ if(S->twin[p]>=0||S->pin[p]) continue; float*x=S->cur[p];
+                if(x[0]<lo[0]||x[0]>hi[0]||x[1]<lo[1]||x[1]>hi[1]||x[2]<lo[2]||x[2]>hi[2]) continue;
+                float t=(e2>1e-12f)?((x[0]-A[0])*e[0]+(x[1]-A[1])*e[1]+(x[2]-A[2])*e[2])/e2:0.f;
+                if(t<0.f) t=0.f; if(t>1.f) t=1.f;
+                float q[3]={A[0]+e[0]*t,A[1]+e[1]*t,A[2]+e[2]*t};
+                float d[3]={x[0]-q[0],x[1]-q[1],x[2]-q[2]}, dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+                float rP=r-S->allowC[p]*sc; if(dl>=rP) continue;      /* its own rest allowance comes off */
+                float n[3];
+                if(dl>1e-7f){ n[0]=d[0]/dl; n[1]=d[1]/dl; n[2]=d[2]/dl; } else memcpy(n,S->nOut[p],12);
+                float xo[3]={x[0],x[1],x[2]};
+                for(int k=0;k<3;k++) x[k]=q[k]+n[k]*rP;
+                float pen=sqrtf((x[0]-xo[0])*(x[0]-xo[0])+(x[1]-xo[1])*(x[1]-xo[1])+(x[2]-xo[2])*(x[2]-xo[2]));
+                /* ⭐ FRICTION (Macklin et al. 2014): this substep's slide across the surface, against the surface's own
+                 * motion under it, is cancelled while short against the push and shortened when long -- so the knee
+                 * that lifts the cloth carries it */
+                float dm[3]; for(int k=0;k<3;k++) dm[k]=q[k]-(Ap[k]+(Bp[k]-Ap[k])*t);   /* the surface under it moved this */
+                float rel[3]; for(int k=0;k<3;k++) rel[k]=(x[k]-S->prv[p][k])-dm[k];
+                float rn=rel[0]*n[0]+rel[1]*n[1]+rel[2]*n[2];
+                float rt[3]={rel[0]-n[0]*rn,rel[1]-n[1]*rn,rel[2]-n[2]*rn}, lt=sqrtf(rt[0]*rt[0]+rt[1]*rt[1]+rt[2]*rt[2]);
+                if(lt>1e-9f){ float f=(lt<g_skMuS*pen)?1.f:fminf(g_skMuK*pen/lt,1.f); for(int k=0;k<3;k++) x[k]-=rt[k]*f; }
+                /* ⭐ INELASTIC: the push puts the cloth back ON the surface, it does not throw it. Whatever speed off the
+                 * surface the correction gave it beyond the surface's own is taken back out of its velocity (prv moves
+                 * with it): a 30 mm correction in a 2 ms substep is 15 m/s, and that flung the coat over her shoulders */
+                { float r2[3]; for(int k=0;k<3;k++) r2[k]=(x[k]-S->prv[p][k])-dm[k];
+                  float vn=r2[0]*n[0]+r2[1]*n[1]+r2[2]*n[2];
+                  if(vn>0.f) for(int k=0;k<3;k++) S->prv[p][k]+=n[k]*vn; }
+                contacts++; if(pen>deep) deep=pen; } } } }
+    /* ⛔ A POINT THAT WENT NON-FINITE is put back on its waistband anchor, and it is SAID: one NaN is a spike to the
+     * edge of the frame (a triangle with a vertex at infinity), and a quiet fix would hide the pass that made it */
+    { int bad=0; for(int p=0;p<np;p++){ if(S->twin[p]>=0) continue;
+        if(isfinite(S->cur[p][0])&&isfinite(S->cur[p][1])&&isfinite(S->cur[p][2])) continue;
+        int a=S->anchor[p]; const float*o=(a>=0&&isfinite(S->cur[a][1]))?S->cur[a]:S->tg1[0];
+        memcpy(S->cur[p],o,12); memcpy(S->prv[p],o,12); bad++; }
+      if(bad){ static int said9=0; if(said9++<8){ printf("[skirt] %s: %d point(s) went NON-FINITE this step -- put back on the waistband\n",P9->label,bad); fflush(stdout); } } }
+    g_skContacts=contacts; g_skDeep=deep/sc;
+    { float ws=0.f; S->worstE=-1; for(int e=0;e<S->ne;e++){ int i=S->e0[e], j=S->e1[e];
+          float dx=S->cur[j][0]-S->cur[i][0], dy=S->cur[j][1]-S->cur[i][1], dz=S->cur[j][2]-S->cur[i][2];
+          float r=sqrtf(dx*dx+dy*dy+dz*dz)/(S->elen[e]*sc+1e-12f); if(r>ws){ ws=r; S->worstE=e; } }
+      g_skStretch=ws; }
+    for(int p=0;p<np;p++) if(S->twin[p]<0&&S->pin[p]) memcpy(S->tg0[p],S->tg1[p],12);
+    memcpy(S->cap0,cap1,sizeof(float)*8*(size_t)ncap); S->ncap0=ncap; memcpy(S->H0,H1,64); }
+
+/* the clothPrep hook for a skirt: returns 2 when it drew the mesh from its own buffers (the caller binds g_skVbo) */
+static int skirtPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world,
+                     GLint uModel,GLint uPal,GLint uBind,GLint uDqS){
+    if(g_skirtSim<0){ const char*e=getenv("REVA_SKIRTSIM"); g_skirtSim=!(e&&e[0]=='0');
+        const char*b=getenv("REVA_SKBEND"); if(b&&*b) g_skBend=(float)atof(b);
+        const char*a=getenv("REVA_SKARMS"); if(a&&*a) g_skArms=atoi(a);
+        g_skDbg=getenv("REVA_SKIRTDBG")?1:0;
+        { const char*o9=getenv("REVA_SKHANDS"); if(o9&&o9[0]=='0') g_skHands=0; o9=getenv("REVA_SKAIR"); if(o9&&o9[0]=='0') g_skAir=0;
+          o9=getenv("REVA_SKDRAG"); if(o9&&*o9) g_skDrag=(float)atof(o9); o9=getenv("REVA_SKSUB"); if(o9&&*o9) g_skSub=(float)atof(o9); o9=getenv("REVA_SKLEGM"); if(o9&&*o9) g_skLegM=(float)atof(o9); o9=getenv("REVA_SKLEGR"); if(o9&&*o9) g_skLegR=(float)atof(o9); }
+        { const char*e9=getenv("REVA_SKSKIN"); if(e9&&e9[0]=='0') g_skSkin=0; e9=getenv("REVA_SKCONE"); if(e9&&e9[0]=='0') g_skCone=0;
+          e9=getenv("REVA_SKMU"); if(e9&&*e9){ g_skMuS=(float)atof(e9); const char*c9=strchr(e9,','); g_skMuK=c9?(float)atof(c9+1):g_skMuS*0.7f; } }
+        printf("[skirt] hanging cloth: %s (bend compliance %.1e, hands %s, arm capsules %s, the air of the run %s)\n",
+               g_skirtSim?"ON -- every ~skirt~ on a VertexCollide pack is simulated":"OFF (REVA_SKIRTSIM=0): the shader drape",
+               g_skBend,g_skHands?"on":"off",g_skArms?"on":"off",g_skAir?"on":"off"); fflush(stdout); }
+    if(g_vcolOn<0){ const char*e=getenv("REVA_VCOLLIDE"); g_vcolOn=!(e&&e[0]=='0');
+        printf("[vcol] per-vertex collision: %s\n",g_vcolOn?"ON (packs with a VertexCollide node)":"OFF (REVA_VCOLLIDE=0)"); fflush(stdout); }
+    if(!g_skirtSim||!P->vcol||g_vcolOn==0) return 0;
+    PMesh*M=&P->meshes[mi];
+    const char*nm=packStr(P,M->name); if(!nm||!strstr(nm,"~skirt~")) return 0;
+    Skirt*S=NULL;
+    for(int i=0;i<SK_POOL;i++) if(g_sk[i].pk==P&&g_sk[i].mesh==(int)mi&&g_sk[i].slot==slot){ S=&g_sk[i]; break; }
+    if(!S){ int pick=-1; unsigned old=0xffffffffu;
+        for(int i=0;i<SK_POOL;i++){ if(!g_sk[i].pk){ pick=i; break; } if(g_sk[i].used<old){ old=g_sk[i].used; pick=i; } }
+        S=&g_sk[pick]; S->pk=NULL; S->seeded=0; S->slot=slot; S->stamp=0; S->shStamp=0; }
+    if(S->seeded<0) return 0;                       /* refused once, and said why */
+    S->used=g_frameStamp;
+    float*rp=(float*)(P->pk+M->offPos), *bd=(float*)(P->pk+M->offBind);
+    unsigned char*jp=(unsigned char*)(P->pk+M->offJoints), *wp=(unsigned char*)(P->pk+M->offWeights);
+    unsigned*ix=(unsigned*)(P->pk+M->offIdx);
+    float sc=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]);
+    if(S->pk!=P||S->mesh!=(int)mi||!S->seeded){ S->slot=slot; if(!skirtInit(S,P,mi)) return 0; S->stamp=0; }
+    S->floorY=model[13]+P->mny*sc;
+    if(S->stamp!=g_frameStamp){ S->stamp=g_frameStamp;
+        /* where the waistband is this frame: its own skin */
+        for(int p=0;p<S->np;p++){ if(S->twin[p]>=0||!S->pin[p]) continue; int v=S->rep[p];
+            float b3[3]; for(int k=0;k<3;k++) b3[k]=bd[k]*rp[v*3]+bd[4+k]*rp[v*3+1]+bd[8+k]*rp[v*3+2]+bd[12+k];
+            float acc[3]={0,0,0}, ws=0.f;
+            for(int q=0;q<4;q++){ float w=wp[v*4+q]/255.f; if(w<=0.f) continue; const float*pm=pal+jp[v*4+q]*16;
+                for(int k=0;k<3;k++) acc[k]+=w*(pm[k]*b3[0]+pm[4+k]*b3[1]+pm[8+k]*b3[2]+pm[12+k]); ws+=w; }
+            if(ws<1e-4f) memcpy(acc,b3,12);
+            skXf(model,acc,S->tg1[p]); }
+        /* the hips: rest -> world this frame */
+        float H1[16]; { int hp=P->pb[0]; M4 t9;
+            if(hp>=0){ m4_mul(t9,model,world[hp]); m4_mul(H1,t9,S->h0inv); } else memcpy(H1,model,64); }
+        float caps[SK_NCAP][8]; int nc=skCaps(P,world,model,sc,S->tmed,S->legM,caps);
+        skBodyFrame(S,P,world,model,!S->warm);
+        skHandFrame(S,P,world,model,!S->warm);
+        /* ⭐ THE AIR OF HER OWN RUN (10-18). On the bench she runs on the spot, so nothing carried her coat through the
+         * air and nothing streamed it back: the knees kicked the panels wide and they hung there. The planted foot
+         * says how fast the ground is going under her -- on the spot it slides back at the run's speed, on a path it
+         * stands still -- so the air comes past her at exactly that, and a body really travelling gets no double. */
+        { int fn[2]={P->footL,P->footR}; float fp[2][3], dt9=(float)g_chDt;
+          for(int k=0;k<2;k++){ float o3[3]={0.f,0.f,0.f}; if(fn[k]>=0){ o3[0]=world[fn[k]][12]; o3[1]=world[fn[k]][13]; o3[2]=world[fn[k]][14]; } skXf(model,o3,fp[k]); }
+          if(!g_skAir||fn[0]<0||fn[1]<0){ S->air[0]=S->air[1]=S->air[2]=0.f; }
+          else if(S->fwarm&&S->warm&&dt9>1e-4f){
+              int lo=(fp[0][1]<fp[1][1])?0:1; float low=fp[lo][1];
+              if(low<S->fground) S->fground=low; else S->fground+=(low-S->fground)*fminf(1.f,dt9*0.5f);   /* the floor, followed slowly up */
+              if(low<S->fground+0.05f*sc){ float a=1.f-expf(-dt9/0.30f);
+                  float vx=(fp[lo][0]-S->fprev[lo][0])/dt9, vz=(fp[lo][2]-S->fprev[lo][2])/dt9;
+                  S->air[0]+=(vx-S->air[0])*a; S->air[2]+=(vz-S->air[2])*a; S->air[1]=0.f; }
+              { static int d9=-1, n9=0; if(d9<0){ const char*e=getenv("REVA_SKIRTDBG"); d9=(e&&e[0]=='3'); }
+                if(d9&&(g_frameStamp%15u)==0u&&n9<400){ n9++; printf("[skairdbg] %s f%u feet y %.3f %.3f x %.3f %.3f z %.3f %.3f low %d ground %.3f dt %.4f air %.3f %.3f\n",
+                    P->label,g_frameStamp,fp[0][1],fp[1][1],fp[0][0],fp[1][0],fp[0][2],fp[1][2],lo,S->fground,dt9,S->air[0],S->air[2]); } } }
+          else { S->fground=fminf(fp[0][1],fp[1][1]); S->air[0]=S->air[1]=S->air[2]=0.f; }
+          memcpy(S->fprev,fp,sizeof fp); S->fwarm=1; }
+        float jump=0.f;
+        if(S->warm) for(int p=0;p<S->np;p++){ if(S->twin[p]>=0||!S->pin[p]) continue;
+            float dx=S->tg1[p][0]-S->tg0[p][0], dy=S->tg1[p][1]-S->tg0[p][1], dz=S->tg1[p][2]-S->tg0[p][2], d=sqrtf(dx*dx+dy*dy+dz*dz);
+            if(d>jump) jump=d; }
+        if(!S->warm||jump>0.5f*sc){
+            /* ⭐ HUNG IN ITS CUT, THEN THE PRE-ROLL: the coat on the hips as it was cut, the body from REST into this
+             * frame's pose over half a second of its own time -- every limb arrives under the cloth from where it
+             * hangs at rest, never starting through it */
+            if(S->warm) printf("[skirt] %s: the body jumped %.2f u in a frame -- the coat is re-hung\n",P->label,jump);
+            for(int p=0;p<S->np;p++){ float w9[3]; skXf(H1,S->pr[p],w9);
+                memcpy(S->cur[p],w9,12); memcpy(S->prv[p],w9,12); if(!(S->twin[p]<0&&S->pin[p])) memcpy(S->tg0[p],w9,12); }
+            for(int p=0;p<S->np;p++) if(S->twin[p]<0&&S->pin[p]){ memcpy(S->cur[p],S->tg1[p],12); memcpy(S->prv[p],S->tg1[p],12); memcpy(S->tg0[p],S->tg1[p],12); }
+            static M4 RW[1024]; skRestFK(P,RW);
+            float capR[SK_NCAP][8]; int ncr=skCaps(P,RW,H1,sc,S->tmed,S->legM,capR);
+            memcpy(S->cap0,capR,sizeof(float)*8*(size_t)ncr); S->ncap0=ncr; memcpy(S->H0,H1,64);
+            /* the skin too: from rest (on these hips) into this frame's pose */
+            static float bpR[SK_BODYMAX][3], bpC[SK_BODYMAX][3]; size_t bsz=sizeof(float)*3*(size_t)S->nbv;
+            skBodyFrame(S,P,RW,H1,1); memcpy(bpR,S->bp1,bsz);
+            skBodyFrame(S,P,world,model,1); memcpy(bpC,S->bp1,bsz);
+            static float hpR[SK_HANDMAX][3], hpC[SK_HANDMAX][3]; size_t hsz=sizeof(float)*3*(size_t)S->nhv;   /* the hands too */
+            skHandFrame(S,P,RW,H1,1); memcpy(hpR,S->hp1,hsz);
+            skHandFrame(S,P,world,model,1); memcpy(hpC,S->hp1,hsz);
+            static const float still9[3]={0.f,0.f,0.f};
+            skNormals(S,ix,M->idxCount,sc);
+            const int PRE=30; float capI[SK_NCAP][8], up=0.f;
+            for(int f=1;f<=PRE;f++){ float u=(float)f/(float)PRE; u=u*u*(3.f-2.f*u);
+                for(int c=0;c<nc&&c<ncr;c++) for(int k=0;k<8;k++) capI[c][k]=capR[c][k]+(caps[c][k]-capR[c][k])*u;
+                for(int i=0;i<S->nbv;i++) for(int k=0;k<3;k++){ S->bp0[i][k]=bpR[i][k]+(bpC[i][k]-bpR[i][k])*up;
+                                                               S->bp1[i][k]=bpR[i][k]+(bpC[i][k]-bpR[i][k])*u; }
+                for(int i=0;i<S->nhv;i++) for(int k=0;k<3;k++){ S->hp0[i][k]=hpR[i][k]+(hpC[i][k]-hpR[i][k])*up;
+                                                               S->hp1[i][k]=hpR[i][k]+(hpC[i][k]-hpR[i][k])*u; }
+                up=u;
+                skirtStep(S,1.f/60.f,sc,capI,(nc<ncr)?nc:ncr,H1,still9);
+                skNormals(S,ix,M->idxCount,sc); }
+            memcpy(S->bp0,bpC,bsz); memcpy(S->bp1,bpC,bsz); memcpy(S->hp0,hpC,hsz); memcpy(S->hp1,hpC,hsz);
+            for(int f=0;f<10;f++){ skirtStep(S,1.f/60.f,sc,caps,nc,H1,still9); skNormals(S,ix,M->idxCount,sc); }   /* and let it settle a moment */
+            if(g_skDbg){ printf("[skirt] %s hung: pre-roll %d frames, %d capsules; at rest in the pose: %d contacts, deepest %.1f mm, worst stretch %.3f\n",
+                                P->label,PRE,nc,g_skContacts,g_skDeep*1000.f,g_skStretch); fflush(stdout); }
+            S->warm=1; }
+        else if(!g_stepHeld) skirtStep(S,(float)g_chDt,sc,caps,nc,H1,S->air);   /* a held exposure does not integrate */
+        else { for(int p=0;p<S->np;p++) if(S->twin[p]<0&&S->pin[p]) memcpy(S->tg0[p],S->tg1[p],12);
+               memcpy(S->cap0,caps,sizeof(float)*8*(size_t)nc); S->ncap0=nc; memcpy(S->H0,H1,64); }
+        skNormals(S,ix,M->idxCount,sc);
+        if(g_skDbg&&(g_frameStamp%60u)==0u){ {
+            float wy=0.f, wa=0.f; int we=S->worstE;
+            if(we>=0){ int i=S->e0[we]; float y0=1e9f,y1=-1e9f; for(int p=0;p<S->np;p++){ if(S->pr[p][1]<y0) y0=S->pr[p][1]; if(S->pr[p][1]>y1) y1=S->pr[p][1]; }
+                wy=(y1-S->pr[i][1])/(y1-y0+1e-9f); wa=atan2f(S->pr[i][0]-S->ax,S->pr[i][2]-S->az)*57.2958f; }
+            printf("[skirt] %s: %d contacts, deepest push %.1f mm, worst stretch %.3f (%.0f%% down, %.0f deg round), air %.2f m/s, %d capsules\n",
+                   P->label,g_skContacts,g_skDeep*1000.f,g_skStretch,wy*100.f,wa,
+                   sqrtf(S->air[0]*S->air[0]+S->air[2]*S->air[2])/sc,nc); fflush(stdout); } }
+        /* the drawn mesh: every vertex at its point */
+        static float vpos[SK_MAXV*3], vnrm[SK_MAXV*3];
+        for(int v=0;v<S->nv;v++){ int p=S->vp[v]; memcpy(vpos+v*3,S->pos[p],12); memcpy(vnrm+v*3,S->nR[p],12); }
+        if(!S->vbo[0]){ glGenBuffers(2,S->vbo);
+            for(int k=0;k<2;k++){ glBindBuffer(GL_ARRAY_BUFFER,S->vbo[k]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(SK_MAXV*12),NULL,GL_DYNAMIC_DRAW); } }
+        glBindBuffer(GL_ARRAY_BUFFER,S->vbo[0]); glBufferSubData(GL_ARRAY_BUFFER,0,(GLsizeiptr)(S->nv*12),vpos);
+        glBindBuffer(GL_ARRAY_BUFFER,S->vbo[1]); glBufferSubData(GL_ARRAY_BUFFER,0,(GLsizeiptr)(S->nv*12),vnrm); }
+    g_skVbo[0]=S->vbo[0]; g_skVbo[1]=S->vbo[1];
+    /* the body's centre, for the lining's outline (colSet, uColOn 3) */
+    { int hp=P->pb[0]; float c0[3]={0,0,0}; if(hp>=0){ c0[0]=world[hp][12]; c0[1]=world[hp][13]; c0[2]=world[hp][14]; }
+      skXf(model,c0,g_skirtBC); g_skirtLive=1; }
+    if(S->shStamp!=g_frameStamp){ S->shStamp=g_frameStamp; sunStashW(P,(int)mi,S->vbo[0],S->vbo[1],(int)M->boneCount,model); }
+    static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    glUniformMatrix4fv(uModel,1,GL_FALSE,I9);
+    for(unsigned b9=0;b9<M->boneCount&&b9<MAXB;b9++) memcpy(pal+b9*16,I9,64);
+    skinPal(uPal,uDqS,(uDqS>=0)?1:0,pal,(int)M->boneCount,1.f);
+    glUniformMatrix4fv(uBind,1,GL_FALSE,I9);
+    { float al=meshAlphaOf(P,mi);
+      if(al<0.999f){ glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
+                     if(g_labAlpha>=0) glUniform1f(g_labAlpha,al); } }
+    return 2; }
+
 static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world,
                      GLint uModel,GLint uPal,GLint uBind,GLint uDqS){
     if(g_clothOff||slot<0||slot>=CLOTH_SLOTS) return 0;
+    { int sk9=skirtPrep(slot,P,mi,pal,model,world,uModel,uPal,uBind,uDqS); if(sk9) return sk9; }   /* a skirt is hanging cloth (10-18) */
     if(!meshIsCloth(P,mi)) return 0;
     PMesh*M=&P->meshes[mi];
     if(M->verts>=CLOTH_MAXV){ static int said=0; if(!said){ said=1;
@@ -9688,7 +11869,7 @@ static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*
             bodyPk=P; bodyStamp=g_frameStamp; nBody=0;
             if(bodyMi<0||bodyPk!=P){ bodyMi=-1; unsigned best=0;
                 for(unsigned m9=0;m9<P->nMeshes;m9++){ PMesh*Mb=&P->meshes[m9];
-                    if(!(Mb->flags&4)||!Mb->boneCount||Mb->boneCount>MAXB||meshIsGarment(P,m9)) continue;
+                    if(!(Mb->flags&4)||!Mb->boneCount||Mb->boneCount>MAXB||meshIsGarment(P,m9)||MOFF(P,m9)) continue;
                     const char*nm=packStr(P,Mb->name);
                     if(strstr(nm,"hair")||strstr(nm,"braid")||strstr(nm,"eye")||strstr(nm,"teeth")||strstr(nm,"tongue")||strstr(nm,"lash")||strstr(nm,"brow")||strstr(nm,"interior")) continue;
                     if(Mb->verts>best){ best=Mb->verts; bodyMi=(int)m9; } }
@@ -9799,7 +11980,7 @@ static int markPick(Pack*P,M4*world,const float*model,const float*ro,const float
     float bestT=1e18f; int got=0;
     for(unsigned mi=0;mi<P->nMeshes;mi++){
         PMesh*M=&P->meshes[mi];
-        if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB) continue;
+        if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB||MOFF(P,mi)) continue;
         if(meshIsGarment(P,mi)) continue;   /* the skin, not the clothes (~cloth, ep 14 ~worn) */
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
         float*ibm=(float*)(P->pk+M->offIBM);
@@ -10303,6 +12484,10 @@ static void caGridBuild(void){
         for(int i=0;i<g_setNI;i++){ SetInst*I=&g_setI[i]; const char*stem=g_setNm[I->pk];
             int wall=(strstr(stem,"wall")||strstr(stem,"window"))&&!strstr(stem,"attic");
             int solid=I->room||wall||propSolid(stem);
+            /* ⭐ (10-22) A ROOM BUILT BY CODE IS NOT FURNITURE: a pack marked NoCast AND Open is a room's shell, its glow,
+             * its glass (build_sickbay / build_rooms) -- floor, walls and ceiling in one prop, named for the room, so the name
+             * test called it solid and the contact pass threw a body standing anywhere in the cabin up toward the ceiling */
+            if(!I->room&&g_setPk[I->pk].open&&g_setPk[I->pk].nocast) solid=0;
             if(!solid) continue;
             if(!I->room&&caVeg(stem)){ if(pass==0) nVeg++; continue; }
             float*IB=(g_caIBox&&i<g_caNIBox&&!I->room&&!wall)?g_caIBox[i]:NULL;
@@ -10310,7 +12495,7 @@ static void caGridBuild(void){
             Pack*Q=&g_setPk[I->pk];
             CaMesh ms[64]; int nm=0;
             for(unsigned mi=0;mi<Q->nMeshes;mi++){ PMesh*Mh=&Q->meshes[mi];
-                if(!(Mh->flags&4)||Mh->boneCount>MAXB||Mh->verts<3) continue;
+                if(!(Mh->flags&4)||Mh->boneCount>MAXB||Mh->verts<3||MOFF(Q,mi)) continue;
                 M4 bind, Mw; memcpy(bind,Q->pk+Mh->offBind,64); m4_mul(Mw,I->m,bind);   /* what the shader does: model * bind * p */
                 const float*pos=(const float*)(Q->pk+Mh->offPos);
                 const unsigned*idx=Mh->idxCount?(const unsigned*)(Q->pk+Mh->offIdx):NULL;
@@ -10536,7 +12721,7 @@ static CtShape*ctShapeOf(Pack*P,M4*W){
     long total=0; for(unsigned mi=0;mi<P->nMeshes;mi++) total+=P->meshes[mi].verts;
     int step=(int)(total/60000)+1;
     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-        if(!(M->flags&4)||!M->boneCount||ctHairMesh(P,M)) continue;
+        if(!(M->flags&4)||!M->boneCount||ctHairMesh(P,M)||MOFF(P,mi)) continue;
         float*rp=(float*)(P->pk+M->offPos); unsigned char*jp=(unsigned char*)(P->pk+M->offJoints);
         unsigned char*wp=(unsigned char*)(P->pk+M->offWeights); float*bindm=(float*)(P->pk+M->offBind);
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap); float*ibm=(float*)(P->pk+M->offIBM);
@@ -10698,12 +12883,14 @@ static void ctSay(int slot,const char*limb,const char*what,float d){
  * 0.05 u, and the bone is turned to point at the sprung tip. Integrated on the EXPOSURE clock: a held frame holds its
  * jiggle, exactly as the chains and the cloth do (stop motion, ep 1). Runs before the contact pass, so a bounce can
  * never carry into anything. */
-static float g_jgP[SCN_MAXCAST][4][3], g_jgV[SCN_MAXCAST][4][3]; static int g_jgInit[SCN_MAXCAST][4]; static const Pack*g_jgPk[SCN_MAXCAST];
-static unsigned long g_jgFrame[SCN_MAXCAST];   /* ⛔ the springs integrate once per frame, not once per draw pass */
+/* ⭐ SET ACTORS JIGGLE TOO (09-29, REVA: "i want ... boob jiggle physic"): the state is per CHAIN slot -- the cast's
+ * five and the actors' sixteen -- so a skater on a set springs exactly as the hero does. */
+static float g_jgP[CH_SLOTS][4][3], g_jgV[CH_SLOTS][4][3]; static int g_jgInit[CH_SLOTS][4]; static const Pack*g_jgPk[CH_SLOTS];
+static unsigned long g_jgFrame[CH_SLOTS];   /* ⛔ the springs integrate once per frame, not once per draw pass */
 static int g_jgOff=-1; static float g_jgMax=0.f; static long g_jgN=0;
 static void jiggleTick(Pack*P,M4*W,const float*model,int slot){
     if(g_jgOff<0){ const char*e=getenv("REVA_NOJIGGLE"); g_jgOff=(e&&e[0]&&e[0]!='0')?1:0; }
-    if(g_jgOff||!P||!P->nJg||slot<0||slot>=SCN_MAXCAST) return;
+    if(g_jgOff||!P||!P->nJg||slot<0||slot>=CH_SLOTS) return;
     if(g_jgPk[slot]!=P){ g_jgPk[slot]=P; for(int q=0;q<4;q++) g_jgInit[slot][q]=0; }
     float dt=(float)g_animDtS; if(dt>0.1f) dt=0.1f;
     if(g_jgFrame[slot]==g_frameNo) dt=0.f;
@@ -11271,7 +13458,15 @@ static void ctSolve(Pack*P,M4*W,const float*model,int slot){
           int standing=0;
           if(g_caS[slot].nsup<=0&&P->footL>=0&&P->footR>=0){ float fl9[3],fr9[3];
               ptWorld(W[P->footL],model,fl9); ptWorld(W[P->footR],model,fr9);
-              standing=(fl9[1]<0.45f&&fr9[1]<0.45f); }
+              standing=(fl9[1]<0.45f&&fr9[1]<0.45f);
+              /* ⭐ (10-22) ...AND UP ON ITS LEGS. A SEATED body has both feet on the floor too, and its thighs rest on
+               * the seat: the slide shoved every sitter in chapter 2 off his chair (0.17-0.67 u, 19 scenes of 27) and the
+               * singles framed an empty seat. Standing is the thigh's top above its knee by half a thigh; a sitter's
+               * thighs lie level, and its limbs still come out of the seat one by one below. */
+              if(standing&&P->pb[12]>=0&&P->pb[13]>=0){ float th9[3],kn9[3];
+                  ptWorld(W[P->pb[12]],model,th9); ptWorld(W[P->pb[13]],model,kn9);
+                  float tl9=sqrtf((th9[0]-kn9[0])*(th9[0]-kn9[0])+(th9[1]-kn9[1])*(th9[1]-kn9[1])+(th9[2]-kn9[2])*(th9[2]-kn9[2]));
+                  if(th9[1]-kn9[1]<0.5f*tl9) standing=0; } }
           static const int WSEG[6]={CT_SPINE,CT_CHEST,CT_THL,CT_SHL,CT_THR,CT_SHR};
           for(int si=0;si<(standing?6:2);si++){ int s=WSEG[si]; float a[3],b[3]; if(!ctSegEnds(P,W,s,a,b)) continue;
               float aw[3],bw[3]; ptWorld((float[16]){1,0,0,0,0,1,0,0,0,0,1,0,a[0],a[1],a[2],1},model,aw);
@@ -11767,7 +13962,8 @@ static int scnLoad(const char*name){
                 for(int k10=0;k10<4;k10++){ L->path[k10][0]=0; L->spd[k10]=-1.f; L->loop[k10]=L->pseg[k10]=L->pnext[k10]=-1;
                     L->pipe[k10][0]=L->pipeAir[k10][0]=0; }   /* ⭐ ep 11 */
                 L->trkN=L->trkHas=L->panN=L->panHas=L->hldN=L->hldHas=0;
-                L->movHas=L->orbN=L->orbHas=L->orbAbs=L->trkAbs=L->shkHas=0; L->secs=-1.f;   /* ⭐ ep 11 */
+                L->movHas=L->orbN=L->orbHas=L->orbAbs=L->trkAbs=L->shkHas=0; L->secs=-1.f; L->set[0]=0; L->atHas=0;
+                L->home[0]=0; for(int o12=0;o12<4;o12++){ L->outfit[o12][0]=0; L->roll[o12][0]=0; }   /* ⭐ ep 11 */
                 L->silent=(L->text[0]==0);
                 L->hlook=L->plook=1; L->shot=SHOT_OTS;
                 L->hbrow=L->pbrow=-9.f; L->hgt=0.f; L->step=-1.f; L->tod=-1.f; L->tone=-1.f; L->feed=-1.f; L->fish=-1.f; L->snap=0;
@@ -11879,6 +14075,23 @@ static int scnLoad(const char*name){
                     int n11=lensNums(q,o11,7,2,&L->orbAbs);
                     if(n11>=5){ memcpy(L->orb,o11,sizeof o11); L->orbN=n11; L->orbHas=1; }
                     else printf("[lens] line %d: camorbit needs slot,radius,height,deg0,deg1[,fov[,aimh]]\n",g_scnN-1); } }
+            if((q=strstr(ln," camat="))){ float a12[3]={0.f,0.f,0.f};   /* ⭐ 10-22 */
+                if(sscanf(q+7,"%f,%f,%f",&a12[0],&a12[1],&a12[2])==3){ memcpy(L->at,a12,12); L->atHas=1; }
+                else printf("[lens] line %d: camat needs x,y,z\n",g_scnN-1); }
+            if((q=strstr(ln," home="))){ int k12=0; q+=6;   /* ⭐ 10-22: the home set changes */
+                while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<47) L->home[k12++]=*q++;
+                L->home[k12]=0; }
+            { static const char*const OK12[4]={" houtfit="," poutfit="," p2outfit="," p3outfit="};
+              for(int o12=0;o12<4;o12++) if((q=strstr(ln,OK12[o12]))){ int k12=0; q+=strlen(OK12[o12]);
+                  while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<23) L->outfit[o12][k12++]=*q++;
+                  L->outfit[o12][k12]=0; } }
+            { static const char*const RK12[4]={" hroll="," proll="," p2roll="," p3roll="};
+              for(int o12=0;o12<4;o12++) if((q=strstr(ln,RK12[o12]))){ int k12=0; q+=strlen(RK12[o12]);
+                  while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<95) L->roll[o12][k12++]=*q++;
+                  L->roll[o12][k12]=0; } }
+            if((q=strstr(ln," set="))){ int k12=0; q+=5;   /* ⭐ 10-22: a cutaway */
+                while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<47) L->set[k12++]=*q++;
+                L->set[k12]=0; }
             if((q=strstr(ln," camsecs=")))  L->secs=(float)atof(q+9);
             if((q=strstr(ln," camshake="))){ q+=10;
                 float s11[2]={0.f,1.5f};
@@ -12048,7 +14261,13 @@ static int scnLoad(const char*name){
      * hero IS 0, so `if(!focus)` was true for exactly the value that means "the hero" and
      * reset it to "the speaker". The parse already writes -1 explicitly on every line, so
      * the default was redundant as well as wrong. */
-    g_scnT=0.f; g_scnStaged=-1; g_scnTA=0.f;
+    /* ⭐ 10-22: a scene (re)started while it is AWAY on a cutaway goes home first -- 2.1 ends in space, and a replay
+     * would otherwise take space for its home */
+    if(g_scnHomeOK&&g_scnAway[0]&&g_scnHome[0]&&!strcmp(g_setCur,g_scnAway)){
+        setLoad(g_scnHome); memcpy(g_sun,g_scnHomeSun,16); memcpy(g_sunC,g_scnHomeSunC,12); memcpy(g_sky,g_scnHomeSky,12);
+        printf("[scene] restarted away on '%s' -- home to '%s' first\n",g_scnAway,g_scnHome); fflush(stdout); }
+    g_scnT=0.f; g_scnStaged=-1; g_scnTA=0.f; g_scnHomeOK=0; g_scnAway[0]=0;
+    memset(g_castRoll,0,sizeof g_castRoll);   /* ⭐ 10-22: and every body stands */
     trickReset();   /* ⭐ ep 10: no trick outlives the scene that asked for it */
     puffReset();    /* ⭐ ep 12: ...and no smoke, exhale or drag outlives the take that made it */
     g_locoPathReset=1; g_camTrk.mode=0;   /* ⭐ ep 10: a replayed scene rolls its paths again, and starts on no tracking lens */
@@ -12079,7 +14298,11 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
     static float T[1024][3], Q[1024][4], S[1024][3]; static M4 W[1024];
     for(unsigned i=0;i<P->nNodes;i++){
         memcpy(T[i],P->nodes[i].t,12); memcpy(Q[i],P->nodes[i].q,16); memcpy(S[i],P->nodes[i].s,12); }
-    PClip*c=&P->clips[(clip>=0&&(unsigned)clip<P->nClips)?clip:0];   /* borrowed: index 0 is only a placeholder -- donorPoseF overwrites the pose */
+    /* ⛔ A PACK WITH NO CLIPS OF ITS OWN (10-19). Wanda and Amelia own no clip at all -- every move they make is
+     * borrowed from a bank -- and the placeholder below read clips[0] out of an EMPTY table: a segfault the first time
+     * either stood in a scene. An empty clip stands in (no tracks: the borrowed pose is all there is). */
+    static PClip noClip9;
+    PClip*c=P->nClips?&P->clips[(clip>=0&&(unsigned)clip<P->nClips)?clip:0]:&noClip9;   /* borrowed: index 0 is only a placeholder -- donorPoseF overwrites the pose */
     /* ⭐ ep 9: a TRANSITION plays once in a scene and holds its last frame (clipHoldsEnd) */
     if(g_scnT>=0.f&&!borrowed9&&clip>=0&&(unsigned)clip<P->nClips&&phase>(double)(c->frames-1)
        &&clipHoldsEnd(P,c,g_castI,packStr(P,c->name)))
@@ -12194,6 +14417,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
         float*a7=W[P->pb[7]],*b7=W[P->pb[10]];
         float dx=a7[12]-b7[12], dy=a7[13]-b7[13], dz=a7[14]-b7[14];
         g_partShoulderW=sqrtf(dx*dx+dy*dy+dz*dz)*P->scale; }
+    stretchTick(P,W);                                          /* ⭐ drapes held between two limbs (09-29) */
     chainSim(P,W,(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1);   /* H1: each partner's chains, in her own slot */
     /* Her own model matrix, built from HER pack's scale and ground -- the hero's cannot
      * be reused, because it carries the hero's scale. She stands g_labPGap in front of
@@ -12252,7 +14476,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
     /* ⭐ ep 10: THE CARVE -- after the spot is published: a lean must not move where the body is said to stand */
     { int s10=(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1;
       if((g_loco[s10].pon||g_loco[s10].phold)&&markFind(g_castMark[s10])) locoLeanModel(model,s10,g_castFloorY[s10]);
-      pipeModel(s10,model,P,sc); }   /* ⭐ ep 11: on a half-pipe the ride places her, over all of the above */
+      pipeModel(s10,model,P,sc); rollModel(s10,model); }   /* ⭐ ep 11: on a half-pipe the ride places her, over all of the above; (10-22) the roll over that */
     /* THE SHARED GEOMETRY, reported once. Two bodies of different sizes cannot each
      * reach "above my own shoulder" and expect to touch -- the meeting point has to be
      * chosen in the world they share, and only the engine knows both bodies. These are
@@ -12349,13 +14573,13 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
             for(int k9=0;k9<3;k9++) g_partEyeW[k9]=0.5f*(el[k9]+er[k9]);
             g_partIOD=sqrtf((el[0]-er[0])*(el[0]-er[0])+(el[1]-er[1])*(el[1]-er[1])+(el[2]-er[2])*(el[2]-er[2]));
             g_partFaceOK=1; } }
-    { static int wasActP=0; morphBlend(P,g_partMorphW,&wasActP); }   /* her face talks too */
+    { static int wasActP9[SCN_MAXCAST]; morphBlend(P,g_partMorphW,&wasActP9[(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1]); }   /* her face talks too */
     mouthArm(P,g_partMorphW,g_labMouthP,g_labMouthS,g_labOpen);
     chainPublish((g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1,model);   /* her chains feel where she goes */
     glUniformMatrix4fv(mModel,1,GL_FALSE,model);
     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
         mouthMeshArm(P,mi,g_partMorphW,g_labOpen);
-        if(!(M->flags&4)||M->boneCount>MAXB) continue;
+        if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
         float*ibm=(float*)(P->pk+M->offIBM);
@@ -12365,7 +14589,8 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
             if((int)mi!=P->fmInterior) sunStash(P,(int)mi,pal,(int)M->boneCount,model,0);   /* ⭐ she casts (09-11) */
             skinPal(mPal,uDqS,dq&&P->dqsOK,pal,(int)M->boneCount,mi<8?P->meshDqS[mi]:1.f);
             glUniformMatrix4fv(mBind,1,GL_FALSE,(float*)(P->pk+M->offBind)); }
-        GLuint*b=&P->vbo[mi*6];
+        GLuint bs9[6]; GLuint*b=&P->vbo[mi*6];
+        if(isCloth9==2){ memcpy(bs9,b,sizeof bs9); bs9[0]=g_skVbo[0]; bs9[1]=g_skVbo[1]; b=bs9; }   /* hanging cloth: its own buffers */
         glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
         if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
         glBindBuffer(GL_ARRAY_BUFFER,b[2]); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
@@ -12383,8 +14608,10 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
           if(tex>=0){ glBindTexture(GL_TEXTURE_2D,P->tex[tex]); glUniform1f(g_labUse,1.f); glUniform3f(g_labTint,1.f,1.f,1.f); }
           else { float c9[3]; meshTintOf(P,mi,c9); glUniform1f(g_labUse,0.f); glUniform3f(g_labTint,c9[0],c9[1],c9[2]); }
           nrmBind(P,mi); }
+        { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,W,mi);
         if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
         else glDrawArrays(GL_TRIANGLES,0,M->verts);
+          toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); mirInst(mModel,toon9,packStr(P,M->name),M->idxCount,M->verts,0); }
         if(isCloth9){ if(g_labAlpha>=0) glUniform1f(g_labAlpha,1.f); glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
                     if(isCloth9) glUniformMatrix4fv(mModel,1,GL_FALSE,model);   /* hand the body back its matrix */
         glUniform1f(g_labUse,1.f); glUniform3f(g_labTint,1.f,1.f,1.f); }
@@ -12859,9 +15086,11 @@ static void sunPass(int W,int H){
     for(int ci=0;ci<g_nSunCast;ci++){ SunCast*S=&g_sunCast[ci]; Pack*Pc=S->P; PMesh*M=&Pc->meshes[S->mi];
         glUniformMatrix4fv(g_su_model,1,GL_FALSE,S->model);
         glUniformMatrix4fv(g_su_pal,(GLsizei)M->boneCount,GL_FALSE,S->pal);
-        glUniformMatrix4fv(g_su_bind,1,GL_FALSE,(float*)(Pc->pk+M->offBind));
+        { static const float I9s[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+          glUniformMatrix4fv(g_su_bind,1,GL_FALSE,S->world?I9s:(float*)(Pc->pk+M->offBind)); }
         { int tx9=Pc->meshTex[S->mi]; if(tx9>=0){ glBindTexture(GL_TEXTURE_2D,Pc->tex[tx9]); glUniform1f(g_su_use,1.f); } else glUniform1f(g_su_use,0.f); }
-        GLuint*b=&Pc->vbo[S->mi*6];
+        GLuint bw9[6]; GLuint*b=&Pc->vbo[S->mi*6];
+        if(S->vb0){ memcpy(bw9,b,sizeof bw9); bw9[0]=S->vb0; if(S->vb1) bw9[1]=S->vb1; b=bw9; }
         glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
         if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
         else glDisableVertexAttribArray(1);
@@ -13765,6 +15994,10 @@ int main(int argc,char**argv){
     g_mode=modeSelect(g_win,W,H);
     saveLoad(); atexit(saveFlush);   /* the club remembers: see THE SAVE FILE above */
     saveSetI("last.mode",g_mode); saveSetI("last.variant",g_modeVariant); saveSetI("nights",saveGetI("nights",0)+1);
+    /* ⭐ 10-12: door 11 is its own program from the first frame -- no packs, no crowd.
+     * EXIT GAME comes back to the doors; under REVA_MODE it ends the run. */
+    while(g_mode==MODE_REVA){ revaLighthouse(g_win,W,H); if(getenv("REVA_MODE")) exit(0);
+        g_mode=modeSelect(g_win,W,H); saveSetI("last.mode",g_mode); }
     /* ⭐ REVA_SET=<name>: a game door plays IN A SET. Until now only the ANIM LAB could load
      * one (the live-control file is the lab's), so no door had ever stood on the street the
      * film is shot on, and "walk the player into a house" could not be tested in the one
@@ -13948,7 +16181,40 @@ int main(int argc,char**argv){
       MAXB_STR(MAXB) "];\n"
       "uniform vec4 mouthP; uniform vec2 mouthS;\n"
       "uniform mat4 uShVP;\n"   /* ⭐ the sun's view-projection, for the receiver test (09-11) */
+      "uniform float uInk; uniform vec2 uAsp;\n"
+      "uniform float uColOn; uniform vec3 uCapA[4]; uniform vec3 uCapB[4]; uniform float uCapR[4]; uniform vec3 uBodyC;\n"
+      "uniform mat4 uHeadM; uniform mat4 uHeadMI;\n"   /* ⭐ PER-VERTEX COLLISION (10-18), in RIG space */   /* ⭐ THE INK (10-18) */
       "varying vec3 vn; varying vec2 vt; varying vec3 vwp; varying vec3 vFace; varying vec4 vShp;\n"
+      "uniform mat4 uHeadMIR; uniform float uWaistY;\n"
+      /* ⭐ THE DRAPE (10-18). Cloth HANGS over a leg: along the vertex's own horizontal way out of the body (from the
+       * hips' axis), it must lie past every part of each leg capsule at or ABOVE its own height -- nine spheres along
+       * each capsule; a sphere below the vertex counts by its slice at the vertex's height. A soft edge beside the
+       * leg (lateral 0.9R..1.6R). Both walls move by the SAME amount: the outer wall (its normal facing out) keeps
+       * its 4 mm. */
+      "vec3 drapeOut(vec3 V, float outer){\n"
+      "  vec3 h=V-uBodyC; h.y=0.0; float tv=length(h);\n"
+      "  if(tv<1e-4) return V;\n"
+      "  vec3 nn=h/tv; vec3 pr=vec3(-nn.z,0.0,nn.x);\n"
+      "  float wall=outer*0.004;\n"
+      "  float push=0.0;\n"
+      "  for(int i=0;i<4;i++){ float R=uCapR[i]; if(R>0.0){\n"
+      "    for(int k=0;k<9;k++){ vec3 s=mix(uCapA[i],uCapB[i],float(k)/8.0);\n"
+      "      vec3 d=s-vec3(uBodyC.x,V.y,uBodyC.z);\n"
+      "      float rad=dot(d,nn); float lat=abs(dot(d,pr)); float vrt=max(V.y-s.y,0.0);\n"
+      "      float q=sqrt(lat*lat+vrt*vrt);\n"
+      "      float ext=(q<R)?rad+sqrt(R*R-q*q):rad-1.2*(q-R);\n"
+      "      push=max(push,ext+0.012+wall-tv); } } }\n"
+      "  push*=1.0-smoothstep(uBodyC.y+0.35*(uWaistY-uBodyC.y),uWaistY-0.01,V.y);\n"
+      "  return V+nn*max(push,0.0); }\n"
+      /* ⭐ HAIR NEVER INWARD (10-18): out of the neck capsule, and never nearer the head's centre (in the head
+       * ellipsoid's normalised frame) than where it sits at rest -- RP is its rest position, uHeadMIR the rest frame */
+      "vec3 hairOut(vec3 V, vec3 RP){\n"
+      "  if(uCapR[0]>0.0){ vec3 e=uCapB[0]-uCapA[0]; float t=clamp(dot(V-uCapA[0],e)/max(dot(e,e),1e-10),0.0,1.0);\n"
+      "    vec3 c=uCapA[0]+e*t; vec3 d=V-c; float l=length(d); if(l<uCapR[0]&&l>1e-6) V=c+d*(uCapR[0]/l); }\n"
+      "  vec3 un=(uHeadMI*vec4(V,1.0)).xyz; vec3 ur=(uHeadMIR*vec4(RP,1.0)).xyz;\n"
+      "  float Ln=length(un), Lr=length(ur)*0.995;\n"
+      "  if(Ln<Lr&&Ln>1e-5) V=(uHeadM*vec4(un*(Lr/Ln),1.0)).xyz;\n"
+      "  return V; }\n"
       "void main(){ vec4 bp=bind*vec4(p,1.0); vt=t;\n"
       /* A MOUTH IS NOT ALWAYS LEVEL: rotate into the lip line's own frame first, by the
        * angle the CORNER MARKS make (mouthP.w). Tilting the marks now tilts the
@@ -13959,9 +16225,18 @@ int main(int argc,char**argv){
       "  vec2 mr2=vec2(md.x*ct+md.y*st, -md.x*st+md.y*ct);\n"
       "  vFace=vec3(mr2.y/max(1e-5,mouthS.x), mr2.x/max(1e-5,mouthS.x), (bp.z-mouthP.z)/max(1e-5,mouthS.y));\n"
       "  mat4 skin=w.x*pal[int(j.x)]+w.y*pal[int(j.y)]+w.z*pal[int(j.z)]+w.w*pal[int(j.w)];\n"
-      "  vec4 wp=model*skin*bp; vwp=wp.xyz; vn=normalize((model*skin*(bind*vec4(n,0.0))).xyz);\n"
+      "  vec4 rp=skin*bp;\n"
+      "  if(uColOn>0.5&&uColOn<1.5) rp.xyz=drapeOut(rp.xyz,(dot((bind*vec4(n,0.0)).xz,bp.xz)>0.0)?1.0:0.0);\n"
+      "  if(uColOn>1.5&&uColOn<2.5) rp.xyz=hairOut(rp.xyz,bp.xyz);\n"
+      "  vec4 wp=model*rp; vwp=wp.xyz; vn=normalize((model*skin*(bind*vec4(n,0.0))).xyz);\n"
       "  vShp=uShVP*wp;\n"
-      "  gl_Position=vp*wp; }\n";
+      "  gl_Position=vp*wp;\n"
+      /* ⭐ THE INK (10-18): on the toon pass's second draw, every vertex pushed out along its normal's direction ON
+       * SCREEN by uInk (a share of the viewport's height), front faces culled -- the back faces left showing round
+       * the silhouette are the line. In clip space, so its width holds at any distance. */
+      "  if(uInk>0.0){ vec2 dd=(vp*vec4(vn,0.0)).xy; float L=length(dd);\n"
+      "    float lin9=((uColOn>0.5&&uColOn<1.5&&dot((bind*vec4(n,0.0)).xz,bp.xz)<=0.0)||(uColOn>2.5&&dot(n.xz,bp.xz-uBodyC.xz)<=0.0))?0.0:1.0;\n"
+      "    if(L>1e-6) gl_Position.xy+=dd/L*uInk*2.0*uAsp*gl_Position.w*lin9; } }\n";
     /* jacob: DARKER, we are in space -- key light dimmer, ambient floor way down; the color now
      * comes from the CLUB: 3 nearest colored point lights (orbs / lamps / snake / reva) per dancer */
     #define LITE \
@@ -13982,7 +16257,10 @@ int main(int argc,char**argv){
       "uniform sampler2D uShMap; uniform float uShOn; varying vec4 vShp;\n"   /* ⭐ THE SUN'S SHADOW MAP (09-11) */
       "uniform sampler2D nmp; uniform float uNrm;\n"   /* ⭐ THE NORMAL MAP (09-11): unit 1, per mesh */
       "uniform float uTone;\n"
-      "void main(){ vec3 N=normalize(vn);\n"
+      "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
+      "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
+      "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
+      "  vec3 N=normalize(vn);\n"
       /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
        * derivatives of position and UV (the cotangent-frame method; OES_standard_derivatives
        * is present), so the pack carries no tangents and a flipped V is handled by the
@@ -14060,11 +16338,41 @@ int main(int argc,char**argv){
       "      for(int i=0;i<4;i++){ vec2 o=vec2(i==1||i==3?0.5:-0.5, i>=2?0.5:-0.5)*px;\n"
       "        vec4 e=texture2D(uShMap,sp.xy+o); float d=dot(e,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));\n"
       "        shv+=(sp.z-bias<=d)?0.25:0.0; } } }\n"
+      /* ⭐ THE TOON'S SHADOW EDGE (10-18). Four taps half a texel apart step from texel to texel, and a hard cel
+       * cut turns every step into a STAIR across a face (Amelia's bob threw one down her cheek). For a toon body the
+       * test is BILINEAR: the four nearest texels' verdicts blended by where the point falls between them, so the
+       * cut follows a smooth contour. The realistic path keeps its filter. */
+      "  if(uCel>0.0&&uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
+      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
+      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
+      "      vec2 tc=sp.xy*2048.0-0.5; vec2 f=fract(tc); vec2 b0=(floor(tc)+0.5)/2048.0; float px=1.0/2048.0;\n"
+      "      vec4 kk=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);\n"
+      "      float s00=(sp.z-bias<=dot(texture2D(uShMap,b0),kk))?1.0:0.0;\n"
+      "      float s10=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,0.0)),kk))?1.0:0.0;\n"
+      "      float s01=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(0.0,px)),kk))?1.0:0.0;\n"
+      "      float s11=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,px)),kk))?1.0:0.0;\n"
+      "      shv=mix(mix(s00,s10,f.x),mix(s01,s11,f.x),f.y); } }\n"
       "  vec3 lit = (uSun.w > 0.0)\n"
       "     ? base*(uSky + uSunC*uSun.w*max(0.0,dot(N,uSun.xyz))*shv) + base*li\n"
       "     : base*(l*0.42+0.13+li);\n"
       /* ⭐ EMISSIVE (ep 4). Before the fog and the tone knee, so a glowing prop still sits in
        * the same air as everything else and still rolls off under `tone=` instead of clipping. */
+      /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
+       * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
+       * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
+      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,uSun.xyz)*shv : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
+      "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
+      "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
+      /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
+       * realistic shade wants and a flat colour does not -- the white robe blew out and its SHADOW read pale
+       * lavender. A dimmer light (dusk, night, a lamp) still darkens; nothing brightens past the palette. */
+      "    float fl9=dot(full,vec3(0.299,0.587,0.114)); full*=min(1.0,1.0/max(fl9,1e-3));\n"
+      /* ⛔ ONE MULTIPLY CRUSHES A DARK COLOUR: Wanda's deep brown face went near-black on its shadow side. A
+       * drawn show keeps a dark skin's shadow a rich readable brown -- so the darker the base, the gentler the cut
+       * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
+      "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
+      "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
+      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25; }\n"
       "  if(uEmis>0.0) lit=base*uEmis;\n"
       /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
        * takes off the sky's own horizon unless a scene names one. It is what a wide has to
@@ -14087,7 +16395,10 @@ int main(int argc,char**argv){
       "uniform sampler2D uShMap; uniform float uShOn; varying vec4 vShp;\n"   /* ⭐ THE SUN'S SHADOW MAP (09-11) */
       "uniform sampler2D nmp; uniform float uNrm;\n"   /* ⭐ THE NORMAL MAP (09-11): unit 1, per mesh */
       "uniform float uTone;\n"
-      "void main(){ vec3 N=normalize(vn);\n"
+      "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
+      "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
+      "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
+      "  vec3 N=normalize(vn);\n"
       /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
        * derivatives of position and UV (the cotangent-frame method; OES_standard_derivatives
        * is present), so the pack carries no tangents and a flipped V is handled by the
@@ -14166,11 +16477,41 @@ int main(int argc,char**argv){
       "      for(int i=0;i<4;i++){ vec2 o=vec2(i==1||i==3?0.5:-0.5, i>=2?0.5:-0.5)*px;\n"
       "        vec4 e=texture2D(uShMap,sp.xy+o); float d=dot(e,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));\n"
       "        shv+=(sp.z-bias<=d)?0.25:0.0; } } }\n"
+      /* ⭐ THE TOON'S SHADOW EDGE (10-18). Four taps half a texel apart step from texel to texel, and a hard cel
+       * cut turns every step into a STAIR across a face (Amelia's bob threw one down her cheek). For a toon body the
+       * test is BILINEAR: the four nearest texels' verdicts blended by where the point falls between them, so the
+       * cut follows a smooth contour. The realistic path keeps its filter. */
+      "  if(uCel>0.0&&uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
+      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
+      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
+      "      vec2 tc=sp.xy*2048.0-0.5; vec2 f=fract(tc); vec2 b0=(floor(tc)+0.5)/2048.0; float px=1.0/2048.0;\n"
+      "      vec4 kk=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);\n"
+      "      float s00=(sp.z-bias<=dot(texture2D(uShMap,b0),kk))?1.0:0.0;\n"
+      "      float s10=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,0.0)),kk))?1.0:0.0;\n"
+      "      float s01=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(0.0,px)),kk))?1.0:0.0;\n"
+      "      float s11=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,px)),kk))?1.0:0.0;\n"
+      "      shv=mix(mix(s00,s10,f.x),mix(s01,s11,f.x),f.y); } }\n"
       "  vec3 lit = (uSun.w > 0.0)\n"
       "     ? base*(uSky + uSunC*uSun.w*max(0.0,dot(N,uSun.xyz))*shv) + base*li\n"
       "     : base*(l*0.42+0.13+li);\n"
       /* ⭐ EMISSIVE (ep 4). Before the fog and the tone knee, so a glowing prop still sits in
        * the same air as everything else and still rolls off under `tone=` instead of clipping. */
+      /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
+       * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
+       * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
+      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,uSun.xyz)*shv : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
+      "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
+      "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
+      /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
+       * realistic shade wants and a flat colour does not -- the white robe blew out and its SHADOW read pale
+       * lavender. A dimmer light (dusk, night, a lamp) still darkens; nothing brightens past the palette. */
+      "    float fl9=dot(full,vec3(0.299,0.587,0.114)); full*=min(1.0,1.0/max(fl9,1e-3));\n"
+      /* ⛔ ONE MULTIPLY CRUSHES A DARK COLOUR: Wanda's deep brown face went near-black on its shadow side. A
+       * drawn show keeps a dark skin's shadow a rich readable brown -- so the darker the base, the gentler the cut
+       * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
+      "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
+      "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
+      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25; }\n"
       "  if(uEmis>0.0) lit=base*uEmis;\n"
       /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
        * takes off the sky's own horizon unless a scene names one. It is what a wide has to
@@ -14216,7 +16557,40 @@ int main(int argc,char**argv){
       "uniform float dqS;\n"
       "uniform vec4 mouthP; uniform vec2 mouthS;\n"
       "uniform mat4 uShVP;\n"
+      "uniform float uInk; uniform vec2 uAsp;\n"
+      "uniform float uColOn; uniform vec3 uCapA[4]; uniform vec3 uCapB[4]; uniform float uCapR[4]; uniform vec3 uBodyC;\n"
+      "uniform mat4 uHeadM; uniform mat4 uHeadMI;\n"   /* ⭐ PER-VERTEX COLLISION (10-18), in RIG space */
       "varying vec3 vn; varying vec2 vt; varying vec3 vwp; varying vec3 vFace; varying vec4 vShp;\n"
+      "uniform mat4 uHeadMIR; uniform float uWaistY;\n"
+      /* ⭐ THE DRAPE (10-18). Cloth HANGS over a leg: along the vertex's own horizontal way out of the body (from the
+       * hips' axis), it must lie past every part of each leg capsule at or ABOVE its own height -- nine spheres along
+       * each capsule; a sphere below the vertex counts by its slice at the vertex's height. A soft edge beside the
+       * leg (lateral 0.9R..1.6R). Both walls move by the SAME amount: the outer wall (its normal facing out) keeps
+       * its 4 mm. */
+      "vec3 drapeOut(vec3 V, float outer){\n"
+      "  vec3 h=V-uBodyC; h.y=0.0; float tv=length(h);\n"
+      "  if(tv<1e-4) return V;\n"
+      "  vec3 nn=h/tv; vec3 pr=vec3(-nn.z,0.0,nn.x);\n"
+      "  float wall=outer*0.004;\n"
+      "  float push=0.0;\n"
+      "  for(int i=0;i<4;i++){ float R=uCapR[i]; if(R>0.0){\n"
+      "    for(int k=0;k<9;k++){ vec3 s=mix(uCapA[i],uCapB[i],float(k)/8.0);\n"
+      "      vec3 d=s-vec3(uBodyC.x,V.y,uBodyC.z);\n"
+      "      float rad=dot(d,nn); float lat=abs(dot(d,pr)); float vrt=max(V.y-s.y,0.0);\n"
+      "      float q=sqrt(lat*lat+vrt*vrt);\n"
+      "      float ext=(q<R)?rad+sqrt(R*R-q*q):rad-1.2*(q-R);\n"
+      "      push=max(push,ext+0.012+wall-tv); } } }\n"
+      "  push*=1.0-smoothstep(uBodyC.y+0.35*(uWaistY-uBodyC.y),uWaistY-0.01,V.y);\n"
+      "  return V+nn*max(push,0.0); }\n"
+      /* ⭐ HAIR NEVER INWARD (10-18): out of the neck capsule, and never nearer the head's centre (in the head
+       * ellipsoid's normalised frame) than where it sits at rest -- RP is its rest position, uHeadMIR the rest frame */
+      "vec3 hairOut(vec3 V, vec3 RP){\n"
+      "  if(uCapR[0]>0.0){ vec3 e=uCapB[0]-uCapA[0]; float t=clamp(dot(V-uCapA[0],e)/max(dot(e,e),1e-10),0.0,1.0);\n"
+      "    vec3 c=uCapA[0]+e*t; vec3 d=V-c; float l=length(d); if(l<uCapR[0]&&l>1e-6) V=c+d*(uCapR[0]/l); }\n"
+      "  vec3 un=(uHeadMI*vec4(V,1.0)).xyz; vec3 ur=(uHeadMIR*vec4(RP,1.0)).xyz;\n"
+      "  float Ln=length(un), Lr=length(ur)*0.995;\n"
+      "  if(Ln<Lr&&Ln>1e-5) V=(uHeadM*vec4(un*(Lr/Ln),1.0)).xyz;\n"
+      "  return V; }\n"
       "vec3 dqxf(vec4 r, vec4 d, vec3 v){\n"
       "  vec3 o=v+2.0*cross(r.xyz,cross(r.xyz,v)+r.w*v);\n"
       "  return o+2.0*(r.w*d.xyz-d.w*r.xyz+cross(r.xyz,d.xyz)); }\n"
@@ -14240,10 +16614,18 @@ int main(int argc,char**argv){
       "  vec4 bd=w.x*d0+w.y*s1*d1+w.z*s2*d2+w.w*s3*d3;\n"
       "  float il=1.0/max(length(br),1e-6); br*=il; bd*=il;\n"
       "  vec3 sp=dqxf(br,bd,bp.xyz);\n"
+      "  if(uColOn>0.5&&uColOn<1.5) sp=drapeOut(sp,(dot((bind*vec4(n,0.0)).xz,bp.xz)>0.0)?1.0:0.0);\n"
+      "  if(uColOn>1.5&&uColOn<2.5) sp=hairOut(sp,bp.xyz);\n"
       "  vec4 wp=model*vec4(sp,1.0); vwp=wp.xyz; vShp=uShVP*wp;\n"
       "  vec3 bn=(bind*vec4(n,0.0)).xyz;\n"
       "  vn=normalize((model*vec4(dqrot(br,bn),0.0)).xyz);\n"
-      "  gl_Position=vp*wp; }\n";
+      "  gl_Position=vp*wp;\n"
+      /* ⭐ THE INK (10-18): on the toon pass's second draw, every vertex pushed out along its normal's direction ON
+       * SCREEN by uInk (a share of the viewport's height), front faces culled -- the back faces left showing round
+       * the silhouette are the line. In clip space, so its width holds at any distance. */
+      "  if(uInk>0.0){ vec2 dd=(vp*vec4(vn,0.0)).xy; float L=length(dd);\n"
+      "    float lin9=((uColOn>0.5&&uColOn<1.5&&dot((bind*vec4(n,0.0)).xz,bp.xz)<=0.0)||(uColOn>2.5&&dot(n.xz,bp.xz-uBodyC.xz)<=0.0))?0.0:1.0;\n"
+      "    if(L>1e-6) gl_Position.xy+=dd/L*uInk*2.0*uAsp*gl_Position.w*lin9; } }\n";
     Prog PRD[2];
     for(int pi=0;pi<2;pi++){ GLuint prog=glCreateProgram();
         glAttachShader(prog,sh(GL_VERTEX_SHADER,vsDQ)); glAttachShader(prog,sh(GL_FRAGMENT_SHADER,pi?fsC:fsO));
@@ -14905,10 +17287,10 @@ int main(int argc,char**argv){
                     ctr[0]=g_rvx;      ctr[1]=1.5f; ctr[2]=g_rvz; } }
         M4 proj,view,vp;
         g_aspect=(float)W/(float)H;   /* ⭐ (ep 4) the medium's lateral guarantee needs the frame's SHAPE, and W/H are locals in here */
-        if(g_fpvNow){ float fv9=fishFov(68.0f,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.12f,900.0f); }   /* first person: a wide eye and a near plane inside her own head */
-        else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,900.0f); }   /* a street runs to the horizon */
-        else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,140.0f); }   /* a scene is two bodies on a black stage */
-        else          { m4_persp(proj,42.0f,(float)W/H,0.8f,520.0f); }   /* jacob: "eliminate the view distance" */
+        if(g_fpvNow){ float fv9=fishFov(68.0f,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
+        else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,fmaxf(900.0f,g_setFar)); }   /* a street runs to the horizon */
+        else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,fmaxf(140.0f,g_setFar)); }   /* a scene is two bodies on a black stage */
+        else          { m4_persp(proj,42.0f,(float)W/H,0.8f,fmaxf(520.0f,g_setFar)); }   /* jacob: "eliminate the view distance" */
         m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
         /* the lens's own position, for anything later in the frame that has to face it
          * (ep 8: a billboarded screen). Stamped here because this is where it is decided. */
@@ -15258,7 +17640,7 @@ int main(int argc,char**argv){
          * where they were -- but the club's own lamp sprites, light orbs and flame snake,
          * which a scene already switches off because a conversation wants a dark stage.
          * A street wants it for the same reason. */
-        if(g_scnT<0.f&&!g_setNI){
+        if(g_scnT<0.f&&!g_setNI&&!g_setSpace){
         glBlendFunc(GL_SRC_ALPHA,GL_ONE);
         { static float lv[(48+NORB*2)*5]; int np=0;
           for(int li=0;li<8&&np<48;li++){
@@ -15636,7 +18018,7 @@ int main(int argc,char**argv){
             int nearRv=hypotf(sl->x-g_rvx,sl->z-g_rvz)<6.0f||si==CAMD.tgt;
             if(g_slotHide[si]) continue;   /* squid-convicted: invisible until relaunch */
             for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-                if(!(M->flags&4)||M->boneCount>MAXB) continue;
+                if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
                 USEPROG((P->meshMatFlags[mi]&4)?1:0);
                 glUniformMatrix4fv(uModel,1,GL_FALSE,model);
@@ -15679,8 +18061,10 @@ int main(int argc,char**argv){
                 glBindBuffer(GL_ARRAY_BUFFER,b[3]); glEnableVertexAttribArray(3); glVertexAttribPointer(3,4,GL_UNSIGNED_BYTE,GL_TRUE,0,0);
                 if(M->flags&2){ glBindBuffer(GL_ARRAY_BUFFER,b[5]); glEnableVertexAttribArray(4); glVertexAttribPointer(4,2,GL_FLOAT,GL_FALSE,0,0); }
                 else glDisableVertexAttribArray(4);
+                { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,world,mi);
                 if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
                 else glDrawArrays(GL_TRIANGLES,0,M->verts);
+                  toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); }
             }
         }
         /* VENUE JUMBOS — the head, on the walls. Opaque and depth-tested: they are objects in
@@ -15722,7 +18106,7 @@ int main(int argc,char**argv){
          * set paints its sky first in drawSet with no depth test, which wiped this quad every frame
          * while its depth kept the room out -- Holly's blank screen. With a set, the world pass draws
          * them after the world. */
-        if(!g_setNI) scrDrawPlaced(vp);
+        if(!g_setNI&&!g_setSpace) scrDrawPlaced(vp);
 
         /* CLUB LASERS — 7-beam fan from above the back of the stage, hue-cycling, beat-pulsed */
         if(g_mode!=MODE_ANIM){ double bp=beatPhase(); float pulse=0.8f+0.4f*powf(1.0f-(float)(bp-floor(bp)),2.0f);
@@ -16175,6 +18559,7 @@ int main(int argc,char**argv){
                 wmsApply(P,T,Q,world,&hw,(float)g_chDt,g_wms); }
             for(unsigned i=0;i<P->nNodes;i++){ M4 loc; m4_trs(loc,T[i],Q[i],S[i]);
                 if(P->nodes[i].parent<0) memcpy(world[i],loc,64); else m4_mul(world[i],world[P->nodes[i].parent],loc); }
+            stretchTick(P,world);  /* ⭐ drapes held between two limbs (09-29) */
             chainSim(P,world,0);   /* H1: the hero's tails/hair swing after the pose is solved */
             simHashMix((const float*)world,P->nNodes*16);   /* ⭐ the receipt: her solved pose */
 
@@ -16854,7 +19239,7 @@ int main(int argc,char**argv){
              * ground contact. After every placement above; before the grips and the attach points. */
             if(!g_skate&&g_heroMk&&(g_loco[0].pon||g_loco[0].phold)) locoLeanModel(model,0,g_castFloorY[0]);
             /* ⭐ ep 11: ON A HALF-PIPE the ride places her -- contact, the surface's up, the air's turn -- over all of the above */
-            if(!g_skate&&g_mode==MODE_ANIM) pipeModel(0,model,P,sc);
+            if(!g_skate&&g_mode==MODE_ANIM){ pipeModel(0,model,P,sc); rollModel(0,model); }   /* (10-22) and the roll */
             /* HER REAL TEXTURE. The hologram program is a deliberate look for the venue --
              * fresnel, scanlines, additive -- but it throws her texture away: her atlas has skin
              * tones, grey panels and purple fabric, and none of it survives an additive purple
@@ -17019,7 +19404,7 @@ int main(int argc,char**argv){
                               if(ulp>=0) glUniform3fv(ulp,NLIGHT,slp9);
                               if(ulc>=0) glUniform3fv(ulc,NLIGHT,slc9);
                               { GLint ulk=glGetUniformLocation(pcur,"lk"); if(ulk>=0) glUniform1fv(ulk,NLIGHT,g_stampK); } } }
-                if(g_setNI||g_nPipe)
+                if(g_setNI||g_nPipe||g_setSpace)   /* ⭐ 10-22: a set that is only space still paints its sky */
                     drawSet(sModel,sPal,sBind,sUse,sTint);
                 if(g_setNA){
                     actorsDraw(sModel,sPal,sBind,pal,sUse,sTint);
@@ -17058,7 +19443,7 @@ int main(int argc,char**argv){
                     /* mesh 1 is his skateboard, skinned to his rig: once he has bailed it
                      * is lying on the ground, so it must not ride along with him */
                     if(g_skate && SK.onFoot && !g_procRig && mi>0) continue;
-                    if(!(M->flags&4)||M->boneCount>MAXB) continue;
+                    if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
                     mouthMeshArm(P,mi,g_heroMorphW,g_labOpen);
                     unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
@@ -17081,7 +19466,8 @@ int main(int argc,char**argv){
                     if(!isCloth9){
                         skinPal(mPal,mDqS,labDq,pal,(int)M->boneCount,mi<8?P->meshDqS[mi]:1.f);
                         glUniformMatrix4fv(mBind,1,GL_FALSE,(float*)(P->pk+M->offBind)); }
-                    GLuint*b=&P->vbo[mi*6];
+                    GLuint bs9[6]; GLuint*b=&P->vbo[mi*6];
+                    if(isCloth9==2){ memcpy(bs9,b,sizeof bs9); bs9[0]=g_skVbo[0]; bs9[1]=g_skVbo[1]; b=bs9; }   /* hanging cloth: its own buffers */
                     glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
                     if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
                     glBindBuffer(GL_ARRAY_BUFFER,b[2]); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
@@ -17116,8 +19502,10 @@ int main(int argc,char**argv){
                          * drew the same garment correctly blue, and comparing the paths TO
                          * EACH OTHER is the only axis that could show it. */
                         else glUniform3f(g_labTint,0.80f,0.80f,0.82f); }
+                    { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,world,mi);
                     if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
                     else glDrawArrays(GL_TRIANGLES,0,M->verts);
+                      toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); mirInst(mModel,toon9,packStr(P,M->name),M->idxCount,M->verts,0); }
                     if(isCloth9){ if(g_labAlpha>=0) glUniform1f(g_labAlpha,1.f); glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
                     if(isCloth9) glUniformMatrix4fv(mModel,1,GL_FALSE,model);   /* hand the body back its matrix */
                     if(g_mode==MODE_ANIM&&getenv("REVA_DRAWDBG")){ static double dbgT=0;
@@ -17324,7 +19712,7 @@ int main(int argc,char**argv){
                     glUniformMatrix4fv(mModel,1,GL_FALSE,model);
                     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
                         mouthMeshArm(P,mi,g_heroMorphW,g_labOpen);
-                        if(!(M->flags&4)||M->boneCount>MAXB) continue;
+                        if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
             meshAlphaState(M);
                         /* P7: the panels used to inherit whatever palette the main pass
                          * left bound. That held only while the hero was the last thing
@@ -17358,8 +19746,10 @@ int main(int argc,char**argv){
                                 c9[0]=((v9>>16)&255)/255.f; c9[1]=((v9>>8)&255)/255.f; c9[2]=(v9&255)/255.f; }
                             glUniform3f(g_labTint,c9[0],c9[1],c9[2]); }
                         glUniform3f(g_labTint,0.80f,0.80f,0.82f);
+                        { int toon9=toonOn(P,P->toon); toonCelSet(toon9); colSet(P,world,mi);
                         if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
-                        else glDrawArrays(GL_TRIANGLES,0,M->verts); }
+                        else glDrawArrays(GL_TRIANGLES,0,M->verts);
+                          toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); } }
                     /* the partner appears on every angle of the wall too -- an interaction
                      * judged from one side is the single-camera habit the wall replaced */
                     if(g_labPartner&&g_labPClip>=0){
@@ -17480,7 +19870,7 @@ int main(int argc,char**argv){
             glDisable(GL_BLEND); glDepthMask(GL_TRUE);
             /* ⭐ ep 12: THE SMOKE -- after every opaque thing in the real frame (the set, the actors, the cast, the
              * boards, the park), into the same target (the post FBO when the post pass is on), far to near */
-            if(g_mode==MODE_ANIM){ smokeTick(); smokeDraw(vp); }
+            if(g_mode==MODE_ANIM){ starDraw(vp); beamDraw(vp); smokeTick(); smokeDraw(vp); }
             if(trBone[1]>=0){ float hx6=world[trBone[1]][12],hy6=world[trBone[1]][13],hz6=world[trBone[1]][14];
                 g_boltFrom[0]=model[0]*hx6+model[4]*hy6+model[8]*hz6+model[12];
                 g_boltFrom[1]=model[1]*hx6+model[5]*hy6+model[9]*hz6+model[13];
@@ -18299,6 +20689,47 @@ int main(int argc,char**argv){
                          * three-second line, slow enough that a 134-degree turn is a
                          * turn and not a snap.) */
                         if(held8!=g_scnStaged){ g_scnStaged=held8;
+                            /* ⭐ 10-22: A LINE ON ANOTHER SET. set=<name> plays this one line on another set -- a
+                             * cutaway: the ship outside the sick bay -- and the next line without one is HOME again,
+                             * the set the scene was staged on. Each set brings its own light (its sun/sky lines);
+                             * home's is put back exactly as the scene left it. */
+                            if(!g_scnHomeOK){ g_scnHomeOK=1; snprintf(g_scnHome,sizeof g_scnHome,"%s",g_setCur); g_scnAway[0]=0; }
+                            /* ⛔ a set the CTL loaded mid-scene is neither home nor our cutaway: it is the NEW home, or
+                             * the next cut would drag the scene back to a set nobody asked for */
+                            else if(strcmp(g_setCur,g_scnHome)&&strcmp(g_setCur,g_scnAway)){
+                                snprintf(g_scnHome,sizeof g_scnHome,"%s",g_setCur); g_scnAway[0]=0; }
+                            /* ⭐ home=: the scene's home set changes from this line on (the boys put in his pan once he
+                             * is out of it). Its light is the old home's, as the scene had it. */
+                            if(S8->home[0]&&strcmp(S8->home,g_scnHome)){
+                                if(!strcmp(g_setCur,g_scnHome)){ memcpy(g_scnHomeSun,g_sun,16); memcpy(g_scnHomeSunC,g_sunC,12); memcpy(g_scnHomeSky,g_sky,12); }
+                                printf("[scene] line %d: home is now '%s' (was '%s')\n",held8,S8->home,g_scnHome); fflush(stdout);
+                                snprintf(g_scnHome,sizeof g_scnHome,"%s",S8->home); }
+                            { const char*want12=S8->set[0]?S8->set:g_scnHome;
+                              if(want12[0]&&strcmp(want12,g_setCur)){
+                                  if(!strcmp(g_setCur,g_scnHome)){ memcpy(g_scnHomeSun,g_sun,16); memcpy(g_scnHomeSunC,g_sunC,12); memcpy(g_scnHomeSky,g_sky,12); }
+                                  setLoad(want12);
+                                  snprintf(g_scnAway,sizeof g_scnAway,"%s",strcmp(want12,g_scnHome)?want12:"");
+                                  if(!strcmp(want12,g_scnHome)){ memcpy(g_sun,g_scnHomeSun,16); memcpy(g_sunC,g_scnHomeSunC,12); memcpy(g_sky,g_scnHomeSky,12); }
+                                  printf("[scene] line %d: set %s%s\n",held8,want12,strcmp(want12,g_scnHome)?" -- a cutaway":" -- home"); fflush(stdout); } }
+                            /* ⭐ 10-22: DRESSED ON THE CUT -- houtfit= etc., each slot's own pack (Viktor into his tunic) */
+                            { static char wore12[4][24];
+                              for(int o12=0;o12<4;o12++){ const char*of=S8->outfit[o12]; if(!of[0]||!strcmp(of,wore12[o12])) continue;
+                                  Pack*pk12=(o12==0)?g_heroPk:g_cast[o12].pk;
+                                  if(pk12){ wardWear(pk12,of); snprintf(wore12[o12],24,"%s",of);
+                                      printf("[scene] line %d: slot %d dressed in '%s'\n",held8,o12,of); fflush(stdout); } } }
+                            /* ⭐ 10-22: THE ROLL on the cut -- a new spec starts it, the same one carried on keeps it running */
+                            for(int o12=0;o12<4&&o12<SCN_MAXCAST;o12++){ const char*rs=S8->roll[o12]; CastRoll*CR=&g_castRoll[o12];
+                              if(!rs[0]){ if(CR->on){ CR->on=0; CR->spec[0]=0; printf("[roll] line %d: slot %d stands again\n",held8,o12); fflush(stdout); } continue; }
+                              if(!strcmp(rs,CR->spec)) continue;
+                              snprintf(CR->spec,sizeof CR->spec,"%s",rs);
+                              if(!strcmp(rs,"off")){ CR->on=0; continue; }
+                              float v12[8]={0,0,0,1,0,0,0,0}; int n12=sscanf(rs,"%f,%f,%f,%f,%f,%f,%f,%f",v12,v12+1,v12+2,v12+3,v12+4,v12+5,v12+6,v12+7);
+                              float dl=sqrtf(v12[3]*v12[3]+v12[4]*v12[4]+v12[5]*v12[5]);
+                              if(n12<7||dl<1e-6f){ printf("[roll] line %d: slot %d '%s' wants ax,ay,az,dx,dy,dz,degps[,deg0] -- IGNORED\n",held8,o12,rs); CR->on=0; continue; }
+                              for(int k=0;k<3;k++){ CR->a[k]=v12[k]; CR->d[k]=v12[3+k]/dl; }
+                              CR->rate=v12[6]*0.0174533f; CR->a0=v12[7]*0.0174533f; CR->t0=scnBodyT(); CR->on=1;
+                              printf("[roll] line %d: slot %d turns round (%.1f,%.1f,%.1f)+(%.2f,%.2f,%.2f) at %.1f deg/s from %.0f\n",
+                                     held8,o12,v12[0],v12[1],v12[2],CR->d[0],CR->d[1],CR->d[2],v12[6],v12[7]); fflush(stdout); }
                             trickArm(held8);   /* ⭐ ep 10: last line's tricks hand their bodies back; this line's are armed */
                             puffArm(held8);    /* ⭐ ep 12: this line's exhales */
                             dollArm(held8);    /* ⭐ this line's falls */
@@ -18472,15 +20903,19 @@ int main(int argc,char**argv){
                               else if(S8->orbHas==1){   /* ⭐ ep 11: THE REPLAY ORBIT */
                                   int sl11=(int)S8->orb[0]; if(sl11<0) sl11=0; if(sl11>SCN_BODIES-1) sl11=SCN_BODIES-1;
                                   float r11=(S8->orb[1]<0.5f)?0.5f:S8->orb[1];
-                                  float fv11=(S8->orbN>=6)?S8->orb[5]:-1.f, ah11=(S8->orbN>=7)?S8->orb[6]:1.6f;
+                                  /* ⭐ 10-22: round a WORLD point (camat=) the aim is the point itself unless aimh says */
+                                  float fv11=(S8->orbN>=6)?S8->orb[5]:-1.f, ah11=(S8->orbN>=7)?S8->orb[6]:(S8->atHas?0.f:1.6f);
                                   int same11=(was10==4&&T10->slot==sl11&&T10->dist==r11&&T10->height==S8->orb[2]&&T10->habs==S8->orbAbs
-                                              &&T10->d0==S8->orb[3]&&T10->d1==S8->orb[4]&&T10->fov==fv11&&T10->aimh==ah11);
+                                              &&T10->d0==S8->orb[3]&&T10->d1==S8->orb[4]&&T10->fov==fv11&&T10->aimh==ah11
+                                              &&T10->wc==S8->atHas&&(!S8->atHas||!memcmp(T10->wcP,S8->at,12)));
                                   /* a sweep that starts where the last one ended, round the same body, is not a cut */
                                   int cont11=(!same11&&was10==4&&T10->slot==sl11&&T10->aimh==ah11&&T10->d1==S8->orb[3]);
                                   if(!same11){ T10->mt=0.f; T10->mT=(S8->secs>0.f)?S8->secs:scnLineSpan(held8); }
                                   if(!same11&&!cont11) T10->snap=1;
                                   T10->slot=sl11; T10->dist=r11; T10->height=S8->orb[2]; T10->habs=S8->orbAbs;
                                   T10->d0=S8->orb[3]; T10->d1=S8->orb[4]; T10->fov=fv11; T10->aimh=ah11; T10->mode=4; T10->line=held8;
+                                  T10->wc=S8->atHas; memcpy(T10->wcP,S8->at,12);
+                                  if(T10->wc){ printf("[lens] line %d camorbit round the world point %.1f,%.1f,%.1f\n",held8,T10->wcP[0],T10->wcP[1],T10->wcP[2]); fflush(stdout); }
                                   g_camOn=1; g_camMoveOn=0; if(fv11>0.f) g_camFov=fv11;
                                   printf("[lens] line %d camorbit slot %d radius %.2f height %s%.2f heading %.0f -> %.0f over %.2f s fov %.0f aimh %.2f %s\n",
                                          held8,sl11,r11,T10->habs?"=":"",T10->height,T10->d0,T10->d1,T10->mT,fv11,ah11,
@@ -18719,7 +21154,7 @@ int main(int argc,char**argv){
                               for(int s9=0;s9<SCN_MAXCAST;s9++){ g_loco[s9].spd=0.f; g_loco[s9].winit=0; g_loco[s9].on=0; g_loco[s9].pon=0; }
                               g_partSpd=0.f; g_heroStageSpd=0.f; g_partWalkMix=0.f; g_scnSnap=0; }
                         } } }
-                    for(int m9=0;m9<MORPH_MAX;m9++){ g_heroMorphW[m9]=0.f; g_partMorphW[m9]=0.f; }
+                    for(int m9=0;m9<MORPH_MAX;m9++) g_heroMorphW[m9]=0.f; memset(g_castMorphW,0,sizeof g_castMorphW);
                     int li9=scnActive();
                     if(li9>=0){ ScnLine*L9=&g_scnL[li9];
                         int fi9=(int)((scnBodyT()-L9->t0)*30.f);
@@ -18730,10 +21165,11 @@ int main(int argc,char**argv){
                         /* speech RMS spends most of its time at 0.2-0.4; a linear map
                          * left the mouth barely parted through whole sentences. */
                         amp9=scnMouth(L9,scnBodyT());   /* same mouth as the bone gets */
-                        Pack*SP=(L9->spk==0)?g_heroPk:g_labPartner;
-                        Pack*LP=(L9->spk==0)?g_labPartner:g_heroPk;
-                        float*SW=(L9->spk==0)?g_heroMorphW:g_partMorphW;
-                        float*LW=(L9->spk==0)?g_partMorphW:g_heroMorphW;
+                        int ss9=(L9->spk>=1&&L9->spk<SCN_BODIES)?L9->spk:1;   /* the speaking slot, its own face */
+                        Pack*SP=(L9->spk==0)?g_heroPk:g_cast[ss9].pk;
+                        Pack*LP=(L9->spk==0)?g_cast[1].pk:g_heroPk;
+                        float*SW=(L9->spk==0)?g_heroMorphW:g_castMorphW[ss9];
+                        float*LW=(L9->spk==0)?g_castMorphW[1]:g_heroMorphW;
                         /* ⛔ A BODY WITH A JAW BONE MUST NOT ALSO GET THE JAW MORPH.
                          * They are two different deformations of the SAME vertices,
                          * both driven from the same speech amplitude: the bone swings
@@ -18760,19 +21196,19 @@ int main(int argc,char**argv){
                      * and fights nothing (unlike jaw/smile, which the bone owns). */
                     { for(int b7=0;b7<2;b7++){
                           if(g_scnBrow[b7]<-8.f) continue;
-                          Pack*BP=b7?g_labPartner:g_heroPk;
-                          float*BW=b7?g_partMorphW:g_heroMorphW;
+                          Pack*BP=b7?g_cast[1].pk:g_heroPk;
+                          float*BW=b7?g_castMorphW[1]:g_heroMorphW;
                           /* both brows: Brow_Raise_Left and _Right inject under one name */
                           morphSetName(BP,BW,"brow",
                                        g_scnBrow[b7]+0.055f*sinf(scnBodyT()*1.3f+b7*2.f)); } }
                     /* BLINKS. Nobody holds their eyes open for a minute (jacob: "eyes
                      * are not moving"). Each body runs her own clock, so they never
                      * blink in lockstep. */
-                    { static float bT9[2]={1.1f,2.7f}, bP9[2]={-1.f,-1.f};
+                    { static float bT9[SCN_BODIES]={1.1f,2.7f,1.9f,3.4f}, bP9[SCN_BODIES]={-1.f,-1.f,-1.f,-1.f};
                       float st9=animStepS((sfps>0.f)?(1.f/sfps):dtf);
-                      for(int b9=0;b9<2;b9++){
-                          Pack*BP=b9?g_labPartner:g_heroPk;
-                          float*BW=b9?g_partMorphW:g_heroMorphW;
+                      for(int b9=0;b9<SCN_BODIES&&b9<g_scnNCast;b9++){
+                          Pack*BP=b9?g_cast[b9].pk:g_heroPk;
+                          float*BW=b9?g_castMorphW[b9]:g_heroMorphW;
                           if(morphIdx(BP,"blink")<0) continue;
                           /* eyeBlinkLeft and eyeBlinkRight both inject as `blink`, so one
                            * clock shuts both eyes -- a body does not wink at the street. */
@@ -18782,9 +21218,9 @@ int main(int argc,char**argv){
                               else morphSetName(BP,BW,"blink",sinf(3.14159f*(bP9[b9]/0.16f))); }
                           else { bT9[b9]-=st9; if(bT9[b9]<=0.f) bP9[b9]=0.f; } } }
                     { const char*mf9=getenv("REVA_MORPHFORCE");   /* bench: pin the jaw open */
-                      if(mf9){ float v9=(float)atof(mf9);
+                      if(mf9&&!strchr(mf9,'=')){ float v9=(float)atof(mf9);
                           morphSetName(g_heroPk,g_heroMorphW,"jaw",v9);
-                          morphSetName(g_labPartner,g_partMorphW,"jaw",v9); } }
+                          for(int c9=1;c9<SCN_BODIES;c9++) morphSetName(g_cast[c9].pk,g_castMorphW[c9],"jaw",v9); } }
                     { static float tel9=0.f; tel9+=dtf;
                       if(tel9>2.0f){ tel9=0.f;
                         printf("[scene] t=%.1f line=%d  jaw idx h=%d p=%d  weights h=[%.2f %.2f %.2f %.2f] p=[%.2f %.2f %.2f %.2f]\n",
@@ -18793,7 +21229,7 @@ int main(int argc,char**argv){
                                g_partMorphW[0],g_partMorphW[1],g_partMorphW[2],g_partMorphW[3]);
                         fflush(stdout); } }
                     if(g_scnT>g_scnLen+1.4f){ g_scnT=-1.f;
-                        for(int m9=0;m9<MORPH_MAX;m9++){ g_heroMorphW[m9]=0.f; g_partMorphW[m9]=0.f; }
+                        for(int m9=0;m9<MORPH_MAX;m9++) g_heroMorphW[m9]=0.f; memset(g_castMorphW,0,sizeof g_castMorphW);
                         g_stepFps=g_stepCtl; g_tone=g_toneCtl;
                         printf("[scene] done\n"); fflush(stdout); } }
                 /* ---- LIVE CONTROL (jacob 08-26: "leave this running and fine tune it
@@ -19103,6 +21539,21 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"reverse="))){
                             g_revForce=(!strncmp(q+8,"auto",4))?-1:(atoi(q+8)?1:0);
                             printf("[lens] ctl: reverse %s\n",(g_revForce<0)?"auto (the script's own)":(g_revForce?"1":"0")); fflush(stdout); }
+                        /* ⭐ THE WARDROBE FROM THE CTL (09-29): outfit=<name> dresses the hero, poutfit= the partner;
+                         * wear=+piece,-piece / pwear= put one piece on or take it off. ⛔ `outfit=` is inside
+                         * `poutfit=` and `wear=` inside `pwear=`: the leading-space guard. */
+                        if((q=strstr(buf,"outfit="))&&(q==buf||q[-1]==' ')){ char o9[24]; int k9=0; q+=7;
+                            while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k9<23) o9[k9++]=*q++; o9[k9]=0;
+                            if(g_heroPk) wardWear(g_heroPk,o9); }
+                        if((q=strstr(buf,"poutfit="))&&(q==buf||q[-1]==' ')){ char o9[24]; int k9=0; q+=8;
+                            while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k9<23) o9[k9++]=*q++; o9[k9]=0;
+                            if(g_labPartner) wardWear(g_labPartner,o9); }
+                        if((q=strstr(buf,"wear="))&&(q==buf||q[-1]==' ')){ char o9[256]; int k9=0; q+=5;
+                            while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k9<255) o9[k9++]=*q++; o9[k9]=0;
+                            if(g_heroPk) wardToggle(g_heroPk,o9); }
+                        if((q=strstr(buf,"pwear="))&&(q==buf||q[-1]==' ')){ char o9[256]; int k9=0; q+=6;
+                            while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k9<255) o9[k9++]=*q++; o9[k9]=0;
+                            if(g_labPartner) wardToggle(g_labPartner,o9); }
                         /* ⭐ jawgain=<f> -- the puppet jaw's opening scale in `mouth hinge` mode
                          * (ep 4). A scene's own jawgain= beats it, and a scene STARTS on it. */
                         if((q=strstr(buf,"jawgain="))&&(q==buf||q[-1]==' ')){ float v=(float)atof(q+8);
@@ -19146,7 +21597,7 @@ int main(int argc,char**argv){
                             nm5[k5]=0;
                             if(!k5||!strcmp(nm5,"off")){ g_scnT=-1.f;
                                 sfxStop(g_scnVoice); g_scnVoice=-1;
-                                for(int m5=0;m5<8;m5++){ g_heroMorphW[m5]=0.f; g_partMorphW[m5]=0.f; }
+                                for(int m5=0;m5<8;m5++) g_heroMorphW[m5]=0.f; memset(g_castMorphW,0,sizeof g_castMorphW);
                                 printf("[scene] off\n"); fflush(stdout); }
                             else scnLoad(nm5); }
                         /* set=<name> lays a world down; set=off clears it. */
@@ -19224,7 +21675,17 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"set="))){ char nm6[64]; int k6=0; q+=4;
                             while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k6<63) nm6[k6++]=*q++;
                             nm6[k6]=0;
-                            if(strcmp(nm6,g_setCur)) setLoad(nm6); }
+                            if(strcmp(nm6,g_setCur)){ setLoad(nm6);
+                                /* ⭐ 10-22: a set may bring its own sun and sky -- the ctl line's own still win */
+                                const char*q7;
+                                if((q7=strstr(buf,"sky="))) sscanf(q7+4,"%f,%f,%f",&g_sky[0],&g_sky[1],&g_sky[2]);
+                                if((q7=strstr(buf,"sun="))){
+                                    if(!strncmp(q7+4,"off",3)) g_sun[3]=0.f;
+                                    else { float el7=45.f,az7=30.f,it7=1.f,r7=1.f,g7=0.97f,b7=0.90f;
+                                        int n7=sscanf(q7+4,"%f,%f,%f,%f,%f,%f",&el7,&az7,&it7,&r7,&g7,&b7);
+                                        if(n7>=3){ float e7=el7*0.0174532925f, a7=az7*0.0174532925f;
+                                            g_sun[0]=cosf(e7)*sinf(a7); g_sun[1]=sinf(e7); g_sun[2]=cosf(e7)*cosf(a7); g_sun[3]=it7;
+                                            if(n7>=6){ g_sunC[0]=r7; g_sunC[1]=g7; g_sunC[2]=b7; } } } } } }
                         if((q=strstr(buf,"hi5="))) g_labHi5=atoi(q+4);   /* 1=hands, 2=held-hands, 3=kiss (head to head), 4=massage (hero hand to her shoulder) */
                         /* P7 pclip=<name>: what the partner plays -- HER OWN pack first,
                          * then ANY loaded bank, retargeted onto her.
@@ -19327,7 +21788,7 @@ int main(int argc,char**argv){
                     float r9=g_bc[b9].side?1.3f*f9:0.3f*f9, gg9=0.5f*f9, bb9=g_bc[b9].side?0.3f*f9:1.3f*f9;
                     gmLine(g_bc[b9].x-0.22f,0.05f,g_bc[b9].z,g_bc[b9].x+0.22f,0.05f,g_bc[b9].z,r9,gg9,bb9);
                     gmLine(g_bc[b9].x,0.05f,g_bc[b9].z-0.22f,g_bc[b9].x,0.05f,g_bc[b9].z+0.22f,r9,gg9,bb9); }
-                if(g_scnT>=0.f||g_setNI){ GM.l1[0]=GM.l2[0]=GM.l3[0]=0; }   /* a scene -- or a SET -- owns the screen */
+                if(g_scnT>=0.f||g_setNI||g_setSpace){ GM.l1[0]=GM.l2[0]=GM.l3[0]=0; }   /* a scene -- or a SET (10-22: or space) -- owns the screen */
                 else { float ratio=(g_labTravel>0.5f)?(g_labSlip/g_labTravel):0.f;
                   snprintf(GM.l1,sizeof GM.l1,"STATE %d/%d  %s%s",GM.stage+1,LAB_N,LAB_NAME[GM.stage],
                            GM.flag?"  [PINNED]":"");
@@ -19531,7 +21992,7 @@ int main(int argc,char**argv){
               { char mh[80];
                 if(MODE_VAR[g_mode][0]) snprintf(mh,sizeof mh,"%s / %s",MODE_NAME[g_mode],MODE_VAR[g_mode][g_modeVariant]);
                 else snprintf(mh,sizeof mh,"%s",MODE_NAME[g_mode]);
-                if(g_scnT<0.f&&!g_setNI) drawText(40,150,1.4f,mh,0.49f,0.98f,1.0f,0.75f); }
+                if(g_scnT<0.f&&!g_setNI&&!g_setSpace) drawText(40,150,1.4f,mh,0.49f,0.98f,1.0f,0.75f); }
               if(g_mode==MODE_ARCADE&&g_modeVariant==3){ char am[96];
                   snprintf(am,sizeof am,"MACHINE: %s   BANK %ld   ROTATION %d   NEXT %.0fs",
                            MODE_VAR[MODE_ARCADE][g_amCab],g_amScore,g_amRot+1,g_amT>0.f?g_amT:0.f);
@@ -19620,7 +22081,7 @@ int main(int argc,char**argv){
            * A SET OWNS THE SCREEN, including the club's own decoration. Those were gated on
            * a scene and then on a set; this credit was missed because it is drawn with the
            * HUD text rather than with the club's props. Same gate as the mode hint above. */
-          if(CAMD.shot==9&&g_scnT<0.f&&!g_setNI){ Pack*sp=&packs[slots[CAMD.tgt].pack];
+          if(CAMD.shot==9&&g_scnT<0.f&&!g_setNI&&!g_setSpace){ Pack*sp=&packs[slots[CAMD.tgt].pack];
               g_showH=sp->effH;
               drawText(60,362,2.4f,sp->label,1.0f,0.92f,1.0f,0.98f);   /* raised clear of the musinfo block */
               if(sp->artist[0]){ char a2[96]; snprintf(a2,sizeof a2,"by %s",sp->artist);

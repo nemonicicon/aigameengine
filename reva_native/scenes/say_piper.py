@@ -35,6 +35,38 @@ PEOPLE = {
                   noise_w_scale=1.05, note="American, quick, loose cadence"),
     "susan": dict(model="en_US-kristin-medium", length_scale=1.00, noise_scale=0.700,
                   noise_w_scale=1.15, note="the neighbour: warm, chatty, deflects"),
+    # THE WORLD AT THE END OF TIME, scene 2.1 -- a TEMPORARY cast (jacob, 10-18: "a rough cut of scene 2.1 on
+    # temporary voices", then "i like piper"). The only installed Piper model with men in it is LibriTTS (904
+    # speakers, one `speaker` each); I cannot hear them, so the four were picked by MEASURED pitch and pace off one
+    # line said by 113 of them (D:/worldattheendoftime/production/voices/audition/spk_NNN.wav): men read 99-152 Hz,
+    # women 170-255. Recast by changing a number.
+    "narrator": dict(model="en_US-libritts_r-medium", speaker=248, length_scale=1.02, noise_scale=0.620,
+                  noise_w_scale=0.80, note="the narrator (V.O.): a low man (106 Hz), unhurried"),
+    "viktor": dict(model="en_US-libritts_r-medium", speaker=464, length_scale=0.98, noise_scale=0.700,
+                  noise_w_scale=0.95, note="a boy of twelve, voiced light (214 Hz) as a cartoon boy is"),
+    "wanda": dict(model="en_US-libritts_r-medium", speaker=352, length_scale=1.05, noise_scale=0.600,
+                  noise_w_scale=0.75, note="a hundred and clear-eyed: the slowest reader of the sample"),
+    "amelia": dict(model="en_US-libritts_r-medium", speaker=864, length_scale=0.95, noise_scale=0.700,
+                  noise_w_scale=1.00, note="his mother, hurrying in: quick (220 Hz)"),
+    # chapter 2 (10-22), the same audition: men 99-152 Hz, women 170-255; nobody already cast is reused
+    "pal": dict(model="en_US-libritts_r-medium", speaker=272, length_scale=0.98, noise_scale=0.680,
+                  noise_w_scale=0.95, note="Pal, cheery, smiles often: a middle man (122 Hz), easy pace"),
+    "marie_claude": dict(model="en_US-libritts_r-medium", speaker=96, length_scale=1.00, noise_scale=0.680,
+                  noise_w_scale=0.95, note="Marie-Claude, twenty-five: a warm mid woman (192 Hz)"),
+    "werner": dict(model="en_US-libritts_r-medium", speaker=432, length_scale=1.00, noise_scale=0.660,
+                  noise_w_scale=0.90, note="Werner, thirty-eight, frayed: a lighter man (128 Hz)"),
+    "bu": dict(model="en_US-libritts_r-medium", speaker=400, length_scale=1.06, noise_scale=0.600,
+                  noise_w_scale=0.75, note="Captain Bu, fifty-two, formal: the lowest of the sample (100 Hz), slow"),
+    "mtiga": dict(model="en_US-libritts_r-medium", speaker=376, length_scale=1.04, noise_scale=0.640,
+                  noise_w_scale=0.85, note="Frances Mtiga, dour and fretful (202 Hz), slower"),
+    "navigator": dict(model="en_US-libritts_r-medium", speaker=416, length_scale=0.96, noise_scale=0.700,
+                  noise_w_scale=1.00, note="2.4's navigator, the joker: a high man (143 Hz), quick"),
+    "billy": dict(model="en_US-libritts_r-medium", speaker=408, length_scale=0.94, noise_scale=0.760,
+                  noise_w_scale=1.10, note="Billy, five, the fighter (240 Hz): voiced as a cartoon boy is"),
+    "freddy": dict(model="en_US-libritts_r-medium", speaker=664, length_scale=0.96, noise_scale=0.740,
+                  noise_w_scale=1.05, note="Freddy, five, the sly one: the highest of the sample (251 Hz)"),
+    "pal_old": dict(model="en_US-libritts_r-medium", speaker=272, length_scale=1.08, noise_scale=0.600,
+                  noise_w_scale=0.85, note="Pal sixteen years on (2.31): the same voice, slower, worn"),
 }
 # the default cast is what every script written before this line meant
 CAST = {"0": dict(PEOPLE["reva"]), "1": dict(PEOPLE["kaeli"])}
@@ -79,7 +111,7 @@ def main():
         path = os.path.join(VOICES, c["model"] + ".onnx")
         assert os.path.exists(path), "missing voice %s (python -m piper.download_voices %s)" % (path, c["model"])
         loaded[spk] = PiperVoice.load(path)
-        print("voice %s = %-22s  %s" % (spk, c["model"], c["note"]))
+        print("voice %s = %-22s %-9s %s" % (spk, c["model"], ("#%d" % c["speaker"]) if "speaker" in c else "", c["note"]))
     i = 0
     for raw in open(src, encoding="utf-8"):
         s = raw.strip()
@@ -98,11 +130,30 @@ def main():
             if "=" in b:
                 k, v = b.split("=", 1)
                 if k in DIRECTION: c[DIRECTION[k]] = float(v)
-        cfg = SynthesisConfig(length_scale=c["length_scale"], noise_scale=c["noise_scale"],
+        cfg = SynthesisConfig(speaker_id=c.get("speaker"),            # a multi-speaker model's ONE voice
+                              length_scale=c["length_scale"], noise_scale=c["noise_scale"],
                               noise_w_scale=c["noise_w_scale"], normalize_audio=True)
         out = os.path.join(outdir, "line_%02d.wav" % i)
         with wave.open(out, "wb") as w:
             loaded[spk].synthesize_wav(text, w, syn_config=cfg)
+        # ⭐ (10-22) with=N: two people say it at once (2.29, BILLY & FREDDY) -- slot N's voice, mixed in
+        both = [b.split("=", 1)[1] for b in bits[1:] if b.startswith("with=")]
+        if both and both[0] in loaded:
+            import numpy as _np
+            c2 = dict(CAST[both[0]])
+            cfg2 = SynthesisConfig(speaker_id=c2.get("speaker"), length_scale=c2["length_scale"],
+                                   noise_scale=c2["noise_scale"], noise_w_scale=c2["noise_w_scale"], normalize_audio=True)
+            tmp2 = out + ".with.wav"
+            with wave.open(tmp2, "wb") as w:
+                loaded[both[0]].synthesize_wav(text, w, syn_config=cfg2)
+            with wave.open(out, "rb") as w:
+                p1 = w.getparams(); a1 = _np.frombuffer(w.readframes(w.getnframes()), dtype=_np.int16).astype(_np.float32)
+            with wave.open(tmp2, "rb") as w:
+                a2 = _np.frombuffer(w.readframes(w.getnframes()), dtype=_np.int16).astype(_np.float32)
+            n = max(len(a1), len(a2)); m = _np.zeros(n, _np.float32); m[:len(a1)] += a1 * 0.62; m[:len(a2)] += a2 * 0.62
+            with wave.open(out, "wb") as w:
+                w.setparams(p1); w.writeframes(_np.clip(m, -32767, 32767).astype(_np.int16).tobytes())
+            os.remove(tmp2)
         with wave.open(out, "rb") as w:
             dur = w.getnframes() / float(w.getframerate())
             sr = w.getframerate()

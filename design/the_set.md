@@ -49,6 +49,11 @@ correct matrices, every pack reported drawable. Nothing rendered.
     prop  <stem> x y z yaw scale [r g b]
     actor <pack> <clip> x y z yaw scale [rate] [speed] [runlen] [board]
 
+⭐ (10-23) `outfit=<name>` anywhere on an actor line is what that actor WEARS (one of its pack's wardrobe
+outfits; a name it lacks is refused and the outfits it has are listed). Without it an actor wears its pack's FIRST
+outfit -- which put Billy in his freezer shift beside Freddy in day clothes (WATEOT 2.22). Each actor keeps its own
+worn pieces, so two actors on one pack can dress differently.
+
 A stem resolves as `props/v1_town_<stem>` → `props/<stem>` → `packs/<stem>`, so a BODY is
 placeable the same way a mailbox is. An optional r,g,b replaces the texture with a flat
 tint, which is how a kit of grey primitives becomes a painted lawn.
@@ -402,3 +407,45 @@ on the other body's pack stood in `z_rest` for half of promo ep 3, and `[stage]`
 once, quietly. The first miss prints a boxed MISSING CLIP notice, later ones count, and the exit
 report says how many lines that body stood in a T-pose for. Every clip a script names is baked
 on the body that plays it.
+
+### Marker nodes on a prop: `ToonSet`, `Glow`, `NoCast`, `Open` (10-18)
+
+A baked prop can carry named marker nodes (`skate_src/glb2rpack.py <glb> <rpack> --marker ToonSet --marker Open ...`)
+that change how the set draws it -- engine_capabilities.md section 38, first used by THE WORLD AT THE END OF TIME's
+sick bay (`sets/sickbay.set`, written by `skate_src/ship/build_sickbay.py`):
+
+- `ToonSet` -- the show's toon look (cel + ink), lit as a room: walls lit, undersides in the shadow tone, sun shadows.
+- `Glow` -- unlit at its own colour, no ink: lamps, screens, an emitter, a lit cubicle.
+- `NoCast` -- out of the sun's shadow map: a ceiling, a room's walls, anything that IS a light.
+- `Open` -- never a collider, whatever its name. ⛔ A shell or a run of fittings built in ROOM coordinates is one pack
+  whose footprint is the whole room: without `Open`, propSolid made it one circle that wide, at the room's centre.
+
+A prop's instance stands on its ROOT NODE (the baker's origin), not on its lowest vertex, so pieces built in room
+coordinates -- a ceiling at 2.9 m, a hood hanging from it -- all go in at `0 0 0` and stay where they were built.
+
+## THE SHIP AND THE SKY (THE WORLD AT THE END OF TIME, 10-22 → 10-23)
+
+The lines chapters 1-3 added (engine_capabilities.md sections 41-46):
+
+    mirror   x y z yaw w h                                   a mirror (4 at most), facing `yaw` into the room
+    star     dx dy dz r g b size_deg [halo] [flare delay rise peak]
+    starbody x y z R T cutdeg cutwidth seed [stretch k rise [delay]]
+    actor    ... outfit=<name>                               what this actor wears (above)
+
+- `mirror`: bodies and props are drawn again through the plane -- a toon body's ink too, a MirrorOnly backing never.
+  A room from `skate_src/ship/build_rooms.py` carries the opening, a frame, the glass (`Alpha18`) and the backing (marker
+  `MirrorOnly`: drawn only in a reflection, so the mirror is silver from the room and never shows its own back).
+  REVA_NOMIRROR is the control, REVA_MIRDBG the instrument. ⛔ The first mirror came back BLACK: it reflected its own
+  backing and glass, and a body's ink hull seen from behind is a black shell -- neither is drawn in a reflection now.
+- `flare` on a `star`: from `delay` s after the set loads it brightens to `peak` over `rise` s, swells, and turns the
+  flare star's blue-white (Wan-To's anomalous K-5; chapter 3's probing fire, five stars flaring in turn).
+- `stretch` on a `starbody`: the star is drawn out along x to `k` times its radius over `rise` s, thinned the other
+  two ways to keep its volume, heaving (3.3-13's particle rack). The rest of the space lines (`space`, `far`,
+  `milkyway`, `beam`, `starspot`, `starloop`, `starweb`) are sections 41-42.
+- ⛔ **A room's SHELL is not furniture.** A pack marked `NoCast` + `Open` is never solid to the contact pass -- built
+  in room coordinates, it threw the hero toward the ceiling on every clip until it was excluded.
+- ⭐ **A room tells the scene generator where its walls are**: `# BOUNDS x0 x1 z0 z1 ceiling` (metres) on its set file,
+  and its geometry as glbs on D: (`production/sets/rooms/rm_<room>_{shell,fix,glow,glass}.glb`), which the generator
+  tests every lens against.
+- ⭐ **A body that LIES needs a mark AT the bed** (`bunk_lie` on the mattress, 2.1's `vik_pan` in the pan): a mark at a
+  bunk's edge or beside a pan is for sitting or standing, and a lying clip on it lies on the floor.

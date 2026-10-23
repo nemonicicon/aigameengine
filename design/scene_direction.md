@@ -536,3 +536,41 @@ looping`. So a filmer's line may simply END near the subject, and her orbit begi
 subtitle play over her own footage (subtitles land after the post pass, sharp across the phone's black bars) and
 her body is never drawn; a body cued limp with `pdoll=` speaks through nine lines and stays down. `aimh` 1.1 for
 a rider (a fisheye bends the top of the frame away from a body close by), 0.5 for a body on the ground.
+
+## THE SHOW'S KEYS (THE WORLD AT THE END OF TIME, 10-22 → 10-23)
+
+### `set=<name>` and `camat=x,y,z` — a cutaway, and a lens round a world point
+A line may play on ANOTHER set -- the freezatorium's racks, the ship outside, Wan-To's star -- and the scene comes home
+after it. `camorbit=` with `camat=` circles a world point instead of a body (engine_capabilities.md section 41).
+
+### `home=<set>` — the scene's room changes (sticky)
+The scene moves (Wanda tugs Viktor from the freezatorium to the workshop and back to the warm corridor). Every line
+after it plays there until another `home=`.
+
+### `houtfit= / poutfit= / p2outfit= / p3outfit=` — dressed on the cut; `hroll=` — carried round a drum
+Section 43. (A set ACTOR's outfit is its line's `outfit=` -- design/the_set.md.)
+
+### `with=N` — two people say it at once
+`say_piper.py` voices the line again in slot N's voice and mixes the two (2.29: BILLY & FREDDY). The mouth on screen is
+the line's own speaker's.
+
+### ⭐ A SCENE WRITTEN BY A PLAN: `scenes/wateot_ch2.py`
+Chapter 2's 29 scenes are not typed: each is a plan (its room, its cast, its extras with their outfits, per slot a lens
+or staging keys) that writes `wateot_2_N.txt`, `sets/_s2_N.set` and `record_ch2.sh`. Its lenses are MEASURED and then
+TESTED before they are used -- the speaker's face toward the lens; no head, torso or furniture (the room's own triangles,
+glass included) across the line; a listener's back may edge a single, never fill it -- and when none passes the line
+gets a two-shot or a wide, and a WARNING says so. What the first takes taught it (design/wateot_series.md):
+- ⛔ over-the-shoulder is for two people FACING each other. Side by side (a row of stations) it shot the back of the
+  speaker's head through the listener: those singles come from in front, swung 35 degrees toward the listener.
+- ⛔ a body on a mark faces the MARK's way and only its head turns (35 degrees): Viktor on his door's mark talked to the
+  door. Standing people on room marks are turned to each other, and moved out of furniture to free floor.
+- ⭐ a lying face looks UP: its single comes from above it, else from the open side at bed height.
+
+### ⛔ A walk that cannot be walked
+A walk the router cannot route goes straight; if the furniture holds the walker for 0.6 s it is PLACED on its mark and
+the log says `[walk] slot N STUCK ... PLACED on the mark`. A walk known to be impossible -- through a shut thermal door,
+round a crowded cabin -- is `snap=1` on its line instead: the cut places it.
+
+### ⛔ A solo scene still gets a partner
+`driver.py scene`'s default partner is kmoves: a scene with one person in it passes `--partner off`, or a stranger
+stands in the cabin.

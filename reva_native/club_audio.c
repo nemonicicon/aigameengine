@@ -15,7 +15,9 @@
  *   a PPM, so anim_bench/audiocheck.py reads the dump and counts the bursts. */
 #define SFX_BANK 64
 #define SFX_VOICES 32
+#ifndef SFX_RATE
 #define SFX_RATE 44100
+#endif
 typedef struct { char name[32]; float*pcm; int n; int missing; } SfxClip;
 typedef struct { int clip; int pos; float gain,pan; int loop,on,spatial; float p[3]; int gen; } SfxVoice;
 static SfxClip g_sfx[SFX_BANK]; static int g_nSfx=0;
@@ -82,6 +84,20 @@ int sfxPlaySlot(int slot,float gain,const float*pos,int loop){
     g_sfxPlays++;
     if(g_sfxDbg){ printf("[sfx] play %s gain %.2f%s\n",g_sfx[slot].name,gain,pos?" (spatial)":""); fflush(stdout); }
     return (v<<16)|(V->gen&0xffff); }
+/* (10-22, reva) the outside face door 11 needs: a synthesised clip into the bank, a voice turned while it plays,
+ * the master volume, whether the device is open */
+int sfxBankPCM(const char*name,float*pcm,int n){
+    int slot=-1; for(int i=0;i<g_nSfx;i++) if(!strcmp(g_sfx[i].name,name)){ slot=i; break; }
+    if(slot<0){ if(g_nSfx>=SFX_BANK){ free(pcm); return -1; } slot=g_nSfx++; }
+    if(g_mixDev) SDL_LockAudioDevice(g_mixDev);
+    if(g_sfx[slot].pcm) free(g_sfx[slot].pcm);
+    snprintf(g_sfx[slot].name,32,"%s",name); g_sfx[slot].pcm=pcm; g_sfx[slot].n=n; g_sfx[slot].missing=0;
+    if(g_mixDev) SDL_UnlockAudioDevice(g_mixDev);
+    return slot; }
+void sfxVoiceGain(int id,float g){ if(id<0||!g_mixDev) return; int v=id>>16; if(v<0||v>=SFX_VOICES) return;
+    SDL_LockAudioDevice(g_mixDev); if((g_voice[v].gen&0xffff)==(id&0xffff)) g_voice[v].gain=g; SDL_UnlockAudioDevice(g_mixDev); }
+void sfxSetMaster(float m){ g_sfxMaster=m; }
+int sfxReady(void){ return g_mixDev!=0; }
 int sfxPlay(const char*name,float gain,const float*pos,int loop){ return sfxPlaySlot(sfxLoad(name),gain,pos,loop); }
 void sfxStop(int id){ if(id<0||!g_mixDev) return; int v=id>>16; if(v<0||v>=SFX_VOICES) return;
     SDL_LockAudioDevice(g_mixDev); if((g_voice[v].gen&0xffff)==(id&0xffff)) g_voice[v].on=0; SDL_UnlockAudioDevice(g_mixDev); }
@@ -92,6 +108,7 @@ void sfxListener(const float*eye,const float*ctr){
     g_lstR[0]=fz/fl; g_lstR[1]=0.f; g_lstR[2]=-fx/fl;      /* right = forward x up */
     if(g_mixDev) SDL_UnlockAudioDevice(g_mixDev); }
 void sfxInit(void){
+    if(g_mixDev) return;   /* idempotent: door 11 opens the mixer before the club does (reva 10-12) */
     if(getenv("REVA_NOAUDIO")){ printf("[sfx] REVA_NOAUDIO: no mixer\n"); return; }
     { const char*e=getenv("REVA_SFXDBG"); g_sfxDbg=(e&&e[0]!='0')?1:0; }
     /* [pi] the KMS build never calls SDL_Init: the mixer owns its subsystem (refcounted, a no-op on SDL video builds) */

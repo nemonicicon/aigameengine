@@ -167,6 +167,18 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # height written `=h` (camtrack=0,6,=3.0,90,50) is ABSOLUTE world y: the lens tilts up after a
               # rider on a wall instead of rising with her. ONE lens mode per line.
               cammove="", camorbit="", camsecs="", camshake="",
+              # ⭐ 10-22: camat=x,y,z (u) is a camorbit's CENTRE when it circles a world point -- a ship -- and not a
+              # body; it rides with the orbit (carried while it is, dropped with it). set=<name> plays THIS line on
+              # another set -- a CUTAWAY, the ship outside the sick bay -- with that set's own light; NOT sticky:
+              # the next line without one is back on the set the scene was staged on, in the light it had.
+              camat="", set="",
+              # ⭐ 10-22: home=<set> -- the scene's HOME set from this line on (sticky: the boys put into his pan once
+              # he is out of it). houtfit= poutfit= p2outfit= p3outfit= -- dress a body on the cut (sticky; its own
+              # pack's outfit names: Viktor's are freezer and tunic).
+              home="", houtfit="", poutfit="", p2outfit="", p3outfit="",
+              # ⭐ 10-22: hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0] -- the body carried round an axis
+              # (Viktor round the treadmill drum); sticky, `off` hands it back.
+              hroll="", proll="", p2roll="", p3roll="",
               # ⭐ ep 10: dur=<sec> makes a line with NOTHING after `|` an ACTION line: no voice, no
               # subtitle, no mouth, that long in the timeline. NOT sticky (it is an event, like beat).
               dur="",
@@ -191,7 +203,7 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # club's own glass, ~0.55 a fisheye). Both sticky, both land on the cut.
               feed="", fish="",
               tod="", tone="")
-VOICE_KEYS = ("rate", "var", "pitch", "voice")   # the voicers' keys, ignored here (voice= is say_kokoro's)
+VOICE_KEYS = ("rate", "var", "pitch", "voice", "with")   # with=N: a second voice in unison (say_piper.py, 10-22)   # the voicers' keys, ignored here (voice= is say_kokoro's)
 TRICK_KEYS = ("htrick", "ptrick", "p2trick", "p3trick")   # ⭐ ep 10: in STAGE0 (the whitelist) but NOT sticky
 PUFF_KEYS = ("hpuff", "ppuff", "p2puff", "p3puff")         # ⭐ ep 12: in STAGE0 but NOT sticky; the engine keeps 8, 63 chars
 DOLL_KEYS = ("hdoll", "pdoll", "p2doll", "p3doll")         # ⭐ the fall: in STAGE0 but NOT sticky
@@ -390,6 +402,13 @@ def main(script, gap=0.42, out=None):
                                      % (k, v, s[:60]))
                 once[k] = v
                 continue
+            if k == "home" and not os.path.exists(os.path.join(here, "..", "sets", v + ".set")):
+                raise SystemExit("home=%s: there is no sets/%s.set, on: %s" % (v, v, s[:60]))
+            if k == "set":        # ⭐ 10-22: a CUTAWAY -- this line only
+                if not os.path.exists(os.path.join(here, "..", "sets", v + ".set")):
+                    raise SystemExit("set=%s: there is no sets/%s.set, on: %s" % (v, v, s[:60]))
+                once[k] = v
+                continue
             if k == "shot" and v not in SHOTS:
                 raise SystemExit("unknown shot '%s' on: %s\n    it is one of: %s"
                                  % (v, s[:60], " ".join(SHOTS)))
@@ -517,6 +536,18 @@ def main(script, gap=0.42, out=None):
         for ak in PIPE_AIR_KEYS:
             if ak in said and stage[ak] != "off" and not all(stage[ak].split(",")):
                 raise SystemExit("bad %s='%s' on: %s\n    it is <clip>[,<clip>...] or off" % (ak, stage[ak], s[:60]))
+        # ⭐ 10-22: camat= is the orbit's centre: checked here, and never left behind when the orbit ends
+        if "camat" in said:
+            try:
+                ok = len([float(x) for x in stage["camat"].split(",")]) == 3
+            except ValueError:
+                ok = False
+            if not ok:
+                raise SystemExit("camat= wants x,y,z (u), on: %s" % s[:60])
+        if stage["camorbit"] in ("", "off"):
+            if "camat" in said:
+                raise SystemExit("camat= is a camorbit's centre -- say it with camorbit=, on: %s" % s[:60])
+            stage["camat"] = ""
         st_ = dict(stage)
         st_.update(once)
         for lk in ("camtrack", "campan", "camorbit") + PIPE_KEYS + PIPE_AIR_KEYS:

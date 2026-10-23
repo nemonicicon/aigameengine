@@ -117,11 +117,23 @@ $PY $D down
 ```
 
 `--live` relaunches by itself, and prints why, when the live window cannot answer: none is up,
-the subject/exe/`--env` differ, or **any pack on disk is newer than the boot** (a running window
-keeps the bodies it loaded). A rewritten `.set` is picked up by sending `set=off` first — the
-engine only loads a set whose NAME changed. `--settle` (2.5 s) is the pause between the ctl line
-and the grab. ⛔ `bench` and `scene` still boot their own engine (their captures are armed by env
-vars at launch) and `kill` every window first, the live one included.
+the subject/exe/`--env` differ, or **any pack or set prop on disk is newer than the boot** (a
+running window keeps the bodies it loaded, and caches set props by NAME). A rewritten `.set` is
+picked up by sending `set=off` first — the engine only loads a set whose NAME changed. `--settle`
+(2.5 s) is the pause between the ctl line and the grab. ⛔ `bench` and `scene` still boot their
+own engine (their captures are armed by env vars at launch) and `kill` every window first, the
+live one included.
+
+⭐ **A SET FROM EVERY CAMERA IN ONE BOOT: `looks`.** jacob (10-22): *"we should batch more work into
+builds to save on overall build time"* — a five-camera look had cost five boots (~2 min). `looks`
+reuses or boots ONE live window, grabs every camera (~1.5 s each after the first), and writes
+`<out>_<name>.png` per camera plus a labelled `<out>_sheet.png`. Batch the other way too: several
+patches per `build`, one bake per batch of builder changes, one scene take per batch of fixes.
+
+```bash
+$PY $D looks /tmp/ship.png --new --set space_mayflower --metres --light "shadow=0" \
+  --cams "q34=160,70,1332.9,0,0,1112.9,40;side=-468,97,1102.9,0,0,1102.9,40"
+```
 
 ```bash
 # THE FACE RIG — 8 angles + mouth and eye cameras, face marks DRAWN IN
@@ -229,12 +241,16 @@ the driver does *not* need that.
 There is no unit-test suite for the engine. The bench instruments are the tests:
 
 ```bash
-$PY reva_native/anim_bench/shotsweep.py                # 4 strict + 11 live door shots
 $PY reva_native/anim_bench/facecheck.py                # the face, incl. the see-through test
 $PY reva_native/anim_bench/posturecheck.py <log>       # is it STANDING, or merely still
 ```
 
-⛔ **`shotsweep.py` measures SAMENESS, not correctness.** It proves you didn't change
+⛔⛔ **`shotsweep.py` IS RETIRED — DO NOT RUN IT.** jacob, 10-18: *"the strict regression sweep is HOT GARBAGE
+it cant tell you ANYTHING and should never be used again in its current state."* To show a change stayed where
+it belongs, run a **control** on the body it could have touched — the change's own switch off (`--env
+REVA_NOTOON=1`, `--env REVA_CHCOLLIDE=0`, `REVA_NOCLOTH=1`…) against on, on a `bench` sheet — and look.
+
+(What it was, for the record:) ⛔ **`shotsweep.py` measures SAMENESS, not correctness.** It proves you didn't change
 what you weren't touching. It cannot tell you a garment is a sack or a walk is wrong —
 only your eyes on a `bench` sheet can. jacob: *"why do i find the pixel regression to be
 pointless... just fuckin look at some of your subjects."* Both are needed; don't mistake
@@ -255,6 +271,15 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
   driver. **Write patch scripts to a FILE** (Write tool), or build strings with `chr(10)`.
 - ⛔ **Most repo files are CRLF.** A multi-line anchor written with `\n` matches nothing.
   Normalise to LF, patch, write back as CRLF — every patch script here does this.
+- ⛔ **`python3` is the Store stub too.** Like bare `python`, it is the Microsoft Store alias -- and in a background
+  shell it never returns: a two-file syntax check sat waiting six hours (10-22). Only the absolute python.
+- ⛔ **`driver.py scene` gives every scene the partner kmoves.** A scene with one person passes `--partner off`.
+- ⭐ **Read a take's LOG before its frames**: `STUCK` (a walk the furniture held, placed), `NOT FOUND`, `standing body
+  out of obstacle` (the contact pass moved a body), a `[walk] ... -> mark` with no `arrived`, `[set] actor N ... wears`.
+  Then `skate_src/robot_neko/scenesheet.py MP4 SCN OUT.png` -- one frame per line -- and LOOK at every tile;
+  `reva_native/scenes/join_chapter.py` joins a chapter's takes in order with an index of where each scene starts.
+- ⛔ **Judge a POSE in profile, at eye level, beside a standing body.** From a high wide I reported seated extras
+  as standing and a fix was asked for; a profile lens showed all seven sitting on their stools (10-23).
 - ⛔ **On Windows, `subprocess` resolves the exe from the PARENT's PATH**, not the `env=`
   you pass. Name `gcc.exe` absolutely.
 - ⛔ **`crowd_win_rc.o` is not optional** — the UTF-8 manifest; without it `fopen` dies on

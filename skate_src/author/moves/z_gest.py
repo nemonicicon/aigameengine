@@ -33,8 +33,22 @@ def ramp(t, t0, t1):
     if t1 <= t0: return 1.0 if t >= t1 else 0.0
     return ease_smooth(max(0.0, min(1.0, (t - t0) / (t1 - t0))))
 
+# ⭐ (10-22, reva) --hang DEG: a body that RESTS in an A-pose (the WATEOT cast) would idle, wave and walk with its arms
+# held out; every move starts instead from the arms hanging DEG degrees off the body, the elbows soft
+HANG, BASE = None, {}
+
+def hang_base(nodes, RM, deg):
+    q = dict()
+    for side, sx in (("l", 1.0), ("r", -1.0)):
+        ua, la, ha = RM["upperarm_" + side], RM["lowerarm_" + side], RM["hand_" + side]
+        th = math.radians(deg)
+        q[ua] = aim_bone(nodes, ua, la, [math.sin(th) * sx, -math.cos(th), 0.03], q)
+        q[la] = aim_bone(nodes, la, ha, [math.sin(th) * sx * 0.8, -math.cos(math.radians(12.0)), math.sin(math.radians(12.0))], q)
+    return q
+
 def hang_angle(nodes, RM, side):
     """how far from straight down the resting upper arm already hangs (degrees), so a raise starts from it"""
+    if HANG is not None: return HANG
     wp, _ = fk_world(nodes)
     ua, la = RM["upperarm_" + side], RM["lowerarm_" + side]
     d = [wp[la][k] - wp[ua][k] for k in range(3)]
@@ -48,7 +62,7 @@ def arm_dir(th_deg, sx, fwd):
 
 # ---------------------------------------------------------------- the moves: t (s) -> q overrides
 def mv_idle(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     br = 0.5 * (1.0 - math.cos(2 * math.pi * 0.5 * t))          # breath: 2 cycles in 4 s
     sw = math.sin(2 * math.pi * 0.25 * t)                          # weight sway: 1 cycle
     hd = math.sin(2 * math.pi * 0.25 * t + 1.1)                    # head drift
@@ -63,7 +77,7 @@ def mv_idle(nodes, RM, t, D):
     return q
 
 def mv_hello(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     side, sx = "r", -1.0
     ua, la, ha = RM["upperarm_" + side], RM["lowerarm_" + side], RM["hand_" + side]
     up = ramp(t, 0.0, 0.40) * (1.0 - ramp(t, 1.55, 2.0))
@@ -77,7 +91,7 @@ def mv_hello(nodes, RM, t, D):
     return q
 
 def mv_bow(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     a = ease_anticipate(min(1.0, t / 0.75)) if t < 0.75 else (1.0 if t < 1.55 else 1.0 - ease_settle(min(1.0, (t - 1.55) / 0.85)))
     a = max(0.0, min(1.0, a))
     for j, deg in (("spine_01", 16.0), ("spine_02", 14.0), ("spine_03", 12.0)):
@@ -89,7 +103,7 @@ def mv_bow(nodes, RM, t, D):
     return q
 
 def mv_point(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     side, sx = "r", -1.0
     ua, la, ha = RM["upperarm_" + side], RM["lowerarm_" + side], RM["hand_" + side]
     up = ramp(t, 0.0, 0.45) * (1.0 - ramp(t, 1.45, 1.95))
@@ -100,7 +114,7 @@ def mv_point(nodes, RM, t, D):
     return q
 
 def mv_shrug(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     up = ramp(t, 0.0, 0.30) * (1.0 - ramp(t, 1.0, 1.5))
     for side, sx in (("l", 1.0), ("r", -1.0)):
         cl, ua, la, ha = RM["clavicle_" + side], RM["upperarm_" + side], RM["lowerarm_" + side], RM["hand_" + side]
@@ -114,20 +128,20 @@ def mv_shrug(nodes, RM, t, D):
     return q
 
 def mv_nod(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     a = math.radians(12.0) * max(0.0, math.sin(2 * math.pi * (t / D) * 2.0))                        # two nods, down only
     q[RM["head"]] = rotate_bone_world(nodes, RM["head"], X, a, q)
     q[RM["neck_01"]] = rotate_bone_world(nodes, RM["neck_01"], X, a * 0.35, q)
     return q
 
 def mv_no(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     a = math.radians(16.0) * math.sin(2 * math.pi * (t / D) * 2.0) * ramp(t, 0.0, 0.15) * (1.0 - ramp(t, D - 0.15, D))
     q[RM["head"]] = rotate_bone_world(nodes, RM["head"], Y, a, q)
     return q
 
 def mv_think(nodes, RM, t, D):
-    q = {}
+    q = dict(BASE)
     side, sx = "r", -1.0
     ua, la, ha = RM["upperarm_" + side], RM["lowerarm_" + side], RM["hand_" + side]
     up = ramp(t, 0.0, 0.55) * (1.0 - ramp(t, 2.0, 2.6))
@@ -148,12 +162,17 @@ def main(argv):
     force = "--force" in argv
     p = Rpack(pack); nodes = p.nodes(); RM = rig_map(p)
     assert not RM["_missing"], "rig incomplete: %s" % RM["_missing"]
+    global HANG, BASE
+    if "--hang" in argv:
+        HANG = float(argv[argv.index("--hang") + 1]); BASE = hang_base(nodes, RM, HANG)
+        print("arms hang %.0f degrees off the body (--hang)" % HANG)
     out = []
     for name, D, fn in MOVES:
         if only and name not in only: continue
         if name in p.clip_names():
             if not force: print("%s already present (--force re-authors it)" % name); continue
             drop_clip(pack, name); p = Rpack(pack); nodes = p.nodes()
+            if HANG is not None: BASE = hang_base(nodes, RM, HANG)
         frames = int(round(D * FPS))
         tracks = {}
         qs = [fn(nodes, RM, f / FPS, D) for f in range(frames)]

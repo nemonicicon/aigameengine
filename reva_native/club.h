@@ -24,6 +24,12 @@ int sfxPlay(const char*name,float gain,const float*pos,int loop);
 void sfxStop(int id);
 void sfxListener(const float*eye,const float*ctr);
 void sfxInit(void);
+/* (10-22, reva) door 11 (lighthouse.c) synthesises its own sounds and turns them while they play */
+#define SFX_RATE 44100
+int sfxBankPCM(const char*name,float*pcm,int n);     /* takes pcm (malloc'd, mono float at SFX_RATE); the slot */
+void sfxVoiceGain(int id,float g);                   /* a playing voice's gain (the id sfxPlay* returned) */
+void sfxSetMaster(float m);                          /* the master volume, 0..1 */
+int sfxReady(void);                                  /* is the device open */
 /* club_save.c: THE SAVE FILE (09-01). REVA_NOSAVE=1 makes the bench blind to it. */
 const char* saveGetS(const char*k,const char*def);
 long saveGetI(const char*k,long def);

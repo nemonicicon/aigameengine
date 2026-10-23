@@ -151,6 +151,10 @@ def main():
     ap.add_argument('--tex', default=None, help='external image to embed instead of the GLB one')
     ap.add_argument('--ground', action='store_true', help='shift so min Y sits at 0')
     ap.add_argument('--center', action='store_true', help='center on X/Z')
+    # a MARKER is a node the engine reads by name (loadPack): ToonStyle (the WATEOT toon look), ToonSet (that look
+    # lit as a room is lit), Glow (unlit at its own colour), NoCast (out of the sun's shadow map). Each is a kind-1
+    # node at the origin under root, so the bounds (span 0, scale 1) and the grounding are what they were.
+    ap.add_argument('--marker', action='append', default=[], help='a named marker node (repeatable)')
     a = ap.parse_args()
 
     js, bin_ = read_glb(a.src)
@@ -217,7 +221,8 @@ def main():
     # offNodes == 64. Hd[11] string table, Hd[12] sizing block, Hd[13] total size.
     HDR = 4 + 15*4
     off = HDR
-    offNodes = off; off += 52
+    nNodes = 1 + len(a.marker)
+    offNodes = off; off += 52 * nNodes
     offMeshes = off; off += 60
     offMats = off; off += 36
     offClips = off                                  # zero clips: table is empty
@@ -235,7 +240,7 @@ def main():
     # String table, exactly as packStr() reads it: u32 nStr, then nStr pairs of
     # {u32 byte-offset, u32 length}, then the characters. Node/clip `name` fields
     # are INDICES into this table, not byte offsets.
-    names = [b'root']
+    names = [b'root'] + [m.encode('ascii') for m in a.marker]
     tbl = struct.pack('<I', len(names))
     so = 0
     for n in names:
@@ -255,7 +260,7 @@ def main():
 
     out = bytearray()
     out += b'RPK1'
-    out += struct.pack('<15I', 2, 1, 1, 1, 0, nTex,
+    out += struct.pack('<15I', 2, nNodes, 1, 1, 0, nTex,
                        offNodes, offMeshes, offMats, offClips, offTexTable,
                        offStr, offSize, total, 0)
     # One node: identity TRS at the origin, kind=1. kind 1 means 'joint', and the
@@ -264,6 +269,8 @@ def main():
     # joint at the origin gives span 0, so the loader's height normalisation is
     # skipped (scale stays 1.0) and the prop keeps the size it was baked at.
     out += struct.pack('<IiI3f4f3f', 0, -1, 1, 0,0,0, 0,0,0,1, 1,1,1)
+    for k in range(len(a.marker)):
+        out += struct.pack('<IiI3f4f3f', k + 1, 0, 1, 0,0,0, 0,0,0,1, 1,1,1)
     # one mesh
     out += struct.pack('<15I', 0, 0, nv, len(IDX), 1, flags,
                        offPos, offNorm, offUV, offJoints, offWeights, offIdx,
@@ -291,6 +298,7 @@ def main():
     print(f"  bounds   X {min(P[0::3]):.2f}..{max(P[0::3]):.2f}"
           f"   Y {min(P[1::3]):.2f}..{max(P[1::3]):.2f}"
           f"   Z {min(P[2::3]):.2f}..{max(P[2::3]):.2f}")
-    print(f"  flags    normals={bool(flags&1)} uvs={bool(flags&2)}   file {len(out):,} B")
+    print(f"  flags    normals={bool(flags&1)} uvs={bool(flags&2)}   file {len(out):,} B"
+          + (f"   markers {' '.join(a.marker)}" if a.marker else ""))
 
 main()

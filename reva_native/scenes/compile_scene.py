@@ -50,12 +50,32 @@ viseme has the shape, and neither one alone is a mouth.
                           the move's end is carried on as the next line's cam=
     camorbit              (ep 11) circle a body, deg0 -> deg1 of world heading; sticky like camtrack
     camshake              (ep 11) amp[,hz]: a handheld on top of any placed lens; sticky, 0 = off
+    to                    (10-23) the slot a line is SAID TO: the speaker's head finds them (the engine's
+                          PERFORMANCE LAYER); this line only
 
 It is STICKY: a line inherits every value the previous line had, so the file shows only
 what CHANGES. The engine eases position and facing toward the new values instead of
 snapping, which is what turns "pyaw=46" into a woman turning her back on someone.
+
+⭐ THE FILM MIX (10-23, THE WORLD AT THE END OF TIME -- jacob: "make voices better ... a little music/atmosphere too
+... better pacing"). A script that says
+
+    mix film room=<set> [music=<mood>] [head=<s>] [tail=<s>] [seed=<n>]
+
+is mixed as a film is, at 48 kHz stereo (mixdown.py, score.py): every line trimmed to its speech, levelled to the same
+loudness (BS.1770), and placed by CONVERSATION GAPS instead of one uniform gap (a reply 0.32 s after the line it
+answers, the same speaker going on 0.20 s, the narrator 0.40 s off the people) after a `head` of the room and the
+music; each line in the ACOUSTIC of the set it is played on (room=, home=, a cutaway's set=) and the narrator (slot 4)
+dry; under it all the BED -- the place's own sound and the scene's music, ducked while anyone speaks -- swelling in at
+the head and out over the `tail`; the whole at -17 LUFS under a -1 dBFS limiter. Without the line, a scene compiles
+exactly as it always has.
+
+⭐ CAPTION PAGES (10-23, jacob: "the captions/subtitles more readable"). A narration slot runs to 1350 characters and
+the engine kept 191 of them on one line, shrunk to fit. Every line now carries `cap <t0> <t1> <text>` pages: at most
+two rows of ~42 characters, cut at sentence ends and then at the strongest stop, each timed off the voice's own
+sentence timings (say_kokoro.py's line_NN.json) or, without them, by its share of the characters.
 """
-import sys, os, wave, struct, math
+import sys, os, wave, struct, math, json, re
 
 def rms_env(frames, sr, nch, sw, fps=30.0):
     step = int(sr / fps)
@@ -202,7 +222,13 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # (4:3, vignette, tape grain, a REC dot) and fish= is the lens on the front of it (0 = the
               # club's own glass, ~0.55 a fisheye). Both sticky, both land on the cut.
               feed="", fish="",
-              tod="", tone="")
+              tod="", tone="",
+              # ⭐ (10-23) camspan=N: this line's cammove/camorbit runs across it and the N-1 lines after it -- the
+              # compiler sets the move's camsecs from the timeline (blocking.py's long narration, said as sentences).
+              # NOT sticky.
+              camspan="",
+              # (10-23) WHO A LINE IS SAID TO, a slot 0-3: the speaker's head finds them. NOT sticky.
+              to="")
 VOICE_KEYS = ("rate", "var", "pitch", "voice", "with")   # with=N: a second voice in unison (say_piper.py, 10-22)   # the voicers' keys, ignored here (voice= is say_kokoro's)
 TRICK_KEYS = ("htrick", "ptrick", "p2trick", "p3trick")   # ⭐ ep 10: in STAGE0 (the whitelist) but NOT sticky
 PUFF_KEYS = ("hpuff", "ppuff", "p2puff", "p3puff")         # ⭐ ep 12: in STAGE0 but NOT sticky; the engine keeps 8, 63 chars
@@ -299,6 +325,223 @@ def viseme_track(text, dur, fps=30.0):
     return [max(0, min(100, int(round(v * 100)))) for v in out]
 
 
+# ---------------------------------------------------------------- CAPTION PAGES (10-23)
+CAP_CHARS = 84          # two rows of ~42: the subtitling norm (BBC, Netflix) for a reader at a normal pace
+CAP_MAXS = 6.5          # no page held longer than this, however short its words
+
+
+def _cut(s, cap=CAP_CHARS):
+    """a run of text in pieces of at most `cap` characters, cut at the strongest stop nearest the middle"""
+    s = s.strip()
+    if len(s) <= cap:
+        return [s] if s else []
+    best = None
+    for m in re.finditer(r"([.!?;:,]|--|\u2014)[\"'\u201d\u2019)]*\s+", s):
+        c = m.end()
+        if c < 18 or c > len(s) - 12:
+            continue
+        pen = {".": 0, "!": 0, "?": 0, ";": 8, ":": 8}.get(m.group(1), 18 if m.group(1) in ("--", "\u2014") else 26)
+        sc = abs(c - len(s) / 2.0) + pen
+        if best is None or sc < best[0]:
+            best = (sc, c)
+    if best is None:   # no stop: at a word, near the middle
+        sp = s.rfind(" ", 0, len(s) // 2 + 10)
+        if sp <= 0:
+            sp = s.find(" ", len(s) // 2)
+        if sp <= 0:
+            return [s]
+        best = (0, sp + 1)
+    return _cut(s[:best[1]], cap) + _cut(s[best[1]:], cap)
+
+
+def cap_pages(text, dur, sents):
+    """[(t0, t1, page)] relative to the line's start. `sents` [(t0, t1, sentence)] from the voice, or None (the line is
+    shared out by characters). Short sentences share a page; a long one is cut into pages timed by their characters."""
+    units = [(float(a), float(b), s) for a, b, s in sents] if sents else [(0.0, float(dur), text)]
+    pieces = []
+    for a, b, s in units:
+        parts = _cut(s)
+        n = float(sum(len(p) for p in parts)) or 1.0
+        t0 = a
+        for p in parts:
+            t1 = t0 + (b - a) * len(p) / n
+            pieces.append([t0, t1, p])
+            t0 = t1
+    pages = []
+    for a, b, p in pieces:
+        if pages and len(pages[-1][2]) + 1 + len(p) <= CAP_CHARS and b - pages[-1][0] <= CAP_MAXS:
+            pages[-1][1] = b
+            pages[-1][2] += " " + p
+        else:
+            pages.append([a, b, p])
+    # each page stays up until the next one comes (the breath between two sentences is not a blank screen)
+    for k in range(len(pages) - 1):
+        pages[k][1] = pages[k + 1][0]
+    if pages:
+        pages[-1][1] = max(pages[-1][1], float(dur))
+    return [(round(a, 3), round(b, 3), p) for a, b, p in pages]
+
+
+def env30(x, sr, fps=30.0):
+    """rms_env on float samples: the loudness per 1/30 s, normalised to the line's p95"""
+    import numpy as np
+    h = int(sr / fps)
+    n = len(x) // h
+    if n == 0:
+        return []
+    v = np.sqrt((x[:n * h].reshape(n, h) ** 2).mean(axis=1))
+    ref = float(np.sort(v)[int(n * 0.95)]) or 1.0
+    return [max(0.0, min(1.0, float(a) / ref)) for a in v]
+
+
+# ---------------------------------------------------------------- THE FILM MIX (10-23)
+GAP_REPLY, GAP_SAME, GAP_VO, GAP_ACTION = 0.32, 0.24, 0.40, 0.12
+
+
+def span_secs(starts, total):
+    """camspan=N -> camsecs: the move lasts from its line's start to the start of the line N after it (or the end)"""
+    for i, (t0, stg) in enumerate(starts):
+        n = stg.pop("camspan", "")
+        if n:
+            j = i + int(n)
+            stg["camsecs"] = "%.3f" % ((starts[j][0] if j < len(starts) else total) - t0)
+DIALOGUE_LUFS, MIX_LUFS = -20.0, -17.0
+
+
+def film_mix(here, out, wdir, lines, sfx, film, cast_names, hinge, gap):
+    import numpy as np
+    import mixdown as M
+    import score as SC
+    head, tail = float(film.get("head", 1.0)), float(film.get("tail", 1.8))
+    mood = film.get("music", "ship")
+    seed = int(film.get("seed", sum(ord(c) * (i + 1) for i, c in enumerate(out)) % 100003))
+    home = film.get("room", "")
+    if home and not os.path.exists(os.path.join(here, "..", "sets", home + ".set")):
+        raise SystemExit("mix film room=%s: there is no sets/%s.set" % (home, home))
+    if mood not in SC.MOODS and mood != "none":
+        raise SystemExit("mix film music=%s: one of %s, or none" % (mood, " ".join(sorted(SC.MOODS))))
+    SR = M.SR
+    VO = 4                                         # the off-screen voice's slot: V.O., dry
+    tracks, t, prev = [], head, None               # prev: (speaker, was it an action line)
+    for i, (spk, text, stg, beat) in enumerate(lines):
+        cur_home = stg.get("home") or home
+        place_set = stg.get("set") or cur_home
+        place = SC.place_of(place_set) if place_set else "ship"
+        if prev is not None:
+            ps, pact = prev
+            if pact or stg.get("dur"):
+                t += GAP_ACTION
+            elif ps == spk:
+                t += GAP_SAME
+            elif VO in (ps, spk):
+                t += GAP_VO
+            else:
+                t += GAP_REPLY
+        t += beat
+        if stg.get("dur"):
+            dd = float(stg["dur"])
+            tracks.append(dict(start=t, spk=spk, text=text, x=None, dur=dd, stg=stg, place=place, caps=[]))
+            t += dd
+            prev = (spk, True)
+            continue
+        path = os.path.join(wdir, "line_%02d.wav" % i)
+        x, sr0 = M.read_wav(path)
+        x = M.resample(M.mono(x), sr0, SR)
+        x, cut = M.trim(x, SR)
+        x = M.to_lufs(x, DIALOGUE_LUFS, SR)
+        dur = len(x) / float(SR)
+        sents = None
+        jp = path[:-4] + ".json"
+        if os.path.exists(jp):
+            sents = [(max(0.0, a - cut), min(dur, b - cut), s) for a, b, s in json.load(open(jp, encoding="utf-8"))["sentences"]]
+        tracks.append(dict(start=t, spk=spk, text=text, x=x, dur=dur, stg=stg, place=place, caps=cap_pages(text, dur, sents)))
+        t += dur
+        prev = (spk, False)
+    total = t + tail
+    span_secs([(tr["start"], tr["stg"]) for tr in tracks], total)
+    n = int(total * SR) + 1
+    # the dialogue: dry per place, then each place's room
+    dry = np.zeros(n, np.float32)
+    rooms = {}
+    for tr in tracks:
+        if tr["x"] is None:
+            continue
+        at = int(tr["start"] * SR)
+        M.place(dry, tr["x"], at)
+        R = SC.ROOMS.get(tr["place"]) if tr["spk"] != VO else None
+        if R:
+            rooms.setdefault(tr["place"], np.zeros(n, np.float32))
+            M.place(rooms[tr["place"]], tr["x"], at)
+    mix = M.stereo(dry).astype(np.float32)
+    for pl, stem in rooms.items():
+        rt, size, wet = SC.ROOMS[pl]
+        ir = M.room_ir(SR, rt60=rt, size=size, bright=0.55, seed=len(pl))
+        mix += M.convolve(stem, ir)[:n] * M.undb(wet)
+    # the bed: the place each stretch of the scene is played in, and the scene's music
+    spans, places = [], []
+    for k, tr in enumerate(tracks):
+        a = 0.0 if k == 0 else tr["start"]
+        b = total if k == len(tracks) - 1 else tracks[k + 1]["start"]
+        places.append((a, b, tr["place"]))
+        if tr["x"] is not None:
+            spans.append((tr["start"], tr["start"] + tr["dur"]))
+    amb, mus = SC.bed(total, places, mood if mood != "none" else "", seed)
+    # the music swells where nobody speaks at the head and the tail, and ducks under every line
+    g_m = M.duck(n, SR, spans, depth_db=-9.0)
+    g_a = M.duck(n, SR, spans, depth_db=-3.0)
+    tt = np.arange(n) / float(SR)
+    first = spans[0][0] if spans else total
+    last = spans[-1][1] if spans else 0.0
+    lift = np.where(tt < first, M.undb(4.0), 1.0) * np.where(tt > last, M.undb(4.0), 1.0)
+    lift = M.smooth_gain(lift.astype(np.float32), SR, attack=0.6, release=0.6) if spans else lift
+    mix += amb * g_a[:, None] + mus * (g_m * lift)[:, None]
+    # the effects, at their own scene times (shifted by the head like everything else)
+    for (st, nm, gn) in sfx:
+        sp = os.path.join(here, "sfx", nm + ".wav")
+        if not os.path.exists(sp):
+            print("  !! sfx '%s' not found (%s)" % (nm, sp))
+            continue
+        y, srs = M.read_wav(sp)
+        y = M.resample(y, srs, SR)
+        M.place(mix, M.stereo(y) * gn, int((st + head) * SR))
+        print("  sfx  %6.2fs  %-12s x%.2f" % (st + head, nm, gn))
+    # in from silence, out to it; the whole at its level under the ceiling
+    fi, fo = int(0.5 * SR), int(min(1.5, tail * 0.5) * SR)
+    mix[:fi] *= np.linspace(0, 1, fi, dtype=np.float32)[:, None]
+    mix[-fo:] *= np.linspace(1, 0, fo, dtype=np.float32)[:, None]
+    mix = M.to_lufs(mix, MIX_LUFS, SR)
+    mix = M.limiter(mix, SR, -1.0)
+    M.write_wav(os.path.join(here, out + ".wav"), mix, SR)
+    # the timeline
+    def screen(tx):   # the TTF caption font has the book's punctuation: keep it, and set `--` as the dash it is
+        tx = tx.replace("--", "\u2014").replace("\u00a0", " ")
+        tx = "".join(c if (32 <= ord(c) <= 126 or 160 <= ord(c) <= 255 or ord(c) in (0x2013, 0x2014, 0x2018, 0x2019,
+                      0x201C, 0x201D, 0x2026)) else "?" for c in tx)
+        return re.sub(r"\s+", " ", tx).strip()
+    with open(os.path.join(here, out + ".scn"), "w", encoding="utf-8") as f:
+        f.write("scene 1 %s.wav %.3f %d\n" % (out, total, len(tracks)))
+        f.write("cast %s\n" % " ".join(cast_names.get(str(i), ("REVA", "KAELI", "SUSAN", "ARCHIVE", "-")[i]) for i in range(5)))
+        for tr in tracks:
+            f.write("line %d %.3f %.3f %s\n" % (tr["spk"], tr["start"], tr["dur"], screen(tr["text"])))
+            for (c0, c1, ct) in tr["caps"]:
+                f.write("cap %.3f %.3f %s\n" % (c0, c1, screen(ct)))
+            env = env30(tr["x"], SR) if tr["x"] is not None else []
+            f.write("env %d %s\n" % (len(env), " ".join("%d" % round(v * 100) for v in env)))
+            stg = tr["stg"]
+            f.write("stage %s\n" % " ".join("%s=%s" % (k, stg[k]) for k in sorted(stg) if str(stg[k]) != ""))
+            if not hinge:
+                vis = viseme_track(tr["text"], tr["dur"]) if tr["x"] is not None else []
+                f.write("vis %d %s\n" % (len(vis), " ".join("%d" % v for v in vis)))
+    spoken = sum(tr["dur"] for tr in tracks if tr["x"] is not None)
+    act = sum(tr["dur"] for tr in tracks if tr["x"] is None)
+    print("%s.wav: %.1fs at %d Hz stereo (film mix: speech %.1f s, action %.1f s, air %.1f s; music %s; %.1f LUFS)"
+          % (out, total, SR, spoken, act, total - spoken - act, mood, M.lufs(mix, SR)))
+    for tr in tracks:
+        print("   %6.2f +%5.2f  %-9s %-10s %2d caps  %s" % (tr["start"], tr["dur"], cast_names.get(str(tr["spk"]), "?")[:9].lower(),
+                                                       tr["place"], len(tr["caps"]), (tr["text"] or "(action)")[:48]))
+    print("TOTAL %.1f seconds" % total)
+
+
 def main(script, gap=0.42, out=None):
     here = os.path.dirname(os.path.abspath(script))
     out = out or os.path.splitext(os.path.basename(script))[0]
@@ -322,6 +565,7 @@ def main(script, gap=0.42, out=None):
 
     sfx = []
     hinge = False
+    film = None
     stage = dict(STAGE0)
     for raw in open(script, encoding="utf-8"):
         s = raw.strip()
@@ -341,6 +585,12 @@ def main(script, gap=0.42, out=None):
         # alone, no viseme track, so no closures and no shapes. That IS the look.
         if s.startswith("mouth "):
             hinge = (s.split()[1:2] == ["hinge"])
+            continue
+        if s.startswith("mix "):   # ⭐ 10-23: the film mix (see the docstring)
+            bb = s.split()
+            if bb[1:2] != ["film"]:
+                raise SystemExit("mix: only `mix film room=<set> [music=<mood>] [head=s] [tail=s] [seed=n]`, on: %s" % s)
+            film = dict(kv.split("=", 1) for kv in bb[2:] if "=" in kv)
             continue
         if s.startswith("cast "):
             # The cast reaches the SCREEN as well as the voices: the engine's caption was
@@ -407,6 +657,16 @@ def main(script, gap=0.42, out=None):
             if k == "set":        # ⭐ 10-22: a CUTAWAY -- this line only
                 if not os.path.exists(os.path.join(here, "..", "sets", v + ".set")):
                     raise SystemExit("set=%s: there is no sets/%s.set, on: %s" % (v, v, s[:60]))
+                once[k] = v
+                continue
+            if k == "camspan":   # (10-23) this line only, and only with a move on it
+                if not (v.isdigit() and int(v) >= 1):
+                    raise SystemExit("camspan= wants a count of lines >= 1, on: %s" % s[:60])
+                once[k] = v
+                continue
+            if k == "to":        # (10-23) who this line is said to -- this line only
+                if not (v.isdigit() and 0 <= int(v) <= 3):
+                    raise SystemExit("to= wants a slot 0-3, on: %s" % s[:60])
                 once[k] = v
                 continue
             if k == "shot" and v not in SHOTS:
@@ -478,6 +738,8 @@ def main(script, gap=0.42, out=None):
         modes = [k for k in ("camtrack", "campan", "camorbit", "cammove", "camhold") if k in said and stage[k] != "off"]
         if len(modes) > 1:
             raise SystemExit("one lens mode per line (%s), on: %s" % (" + ".join(modes), s[:60]))
+        if "camspan" in said and not ({"cammove", "camorbit"} & said):
+            raise SystemExit("camspan= carries a cammove= or camorbit= said on the SAME line, on: %s" % s[:60])
         if "camsecs" in said and not ({"cammove", "camorbit"} & said):
             raise SystemExit("camsecs= times a cammove= or camorbit= said on the SAME line, on: %s" % s[:60])
         if "camhold" in said and stage["camhold"] != "off":
@@ -573,6 +835,8 @@ def main(script, gap=0.42, out=None):
         lines.append((int(bits[0]), text.strip(), st_, beat))
     wdir = os.path.join(here, "wav", out)
     if not os.path.isdir(wdir): wdir = os.path.join(here, "wav")   # scenes spoken before the split
+    if film is not None:
+        return film_mix(here, out, wdir, lines, sfx, film, cast_names, hinge, gap)
     sr = nch = sw = None
     tracks = []
     t = 0.0
@@ -598,6 +862,7 @@ def main(script, gap=0.42, out=None):
                        viseme_track(text, dur)))
         t += dur + gap
     total = t - gap
+    span_secs([(tr[0], tr[6]) for tr in tracks], total)
     if sr is None:      # ⭐ ep 10: a scene of nothing but action lines has no wav to take a format from
         sr, nch, sw = 24000, 1, 2
     # mix: one buffer, every line written at its own offset
@@ -664,6 +929,8 @@ def main(script, gap=0.42, out=None):
             cast_names.get(str(i), ("REVA", "KAELI", "SUSAN", "ARCHIVE", "-")[i]) for i in range(5)))
         for (start, spk, text, data, dur, env, stg, vis) in tracks:
             f.write("line %d %.3f %.3f %s\n" % (spk, start, dur, screen_text(text)))
+            for (c0, c1, ct) in (cap_pages(text, dur, None) if text.strip() else []):
+                f.write("cap %.3f %.3f %s\n" % (c0, c1, screen_text(ct)))
             f.write("env %d %s\n" % (len(env), " ".join("%d" % round(v*100) for v in env)))
             # ⛔ AND DO NOT WRITE EMPTY KEYS. STAGE0 carries hx/hz so a line CAN move the
             # pair; written blank on every other line, the engine read atof("") = 0 and

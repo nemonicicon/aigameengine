@@ -237,6 +237,7 @@ typedef struct {
      * "sb_fixtures" is not a name it knows to leave open). */
     int glow, nocast, open;
     int mirOnly;   /* ⭐ (10-22) marker `MirrorOnly`: drawn only in reflections (a mirror's backing, seen in another) */
+    int floor;     /* ⭐ (10-23) marker `Floor`: a floor that a set's `gloss` line makes glossy (glossFloorPass) */
     /* ⭐ (10-22) SHEER: a set prop carrying a marker node `AlphaNN` is drawn NN% opaque, blended over what is behind it
      * (a martini glass): set props were opaque only -- the blend existed for a body's meshes, never a prop's. 0 = opaque */
     float sheer;
@@ -257,6 +258,9 @@ static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei vert
  * a set's `mirror x y z yaw w h`; see mirInst */
 typedef struct { float p[3], n[3], w, h, R[16]; } Mirror;
 static Mirror g_mir[4]; static int g_nMir=0, g_mirOff=-1;
+/* ⭐ (10-23) THE GLOSSY FLOOR: a set's `gloss y [F0] [max] [fade]` -- a mirror lying down (g_glossM), see glossFloorPass */
+static struct { int on; float y, f0, fmax, fade; } g_gloss={0,0.f,0.06f,0.35f,2.5f};
+static Mirror g_glossM; static int g_glossDraw=0;
 static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,GLsizei verts,int flags);
 static void colSet(Pack*P,M4*W,unsigned mi);   /* per-vertex collision (10-18), below */
 static int g_skirtLive=0; static float g_skirtBC[3]={0,0,0}; static GLuint g_skVbo[2]={0,0};   /* THE HANGING CLOTH (10-18) */
@@ -851,11 +855,19 @@ static void clockTick(void){
     static double last=-1.0; double w=wall_ms(); if(last<0.0) last=w;
     double d=w-last; last=w; g_wallDt=d*0.001;
     if(g_fixedStepMs>0.0){ g_tickN=1; g_virtMs+=g_fixedStepMs; g_tickTotal++; return; }
-    for(int n=1;n<=TICK_MAX;n++) if(fabs(d-n*g_tickMs)<0.2*g_tickMs){ d=n*g_tickMs; break; }   /* vsync jitter is not time */
+    /* vsync jitter is not time. ⛔ (11-02) IT WAS +-20%, and a frame on a 100 Hz panel paced to 60 is 20 ms: within 20% of one tick, so every
+     * door on jacob's monitor ran at 5/6 speed, real time in, one tick out. Jitter is a fraction of a millisecond; a 20 ms frame is 20 ms. */
+    for(int n=1;n<=TICK_MAX;n++) if(fabs(d-n*g_tickMs)<0.05*g_tickMs){ d=n*g_tickMs; break; }
     g_tickAcc+=d; if(g_tickAcc>TICK_MAX*g_tickMs) g_tickAcc=TICK_MAX*g_tickMs;
     int k=(int)floor(g_tickAcc/g_tickMs);
-    if(k<1){ double rem=g_tickMs-g_tickAcc; struct timespec ts={0,(long)(rem*1e6)}; if(ts.tv_nsec>0) nanosleep(&ts,NULL);
-             last=wall_ms(); g_tickAcc=0.0; k=1; }
+    if(k<1){ double rem=g_tickMs-g_tickAcc; struct timespec ts={0,(long)(rem*1e6)};
+             /* ⛔ (11-02) A sliver short of a tick is not worth a sleep: on Windows a sleep can run many times long, and it broke a locked 100 fps down to 60.
+              * vsync is pacing that frame already. The debt is carried below, and only a real gap sleeps. */
+             if(rem>g_tickMs*0.25) nanosleep(&ts,NULL);
+             /* ⛔ (11-02) This reset the clock after the sleep, and a sleep on Windows runs long: what it overslept was never paid for. Now it is owed. */
+             double w2=wall_ms(); g_tickAcc+=w2-last; last=w2; k=(int)floor(g_tickAcc/g_tickMs);
+             if(k<1) k=1; else if(k>TICK_MAX) k=TICK_MAX;   /* woke early: the tick is still taken, and the debt carried */
+             g_tickAcc-=k*g_tickMs; }
     else g_tickAcc-=k*g_tickMs;
     g_tickN=k; g_virtMs+=k*g_tickMs; g_tickTotal+=k; }
 static float simStepS(void){ return (float)(g_tickN*g_tickMs*0.001); }   /* the frame's sim step */
@@ -1211,6 +1223,7 @@ static Pack loadPack(const char*path){
         if(!strcmp(nm9,"NoCast")) P.nocast=1;
         if(!strcmp(nm9,"Open")) P.open=1;
         if(!strcmp(nm9,"MirrorOnly")) P.mirOnly=1;
+        if(!strcmp(nm9,"Floor")) P.floor=1;
         if(!strncmp(nm9,"Alpha",5)&&nm9[5]>='0'&&nm9[5]<='9') P.sheer=(float)atoi(nm9+5)/100.f;
         if(!strcmp(nm9,"TrueScale")) P.trueScale=1;
         if(!strcmp(nm9,"VertexCollide")) P.vcol=1; }
@@ -2636,6 +2649,113 @@ static int g_modeVariant=0;
  * random machine, controls change, no loading, one endurance score. */
 static int g_amCab=0, g_amRot=0; static float g_amT=0.f; static long g_amScore=0;
 #define ARC_CAB ((g_mode==MODE_ARCADE&&g_modeVariant==3)?g_amCab:g_modeVariant)
+/* ⭐ REVA VS ZOMBIES M0 (11-01, design/reva_vs_zombies_m0.md). The ZAMN cab is the game's bench: on the club floor it is
+ * v0's fenced yard; with a set loaded (REVA_SET) it is played ON THE STREET. CAB_ZAMN is "we are in it". */
+#define CAB_ZAMN (g_mode==MODE_ARCADE&&ARC_CAB==1)
+static int g_cabFire=0;   /* the attract host's trigger -- the cab's A reads it as a thumb would press it */
+static int g_cabAttract=0;   /* no live input for 30 s: the cab plays itself (set once a frame by the input policy) */
+/* ⭐ THE NUMBERS (11-02). jacob: "we are drwaing inspiration here not copying directly completley": design/rvz_from_zamnc.md
+ * says what came over from ZAMNC and why. They live in rules/rvz.rules, and the file is re-read while the game runs: save it
+ * and the next second plays by it. REVA_RVZRULES=<file> points the cab at another one; rules/rvz_m0.rules is the old
+ * prototype's numbers, the control for everything below. These defaults are rvz.rules's own, and missing it is loud. */
+typedef struct { float heroSpd,heroSnap,heroTurn, deadSpd,deadSpdLvl,deadRunOver,deadTurn,deadAccel,deadGait,aggro,wander,recycle,
+                 bullet,shotSpd,shotLife,shotAhead,shotHit,shotCool, lensArm,lensPitch,lensFov,lensAimY, streetStep,tod, cast,deadTint,ring; char street[32]; } RvzRules;
+static RvzRules g_zr={14.f,1.f,5000.f, 3.5f,0.1f,4.5f,6.f,6.f,0.62f,8.75f,3.f,45.f, 1.f,35.f,1.2f,1.75f,0.78f,0.f, 31.5f,60.f,32.6f,1.68f, 1.f,17.5f, 1.f,0.35f,1.f,"block"};
+static time_t g_rvzStamp=0;
+static const char*rvzPath(void){ const char*p=getenv("REVA_RVZRULES"); return (p&&p[0])?p:"rules/rvz.rules"; }
+static void rvzLoad(void){
+    static const struct { const char*k; float*v; } KEY[]={
+        {"hero_speed",&g_zr.heroSpd},{"hero_snap",&g_zr.heroSnap},{"hero_turn",&g_zr.heroTurn},
+        {"dead_speed",&g_zr.deadSpd},{"dead_speed_level",&g_zr.deadSpdLvl},{"dead_run_over",&g_zr.deadRunOver},
+        {"dead_turn",&g_zr.deadTurn},{"dead_accel",&g_zr.deadAccel},{"dead_gait",&g_zr.deadGait},
+        {"dead_aggro",&g_zr.aggro},{"dead_wander",&g_zr.wander},{"dead_recycle",&g_zr.recycle},
+        {"bullet",&g_zr.bullet},{"bullet_speed",&g_zr.shotSpd},{"bullet_life",&g_zr.shotLife},{"bullet_ahead",&g_zr.shotAhead},
+        {"bullet_hit",&g_zr.shotHit},{"gun_cooldown",&g_zr.shotCool},
+        {"lens_arm",&g_zr.lensArm},{"lens_pitch",&g_zr.lensPitch},{"lens_fov",&g_zr.lensFov},{"lens_aim_y",&g_zr.lensAimY},
+        {"street_step",&g_zr.streetStep},{"tod",&g_zr.tod},{"cast_citizens",&g_zr.cast},{"dead_tint",&g_zr.deadTint},{"neighbour_ring",&g_zr.ring} };
+    const char*path=rvzPath();
+    FILE*f=fopen(path,"r");
+    if(!f){ printf("[rvz] %s MISSING -- the built-in numbers\n",path); g_rvzStamp=(time_t)1; return; }
+    char ln[256];
+    while(fgets(ln,sizeof ln,f)){ char k[48],v[48]; char*h=strchr(ln,'#'); if(h)*h=0;
+        int n=sscanf(ln,"%47s %47s",k,v);
+        if(n<=0) continue;
+        int ok=0;
+        if(n==2&&!strcmp(k,"street")){ snprintf(g_zr.street,sizeof g_zr.street,"%s",v); ok=1; }
+        else if(n==2) for(unsigned i=0;i<sizeof KEY/sizeof KEY[0];i++) if(!strcmp(k,KEY[i].k)){ *KEY[i].v=(float)atof(v); ok=1; break; }
+        if(!ok) printf("[rvz] %s: line not understood: %s\n",path,ln); }
+    fclose(f);
+    { struct stat st; g_rvzStamp=(stat(path,&st)==0)?st.st_mtime:(time_t)1; }
+    printf("[rvz] %s: hero %.1f u/s snap %.0f | dead %.1f u/s aggro %.2f wander %.1f s recycle %.0f | bullet %.0f %.0f u/s | lens %.1f u %.0f deg fov %.1f | street %s\n",
+           path,g_zr.heroSpd,g_zr.heroSnap,g_zr.deadSpd,g_zr.aggro,g_zr.wander,g_zr.recycle,g_zr.bullet,g_zr.shotSpd,g_zr.lensArm,g_zr.lensPitch,g_zr.lensFov,g_zr.street);
+    fflush(stdout); }
+static int rvzPoll(float dtf){   /* once a second: has the file changed? */
+    static float t=0.f; t+=dtf; if(t<1.f) return 0; t=0.f;
+    struct stat st; if(stat(rvzPath(),&st)!=0||st.st_mtime==g_rvzStamp) return 0;
+    int first=(g_rvzStamp==0); rvzLoad(); return !first; }
+/* ⭐ WHO PLAYS WHOM (11-02). The cab took the first bodies in the pack order, so on the street the neighbours were the film's cast and
+ * the dead were the black-clad end of the roster, flat dark shapes on dark asphalt (the_set.md: "they are the Killer/Monster end").
+ * The GDD's street is its citizens. A killer can be dead; nobody needs saving from a killer. `cast_citizens 0` is the old order. */
+static int zamnCast(const char*label,int dead){
+    if(g_zr.cast<=0.f) return 1;
+    if(strncmp(label,"Character",9)) return 0;
+    if(strstr(label,"Killer")||strstr(label,"Monster")) return dead;
+    return 1; }
+static unsigned char g_zBump[1024];   /* a dead body the world stopped this frame: it picks another way */
+static float g_zWanT[1024], g_zWanA[1024];   /* each of the dead on its OWN wander clock (a shared one is what ZAMNC's own doc called a dance routine) */
+static int g_zShots=0;
+/* THE PLAY AREA. Yard: x -21..21, z -54..-26, the hero at (0,-40). Street: block.set's own numbers (street.py: the road
+ * runs along x at z -14..14, the house fronts stand at |z| 26, the lots at x 0..135) -- the road and both front lawns,
+ * x -8..142, z -24..24. REVA_ZAMNAREA=x0,x1,z0,z1 for any other street. */
+static float g_zaX0=-21.f,g_zaX1=21.f,g_zaZ0=-54.f,g_zaZ1=-26.f,g_zaHx=0.f,g_zaHz=-40.f; static int g_zaStreet=0;
+static void zamnArea(int street){
+    g_zaStreet=street;
+    if(!street){ g_zaX0=-21.f; g_zaX1=21.f; g_zaZ0=-54.f; g_zaZ1=-26.f; g_zaHx=0.f; g_zaHz=-40.f; return; }
+    g_zaX0=-8.f; g_zaX1=142.f; g_zaZ0=-24.f; g_zaZ1=24.f;
+    { const char*e=getenv("REVA_ZAMNAREA"); float a,b,c,d;
+      if(e&&sscanf(e,"%f,%f,%f,%f",&a,&b,&c,&d)==4&&b>a&&d>c){ g_zaX0=a; g_zaX1=b; g_zaZ0=c; g_zaZ1=d; } }
+    g_zaHx=g_zaX0+0.15f*(g_zaX1-g_zaX0); g_zaHz=0.5f*(g_zaZ0+g_zaZ1);
+    printf("[zamn] THE STREET: x %.0f..%.0f z %.0f..%.0f, the hero starts at %.1f,%.1f\n",g_zaX0,g_zaX1,g_zaZ0,g_zaZ1,g_zaHx,g_zaHz); }
+/* the street's dead, as a multiplier on the crowd's 1.15 u/s: rules' dead_speed at level 1. The yard keeps v0's 0.75+0.07/level,
+ * which was tuned for a yard 42 u across. */
+static float zamnDeadSpd(int lvl){ return g_zaStreet?(g_zr.deadSpd+g_zr.deadSpdLvl*(float)(lvl-1))/1.15f:(0.75f+lvl*0.07f); }
+static void zamnNeighbourXZ(float*x,float*z){
+    if(!g_zaStreet){ *x=(frnd()*2.f-1.f)*18.f; *z=-40.f+(frnd()*2.f-1.f)*11.f; return; }
+    *x=g_zaX0+4.f+frnd()*(g_zaX1-g_zaX0-8.f);
+    if(frnd()<0.75f){ float sd=frnd()<0.5f?-1.f:1.f; *z=sd*(15.f+frnd()*7.f); }   /* the front lawns and the sidewalk */
+    else *z=(frnd()*2.f-1.f)*8.f;                                                  /* or out in the road */
+    if(*z<g_zaZ0+1.f)*z=g_zaZ0+1.f; if(*z>g_zaZ1-1.f)*z=g_zaZ1-1.f; }
+static void zamnMill(float x,float z,float*tx,float*tz){
+    if(!g_zaStreet){ *tx=(frnd()*2.f-1.f)*18.f; *tz=-40.f+(frnd()*2.f-1.f)*11.f; return; }
+    *tx=x+(frnd()*2.f-1.f)*5.f; *tz=z+(frnd()*2.f-1.f)*4.f;   /* a neighbour on the street wanders their own lawn */
+    if(*tx<g_zaX0+1.f)*tx=g_zaX0+1.f; if(*tx>g_zaX1-1.f)*tx=g_zaX1-1.f;
+    if(*tz<g_zaZ0+1.f)*tz=g_zaZ0+1.f; if(*tz>g_zaZ1-1.f)*tz=g_zaZ1-1.f; }
+static void zamnEdgeXZ(float*x,float*z){
+    float a9=frnd()*6.28f;
+    if(!g_zaStreet){   /* v0: crawl in over the fence line */
+        *x=sinf(a9)>0?21.f-0.5f:-21.f+0.5f; *z=-54.f+frnd()*28.f;
+        if(frnd()<0.5f){ *x=(frnd()*2.f-1.f)*21.f; *z=cosf(a9)>0?-26.f-0.5f:-54.f+0.5f; }
+        return; }
+    float sd=sinf(a9)>0?1.f:-1.f;
+    if(frnd()<0.7f){ *x=g_rvx+sd*((g_zr.aggro>0.f?18.f:12.f)+frnd()*18.f); *z=cosf(a9)>0?g_zaZ1-0.5f:g_zaZ0+0.5f; }   /* out of the houses, past the edge of the lens */
+    else { *x=g_rvx+sd*(28.f+frnd()*10.f); *z=(frnd()*2.f-1.f)*10.f; }                          /* up the road */
+    if(*x<g_zaX0+0.5f)*x=g_zaX0+0.5f; if(*x>g_zaX1-0.5f)*x=g_zaX1-0.5f; }
+/* the Z4 bank BY NAME (cached; one NOT FOUND line per name). The cab's dead walk z_walk_a/b/c (z_run past 3 u/s) and
+ * stand in z_idle_a/b -- the clips the film's `zombie` casting note plays, through the same canonical transfer. */
+static int zombClip(const char*nm){
+    static char seen[8][16]; static int idx[8], n=0;
+    if(!g_zombP) return -1;
+    for(int i=0;i<n;i++) if(!strcmp(seen[i],nm)) return idx[i];
+    int f=-1; for(unsigned c=0;c<g_zombP->nClips;c++) if(!strcmp(packStr(g_zombP,g_zombP->clips[c].name),nm)){ f=(int)c; break; }
+    if(n<8){ snprintf(seen[n],16,"%s",nm); idx[n]=f; n++; }
+    if(f<0) printf("[zamn] zombie clip '%s' NOT FOUND in the Z4 bank (packs/v1_zmoves.rpack)\n",nm);
+    return f; }
+static int zombLoco(int si,float spd,Pack*tp){
+    int c=zombClip(spd>g_zr.deadRunOver?"z_run":(si%3==0?"z_walk_a":si%3==1?"z_walk_b":"z_walk_c"));   /* GDD: "not quite running" */
+    return (c>=0&&donorOK(g_zombP,c,tp))?c:-1; }
+static int zombIdle(int si,Pack*tp){
+    int c=zombClip((si&1)?"z_idle_b":"z_idle_a");
+    return (c>=0&&donorOK(g_zombP,c,tp))?c:-1; }
 /* S3: the RTS variants stop lying -- one skirmish engine, four honest skins, until the
  * per-donor archaeology lands (design/rts_command.md rung 6). PHOSPHOR additionally
  * hands off to the real phosphor.exe when it exists (grade A). */
@@ -2804,6 +2924,14 @@ static int   g_postOn=0;                    /* the decision for THIS frame */
  * saturated pixels bloom: 0.12 over 0.95. (An HDR buffer is what separates "bright" from
  * "white"; EXT_color_buffer_half_float is present when that day comes.) */
 static float g_bloom=0.12f; static int g_fxaa=1; static float g_bloomThr=0.95f, g_postKnee=0.70f;
+/* ⭐ (10-23) THE FILM'S LOOK, in the post pass (jacob: "a general like shader/reflections pass"): grade= a gentle S, the
+ * shadows a little cool and the highlights a little warm, a touch more colour (0 off, 1 the show's); vig= the corners
+ * fall away (0..1). ctl grade= vig=, REVA_GRADE / REVA_VIG. REVA_SSAA=2: the 3D frame drawn at twice the size into
+ * the post target and resolved by the post quad's own bilinear tap (a 2x2 box): a take's ink lines and edges
+ * antialiased, the HUD still drawn sharp at the window's size. Boot only; never on the multi-cam wall (its panels are
+ * laid out in screen pixels). */
+static float g_grade=0.f, g_vig=0.f; static int g_ssaa=1; static GLint g_pu_grade=-1, g_pu_vig=-1;
+static int g_labGrid;   /* a tentative definition: the lab's own is below */
 /* ---- RENDER SCALE (2026-09-30): the ladder's biggest rung ------------------------------------
  * A Pi 4 is fill-bound: its GPU shades about a gigapixel a second in practice, and 720p with a
  * shadow pass and a post pass is three screens a frame. So the 3D frame is drawn into a SUB-RECT
@@ -2860,6 +2988,8 @@ static GLuint postTex(int w,int h){ GLuint t; glGenTextures(1,&t); glBindTexture
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     return t; }
 static void postInit(int W,int H){
+    { const char*e=getenv("REVA_SSAA"); if(e&&e[0]){ int s=atoi(e); g_ssaa=(s>=2)?2:1; } }
+    if(g_ssaa>1){ W*=g_ssaa; H*=g_ssaa; printf("[post] SSAA x%d: the 3D frame at %dx%d\n",g_ssaa,W,H); }
     const char*vsQ="attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.0,1.0); }\n";
     /* threshold + 9-tap gaussian along dir (px units). thr>0 only on the first (downsample) pass. */
     const char*fsB=
@@ -2874,7 +3004,7 @@ static void postInit(int W,int H){
     const char*fsP=
       "precision mediump float; varying vec2 uv; uniform sampler2D tex; uniform sampler2D blm; uniform vec2 px;\n"
       "uniform float tone; uniform float bloom; uniform float fxaa; uniform float fish; uniform float asp; uniform float tht;\n"
-      "uniform float feed; uniform float feedT; uniform vec2 uvs;\n"
+      "uniform float feed; uniform float feedT; uniform vec2 uvs; uniform float grade; uniform float vig;\n"
       "vec3 fetch(sampler2D t,vec2 q){ return texture2D(t,min(q,vec2(1.0))*uvs).rgb; }\n"
       "float fhash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n"
       "float luma(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }\n"
@@ -2937,6 +3067,12 @@ static void postInit(int W,int H){
       "  if(tone>0.0){ float l=luma(col); float ov=max(l-tone,0.0); float wp=0.96;\n"
       "    float l2=min(l,tone)+(wp-tone)*(1.0-exp(-ov/(wp-tone)));\n"
       "    col*=l2/max(l,1e-4); }\n"
+      /* \u2b50 (10-23) THE GRADE and THE VIGNETTE: after the knee, before a camera's own frame */
+      "  if(grade>0.0){ float l0=luma(col); vec3 s=clamp(col,0.0,1.0); s=s*s*(3.0-2.0*s); col=mix(col,s,0.16*grade);\n"
+      "    col+=vec3(-0.012,-0.002,0.020)*grade*(1.0-smoothstep(0.0,0.45,l0));\n"
+      "    col*=mix(vec3(1.0),vec3(1.03,1.005,0.965),grade*smoothstep(0.45,1.0,l0));\n"
+      "    float l1=luma(col); col=mix(vec3(l1),col,1.0+0.07*grade); }\n"
+      "  if(vig>0.0){ vec2 dv=(fu-0.5)*vec2(fasp,1.0)/sqrt(fasp*fasp+1.0)*2.0; col*=1.0-vig*0.32*smoothstep(0.55,1.25,length(dv)); }\n"
       /* \u2b50 THE TAPE FRAME. The picture is squeezed to 4:3 inside the delivery frame, the corners fall away,
        * the grain moves, and the dot blinks once a second. All of it AFTER the tone knee, because a camera's
        * own frame is not part of the scene's exposure. */
@@ -2981,6 +3117,7 @@ static void postInit(int W,int H){
     g_pu_tone=glGetUniformLocation(p,"tone"); g_pu_bloom=glGetUniformLocation(p,"bloom"); g_pu_fxaa=glGetUniformLocation(p,"fxaa");
     g_pu_fish=glGetUniformLocation(p,"fish"); g_pu_asp=glGetUniformLocation(p,"asp"); g_pu_tht=glGetUniformLocation(p,"tht");
     g_pu_feed=glGetUniformLocation(p,"feed"); g_pu_feedT=glGetUniformLocation(p,"feedT");
+    g_pu_grade=glGetUniformLocation(p,"grade"); g_pu_vig=glGetUniformLocation(p,"vig");
     GLuint b=glCreateProgram(); glAttachShader(b,sh(GL_VERTEX_SHADER,vsQ)); glAttachShader(b,sh(GL_FRAGMENT_SHADER,fsB));
     glBindAttribLocation(b,0,"p"); glLinkProgram(b); { GLint ok; glGetProgramiv(b,GL_LINK_STATUS,&ok); if(!ok) die("blur link"); }
     g_blurProg=b; g_bu_tex=glGetUniformLocation(b,"tex"); g_bu_px=glGetUniformLocation(b,"px"); g_bu_uvs=glGetUniformLocation(b,"uvs"); g_bu_dir=glGetUniformLocation(b,"dir"); g_bu_thr=glGetUniformLocation(b,"thr");
@@ -2992,6 +3129,8 @@ static void postInit(int W,int H){
       if((e=getenv("REVA_POST"))&&e[0]) g_post=atoi(e)?1:0;
       if((e=getenv("REVA_BLOOM"))&&e[0]) g_bloom=(float)atof(e);
       if((e=getenv("REVA_FXAA"))&&e[0]) g_fxaa=atoi(e)?1:0;
+      if((e=getenv("REVA_GRADE"))&&e[0]) g_grade=(float)atof(e);
+      if((e=getenv("REVA_VIG"))&&e[0]) g_vig=(float)atof(e);
       if((e=getenv("REVA_FOG"))&&e[0]){ float d=0,r=0,g=0,bb=0; int n=sscanf(e,"%f,%f,%f,%f",&d,&r,&g,&bb);
           g_fog[3]=d; if(n==4){ g_fog[0]=r; g_fog[1]=g; g_fog[2]=bb; g_fogAuto=0; } } }
     printf("[post] ready %dx%d, bloom %dx%d (post=%d bloom=%.2f fxaa=%d fog=%.3f)\n",W,H,g_blmW,g_blmH,g_post,g_bloom,g_fxaa,g_fog[3]); fflush(stdout); }
@@ -3001,6 +3140,7 @@ static void postQuad(void){ glBindBuffer(GL_ARRAY_BUFFER,g_postVbo); glEnableVer
 /* the decision for this frame, made once at the top of it so every uniform upload agrees */
 static void postDecide(int mode,int modeAnim){
     int want=(g_post>=0)?g_post:(mode!=modeAnim);
+    if(g_ssaa>1) want=(mode==modeAnim&&g_labGrid>1)?0:1;   /* ⭐ (10-23) the post quad IS the resolve */
     g_rsOn=(g_rscale<0.999f&&mode!=modeAnim&&g_postFbo)?1:0; if(g_rsOn) want=1;   /* the post quad IS the upsampler */
     g_rW=g_rsOn?(int)(g_postW*g_rscale+0.5f):g_postW; g_rH=g_rsOn?(int)(g_postH*g_rscale+0.5f):g_postH;
     if(g_rW<64) g_rW=64; if(g_rH<64) g_rH=64;
@@ -3026,7 +3166,8 @@ static void postEnd(int W,int H,float tone){ if(!g_postOn) return;
     glUseProgram(g_postProg); glUniform1i(g_pu_tex,0); glUniform1i(g_pu_blm,1);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,g_bloom>0.f?g_blmTex[0]:g_postTex);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_postTex);
-    glUniform2f(g_pu_px,1.f/g_rW,1.f/g_rH); if(g_pu_uvs>=0) glUniform2f(g_pu_uvs,rs,rs); glUniform1f(g_pu_tone,tone>0.f?tone:g_postKnee); glUniform1f(g_pu_bloom,g_bloom>0.f?g_bloom:0.f); glUniform1f(g_pu_fxaa,(float)g_fxaa);
+    glUniform2f(g_pu_px,1.f/g_rW,1.f/g_rH); if(g_pu_uvs>=0) glUniform2f(g_pu_uvs,rs,rs); glUniform1f(g_pu_tone,tone>0.f?tone:g_postKnee); glUniform1f(g_pu_bloom,g_bloom>0.f?g_bloom:0.f); glUniform1f(g_pu_fxaa,(float)(g_fxaa&&g_ssaa<2));
+    if(g_pu_grade>=0) glUniform1f(g_pu_grade,g_grade); if(g_pu_vig>=0) glUniform1f(g_pu_vig,g_vig);
     glUniform1f(g_pu_fish,(g_fishTh>0.f)?g_fish:0.f); glUniform1f(g_pu_asp,(H>0)?((float)W/(float)H):1.777f);
     glUniform1f(g_pu_tht,(g_fishTh>0.f)?g_fishTh:0.8f);
     g_tapeT+=(float)g_animDtS; if(g_tapeT>1e6f) g_tapeT=0.f;
@@ -3675,8 +3816,13 @@ static int modeSelect(SDL_Window*win,int W,int H){
     return done;
 }
 #endif
-#ifdef _WIN32
+#if defined(_WIN32) || defined(REVA_SDL)
+/* 11-01: door 11 was Windows-only, but the SDL platform calls it on every OS and the captions (10-23)
+   need the stb_truetype it compiles in -- the Linux build had not linked since then. */
 #include "lighthouse.c"   /* ⭐ 10-12 R.E.V.A.: door 11 is the real game's start menu */
+#else
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb/stb_truetype.h>
 #endif
 
 /* ================= THE SKATER: PHYSICS, TRICKS, POINTS ==============================
@@ -4123,7 +4269,9 @@ static double beatPLL(double tsec){
 static void hsv(float h,float*r,float*g,float*b){ h=h-floorf(h); float i=floorf(h*6),f=h*6-i;
     float q=1-f; switch(((int)i)%6){ case 0:*r=1;*g=f;*b=0;break; case 1:*r=q;*g=1;*b=0;break;
     case 2:*r=0;*g=1;*b=f;break; case 3:*r=0;*g=q;*b=1;break; case 4:*r=f;*g=0;*b=1;break; default:*r=1;*g=0;*b=q; } }
-static float frnd(void){ return (float)rand()/(float)RAND_MAX; }
+/* ⛔ (11-02) This divided by RAND_MAX, and THE DICE roll 31 bits on every platform while mingw's RAND_MAX is 32767: since the
+ * dice came home on 10-22, every frnd() on WINDOWS was 0..65536, not 0..1, in every door. Linux hid it (glibc's is 31 bits). */
+static float frnd(void){ int r=rand(); return (float)r/(g_diceLibc>0?(float)RAND_MAX:2147483648.f); }
 /* ================= THE WEAPON LAYER (OVERVIEW #1; campaign S1) ======================
  * One system for BR / arena / ARPG / the bash: every combatant -- the hero AND the
  * slots -- carries a weapon state. Melee is the birthright, guns are floor pickups,
@@ -4685,6 +4833,7 @@ static Water g_wat[WAT_MAX]; static int g_nWat=0;
  * program it came from. Published by whoever sets up the scene pass. */
 static float g_watVP[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
 static int g_cullOn=1;   /* ⭐ the set's frustum cull (09-11); ctl cull=0 for the A/B */
+static int g_cullEnvDone=0;   /* REVA_NOCULL=1: the same A/B in a door, which never reads the lab's ctl file (11-01) */
 
 
 /* ---- THE SKY, AS A FUNCTION ---------------------------------------------------------
@@ -5963,7 +6112,7 @@ static int setLoad(const char*name){
     g_setNRt=0;              /* ⭐ ep 10: a set's routes go with it */
     pipeClear();             /* ⭐ ep 11: and its half-pipes */
     g_setNL=0;
-    g_setSpace=0; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0;
+    g_setSpace=0; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0; g_gloss.on=0;
     memset(&g_stb,0,sizeof g_stb);   /* ⭐ 10-22: and Wan-To's star */   /* ⭐ 10-22: and its space */
     /* ⛔ A SET OWNS ITS CLOTH. Leaving the last level's curtains up is the same class of
      * bug as the club's own lamp sprites hanging over the road in a day sheet. */
@@ -6205,6 +6354,16 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"starweb ",8)){ float v9[3]={0.f,1.f,1.f}; int n9=sscanf(ln,"starweb %f %f %f",v9,v9+1,v9+2);
             if(n9>=1){ g_stb.webN=(int)v9[0]; if(g_stb.webN>STB_WEB) g_stb.webN=STB_WEB; g_stb.webSeed=v9[1]; g_stb.webX=(v9[2]!=0.f); g_stb.dirty=1;
                 printf("[set] starweb: %d pieces of him%s\n",g_stb.webN,g_stb.webX?", seen through the star":""); }
+            continue; }
+        if(!strncmp(ln,"gloss ",6)){ float v9[4]={0.f,0.06f,0.35f,2.5f};   /* ⭐ 10-23: a glossy floor -- see glossFloorPass */
+            int n9=sscanf(ln,"gloss %f %f %f %f",v9,v9+1,v9+2,v9+3);
+            if(n9>=1){ const char*e9=getenv("REVA_NOGLOSS");
+                if(e9&&e9[0]&&e9[0]!='0') printf("[set] gloss: REVA_NOGLOSS -- the floor stays matte\n");
+                else { g_gloss.on=1; g_gloss.y=v9[0]; g_gloss.f0=v9[1]; g_gloss.fmax=v9[2]; g_gloss.fade=(v9[3]>0.05f)?v9[3]:2.5f;
+                    Mirror*M9=&g_glossM; memset(M9,0,sizeof*M9); M9->p[1]=v9[0]; M9->n[1]=1.f;
+                    float*R9=M9->R; R9[0]=1.f; R9[5]=-1.f; R9[10]=1.f; R9[13]=2.f*v9[0]; R9[15]=1.f;   /* y' = 2y0 - y */
+                    printf("[set] gloss: the floor at y %.2f reflects (F0 %.2f, at most %.2f, fading over %.1f u)\n",v9[0],v9[1],v9[2],g_gloss.fade); } }
+            else printf("[set] gloss: want `gloss y [F0] [max] [fade]` -- %s\n",ln);
             continue; }
         if(!strncmp(ln,"mirror ",7)){ float v9[6];   /* ⭐ 10-22: MIRRORS -- see mirInst */
             if(sscanf(ln,"mirror %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5)==6&&g_nMir<4){
@@ -6733,6 +6892,7 @@ static void meshTintOf(Pack*P,unsigned mi,float*c){
  * \u2b50 Restoring on every OPAQUE mesh is what keeps the state from leaking out of a pack:
  * blended meshes sort last within a pack, and the next pack starts with an opaque one. */
 static void meshAlphaState(const PMesh*M){
+    if(g_glossDraw){ glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA); glDepthMask(GL_TRUE); return; }   /* ⭐ (10-23) the glossy floor */
     if(M&&(M->flags&8u)){
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(GL_FALSE);
@@ -7295,6 +7455,7 @@ static void pipeDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint)
     if(!g_shadowPass){ glPolygonOffset(0.f,0.f); glDisable(GL_POLYGON_OFFSET_FILL); }
     if(cull9) glEnable(GL_CULL_FACE);
     glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
+static int g_skyEarly=0;   /* this frame's sky is already down: see THE CROWD WAS HOLES */
 static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
     if(!g_setNI&&!g_nPipe&&!g_setSpace) return;   /* ⭐ ep 11: a set may be only a half-pipe -- (10-22) or only space */
     /* ⛔ CLAIM UNIT 0. drawProp binds its texture to whatever unit happens to be active,
@@ -7307,7 +7468,7 @@ static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
      * daylight sky behind them would be wrong. Gating here also leaves shotsweep's lab and
      * face-rig shots byte-identical, which is what separates a rendering change from a
      * rendering regression. */
-    if(!g_shadowPass) skyDraw();   /* the sun pass wants casters only: no sky, no cloth, no water */
+    if(!g_shadowPass){ if(g_skyEarly) g_skyEarly=0; else skyDraw(); }   /* the sun pass wants casters only: no sky, no cloth, no water */
     glActiveTexture(GL_TEXTURE0);
     /* ⭐ FRUSTUM CULL (09-11). The set renderer was "deliberately dumb: no culling, no batching,
      * no LOD" and drew all 559 of parsons' props every frame whichever way the lens faced.
@@ -7315,12 +7476,14 @@ static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
      * instance carries a sphere (the pack's XZ radius and rendered height, at the instance's
      * scale) tested against the six planes of this pass's view-projection (Gribb-Hartmann,
      * off g_watVP). ctl cull=0 for the A/B; REVA_CULLDBG=1 prints the count. */
+    if(!g_cullEnvDone){ g_cullEnvDone=1; const char*e=getenv("REVA_NOCULL"); if(e&&e[0]&&e[0]!='0'){ g_cullOn=0; printf("[cull] OFF (REVA_NOCULL)\n"); } }
     float pl[6][4]; int cullOn=g_cullOn&&!g_shadowPass; int drawn=0;
     if(cullOn){ const float*m=g_watVP;
         for(int k=0;k<3;k++){ for(int c=0;c<4;c++){ pl[k*2][c]=m[c*4+3]+m[c*4+k]; pl[k*2+1][c]=m[c*4+3]-m[c*4+k]; } }
         for(int k=0;k<6;k++){ float l=sqrtf(pl[k][0]*pl[k][0]+pl[k][1]*pl[k][1]+pl[k][2]*pl[k][2]); if(l>1e-6f) for(int c=0;c<4;c++) pl[k][c]/=l; } }
     for(int i=0;i<g_setNI;i++){
         SetInst*I=&g_setI[i];
+        if(!g_shadowPass&&g_gloss.on&&g_setPk[I->pk].floor) continue;   /* ⭐ (10-23) a glossy floor goes down LAST (glossFloorPass) */
         if(g_shadowPass){ /* ⭐ only what the sun window holds: a 300-unit street is mostly outside it */
             float dx=I->m[12]-g_sunFocus[0], dz=I->m[14]-g_sunFocus[2], lim=g_shadowExt*1.7f;
             if(dx>lim||dx<-lim||dz>lim||dz<-lim) continue;
@@ -7349,8 +7512,9 @@ static void drawSet(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
     rbDraw(uModel,uPal,uBind,uUse,uTint);   /* ⭐ the loose objects, in both passes (09-11) */
     pipeDraw(uModel,uPal,uBind,uUse,uTint);   /* ⭐ ep 11: the half-pipes, in both passes */
     if(g_shadowPass) return;
-    { static int n=0; static int dbg=-1; if(dbg<0) dbg=getenv("REVA_CULLDBG")?1:0;
-      if(dbg&&(n++%300)==0){ printf("[cull] %d of %d props drawn (%s)\n",drawn,g_setNI,cullOn?"frustum":"cull=0"); fflush(stdout); } }
+    { static int n=0; static int dbg=-1; if(dbg<0){ const char*e=getenv("REVA_CULLDBG"); dbg=e?atoi(e):0; if(e&&dbg<1) dbg=1; }
+      if(dbg>=2){ printf("[cull] f%lu %d of %d props drawn (%s)\n",g_frameNo,drawn,g_setNI,cullOn?"frustum":"cull=0"); fflush(stdout); }
+      else if(dbg&&(n++%300)==0){ printf("[cull] %d of %d props drawn (%s)\n",drawn,g_setNI,cullOn?"frustum":"cull=0"); fflush(stdout); } }
     glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
     sclDraw(uModel,uPal,uBind,uUse,uTint);
     /* water LAST: it is transparent, so everything it should be seen through has to be in
@@ -7627,9 +7791,10 @@ static GLint g_labUse=-1, g_labTint=-1;
 /* ⭐ THE TOON PASS (10-18). Four programs draw bodies (PR and PRD, opaque and cutout); their uniform locations
  * are looked up once per program here. toonCel() before a body mesh's draw (0 for every non-toon pack: uniforms
  * persist per program), toonInkDraw() right after it while its index buffer is still bound. */
-static float g_toonCel=0.30f, g_toonInk=0.0020f; static int g_toonOff=-1;
+static float g_toonCel=0.30f, g_toonInk=0.0020f, g_toonRim=0.30f; static int g_toonOff=-1;
+static int g_toonKeyCam=1; static float g_roomGrad=1.f;   /* ⭐ (10-23) the key from the lens, the room's ceiling light (REVA_TOONKEY, REVA_ROOMGRAD) */   /* ⭐ (10-23) the rim: REVA_TOONRIM */
 static const float g_inkC[3]={0.110f,0.086f,0.118f};
-typedef struct { GLuint prog; GLint cel, inkc, ink, asp, con, ca, cb, cr, hm, hmi, bc, hmr, wy, hemi, emis; } ToonLoc;
+typedef struct { GLuint prog; GLint cel, inkc, ink, asp, con, ca, cb, cr, hm, hmi, bc, hmr, wy, hemi, emis, rim, refl, gloss; } ToonLoc;
 static ToonLoc g_tl[8]; static int g_ntl=0;
 static ToonLoc*toonLoc(void){ GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr);
     for(int i=0;i<g_ntl;i++) if(g_tl[i].prog==(GLuint)pr) return &g_tl[i];
@@ -7642,7 +7807,35 @@ static ToonLoc*toonLoc(void){ GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr);
     t->bc=glGetUniformLocation(pr,"uBodyC"); t->hmr=glGetUniformLocation(pr,"uHeadMIR");
     t->wy=glGetUniformLocation(pr,"uWaistY");
     t->hemi=glGetUniformLocation(pr,"uHemi"); t->emis=glGetUniformLocation(pr,"uEmis");
+    t->rim=glGetUniformLocation(pr,"uRim"); t->refl=glGetUniformLocation(pr,"uRefl"); t->gloss=glGetUniformLocation(pr,"uGloss");
     return t; }
+/* ⭐ (10-23) THE GLOSSY FLOOR (jacob: "a general like shader/reflections pass"). A set's `gloss y [F0] [max] [fade]` makes
+ * its floor a second MIRROR, lying down: every body and prop above it is drawn a second time through its plane (mirInst,
+ * as the wall mirrors are), fading with its depth below it (uRefl: a polished floor shows what is near it), while the
+ * floor itself -- a pack carrying the marker `Floor` -- is held back from drawSet. It goes down LAST, here, after
+ * every body: its own colour plus the reflection under it times a Fresnel term (F0 looking straight down, rising
+ * toward `max` at a grazing angle) -- glBlendFunc(ONE, SRC_ALPHA) with the floor's alpha set to F. In a closed room
+ * every floor pixel has the room's reflection under it. One bounce: a reflection is not reflected again, and the floor
+ * seen in a wall mirror is drawn opaque. No `Floor` pack, no `gloss` line, or REVA_NOGLOSS=1: the floor is drawn as it
+ * always was, in drawSet. */
+static void glossFloorPass(GLuint prog,GLint uVP,GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint,const float*vp){
+    if(!g_gloss.on||!g_setNI) return;
+    glUseProgram(prog); glUniformMatrix4fv(uVP,1,GL_FALSE,vp);
+    ToonLoc*tl=toonLoc();
+    glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE);
+    glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA);
+    if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,g_gloss.f0,g_gloss.fmax,0.f,1.f);
+    glActiveTexture(GL_TEXTURE0);
+    g_glossDraw=1; int n=0;
+    for(int i=0;i<g_setNI;i++){ SetInst*I=&g_setI[i]; if(!g_setPk[I->pk].floor) continue;
+        if(I->tinted){ glUniform1f(uUse,0.f); glUniform3f(uTint,I->tint[0],I->tint[1],I->tint[2]); }
+        else         { glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
+        drawProp(&g_setPk[I->pk],I->m,uModel,uPal,uBind); n++; }
+    g_glossDraw=0;
+    if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,0.f,0.f,0.f,0.f);
+    glDisable(GL_BLEND); glDepthMask(GL_TRUE); glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
+    { static int said=0; if(!said){ said=1; printf("[gloss] %d floor piece(s) drawn over their reflections\n",n); fflush(stdout); } } }
+
 /* ⭐ PER-VERTEX COLLISION (10-18). headMats: the measured head ellipsoid on the POSED head bone (rotation only --
  * the bone's frame orthonormalised), as a matrix from the unit sphere to rig space and back. */
 static void measureHead(Pack*P);
@@ -7714,9 +7907,11 @@ static int toonOn(const void*Pv,int toon){
     if(g_toonOff<0){ const char*e=getenv("REVA_NOTOON"); g_toonOff=(e&&*e&&*e!='0');
         const char*c=getenv("REVA_TOONCEL"); if(c&&*c) g_toonCel=(float)atof(c);
         const char*k=getenv("REVA_TOONINK"); if(k&&*k) g_toonInk=(float)atof(k);
+        const char*rm=getenv("REVA_TOONRIM"); if(rm&&*rm) g_toonRim=(float)atof(rm);
         printf("[toon] cel %.2f ink %.4f%s\n",g_toonCel,g_toonInk,g_toonOff?" -- OFF (REVA_NOTOON)":""); fflush(stdout); }
     return Pv&&toon&&!g_toonOff; }
-static void toonCelSet(int on){ ToonLoc*t=toonLoc(); if(t&&t->cel>=0) glUniform1f(t->cel,on?g_toonCel:0.f); }
+static void toonCelSet(int on){ ToonLoc*t=toonLoc(); if(t&&t->cel>=0) glUniform1f(t->cel,on?g_toonCel:0.f);
+    if(t&&t->rim>=0) glUniform1f(t->rim,(on&&!g_toonOff)?g_toonRim:0.f); }
 /* ⭐ THE SHIP'S SETS (10-18). hemi: the cel cut taken on the surface's facing UP (0.5+0.5*N.y) times the sun's
  * shadow, not on the sun's direction -- a room is lit from its ceiling, so every wall reads lit and every underside
  * falls into the shadow tone, while the bodies keep the key. glow: uEmis 1, the surface at its own colour. Both
@@ -7725,7 +7920,7 @@ static void toonSetLook(int hemi,int glow){ if(g_shadowPass) return; ToonLoc*t=t
     if(t->hemi>=0) glUniform1f(t->hemi,hemi?1.f:0.f);
     if(t->emis>=0) glUniform1f(t->emis,glow?1.f:0.f); }
 static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei verts){
-    if(!on||g_toonInk<=0.f) return;
+    if(!on||g_toonInk<=0.f||g_glossDraw) return;   /* ⭐ (10-23) a glossy floor's own pass: no hull (a flat floor's is under it) */
     if(meshName&&strstr(meshName,"~face~")) return;          /* the face's drawn shapes are decals: no line */
     ToonLoc*t=toonLoc(); if(!t||t->ink<0||t->inkc<0) return;
     GLint vpv[4]; glGetIntegerv(GL_VIEWPORT,vpv);
@@ -7757,7 +7952,7 @@ static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,G
     /* flags: 1 cull back faces (props); 2 no ink -- a mirror's backing and its glass, reflected through their OWN mirror,
      * land just inside the room facing away, and an inverted hull drawn from behind blacked the first mirror out */
     int cull=flags&1;
-    if(!g_nMir||g_shadowPass||uModel<0) return;
+    if((!g_nMir&&!g_gloss.on)||g_shadowPass||uModel<0) return;
     if(g_mirOff<0){ const char*e=getenv("REVA_NOMIRROR"); g_mirOff=(e&&e[0]!='0')?1:0;
         if(g_mirOff) printf("[mirror] REVA_NOMIRROR: mirrors are dark openings\n"); }
     if(g_mirOff) return;
@@ -7765,7 +7960,9 @@ static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,G
     float cur[16]; glGetUniformfv((GLuint)pr,uModel,cur);
     GLboolean cf0=glIsEnabled(GL_CULL_FACE);
     static int dbg=-1, ndbg=0; if(dbg<0){ const char*e=getenv("REVA_MIRDBG"); dbg=(e&&e[0]!='0')?1:0; }
-    for(int k=0;k<g_nMir;k++){ Mirror*M=&g_mir[k];
+    ToonLoc*tl=toonLoc();
+    int nFl=(g_gloss.on&&!g_glossDraw)?1:0;   /* ⭐ (10-23) the glossy floor, lying down; never reflected in itself */
+    for(int k=0;k<g_nMir+nFl;k++){ Mirror*M=(k<g_nMir)?&g_mir[k]:&g_glossM; int fl=(k>=g_nMir);
         float dt=(cur[12]-M->p[0])*M->n[0]+(cur[13]-M->p[1])*M->n[1]+(cur[14]-M->p[2])*M->n[2];
         if(dbg&&ndbg<40){ ndbg++; printf("[mirror] %s prog %d uModel %d t %.2f %.2f %.2f -> mirror %d dt %.2f%s (glerr %x)\n",
             meshName?meshName:"?",(int)pr,(int)uModel,cur[12],cur[13],cur[14],k,dt,dt<-0.5f?" SKIP":"",glGetError()); fflush(stdout); }
@@ -7774,8 +7971,12 @@ static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,G
         glUniformMatrix4fv(uModel,1,GL_FALSE,mm);
         glFrontFace(GL_CW);
         if(cull){ glEnable(GL_CULL_FACE); glCullFace(GL_BACK); }
+        if(fl&&tl&&tl->refl>=0) glUniform4f(tl->refl,M->p[1],1.f/g_gloss.fade,0.f,1.f);
+        if(g_glossDraw&&!fl){ glDisable(GL_BLEND); if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,0.f,0.f,0.f,0.f); }
         if(idxCount) glDrawElements(GL_TRIANGLES,idxCount,GL_UNSIGNED_INT,0); else glDrawArrays(GL_TRIANGLES,0,verts);
         if(!(flags&2)) toonInkDraw(toon,meshName,idxCount,verts);
+        if(fl&&tl&&tl->refl>=0) glUniform4f(tl->refl,0.f,0.f,0.f,0.f);
+        if(g_glossDraw&&!fl){ glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA); if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,g_gloss.f0,g_gloss.fmax,0.f,1.f); }
         if(cull&&!cf0) glDisable(GL_CULL_FACE);
         glFrontFace(GL_CCW); }
     glUniformMatrix4fv(uModel,1,GL_FALSE,cur); }
@@ -7981,8 +8182,8 @@ static int morphSetName(Pack*P,float*wts,const char*nm,float v){
  * The MOUTH is driven by the line's own loudness envelope at 30Hz, so it opens on the
  * sound it is actually making. Faces have no bones on either body -- the jaw, smile
  * and brow are rpack v3 MORPHS (homecoming H6, authored by skate_src/author/face_morphs.py). */
-#define SCN_MAXL 64
-#define SCN_MAXE 512
+#define SCN_MAXL 256   /* ⭐ (10-23) 64 -> 256: a long narration is said as its sentences, each a line */
+#define SCN_MAXE 2048  /* ⭐ (10-23) 512 -> 2048 (68 s): a narration slot runs to 84 s */
 /* THE STAGING, per line (compile_scene.py writes a `stage` record beside every line).
  * A conversation in which both bodies hold one pose for a minute and a half is a radio
  * play with a camera pointed at it. What a director actually gives is: where they
@@ -8038,7 +8239,7 @@ static int scnRevNow(void){ return (g_revForce>=0)?g_revForce:g_scnRev; }
 /* ⭐ jawgain= (ep 4): how far the PUPPET jaw opens in `mouth hinge` mode. 1.0 is what
  * every scene shot so far used; ep 4 runs about 0.5. Sticky per line, and a ctl key. */
 static float g_jawGain=1.f, g_jawGainCtl=1.f;
-typedef struct { int spk; float t0,dur; char text[192]; unsigned char env[SCN_MAXE]; int nEnv;
+typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned char env[SCN_MAXE]; int nEnv;   /* ⭐ (10-23) 192 -> 1536, and its caption pages */
                  unsigned char vis[SCN_MAXE]; int nVis;   /* the jaw SHAPE, walked off the text */
                  float pgap,pyaw,pside; int hlook,plook,shot;
                  float hx,hz; int hasMark;   /* the pair's world mark for this line */
@@ -8106,7 +8307,10 @@ typedef struct { int spk; float t0,dur; char text[192]; unsigned char env[SCN_MA
                  /* ⭐ THE REACTION SHOT. Which body the LENS treats as the subject, when
                   * that is not the one talking. -1 = the speaker, as always. Moves the
                   * camera only: the voice, the mouth and the subtitle are untouched. */
-                 int focus; } ScnLine;
+                 int focus;
+                 /* ⭐ (10-23) WHO THE LINE IS SAID TO: a slot, -1 unsaid. The speaker's head finds them (THE PERFORMANCE
+                  * LAYER); NOT sticky -- blocking.py writes it on every speech line it knows the listener of. */
+                 int to; } ScnLine;
 static int numAt(const char*p){ if(!p) return 0;
     if(*p=='-'||*p=='+') p++;
     return (*p>='0'&&*p<='9')||*p=='.'; }
@@ -8125,6 +8329,11 @@ static int lensNums(const char*q,float*v,int maxn,int absAt,int*abs){
         q++; }
     return n; }
 static ScnLine g_scnL[SCN_MAXL]; static int g_scnN=0;
+/* ⭐ (10-23) CAPTION PAGES: compile_scene.py's `cap t0 t1 text` records (seconds into their line), each line's own
+ * run of them (capA, capN) -- see capDraw */
+#define SCN_MAXCAP 4096
+typedef struct { float t0,t1; char text[208]; } ScnCap;
+static ScnCap g_scnCap[SCN_MAXCAP]; static int g_scnCapN=0;
 static float g_scnT=-1.f, g_scnLen=0.f;
 /* ⭐ THE SCENE CLOCK AS THE BODIES SEE IT. g_scnT has to stay smooth -- it is what the wav
  * was mixed against, and what the subtitles and the cuts run on -- but a jaw or a head
@@ -9430,8 +9639,8 @@ static void locoTick(float st8,int snap){
                 float dx=MK->x-g_castAt[s][0], dz=MK->z-g_castAt[s][1], d=sqrtf(dx*dx+dz*dz);
                 if(d>30.f){ printf("[walk] slot %d: %.1fu to '%s' is not a walk -- placed\n",s,d,MK->name); fflush(stdout); }
                 else if(d>0.05f){ L->on=1; L->x=g_castAt[s][0]; L->z=g_castAt[s][1]; L->yaw=g_castAt[s][2]; L->v=0.f; L->trav=atan2f(dx,dz);
-                    printf("[walk] slot %d -> mark '%s': %.2fu from (%.2f,%.2f) to (%.2f,%.2f)\n",
-                           s,MK->name,d,L->x,L->z,MK->x,MK->z); fflush(stdout);
+                    printf("[walk] t %.2f slot %d -> mark '%s': %.2fu from (%.2f,%.2f) to (%.2f,%.2f)\n",
+                           g_scnT,s,MK->name,d,L->x,L->z,MK->x,MK->z); fflush(stdout);
                     L->rn=wrrtRoute(s,L->x,L->z,MK->x,MK->z,L->rx,L->rz,64); L->ri=0; } }
             /* a changed mark publishes AT ONCE: a walk starts where the body already stands, and a
              * placed mark lands on the cut -- neither may wait for the next exposure */
@@ -9480,11 +9689,11 @@ static void locoTick(float st8,int snap){
                              if(stp>1e-4f&&mv9<0.33f*stp) L->stuck+=st8; else L->stuck=0.f;
                              if(L->stuck>0.6f){
                                  float sl9=sqrtf((MK->x-L->x)*(MK->x-L->x)+(MK->z-L->z)*(MK->z-L->z));
-                                 printf("[walk] slot %d STUCK %.2fu short of '%s' at (%.2f,%.2f) -- the furniture holds it; PLACED on the mark\n",
-                                        s,sl9,MK->name,L->x,L->z); fflush(stdout);
+                                 printf("[walk] t %.2f slot %d STUCK %.2fu short of '%s' at (%.2f,%.2f) -- the furniture holds it; PLACED on the mark\n",
+                                        g_scnT,s,sl9,MK->name,L->x,L->z); fflush(stdout);
                                  L->x=MK->x; L->z=MK->z; L->yaw=MK->yaw*0.0174533f; L->v=0.f; L->on=0; L->rn=0; L->ri=0; L->stuck=0.f; } } } }
                 else { L->x=MK->x; L->z=MK->z; L->v=0.f;
-                       if(fabsf(dy)<0.02f){ L->on=0; printf("[walk] slot %d arrived on '%s'\n",s,MK->name); fflush(stdout); } } } }
+                       if(fabsf(dy)<0.02f){ L->on=0; printf("[walk] t %.2f slot %d arrived on '%s'\n",g_scnT,s,MK->name);   /* (10-23) timed: foley.py */ fflush(stdout); } } } }
         /* 2b. ⭐ ep 10: ROLL IT ALONG ITS PATH, by arc length -- or land it, on a snap=1 line */
         if(L->on&&L->path&&snap) locoPathLand(s,L,1);
         else if(L->on&&L->path&&st8>1e-6f){
@@ -12080,6 +12289,183 @@ static long  g_holdIdx[SCN_MAXCAST];   /* the exposure each slot's cache belongs
 static int   g_holdHas[SCN_MAXCAST];   /* nodes actually cached, 0 = nothing yet */
 static int   g_holdOff=-1;             /* REVA_NOHOLDLATCH */
 static int holdSlot(int who){ return who ? ((g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1) : 0; }
+
+/* ⭐ (10-23) THE PERFORMANCE LAYER. jacob, after the film pass's second sample: "Not yet. Keep refining the sample
+ * first." Measured on it (a frame difference per shot): 68% of 2.4's frames and 43% of 2.3's did not change at all. In
+ * a single only the mouth moved -- the old layer's drift was 3 degrees over 20 s, under a pixel a frame -- and its
+ * look-at never ran for the show's cast: lookTarget wants face marks, which no code-built person carries, and it knew
+ * two bodies (every partner aimed at the HERO; in 2.4 a boy lurking unseen at the door). Now, per scene SLOT:
+ *  - WHO TO LOOK AT. A listener looks at the line's speaker; the speaker at the one it is said to (the line's `to=`,
+ *    else the last other speaker, else the nearest body) and under-turns, the eyes finishing it; hlook=0 / plook=0
+ *    still refuse. Head to head: the eye marks where a body has them, the head bone where it does not.
+ *  - ON AN OFF-SCREEN VOICE'S LINE, OR AN ACTION'S, A BODY LOOKS ABOUT: a new place every 3-5 s, a third of the time
+ *    back to what it was doing.
+ *  - A TURN IS A SPRING (critically damped, ~0.45 s), never a snap -- integrated on the scene clock.
+ *  - THE SPEAKER MOVES WITH ITS WORDS: a nod on each strong stress (the rise of its own voice's envelope convolved
+ *    with a 0.4-s half sine, past the 80th percentile of 2.4's) and a turn and a tilt that drift with its voice and
+ *    settle in its pauses; the chest turns a little with the head.
+ *  - A LISTENER NODS as the speaker finishes (half the lines, by slot and line).
+ *  - EVERY BODY BREATHES (the chest, 0.24 Hz), and none holds dead still.
+ * Deterministic -- the scene clock, the lines and the slot; no rand() -- so [simhash] holds and a held exposure
+ * replays. REVA_ACT=0 is the old layer (the control); REVA_ACTDBG=1 prints each slot's target as it changes. */
+static int g_perf=-1, g_perfDbg=0;
+static float g_perfS[SCN_MAXCAST][4];       /* per slot, the head's spring: yaw, pitch and their rates */
+static float g_perfT[SCN_MAXCAST];          /* the scene time it was integrated to */
+static int   g_perfHas[SCN_MAXCAST], g_perfTgt[SCN_MAXCAST];
+static float g_perfF[SCN_MAXCAST][3];      /* per slot, where the CLIP's head faces, low-passed (the look-at's base) */
+static void perfRot(const float*q,const float*v,float*o){   /* v turned by q: v + w t + u x t, t = 2 u x v */
+    float tx=2.f*(q[1]*v[2]-q[2]*v[1]), ty=2.f*(q[2]*v[0]-q[0]*v[2]), tz=2.f*(q[0]*v[1]-q[1]*v[0]);
+    o[0]=v[0]+q[3]*tx+(q[1]*tz-q[2]*ty); o[1]=v[1]+q[3]*ty+(q[2]*tx-q[0]*tz); o[2]=v[2]+q[3]*tz+(q[0]*ty-q[1]*tx); }
+/* where the head faces in the rig's frame (+Z forward, the body's own): the rig's forward as the head bone held it at
+ * rest, carried through the pose's rotations, root to head */
+static int perfHeadFwd(Pack*P,float Q[][4],float*o){
+    int ch[64], n=0;
+    for(int i=P->pb[5];i>=0&&n<64;i=P->nodes[i].parent) ch[n++]=i;
+    if(!n) return 0;
+    float Rc[4]={0.f,0.f,0.f,1.f}, Rr[4]={0.f,0.f,0.f,1.f}, c[4], fl[3];
+    const float Z[3]={0.f,0.f,1.f};
+    for(int k=n-1;k>=0;k--){ qmul(Rc,Rc,Q[ch[k]]); qmul(Rr,Rr,P->nodes[ch[k]].q); }
+    qconj(c,Rr); perfRot(c,Z,fl); perfRot(Rc,fl,o);
+    float l=sqrtf(o[0]*o[0]+o[1]*o[1]+o[2]*o[2]); if(l<1e-5f) return 0;
+    o[0]/=l; o[1]/=l; o[2]/=l; return 1; }
+static void perfInit(void){
+    const char*e9=getenv("REVA_ACT"); g_perf=!(e9&&e9[0]=='0');
+    e9=getenv("REVA_ACTDBG"); g_perfDbg=(e9&&e9[0]!='0');
+    for(int s=0;s<SCN_MAXCAST;s++){ g_perfHas[s]=0; g_perfTgt[s]=-9; }
+    printf("[act] the performance layer %s\n",g_perf?"ON -- heads find who is talking, speakers move with their words, "
+           "the rest look about and breathe (REVA_ACT=0 is the control)":"OFF (REVA_ACT=0): the old head layer");
+    fflush(stdout); }
+static float perfRnd(int s,int k,int salt){
+    unsigned h=(unsigned)s*0x9E3779B1u^(unsigned)k*0x85EBCA77u^(unsigned)salt*0xC2B2AE3Du;
+    h^=h>>16; h*=0x7FEB352Du; h^=h>>15; h*=0x846CA68Bu; h^=h>>16;
+    return (float)(h>>8)/16777216.f; }
+/* where slot s looks FROM and is looked AT: between its eye marks, else its head bone */
+static int perfEye(int s,float*o){
+    if(s<0||s>=SCN_BODIES) return 0;   /* a slot is in the scene when it has a body (g_scnNCast is never set: 2) */
+    if(s==0){ if(g_heroFaceOK){ memcpy(o,g_heroEyeW,12); return 1; } }
+    else { if(!g_cast[s].pk) return 0;
+           if(g_cast[s].faceOK){ memcpy(o,g_cast[s].eyeW,12); return 1; } }
+    if(castHeadOK(s)){ memcpy(o,castHead(s),12); return 1; }
+    return 0; }
+static float perfEnv(const ScnLine*L,float t){
+    if(!L||L->silent||L->nEnv<2) return 0.f;
+    float f=(t-L->t0)*30.f; if(f<0.f||f>=(float)(L->nEnv-1)) return 0.f;
+    int k=(int)f; float u=f-(float)k, v=((float)L->env[k]*(1.f-u)+(float)L->env[k+1]*u)/100.f;
+    return v>1.f?1.f:v; }
+/* a line's strong stresses, 0..1.2: each rise of the voice (over 0.1 s) convolved with a 0.4-s half sine, less 1.7 --
+ * the 80th percentile of 2.4's (the median is 1.0: every syllable rises; only the stresses rise that far) */
+static float perfStress(const ScnLine*L,float t){
+    float s=0.f;
+    for(int k=0;k<12;k++){ float tau=((float)k+0.5f)/30.f, r=perfEnv(L,t-tau)-perfEnv(L,t-tau-0.10f);
+        if(r>0.f) s+=r*sinf(3.14159f*tau/0.40f); }
+    s=(s-1.7f)*1.25f; return s<0.f?0.f:(s>1.2f?1.2f:s); }
+static void perfLayer(Pack*P,float Q[][4],int who,int li,float t){
+    int me=holdSlot(who);
+    if(!P||me<0||me>=SCN_MAXCAST) return;
+    /* the line framing this moment: the one being said, else the last begun (a gap keeps its look) */
+    int lk=li;
+    if(lk<0) for(int i=0;i<g_scnN;i++) if(g_scnL[i].t0<=t) lk=i;
+    const ScnLine*L=(li>=0)?&g_scnL[li]:NULL, *LK=(lk>=0)?&g_scnL[lk]:NULL;
+    int spk=LK?LK->spk:-1;
+    int speaking=(L&&L->spk==me&&!L->silent);
+    int refuse=(g_scnT>=0.f&&!g_scnLook[me?1:0])||g_prd[me].pon||!g_lookOn;
+    /* WHO */
+    int tgt=-1;
+    if(LK&&!refuse&&!LK->silent){
+        if(spk>=0&&spk<SCN_BODIES&&spk!=me) tgt=spk;                          /* listening */
+        else if(spk==me){                                                      /* saying it: to whom */
+            if(LK->to>=0&&LK->to<SCN_BODIES&&LK->to!=me) tgt=LK->to;
+            for(int i=lk-1;i>=0&&tgt<0;i--){ int s=g_scnL[i].spk; if(s>=0&&s<SCN_BODIES&&s!=me&&!g_scnL[i].silent) tgt=s; }
+            if(tgt<0){ float E[3],F[3],best=1e9f;
+                if(perfEye(me,E)) for(int s=0;s<SCN_BODIES;s++){ if(s==me||!perfEye(s,F)) continue;
+                    float d=(F[0]-E[0])*(F[0]-E[0])+(F[2]-E[2])*(F[2]-E[2]); if(d<best){ best=d; tgt=s; } } } } }
+    float yawT=0.f, pitchT=0.f; int aimed=0, about=0;
+    float dt0=t-g_perfT[me]; int fresh=(!g_perfHas[me]||dt0<0.f||dt0>0.75f);
+    /* ⭐ THE LOOK-AT IS ABSOLUTE. An offset on the clip's head was not a look: a sitting clip holds the head down at
+     * its console, and "look at Marie" came out as a look at Marie's lap (2.4's first take). Where the CLIP's head faces
+     * -- its rotations carried root to head, low-passed over 1.2 s so the clip's own nods still play -- is corrected to
+     * where the other one's head is. */
+    { float fc[3], *FD=g_perfF[me];
+      if(perfHeadFwd(P,Q,fc)){
+          if(fresh){ memcpy(FD,fc,12); }
+          else if(dt0>0.f){ float a=1.f-expf(-dt0/1.2f); for(int k=0;k<3;k++) FD[k]+=(fc[k]-FD[k])*a;
+              float l=sqrtf(FD[0]*FD[0]+FD[1]*FD[1]+FD[2]*FD[2]); if(l>1e-5f) for(int k=0;k<3;k++) FD[k]/=l; } }
+      else if(fresh){ FD[0]=0.f; FD[1]=0.f; FD[2]=1.f; } }
+    { float E[3],F[3];
+      if(tgt>=0&&perfEye(me,E)&&perfEye(tgt,F)){
+          float by=who?g_partYaw:g_rvHead, dx=F[0]-E[0], dy=F[1]-E[1], dz=F[2]-E[2], d=sqrtf(dx*dx+dz*dz);
+          if(d>1e-4f){ float f=dx*sinf(by)+dz*cosf(by), r=dx*cosf(by)-dz*sinf(by);
+              const float*FD=g_perfF[me];
+              float yc=atan2f(FD[0],FD[2]), pc=atan2f(FD[1],sqrtf(FD[0]*FD[0]+FD[2]*FD[2]));
+              yawT=atan2f(r,f)-yc; pitchT=(atan2f(dy,d)-pc)*LOOK_PITCH_SIGN; aimed=1;
+              if(yawT>3.14159f) yawT-=6.28318f; if(yawT<-3.14159f) yawT+=6.28318f;
+              if(yawT>0.70f) yawT=0.70f; if(yawT<-0.70f) yawT=-0.70f;
+              if(pitchT>0.35f) pitchT=0.35f; if(pitchT<-0.35f) pitchT=-0.35f; } } }
+    if(!aimed&&!refuse){   /* NOBODY TO LOOK AT: look about */
+        float Pd=3.2f+0.7f*(float)me; int k=(int)floorf(t/Pd); float u=t-(float)k*Pd;
+        int kk=(u<perfRnd(me,k,5)*0.5f*Pd)?k-1:k;
+        if(perfRnd(me,kk,3)>=0.34f){ yawT=(perfRnd(me,kk,1)-0.5f)*0.85f; pitchT=(perfRnd(me,kk,2)-0.6f)*0.28f;
+            /* ⭐ CHEAT TO THE LENS: a look about turned away from a close lens gave a close-up of the back of a boy's head
+             * (2.3, at his mirror). Looking at nothing in particular, a body looks to the CAMERA's side of the room, as an
+             * actor cheats out -- not into the lens -- unless the lens is behind it. */
+            float E[3];
+            if(g_camOn&&perfEye(me,E)){ float by=who?g_partYaw:g_rvHead, dx=g_camPos[0]-E[0], dz=g_camPos[2]-E[2];
+                float cy=atan2f(dx*cosf(by)-dz*sinf(by),dx*sinf(by)+dz*cosf(by));
+                if(fabsf(cy)<2.2f){ if(yawT*cy<0.f) yawT=-yawT;
+                    yawT=0.6f*yawT+0.25f*cy; if(yawT>0.62f) yawT=0.62f; if(yawT<-0.62f) yawT=-0.62f; } } }
+        about=1; }
+    if(g_perfDbg&&tgt!=g_perfTgt[me]){ char b9[16]=""; if(tgt>=0) snprintf(b9,sizeof b9," %d",tgt);
+        printf("[act] t %.2f slot %d %s%s%s\n",t,me,tgt>=0?"looks at slot":(refuse?"refuses to look":"looks about"),b9,
+               (tgt>=0&&!aimed)?" -- but has no head to find":""); fflush(stdout); }
+    g_perfTgt[me]=tgt;
+    /* THE TURN: a critically damped spring on the scene clock */
+    float wgt=speaking?0.72f:1.f, hy=yawT*wgt, hp=pitchT*wgt, *S=g_perfS[me];
+    float dt=t-g_perfT[me];
+    if(!g_perfHas[me]||dt<0.f||dt>0.75f){ S[0]=hy; S[1]=hp; S[2]=S[3]=0.f; g_perfHas[me]=1; }
+    else if(dt>0.f){ const float W=10.f; int n=(int)ceilf(dt/0.004f); if(n>200) n=200; float h=dt/(float)n;
+        for(int i=0;i<n;i++){ S[2]+=h*(W*W*(hy-S[0])-2.f*W*S[2]); S[3]+=h*(W*W*(hp-S[1])-2.f*W*S[3]);
+                              S[0]+=h*S[2]; S[1]+=h*S[3]; } }
+    g_perfT[me]=t;
+    if(g_perfDbg){ static float said9[SCN_MAXCAST]; if(t-said9[me]>=1.f||t<said9[me]){ said9[me]=t;
+        const float*FD=g_perfF[me];
+        printf("[act] t %.1f slot %d clip head yaw %+.0f pitch %+.0f (up)  ask yaw %+.0f pitch %+.0f (down)  head at %+.0f %+.0f%s\n",
+               t,me,atan2f(FD[0],FD[2])*57.3f,atan2f(FD[1],sqrtf(FD[0]*FD[0]+FD[2]*FD[2]))*57.3f,yawT*57.3f,pitchT*57.3f,
+               S[0]*57.3f,S[1]*57.3f,aimed?"":(about?"  (looking about)":"")); fflush(stdout); } }
+    float yaw=S[0], pitch=S[1], roll=0.f, sway=0.f;
+    /* THE SPEAKER'S WORDS */
+    if(speaking){
+        float va=0.f; for(int k=0;k<15;k++) va+=perfEnv(L,t-(float)k/30.f);
+        va=va/15.f*2.4f; if(va>1.f) va=1.f;                                   /* the voice over the last half second */
+        float ph=(float)me*1.7f+(float)li*0.9f;
+        float dy=va*(0.080f*sinf(1.21f*t+ph)+0.035f*sinf(2.63f*t+2.f*ph));
+        yaw+=dy; sway=dy;
+        roll+=va*0.030f*sinf(0.97f*t+1.3f*ph);   /* (a 0.05 tilt on a clip's own read as dozing off) */
+        pitch+=va*0.020f*sinf(1.73f*t+0.7f*ph)+0.075f*perfStress(L,t); }      /* positive pitch: the face DOWN */
+    /* THE LISTENER'S NOD, as the speaker finishes */
+    else if(aimed){
+        for(int i=(lk>0?lk-1:0);i<=lk&&i<g_scnN;i++){ const ScnLine*Li=&g_scnL[i];
+            if(Li->silent||Li->spk==me||Li->spk<0||Li->spk>=SCN_BODIES) continue;
+            float u=t-(Li->t0+Li->dur);
+            if(u>=0.f&&u<0.7f&&perfRnd(me,i,9)<0.5f) pitch+=0.060f*sinf(3.14159f*u/0.7f); } }
+    /* NOBODY HOLDS DEAD STILL */
+    yaw  +=0.022f*sinf(0.37f*t+(float)me*2.1f);
+    pitch+=0.012f*sinf(0.53f*t+(float)me*1.3f);
+    roll +=0.010f*sinf(0.29f*t+(float)me*0.7f);
+    float off[4]; int nk=P->pb[4], hd=P->pb[5];
+    if(nk>=0){ qaxis(off,1,0,0,pitch*0.45f); qmul(Q[nk],Q[nk],off); qaxis(off,0,1,0,yaw*0.45f); qmul(Q[nk],Q[nk],off);
+               qaxis(off,0,0,1,roll*0.45f); qmul(Q[nk],Q[nk],off); }
+    if(hd>=0){ qaxis(off,1,0,0,pitch*0.55f); qmul(Q[hd],Q[hd],off); qaxis(off,0,1,0,yaw*0.55f); qmul(Q[hd],Q[hd],off);
+               qaxis(off,0,0,1,roll*0.55f); qmul(Q[hd],Q[hd],off); }
+    /* THE EYES LEAD: on the target while the head is still on its way there, and steady against the nods */
+    if(aimed||(about&&(yawT!=0.f||pitchT!=0.f))){
+        float ey=yawT-yaw, ep=pitchT-pitch;
+        eyeAim(P,Q,ey,ep);
+        eyeMorphAim(P,who?g_partMorphW:g_heroMorphW,ey,ep*LOOK_PITCH_SIGN); }
+    /* THE BREATH, and the chest turning a little with a speaker's head */
+    { int ch=(P->pb[3]>=0)?P->pb[3]:P->pb[2];
+      float br=sinf(6.2832f*0.24f*t+(float)me*1.9f);
+      if(ch>=0){ qaxis(off,1,0,0,-0.014f*br); qmul(Q[ch],Q[ch],off);
+                 if(sway!=0.f){ qaxis(off,0,1,0,0.22f*sway); qmul(Q[ch],Q[ch],off); } } } }
 static void scnHeadLayer(Pack*P,float Q[][4],int who){
     if(g_holdOff<0){ const char*e9=getenv("REVA_NOHOLDLATCH"); g_holdOff=(e9&&e9[0]!='0');
         if(g_holdOff){ printf("[hold] face latch OFF (REVA_NOHOLDLATCH) -- the solve re-runs on held exposures\n"); fflush(stdout); } }
@@ -12104,8 +12490,13 @@ static void scnHeadLayer(Pack*P,float Q[][4],int who){
     int nk=P->pb[4], hd=P->pb[5];
     float t=scnBodyT();
     int li=scnActive();
-    int speaking=(li>=0&&g_scnL[li].spk==who);
+    if(g_perf<0) perfInit();
+    /* ⭐ (10-23) the SLOT, not `who` -- who is 1 for every partner: slot 3's jaw opened on slot 1's words */
+    int speaking=(li>=0&&g_scnL[li].spk==(g_perf?holdSlot(who):who));
     float amp=(li>=0)?scnMouth(&g_scnL[li],t):0.f;
+    float off[4];
+    if(g_perf) perfLayer(P,Q,who,li,t);
+    else {   /* the old head layer: REVA_ACT=0, the control */
     float ph=t*0.6f+(float)who*2.1f;
     float yaw=sinf(ph*0.53f)*0.055f, pitch=sinf(ph*0.37f)*0.035f;
     if(speaking){ pitch-=0.075f*amp; yaw+=sinf(t*2.1f+who)*0.035f*amp; }
@@ -12135,11 +12526,11 @@ static void scnHeadLayer(Pack*P,float Q[][4],int who){
                   if(dot>1.f)dot=1.f; if(dot<-1.f)dot=-1.f;
                   printf("[look] t %.1f  hero face-to-partner OFF BY %.1f deg  (yaw ask %.1f)\n",
                          g_scnT,acosf(dot)*57.2958f,ly*57.2958f); fflush(stdout); } } } } }
-    float off[4];
     if(nk>=0){ qaxis(off,1,0,0,pitch*0.45f); qmul(Q[nk],Q[nk],off);
                qaxis(off,0,1,0,yaw*0.45f);   qmul(Q[nk],Q[nk],off); }
     if(hd>=0){ qaxis(off,1,0,0,pitch*0.55f); qmul(Q[hd],Q[hd],off);
                qaxis(off,0,1,0,yaw*0.55f);   qmul(Q[hd],Q[hd],off); }
+    }   /* the old head layer */
     /* ⭐ THE ANIMATOR'S HAND, IN THE JOINTS. Ep 1's boil moved the whole puppet a hair and
      * nobody could see it: a root offset of +-0.005 is a pixel or two in a wide. A puppet's
      * boil is in the JOINTS -- every exposure the neck, the head and the arms are set down a
@@ -13928,8 +14319,8 @@ static int scnLoad(const char*name){
     char pth[512]; snprintf(pth,sizeof pth,"scenes/%s.scn",name);
     FILE*f=fopen(pth,"rb");
     if(!f){ printf("[scene] %s NOT FOUND\n",pth); fflush(stdout); return 0; }
-    g_scnN=0; g_scnLen=0.f;
-    char wav[128]={0}; char ln[8192];   /* ⭐ ep 10: 4096 -> 8192 -- four mark-list paths on one stage record */
+    g_scnN=0; g_scnLen=0.f; g_scnCapN=0;
+    char wav[128]={0}; static char ln[32768];   /* ⭐ ep 10: 4096 -> 8192 -- four mark-list paths on one stage record; (10-23) -> 32768: an 84 s line's mouth envelope */
     while(fgets(ln,sizeof ln,f)){
         /* ⛔ ep 10: a record longer than the buffer used to be split in two, silently -- its tail lost */
         if(!strchr(ln,'\n')&&!feof(f)){ int c9; while((c9=fgetc(f))!=EOF&&c9!='\n'){ }
@@ -13944,8 +14335,8 @@ static int scnLoad(const char*name){
             int used=0;
             if(sscanf(ln,"line %d %f %f %n",&L->spk,&L->t0,&L->dur,&used)>=3&&used>0){
                 const char*t=ln+used; int k9=0;
-                while(*t&&*t!='\n'&&*t!='\r'&&k9<191) L->text[k9++]=*t++;
-                L->text[k9]=0; L->nEnv=0; L->nVis=0;
+                while(*t&&*t!='\n'&&*t!='\r'&&k9<(int)sizeof L->text-1) L->text[k9++]=*t++;
+                L->text[k9]=0; L->nEnv=0; L->nVis=0; L->capA=g_scnCapN; L->capN=0;
                 /* staging defaults, so a .scn written before staging existed still plays */
                 L->pgap=1.15f; L->pyaw=180.f; L->pside=0.12f;
                 L->p2gap=1.45f; L->p2yaw=214.f; L->p2side=-1.25f;
@@ -13967,13 +14358,21 @@ static int scnLoad(const char*name){
                 L->silent=(L->text[0]==0);
                 L->hlook=L->plook=1; L->shot=SHOT_OTS;
                 L->hbrow=L->pbrow=-9.f; L->hgt=0.f; L->step=-1.f; L->tod=-1.f; L->tone=-1.f; L->feed=-1.f; L->fish=-1.f; L->snap=0;
-                L->reverse=0; L->jawgain=-1.f;
+                L->reverse=0; L->jawgain=-1.f; L->to=-1;
                 L->hover[0]=L->pover[0]=L->p2over[0]=0;
                 L->htrick[0]=L->ptrick[0]=L->p2trick[0]=L->p3trick[0]=0;   /* ⭐ ep 10 */
                 L->hpuff[0]=L->ppuff[0]=L->p2puff[0]=L->p3puff[0]=0;       /* ⭐ ep 12 */
                 snprintf(L->hclip,sizeof L->hclip,"z_upright");
                 snprintf(L->pclip,sizeof L->pclip,"z_upright");
                 g_scnN++; } }
+        else if(!strncmp(ln,"cap ",4)&&g_scnN>0){   /* ⭐ (10-23) a caption page of the line just read */
+            ScnLine*L=&g_scnL[g_scnN-1]; int used=0; float a9=0.f,b9=0.f;
+            if(g_scnCapN<SCN_MAXCAP&&sscanf(ln,"cap %f %f %n",&a9,&b9,&used)>=2&&used>0){
+                ScnCap*C=&g_scnCap[g_scnCapN]; const char*t=ln+used; int k9=0;
+                while(*t&&*t!='\n'&&*t!='\r'&&k9<(int)sizeof C->text-1) C->text[k9++]=*t++;
+                C->text[k9]=0; C->t0=a9; C->t1=b9;
+                if(!L->capN) L->capA=g_scnCapN;
+                g_scnCapN++; L->capN++; } }
         else if(!strncmp(ln,"vis ",4)&&g_scnN>0){
             ScnLine*L=&g_scnL[g_scnN-1];
             int n9=0, used=0; sscanf(ln,"vis %d %n",&n9,&used);
@@ -14135,6 +14534,8 @@ static int scnLoad(const char*name){
             { q=strstr(ln,"pgap="); while(q&&q>ln&&q[-1]>='0'&&q[-1]<='9') q=strstr(q+1,"pgap=");
               if(q) L->pgap=(float)atof(q+5); }
             /* ⭐ focus=hero|partner -- who the LENS is on, when it is not the speaker. */
+            L->to=-1;   /* ⭐ (10-23) ` to=<slot>`: leading space, nothing else ends in "to" */
+            if((q=strstr(ln," to="))&&numAt(q+4)) L->to=atoi(q+4);
             L->focus=-1;
             if((q=strstr(ln,"focus="))){
                 if(!strncmp(q+6,"hero",4)) L->focus=0;
@@ -14278,6 +14679,172 @@ static int scnLoad(const char*name){
     printf("[scene] %s: %d lines, %.1fs, wav %s (%u bytes)\n",name,g_scnN,g_scnLen,wav,g_scnWavLen);
     fflush(stdout);
     return 1; }
+
+/* ================= THE CAPTIONS (10-23) =====================================================================
+ * jacob: "the captions/subtitles more readable". They were stb_easy_font -- a segment font of six pixels a character
+ * -- on ONE line that shrank to fit, and the line was cut at 191 characters: 123 of the show's 340 lines lost their
+ * ends. Now a real typeface (Segoe UI Semibold here; REVA_CAPFONT / REVA_CAPFONTI name others; DejaVu on Linux),
+ * packed once into an alpha atlas with 2x2 oversampling (stb_truetype, which door 11 already compiles in), drawn as
+ * textured quads on the HUD's 1280-wide canvas: near-white with a dark outline over a soft rounded box, at most two
+ * rows balanced against each other. What is shown is the line's PAGE for this moment -- compile_scene.py cuts a line
+ * into pages of two rows and times each off the voice (`cap t0 t1 text`); a line without pages is wrapped whole. The
+ * off-screen voice (slot 4: the narrator) is set in italic with no name; an on-screen speaker's name sits over the
+ * box in the slot's colour. No font found, or REVA_OLDCAPS=1 (the control): the old captions. */
+#define CAP_PX   64.f              /* the packed size */
+#define CAP_SIZE 36.f              /* drawn on the 1280-wide canvas: 5% of a 720 frame */
+#define CAP_AW 2048
+#define CAP_AH 2048
+#define CAP_ROWS 4
+static const int CAP_EXTRA[8]={0x2013,0x2014,0x2018,0x2019,0x201C,0x201D,0x2026,0x2022};
+static stbtt_packedchar g_capA[2][95], g_capB[2][96], g_capC[2][8];
+static int g_capOK=0; static GLuint g_capTex=0, g_capProg=0, g_capVbo=0;
+static GLint g_capScr=-1, g_capCol=-1, g_capTx=-1, g_capOff=-1, g_capSolid=-1, g_capBox=-1;
+static unsigned char*capFile(const char*p){
+    if(!p||!p[0]) return NULL;
+    FILE*f=fopen(p,"rb"); if(!f) return NULL;
+    fseek(f,0,SEEK_END); long n=ftell(f); fseek(f,0,SEEK_SET);
+    unsigned char*b=(n>0)?(unsigned char*)malloc((size_t)n):NULL;
+    if(b&&fread(b,1,(size_t)n,f)!=(size_t)n){ free(b); b=NULL; }
+    fclose(f); return b; }
+static int capCp(const char**s){   /* one UTF-8 codepoint */
+    const unsigned char*p=(const unsigned char*)*s; int c=p[0];
+    if(c<0x80){ *s+=1; return c; }
+    if((c&0xE0)==0xC0&&(p[1]&0xC0)==0x80){ *s+=2; return ((c&0x1F)<<6)|(p[1]&0x3F); }
+    if((c&0xF0)==0xE0&&(p[1]&0xC0)==0x80&&(p[2]&0xC0)==0x80){ *s+=3; return ((c&0x0F)<<12)|((p[1]&0x3F)<<6)|(p[2]&0x3F); }
+    *s+=1; return '?'; }
+static stbtt_packedchar*capGlyph(int f,int c){
+    if(c>=32&&c<=126) return &g_capA[f][c-32];
+    if(c>=160&&c<=255) return &g_capB[f][c-160];
+    for(int k=0;k<8;k++) if(CAP_EXTRA[k]==c) return &g_capC[f][k];
+    return &g_capA[f]['?'-32]; }
+static void capInit(void){
+    const char*e=getenv("REVA_OLDCAPS");
+    if(e&&e[0]&&e[0]!='0'){ printf("[caps] REVA_OLDCAPS: the old segment-font captions\n"); fflush(stdout); return; }
+    const char*cand[2][6]={{getenv("REVA_CAPFONT"),"C:/Windows/Fonts/seguisb.ttf","C:/Windows/Fonts/segoeui.ttf","C:/Windows/Fonts/arial.ttf",
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"},
+                           {getenv("REVA_CAPFONTI"),"C:/Windows/Fonts/seguisbi.ttf","C:/Windows/Fonts/segoeuii.ttf","C:/Windows/Fonts/ariali.ttf",
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"}};
+    unsigned char*ttf[2]={NULL,NULL}; const char*got[2]={"",""};
+    for(int f=0;f<2;f++) for(int k=0;k<6&&!ttf[f];k++){ ttf[f]=capFile(cand[f][k]); if(ttf[f]) got[f]=cand[f][k]; }
+    if(!ttf[0]){ printf("[caps] NO CAPTION FONT (REVA_CAPFONT names a .ttf) -- the old segment-font captions\n"); fflush(stdout); free(ttf[1]); return; }
+    int haveI=(ttf[1]!=NULL);
+    unsigned char*bmp=(unsigned char*)calloc((size_t)CAP_AW*CAP_AH,1);
+    stbtt_pack_context pc;
+    if(!bmp||!stbtt_PackBegin(&pc,bmp,CAP_AW,CAP_AH,0,3,NULL)){ printf("[caps] the atlas: out of memory -- the old captions\n"); free(bmp); free(ttf[0]); free(ttf[1]); return; }
+    stbtt_PackSetOversampling(&pc,2,2);
+    int ok=1;
+    for(int f=0;f<2;f++){
+        if(f==1&&!haveI){ memcpy(g_capA[1],g_capA[0],sizeof g_capA[0]); memcpy(g_capB[1],g_capB[0],sizeof g_capB[0]); memcpy(g_capC[1],g_capC[0],sizeof g_capC[0]); break; }
+        stbtt_pack_range r[3]; memset(r,0,sizeof r);
+        r[0].font_size=CAP_PX; r[0].first_unicode_codepoint_in_range=32;  r[0].num_chars=95; r[0].chardata_for_range=g_capA[f];
+        r[1].font_size=CAP_PX; r[1].first_unicode_codepoint_in_range=160; r[1].num_chars=96; r[1].chardata_for_range=g_capB[f];
+        r[2].font_size=CAP_PX; r[2].array_of_unicode_codepoints=(int*)CAP_EXTRA; r[2].num_chars=8; r[2].chardata_for_range=g_capC[f];
+        if(!stbtt_PackFontRanges(&pc,ttf[f],0,r,3)) ok=0; }
+    stbtt_PackEnd(&pc); free(ttf[0]); free(ttf[1]);
+    if(!ok) printf("[caps] some glyphs did not fit the atlas -- they draw as '?'\n");
+    glGenTextures(1,&g_capTex); glBindTexture(GL_TEXTURE_2D,g_capTex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_ALPHA,CAP_AW,CAP_AH,0,GL_ALPHA,GL_UNSIGNED_BYTE,bmp);
+    glPixelStorei(GL_UNPACK_ALIGNMENT,4);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    free(bmp);
+    const char*vs="attribute vec4 p; uniform vec2 scr; uniform vec2 off; varying vec2 uv; varying vec2 cp;\n"
+                  "void main(){ vec2 q=p.xy+off; cp=q; uv=p.zw; gl_Position=vec4(q.x/scr.x*2.0-1.0,1.0-q.y/scr.y*2.0,0.0,1.0); }\n";
+    /* solid > 0: the box, a rounded rectangle of corner radius `solid` (an antialiased distance), else a glyph */
+    const char*fs="precision mediump float; varying vec2 uv; varying vec2 cp; uniform sampler2D tx; uniform vec4 col; uniform float solid; uniform vec4 box;\n"
+                  "void main(){ float a;\n"
+                  "  if(solid>0.5){ vec2 c=(box.xy+box.zw)*0.5, h=(box.zw-box.xy)*0.5;\n"
+                  "    vec2 q=abs(cp-c)-(h-vec2(solid)); float d=length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-solid; a=clamp(0.5-d,0.0,1.0); }\n"
+                  "  else a=texture2D(tx,uv).a;\n"
+                  "  gl_FragColor=vec4(col.rgb,col.a*a); }\n";
+    GLuint p=glCreateProgram(); glAttachShader(p,sh(GL_VERTEX_SHADER,vs)); glAttachShader(p,sh(GL_FRAGMENT_SHADER,fs));
+    glBindAttribLocation(p,0,"p"); glLinkProgram(p);
+    { GLint lk=0; glGetProgramiv(p,GL_LINK_STATUS,&lk); if(!lk){ printf("[caps] the caption program did not link -- the old captions\n"); fflush(stdout); return; } }
+    g_capProg=p; g_capScr=glGetUniformLocation(p,"scr"); g_capCol=glGetUniformLocation(p,"col"); g_capTx=glGetUniformLocation(p,"tx");
+    g_capOff=glGetUniformLocation(p,"off"); g_capSolid=glGetUniformLocation(p,"solid"); g_capBox=glGetUniformLocation(p,"box");
+    glGenBuffers(1,&g_capVbo);
+    g_capOK=1;
+    printf("[caps] %s%s%s packed at %.0f px (2x2 oversampled) into %dx%d, drawn at %.0f px%s\n",got[0],haveI?" + ":"",got[1],
+           CAP_PX,CAP_AW,CAP_AH,CAP_SIZE,haveI?"":" (no italic face: the narrator in the upright one)"); fflush(stdout); }
+static float capWidth(int f,const char*s,const char*e,float sz){
+    float w=0.f; while(s<e&&*s){ int c=capCp(&s); w+=capGlyph(f,c)->xadvance; } return w*sz/CAP_PX; }
+static int capQuads(int f,const char*s,const char*e,float x,float y,float sz,float*v,int cap){   /* y: the baseline; floats written */
+    float k=sz/CAP_PX, px=0.f, py=0.f; int n=0;
+    while(s<e&&*s&&n+24<=cap){ int c=capCp(&s); stbtt_aligned_quad q;
+        stbtt_GetPackedQuad(capGlyph(f,c),CAP_AW,CAP_AH,0,&px,&py,&q,0);
+        float x0=x+q.x0*k, x1=x+q.x1*k, y0=y+q.y0*k, y1=y+q.y1*k;
+        float Q[24]={x0,y0,q.s0,q.t0, x1,y0,q.s1,q.t0, x1,y1,q.s1,q.t1, x0,y0,q.s0,q.t0, x1,y1,q.s1,q.t1, x0,y1,q.s0,q.t1};
+        memcpy(v+n,Q,sizeof Q); n+=24; }
+    return n; }
+/* the page in rows no wider than maxW: one if it fits, else the two-row break that makes the longer row shortest (a
+ * subtitle's two rows are read as one shape), else as many whole-word rows as it takes */
+static int capWrap(int f,const char*t,float sz,float maxW,const char**ra,const char**rb){
+    const char*end=t+strlen(t);
+    while(t<end&&*t==' ') t++;
+    while(end>t&&end[-1]==' ') end--;
+    if(t>=end) return 0;
+    if(capWidth(f,t,end,sz)<=maxW){ ra[0]=t; rb[0]=end; return 1; }
+    const char*best=NULL; float bw=1e9f;
+    for(const char*p=t;p<end;p++) if(*p==' '){ float w1=capWidth(f,t,p,sz), w2=capWidth(f,p+1,end,sz);
+        float m=(w1>w2?w1:w2)+(w1>w2?0.5f:0.f);       /* a tie goes to the shorter TOP row */
+        if(m<bw){ bw=m; best=p; } }
+    if(best&&bw<=maxW+0.5f){ ra[0]=t; rb[0]=best; ra[1]=best+1; rb[1]=end; return 2; }
+    int n=0; const char*a=t;
+    while(a<end&&n<CAP_ROWS){ const char*fit=NULL;
+        for(const char*p=a;p<=end;p++) if(p==end||*p==' '){ if(!fit||capWidth(f,a,p,sz)<=maxW) fit=p; else break; }
+        ra[n]=a; rb[n]=fit; n++;
+        a=fit; while(a<end&&*a==' ') a++; }
+    return n; }
+static void capDraw(float HW,float HH){
+    int li=scnActive(); if(li<0) return;
+    ScnLine*L=&g_scnL[li]; if(L->silent) return;
+    const char*tx=L->text; float lt=g_scnT-L->t0;
+    if(L->capN>0){ int k=L->capA;
+        for(int i=L->capA;i<L->capA+L->capN&&i<g_scnCapN;i++) if(lt>=g_scnCap[i].t0-0.02f) k=i;
+        tx=g_scnCap[k].text; }
+    int sp=L->spk; if(sp<0||sp>=SCN_MAXCAST) sp=0;
+    int f=(sp==SCN_VOICE)?1:0;
+    const char*ra[CAP_ROWS], *rb[CAP_ROWS]; float sz=CAP_SIZE, maxW=HW*0.70f; int nr=0;
+    for(int tries=0;tries<4;tries++){ nr=capWrap(f,tx,sz,maxW,ra,rb); if(nr<=2) break; sz*=0.9f; maxW=HW*0.78f; }
+    if(nr<=0) return;
+    float lineH=sz*1.30f, wmax=0.f;
+    for(int r=0;r<nr;r++){ float w=capWidth(f,ra[r],rb[r],sz); if(w>wmax) wmax=w; }
+    float base=HH-46.f;                               /* the last row's baseline */
+    float top=base-(float)(nr-1)*lineH-sz*0.74f;      /* the first row's cap height */
+    float padX=sz*0.60f, padY=sz*0.34f;
+    float bx0=HW*0.5f-wmax*0.5f-padX, bx1=HW*0.5f+wmax*0.5f+padX, by0=top-padY, by1=base+sz*0.24f+padY;
+    glUseProgram(g_capProg); glUniform2f(g_capScr,HW,HH); glUniform1i(g_capTx,0);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_capTex);
+    glBindBuffer(GL_ARRAY_BUFFER,g_capVbo);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,0,0);
+    for(int k=1;k<5;k++) glDisableVertexAttribArray(k);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDisable(GL_DEPTH_TEST);
+    { float q[24]={bx0,by0,0,0, bx1,by0,0,0, bx1,by1,0,0, bx0,by0,0,0, bx1,by1,0,0, bx0,by1,0,0};
+      glBufferData(GL_ARRAY_BUFFER,sizeof q,q,GL_DYNAMIC_DRAW);
+      glUniform1f(g_capSolid,sz*0.30f); glUniform4f(g_capBox,bx0,by0,bx1,by1); glUniform2f(g_capOff,0.f,0.f);
+      glUniform4f(g_capCol,0.02f,0.025f,0.04f,0.46f); glDrawArrays(GL_TRIANGLES,0,6); }
+    glUniform1f(g_capSolid,0.f);
+    static float v[24*480];
+    /* the name of an on-screen speaker, over the box's left edge, in the slot's colour */
+    static const float SPK[SCN_MAXCAST][3]={{0.55f,0.95f,1.00f},{1.00f,0.78f,0.42f},{0.62f,0.94f,0.58f},{0.92f,0.72f,0.96f},{0.86f,0.86f,0.90f}};
+    if(!f&&g_scnWho[sp][0]&&strcmp(g_scnWho[sp],"-")){
+        char nm[24]; int k=0; for(const char*s=g_scnWho[sp];*s&&k<23;s++) nm[k++]=(*s=='_')?' ':*s; nm[k]=0;
+        float nsz=sz*0.66f; int nv=capQuads(0,nm,nm+k,bx0+padX*0.30f,by0-7.f,nsz,v,24*480);   /* over the box, not on its edge */
+        glBufferData(GL_ARRAY_BUFFER,nv*4,v,GL_DYNAMIC_DRAW);
+        glUniform4f(g_capCol,0.f,0.f,0.f,0.85f);
+        for(int d=0;d<8;d++){ float a=d*0.785398f; glUniform2f(g_capOff,cosf(a)*1.4f,sinf(a)*1.4f); glDrawArrays(GL_TRIANGLES,0,nv/4); }
+        glUniform2f(g_capOff,0.f,0.f); glUniform4f(g_capCol,SPK[sp][0],SPK[sp][1],SPK[sp][2],1.f); glDrawArrays(GL_TRIANGLES,0,nv/4); }
+    /* the rows: a dark outline (twelve offsets), then the face */
+    for(int r=0;r<nr;r++){ float w=capWidth(f,ra[r],rb[r],sz);
+        int nv=capQuads(f,ra[r],rb[r],HW*0.5f-w*0.5f,base-(float)(nr-1-r)*lineH,sz,v,24*480);
+        glBufferData(GL_ARRAY_BUFFER,nv*4,v,GL_DYNAMIC_DRAW);
+        glUniform4f(g_capCol,0.01f,0.01f,0.02f,0.90f);
+        for(int d=0;d<12;d++){ float a=d*0.523599f; glUniform2f(g_capOff,cosf(a)*2.0f,sinf(a)*2.0f); glDrawArrays(GL_TRIANGLES,0,nv/4); }
+        glUniform2f(g_capOff,0.f,0.f);
+        if(f) glUniform4f(g_capCol,1.0f,0.97f,0.90f,1.f); else glUniform4f(g_capCol,0.98f,0.98f,0.96f,1.f);
+        glDrawArrays(GL_TRIANGLES,0,nv/4); } }
 
 /* P7: pose the partner from one clip and draw her. Deliberately the whole pipeline in
  * one place and nothing more: rest pose, clip tracks over it, FK, skin, draw. She has
@@ -14903,7 +15470,7 @@ static void wpnHurtHero(float dmg,const char*how){
 static void wpnSpawnProj(float x,float z,float dx,float dz,int owner,int kind){
     for(int p=0;p<WPROJ_MAX;p++) if(!g_wproj[p].on){
         g_wproj[p].on=1; g_wproj[p].x=x; g_wproj[p].y=1.4f; g_wproj[p].z=z;
-        g_wproj[p].dx=dx; g_wproj[p].dz=dz; g_wproj[p].ttl=1.35f;
+        g_wproj[p].dx=dx; g_wproj[p].dz=dz; g_wproj[p].ttl=CAB_ZAMN?g_zr.shotLife:1.35f;
         g_wproj[p].owner=owner; g_wproj[p].kind=kind; return; } }
 static void wpnFire(int owner,float x,float z,float aim,int kind){
     { float p9[3]={x,1.4f,z}; sfxPlay("shot",owner<0?0.9f:0.7f,owner<0?NULL:p9,0); }   /* the hero's own gun is not spatial: it is at the ear */
@@ -14922,16 +15489,24 @@ static void wpnFire(int owner,float x,float z,float aim,int kind){
         gmLine(x,1.5f,z,x+bx*hd,1.5f,z+bz*hd,1.3f,0.8f,1.5f);
         if(hit==-2) wpnHurtHero(20.f,"BEAMED DOWN - B TO GET UP");
         else if(hit>=0) wpnKillSlot(hit,owner,WPN_BEAM); } }
+static void zamnKill(int i){   /* the cab's kill: one hit, the body bursts and is gone for good */
+    float p9[3]={g_slots[i].x,1.2f,g_slots[i].z};
+    g_slotHide[i]=1; GM.score+=50;
+    if(g_zaStreet) g_slotTeam[i]=0; else g_slotBan[i]=1;   /* the street's dead do not run out: this body comes round again */
+    sfxPlay("kill",0.7f,p9,0); gmBurst(p9[0],1.3f,p9[2],0.4f,0.9f,1.4f,8,1.4f); }
 static void wpnProjStep(float dtf){
     for(int f9=0;f9<3;f9++) if(g_feedT[f9]>0.f) g_feedT[f9]-=dtf;
     for(int p=0;p<WPROJ_MAX;p++){ if(!g_wproj[p].on) continue;
         g_wproj[p].ttl-=dtf;
         if(g_wproj[p].ttl<=0.f){ g_wproj[p].on=0; continue; }
         float nx=g_wproj[p].x+g_wproj[p].dx*dtf, nz=g_wproj[p].z+g_wproj[p].dz*dtf;
-        int dead=0;
+        int dead=0, cab9=CAB_ZAMN;   /* in the zombie cab a bullet is for the dead: it passes a neighbour, and the world stops it */
         for(int i=0;i<g_NS;i++){ if(i==g_wproj[p].owner||g_slotHide[i]||!g_slotDrawable[i]||g_slotAlt[i]>0.f||g_slotBhv[i]==BHV_DOWN) continue;
-            if(hypotf(g_slots[i].x-nx,g_slots[i].z-nz)<0.95f){
-                wpnKillSlot(i,g_wproj[p].owner,g_wproj[p].kind); dead=1; break; } }
+            if(cab9&&g_slotTeam[i]!=3) continue;
+            if(hypotf(g_slots[i].x-nx,g_slots[i].z-nz)<(cab9?g_zr.shotHit:0.95f)){
+                if(cab9) zamnKill(i); else wpnKillSlot(i,g_wproj[p].owner,g_wproj[p].kind);
+                dead=1; break; } }
+        if(cab9&&!dead){ float wx9=nx,wz9=nz; if(colResolve(&wx9,&wz9,0.06f)>0.f) dead=1; }
         if(!dead&&g_wproj[p].owner>=0&&hypotf(g_rvx-nx,g_rvz-nz)<0.95f){
             wpnHurtHero(14.f,"GUNNED DOWN - B TO GET UP"); dead=1; }
         if(dead){ gmBurst(nx,1.4f,nz,1.2f,1.0f,0.4f,6,0.9f); g_wproj[p].on=0; continue; }
@@ -15212,6 +15787,11 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
               CAMD.tgt=cand; }
           CAMD.shot=9; CAMD.dur=bar*(3.5f+frnd()*1.5f); }
     }
+    /* ⛔ M0 (11-01): THE PARADE'S CUT RUNS ON ITS BAR CLOCK IN EVERY MODE -- it set shot 9 over the lens the zombie cab
+     * pinned at the top, so every few bars a frame (and the fly back from it) showed a spotlight on a stranger's lawn
+     * mid-game: two frames of a twelve-frame burst. The cab's pin wins here too. (The RTS, the platformer and the action
+     * modes pin the same way at the top and are open to the same cut -- unverified, design/reva_vs_zombies_m0.md.) */
+    if(CAB_ZAMN) CAMD.shot=22;
     float p=(float)(CAMD.t/(CAMD.dur>0.001?CAMD.dur:0.001));
     float rx=RVX, rz=RVZ;
     /* SKATE MODE: the parade/spotlight director is a dancefloor idea -- it orbits wide and,
@@ -15689,9 +16269,18 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
         eye[0]=ex; eye[1]=ey; eye[2]=ez;
         ctr[0]=bx; ctr[1]=1.0f+g_rvAlt*0.8f; ctr[2]=bz;
         memcpy(g_lastE,eye,12); memcpy(g_lastC,ctr,12); return; }
-    case 22: {   /* ZAMN cab: tight top-down on the hero, the whole yard in frame */
-        eye[0]=rx; eye[1]=24.0f; eye[2]=rz+8.5f;
-        ctr[0]=rx; ctr[1]=0.0f;  ctr[2]=rz;
+    case 22: {   /* ZAMN cab: tight top-down on the hero, the whole yard in frame.
+         * 11-01 REVA VS ZOMBIES M0: the GDD's eye is TOP-DOWN 3/4 (ZAMN's own angle), not
+         * straight down -- bodies read as people, not as cut-outs. REVA_ZAMNCAM=height,back
+         * tunes it without a rebuild; the old lens is 24,8.5. Default 19,13 (~56 degrees). */
+        static float zh=-1.f, zb=13.f; if(zh<0){ zh=19.f; const char*e=getenv("REVA_ZAMNCAM");
+            if(e&&e[0]){ float a=0,b=0; if(sscanf(e,"%f,%f",&a,&b)==2){ zh=a; zb=b; } } }
+        eye[0]=rx; eye[1]=zh; eye[2]=rz+zb;
+        ctr[0]=rx; ctr[1]=0.8f; ctr[2]=rz-1.0f;
+        /* ⭐ the rules' lens (ZAMNC's arm, 11-02): from her chest, at a pitch, never turning. REVA_ZAMNCAM still wins; lens_arm 0 is the old one */
+        if(g_zr.lensArm>0.f&&!getenv("REVA_ZAMNCAM")){ float pr9=g_zr.lensPitch*0.0174533f;
+            eye[1]=g_zr.lensAimY+g_zr.lensArm*sinf(pr9); eye[2]=rz+g_zr.lensArm*cosf(pr9);
+            ctr[1]=g_zr.lensAimY; ctr[2]=rz; }
         for(int i2=0;i2<3;i2++){ g_lastE[i2]=eye[i2]; g_lastC[i2]=ctr[i2]; }
         return; }
     case 4: { float a=CAMD.seed+p*1.6f, R=11.5f;   /* raised orbit, wider ring for the big floor */
@@ -15870,6 +16459,11 @@ int main(int argc,char**argv){
     SDL_GLContext g_glctx = SDL_GL_CreateContext(g_win);
     if(!g_glctx){ fprintf(stderr,"SDL_GL_CreateContext: %s\n",SDL_GetError()); return 1; }
     SDL_GL_SetSwapInterval(1);
+    /* ⭐ REVA_TICK=auto (11-02): one sim tick per displayed frame, whatever this display is running. At any rate the sim keeps true time;
+     * a tick rate that matches the panel just never has to take 1, 2, 2, 1 ticks a frame. REVA_FIXEDSTEP still wins. */
+    { const char*t9=getenv("REVA_TICK"); SDL_DisplayMode m9;
+      if(t9&&!strcmp(t9,"auto")&&SDL_GetCurrentDisplayMode(0,&m9)==0&&m9.refresh_rate>0){ g_tickMs=1000.0/m9.refresh_rate;
+          printf("[tick] auto: %dx%d at %d Hz, %d sim ticks a second\n",m9.w,m9.h,m9.refresh_rate,m9.refresh_rate); fflush(stdout); } }
     { int dz=0; SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE,&dz); printf("GL depth bits: %d\n",dz); }
     /* the drawable is the truth, not what we asked for: glViewport and the projection
      * aspect both read W/H below, and fullscreen gives us the panel's real size. */
@@ -16002,12 +16596,18 @@ int main(int argc,char**argv){
      * one (the live-control file is the lab's), so no door had ever stood on the street the
      * film is shot on, and "walk the player into a house" could not be tested in the one
      * mode that has a player. The world becoming a playable space starts here. */
-    { const char*es=getenv("REVA_SET"); if(es&&es[0]){ setLoad(es);
+    { const char*es=getenv("REVA_SET");
+      /* ⭐ REVA VS ZOMBIES: the door itself plays on the street (rules' `street`; `none` is v0's yard) */
+      int zamn9=(g_mode==MODE_ARCADE&&g_modeVariant==1);
+      if(zamn9){ rvzLoad();
+        if((!es||!es[0])&&strcmp(g_zr.street,"none")){ char p9[96]; snprintf(p9,sizeof p9,"sets/%s.set",g_zr.street); FILE*f9=fopen(p9,"rb");
+            if(f9){ fclose(f9); es=g_zr.street; } else printf("[rvz] no %s here: the door plays in the yard\n",p9); } }
+      if(es&&es[0]){ setLoad(es);
         /* ⛔ A SET WITHOUT A DAY IS LIT BY THE CLUB. Nothing outside the lab applies sun=/sky=,
          * so the first door on the street stood under the dark-room rig with the club sky's
          * magenta ground band painted under the road. A set brings its hour: REVA_TOD=<h>,
          * default noon, through the same fourteen-keyframe curve tod= uses. */
-        const char*et=getenv("REVA_TOD"); g_tod=(et&&et[0])?(float)atof(et):12.0f; todApply(g_tod);
+        const char*et=getenv("REVA_TOD"); g_tod=(et&&et[0])?(float)atof(et):(zamn9?g_zr.tod:12.0f); todApply(g_tod);
         printf("[set] REVA_SET=%s loaded for %s at %05.2f h\n",es,MODE_NAME[g_mode],g_tod); } }
 #else
     { const char*e=getenv("REVA_MODE");
@@ -16259,6 +16859,7 @@ int main(int argc,char**argv){
       "uniform float uTone;\n"
       "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
       "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
+      "uniform float uRim; uniform vec4 uRefl; uniform vec4 uGloss; uniform float uKeyCam; uniform float uRoomG;\n"   /* ⭐ (10-23) the rim, a floor's reflection, the floor */
       "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
       "  vec3 N=normalize(vn);\n"
       /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
@@ -16360,7 +16961,14 @@ int main(int argc,char**argv){
       /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
        * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
        * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
-      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,uSun.xyz)*shv : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
+      /* \u2b50 (10-23) THE KEY FROM THE LENS: a toon BODY's cel cut taken on a light above and to the right of the camera (as a
+       * drawn show keys its characters), not on the set's one sun -- under the ship's fixed sun two faces in three were
+       * in the shadow tone, a hair's shadow carved across them in hard purple. The room's shadows still reach a body:
+       * as a dim (below), not a cut. uKeyCam 0 (REVA_TOONKEY=0) is the control. */
+      "  vec3 Lk=uSun.xyz; float shk=shv;\n"
+      "  if(uKeyCam>0.5&&uHemi<0.5&&uCel>0.0){ vec3 Vk=normalize(uEye-vwp); vec3 Rk=cross(vec3(0.0,1.0,0.0),Vk); float rl=length(Rk);\n"
+      "    Rk=(rl>1e-4)?Rk/rl:vec3(1.0,0.0,0.0); Lk=normalize(Vk*0.75+vec3(0.0,0.80,0.0)+Rk*0.30); shk=1.0; }\n"
+      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,Lk)*shk : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
       "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
       "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
       /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
@@ -16372,7 +16980,15 @@ int main(int argc,char**argv){
        * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
       "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
       "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
-      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25; }\n"
+      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25;\n"
+      /* \u2b50 (10-23) THE RIM: a cel band of the key light along a toon body's silhouette, full on its lit side and a third
+       * on its shadow side -- what separates a figure from a room drawn in the same flat colours. Bodies only (a room's
+       * surfaces are lit by uHemi); uRim 0 (REVA_TOONRIM=0) is the control. */
+      "    if(uRim>0.0&&uHemi<0.5){ vec3 V=normalize(uEye-vwp); float fr=1.0-max(dot(N,V),0.0);\n"
+      "      lit+=base*full*smoothstep(0.60,0.68,fr)*(0.35+0.65*lv)*uRim; }\n"
+      "    if(uKeyCam>0.5&&uHemi<0.5) lit*=mix(0.80,1.0,shv);\n"
+      /* \u2b50 (10-23) A ROOM LIT FROM ITS CEILING: its surfaces a little darker toward the floor (uRoomG; REVA_ROOMGRAD=0) */
+      "    if(uHemi>0.5&&uRoomG>0.0) lit*=mix(1.0-0.16*uRoomG,1.0+0.03*uRoomG,clamp(vwp.y/5.2,0.0,1.0)); }\n"
       "  if(uEmis>0.0) lit=base*uEmis;\n"
       /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
        * takes off the sky's own horizon unless a scene names one. It is what a wide has to
@@ -16380,7 +16996,12 @@ int main(int argc,char**argv){
       "  if(uFog.w>0.0){ float fd=distance(vwp,uEye); lit=mix(uFog.rgb,lit,exp(-fd*uFog.w)); }\n"
       "  if(uTone>0.0){ vec3 kn=vec3(uTone); vec3 ov=max(lit-kn,vec3(0.0));\n"
       "    vec3 wp=vec3(0.96); lit=min(lit,kn)+(wp-kn)*(vec3(1.0)-exp(-ov/(wp-kn))); }\n"
-      "  gl_FragColor=vec4(lit,uAlpha); }\n";
+      /* \u2b50 (10-23) THE GLOSSY FLOOR: a reflection fades with its depth under the floor (uRefl: y, 1/fade); the floor's own
+       * pass writes its Fresnel term as alpha (uGloss: F0, the most) for glBlendFunc(ONE, SRC_ALPHA) -- see glossFloorPass */
+      "  float aOut=uAlpha;\n"
+      "  if(uRefl.w>0.5) lit*=exp(-max(uRefl.x-vwp.y,0.0)*uRefl.y);\n"
+      "  if(uGloss.w>0.5){ vec3 Vg=normalize(uEye-vwp); float ct=clamp(dot(N,Vg),0.0,1.0); aOut=min(uGloss.y,uGloss.x+(1.0-uGloss.x)*pow(1.0-ct,5.0)); }\n"
+      "  gl_FragColor=vec4(lit,aOut); }\n";
     const char*fsC=
       "#extension GL_OES_standard_derivatives : enable\n"   /* dFdx/dFdy for the normal map's tangent frame (09-11) */
       "precision mediump float; varying vec3 vn; varying vec2 vt; varying vec3 vwp;\n"
@@ -16397,6 +17018,7 @@ int main(int argc,char**argv){
       "uniform float uTone;\n"
       "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
       "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
+      "uniform float uRim; uniform vec4 uRefl; uniform vec4 uGloss; uniform float uKeyCam; uniform float uRoomG;\n"   /* ⭐ (10-23) the rim, a floor's reflection, the floor */
       "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
       "  vec3 N=normalize(vn);\n"
       /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
@@ -16499,7 +17121,14 @@ int main(int argc,char**argv){
       /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
        * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
        * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
-      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,uSun.xyz)*shv : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
+      /* \u2b50 (10-23) THE KEY FROM THE LENS: a toon BODY's cel cut taken on a light above and to the right of the camera (as a
+       * drawn show keys its characters), not on the set's one sun -- under the ship's fixed sun two faces in three were
+       * in the shadow tone, a hair's shadow carved across them in hard purple. The room's shadows still reach a body:
+       * as a dim (below), not a cut. uKeyCam 0 (REVA_TOONKEY=0) is the control. */
+      "  vec3 Lk=uSun.xyz; float shk=shv;\n"
+      "  if(uKeyCam>0.5&&uHemi<0.5&&uCel>0.0){ vec3 Vk=normalize(uEye-vwp); vec3 Rk=cross(vec3(0.0,1.0,0.0),Vk); float rl=length(Rk);\n"
+      "    Rk=(rl>1e-4)?Rk/rl:vec3(1.0,0.0,0.0); Lk=normalize(Vk*0.75+vec3(0.0,0.80,0.0)+Rk*0.30); shk=1.0; }\n"
+      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,Lk)*shk : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
       "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
       "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
       /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
@@ -16511,7 +17140,15 @@ int main(int argc,char**argv){
        * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
       "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
       "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
-      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25; }\n"
+      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25;\n"
+      /* \u2b50 (10-23) THE RIM: a cel band of the key light along a toon body's silhouette, full on its lit side and a third
+       * on its shadow side -- what separates a figure from a room drawn in the same flat colours. Bodies only (a room's
+       * surfaces are lit by uHemi); uRim 0 (REVA_TOONRIM=0) is the control. */
+      "    if(uRim>0.0&&uHemi<0.5){ vec3 V=normalize(uEye-vwp); float fr=1.0-max(dot(N,V),0.0);\n"
+      "      lit+=base*full*smoothstep(0.60,0.68,fr)*(0.35+0.65*lv)*uRim; }\n"
+      "    if(uKeyCam>0.5&&uHemi<0.5) lit*=mix(0.80,1.0,shv);\n"
+      /* \u2b50 (10-23) A ROOM LIT FROM ITS CEILING: its surfaces a little darker toward the floor (uRoomG; REVA_ROOMGRAD=0) */
+      "    if(uHemi>0.5&&uRoomG>0.0) lit*=mix(1.0-0.16*uRoomG,1.0+0.03*uRoomG,clamp(vwp.y/5.2,0.0,1.0)); }\n"
       "  if(uEmis>0.0) lit=base*uEmis;\n"
       /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
        * takes off the sky's own horizon unless a scene names one. It is what a wide has to
@@ -16519,7 +17156,12 @@ int main(int argc,char**argv){
       "  if(uFog.w>0.0){ float fd=distance(vwp,uEye); lit=mix(uFog.rgb,lit,exp(-fd*uFog.w)); }\n"
       "  if(uTone>0.0){ vec3 kn=vec3(uTone); vec3 ov=max(lit-kn,vec3(0.0));\n"
       "    vec3 wp=vec3(0.96); lit=min(lit,kn)+(wp-kn)*(vec3(1.0)-exp(-ov/(wp-kn))); }\n"
-      "  gl_FragColor=vec4(lit,uAlpha); }\n";
+      /* \u2b50 (10-23) THE GLOSSY FLOOR: a reflection fades with its depth under the floor (uRefl: y, 1/fade); the floor's own
+       * pass writes its Fresnel term as alpha (uGloss: F0, the most) for glBlendFunc(ONE, SRC_ALPHA) -- see glossFloorPass */
+      "  float aOut=uAlpha;\n"
+      "  if(uRefl.w>0.5) lit*=exp(-max(uRefl.x-vwp.y,0.0)*uRefl.y);\n"
+      "  if(uGloss.w>0.5){ vec3 Vg=normalize(uEye-vwp); float ct=clamp(dot(N,Vg),0.0,1.0); aOut=min(uGloss.y,uGloss.x+(1.0-uGloss.x)*pow(1.0-ct,5.0)); }\n"
+      "  gl_FragColor=vec4(lit,aOut); }\n";
     typedef struct { GLuint prog; GLint uVP,uModel,uBind,uPal,uTint,uUse,uLp,uLc,uLk,uDqS,uMouthP,uMouthS,uOpen,uSun,uSunC,uSky,uAlpha,uTone,uEye,uFog,uShVP,uShMap,uShOn,uNmap,uNrm; } Prog;
     Prog PR[2];
     for(int pi=0;pi<2;pi++){ GLuint prog=glCreateProgram();
@@ -16989,6 +17631,7 @@ int main(int argc,char**argv){
     GLuint hudVbo; glGenBuffers(1,&hudVbo);
     static char fontBuf[60000]; (void)fontBuf;
     postInit(W,H);   /* ⭐ the post pass's targets and programs (09-11) */
+    capInit();       /* ⭐ (10-23) the captions' typeface */
     sfxInit();       /* ⭐ the audio mixer (09-11) */
     sunMapInit(vs);  /* ⭐ the sun's shadow map (09-11): the mesh vertex shader over a depth-pack fragment */
 
@@ -17163,17 +17806,26 @@ int main(int argc,char**argv){
         gmBanner((g_qLoaded&&g_qStart[0])?g_qStart:"THE REGULARS ARE TALKING - WALK UP, PRESS A",5.f);
         } break;
     case MODE_ARCADE:
-        if(g_modeVariant==1){   /* ZAMN - SAVE YOUR NEIGHBORS: the yard */
+        if(g_modeVariant==1){   /* ZAMN - SAVE YOUR NEIGHBORS: the yard -- or, with a set loaded, THE STREET (REVA VS ZOMBIES M0) */
             GM.lvl=1;
-            g_rvx=0.f; g_rvz=-40.f;
-            int k=0;
-            for(int i=0;i<NS&&k<10;i++){ if(g_slotHide[i]||!g_slotDrawable[i]||g_slotAlt[i]>0.f) continue;
-                g_slotTeam[i]=4;
-                slots[i].x=(frnd()*2.f-1.f)*18.f; slots[i].z=-40.f+(frnd()*2.f-1.f)*11.f;
+            zamnArea(g_setNI>0);
+            g_rvx=g_zaHx; g_rvz=g_zaHz;
+            if(g_zr.bullet>0.f){ GM.wKind=WPN_PISTOL; GM.wVar=wpnPickDef(WPN_PISTOL,0u); }   /* the gun is real and in her hand */
+            /* the street is not the club: nobody on it but the neighbours and the dead. Everyone else waits, hidden,
+             * as the dead to come (the spawn below takes from them; the yard still takes the floor's dancers). */
+            if(g_zaStreet){ int hid=0; for(int i=0;i<NS;i++) if(!g_slotTeam[i]&&!g_slotHide[i]){ g_slotHide[i]=1; hid++; }
+                            printf("[zamn] %d of the club's crowd held off the street as the dead to come\n",hid); }
+            int k=0, st9=rand()%NS;
+            for(int n9=0;n9<NS&&k<10;n9++){ int i=(st9+n9)%NS; if(g_slotBan[i]||!g_slotDrawable[i]||g_slotAlt[i]>0.f) continue;
+                if(g_slotHide[i]&&!g_zaStreet) continue;
+                if(g_zaStreet&&!zamnCast(packs[slots[i].pack].label,0)) continue;
+                g_slotHide[i]=0; g_slotTeam[i]=4;
+                zamnNeighbourXZ(&slots[i].x,&slots[i].z);
                 slots[i].tx=slots[i].x; slots[i].tz=slots[i].z; slots[i].state=0;
                 slots[i].moving=0; slots[i].mate=-1; k++; }
             GM.count=k;   /* neighbors standing */
-            gmBanner("SAVE YOUR NEIGHBORS - A SQUIRTS",5.f); }
+            printf("[zamn] %d neighbours placed%s\n",k,g_zaStreet?" on the street":" in the yard");
+            gmBanner(g_zr.bullet>0.f?"SAVE YOUR NEIGHBORS - A OR SPACE SHOOTS":"SAVE YOUR NEIGHBORS - A SQUIRTS",5.f); }
         else if(g_modeVariant==2){   /* RIFT RAVAGERS: the invader grid */
             GM.count=0xFFFFFF;   /* 24 invaders alive (6x4 bitmask) */
             GM.ax=340.f; GM.az=120.f; GM.flag=1; GM.tA=0.f; GM.bx=640.f; GM.py=-1.f;
@@ -17290,7 +17942,7 @@ int main(int argc,char**argv){
         if(g_fpvNow){ float fv9=fishFov(68.0f,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
         else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,fmaxf(900.0f,g_setFar)); }   /* a street runs to the horizon */
         else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],(float)W/H); m4_persp(proj,fv9,(float)W/H,0.30f,fmaxf(140.0f,g_setFar)); }   /* a scene is two bodies on a black stage */
-        else          { m4_persp(proj,42.0f,(float)W/H,0.8f,fmaxf(520.0f,g_setFar)); }   /* jacob: "eliminate the view distance" */
+        else          { m4_persp(proj,(CAB_ZAMN&&g_zr.lensFov>0.f)?g_zr.lensFov:42.0f,(float)W/H,0.8f,fmaxf(520.0f,g_setFar)); }   /* jacob: "eliminate the view distance" */
         m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
         /* the lens's own position, for anything later in the frame that has to face it
          * (ep 8: a billboarded screen). Stamped here because this is where it is decided. */
@@ -17304,11 +17956,18 @@ int main(int argc,char**argv){
         for(int pi=0;pi<2;pi++){ glUseProgram(PR[pi].prog); glUniformMatrix4fv(PR[pi].uVP,1,GL_FALSE,vp); }
         /* ⭐ FOG needs the eye and, unless a scene named one, the SKY'S OWN HORIZON as its colour,
          * so the far end of a street dissolves into the sky it stands under instead of a grey. */
-        if(g_fog[3]>0.f){ if(g_fogAuto){ float hz[3]; skyHorizonC(hz); g_fog[0]=hz[0]; g_fog[1]=hz[1]; g_fog[2]=hz[2]; }
+        /* ⭐ (10-23) THE EYE, EVERY FRAME: the toon rim and a glossy floor face the lens, as only the fog did -- uploaded
+         * with the fog alone, a rim would read the eye of the last foggy frame, or the origin */
+        { if(g_fog[3]>0.f&&g_fogAuto){ float hz[3]; skyHorizonC(hz); g_fog[0]=hz[0]; g_fog[1]=hz[1]; g_fog[2]=hz[2]; }
             for(int pi=0;pi<2;pi++){ Prog*Q9[2]={&PR[pi],&PRD[pi]};
                 for(int k9=0;k9<2;k9++){ Prog*R9=Q9[k9]; if(!R9->prog) continue; glUseProgram(R9->prog);
                     if(R9->uEye>=0) glUniform3fv(R9->uEye,1,eye);
-                    if(R9->uFog>=0) glUniform4fv(R9->uFog,1,g_fog); } }
+                    { static int kinit=0; if(!kinit){ kinit=1; const char*e9=getenv("REVA_TOONKEY"); if(e9&&*e9) g_toonKeyCam=atoi(e9)!=0;
+                          e9=getenv("REVA_ROOMGRAD"); if(e9&&*e9) g_roomGrad=(float)atof(e9);
+                          printf("[toon] key %s, room gradient %.2f\n",g_toonKeyCam?"from the lens":"the set's sun (REVA_TOONKEY=0)",g_roomGrad); fflush(stdout); }
+                      GLint lk9=glGetUniformLocation(R9->prog,"uKeyCam"); if(lk9>=0) glUniform1f(lk9,(float)g_toonKeyCam);
+                      GLint lg9=glGetUniformLocation(R9->prog,"uRoomG"); if(lg9>=0) glUniform1f(lg9,g_roomGrad); }
+                    if(g_fog[3]>0.f&&R9->uFog>=0) glUniform4fv(R9->uFog,1,g_fog); } }
             curProg=-1; }
         curProg=-1;
 
@@ -17343,7 +18002,13 @@ int main(int argc,char**argv){
             if(g_labSpeed>=0.f) g_ly=-(g_labSpeed/8.6f);   /* live speed sweep */
             if(g_labFreeze){ g_lx=g_ly=0.f; }              /* frozen: every lens sees one instant */
             if(GM.stage==LAB_AIR) g_manAlt=2.2f; }
-        else if(g_mode==MODE_RTS||g_mode==MODE_ARCADE){ g_manual=0; }
+        else if(g_mode==MODE_RTS||(g_mode==MODE_ARCADE&&ARC_CAB!=1)){ g_manual=0; }
+        /* ⛔ M0 (11-01): that line took the ZAMN cab too. The policy above set g_manual=1 for it ("a run-around game") and this
+         * line undid it every frame, so no stick or key ever drove her in the cab -- the DANCE host walked her about. The
+         * beat lane and RIFT RAVAGERS still keep the host; the zombie cab is the pad's. */
+        { static double lastIn=-1e9;   /* M0: the zombie cab's attract host gives way to ANY live input -- pad, keys or a tape -- for 30 s */
+          if(fabsf(g_lx)>0.3f||fabsf(g_ly)>0.3f||g_btnA||g_btnB||g_btnX) lastIn=tsec;
+          g_cabAttract=CAB_ZAMN&&(tsec-lastIn>30.0); }
         /* ================= THE START MENU =============================================
          * Start toggles it anywhere; while it is up the pad belongs to the menu (the
          * game sees a neutral controller) and the game-layer clock stops -- the club
@@ -17460,6 +18125,30 @@ int main(int argc,char**argv){
          * 26x12 floor, pairs seek each other, stop short, face, disband; stage line z<-0.5 held. */
         for(int si=0;si<NS;si++){ Slot*s=&slots[si];
             s->tT-=(float)dt;
+            /* ⭐ THE STREET'S OWN FEET (11-02). On the street the cab's bodies still walked by the DANCE FLOOR's manners, and
+             * those are wrong out here: everyone was clamped to the floor's z (-190..-0.5), so half the street did not exist;
+             * everyone was pushed out of a 2.4 u circle round her and carved around her, so the dead steered AWAY from the body
+             * they wanted; they kept personal space from the neighbour they came for; and nothing met the world. The dead and the
+             * neighbours walk here instead. `street_step 0` in the rules is the old feet, the control. */
+            if(CAB_ZAMN&&g_zaStreet&&g_zr.streetStep>0.f){
+                if(g_slotHide[si]) continue;   /* the reserve waits off the street: nothing to walk, nobody to bump */
+                if(g_slotTeam[si]==3||g_slotTeam[si]==4){ int dd9=(g_slotTeam[si]==3);
+                    float dx9=s->tx-s->x, dz9=s->tz-s->z, d9=hypotf(dx9,dz9);
+                    if(!dd9&&s->moving&&d9<0.7f){ s->moving=0; s->state=0; }   /* a neighbour got where they were going */
+                    if(s->moving&&d9>0.05f){ float dh9=fmodf(atan2f(dx9,dz9)-s->h+9.42477f,6.28318f)-3.14159f;
+                        s->h+=dh9*fminf(1,(float)dt*(dd9?g_zr.deadTurn:3.f)); }
+                    float want9=s->moving?1.15f*(dd9?zamnDeadSpd(GM.lvl):1.f):0.f;
+                    s->spd+=(want9-s->spd)*fminf(1,(float)dt*(dd9?g_zr.deadAccel:4.f));
+                    s->x+=sinf(s->h)*s->spd*(float)dt; s->z+=cosf(s->h)*s->spd*(float)dt;
+                    if(dd9) for(int j=0;j<NS;j++){ if(j==si||g_slotHide[j]||g_slotTeam[j]!=3) continue;   /* the dead do not stack */
+                        float ox9=s->x-slots[j].x, oz9=s->z-slots[j].z, od9=hypotf(ox9,oz9);
+                        if(od9<1.0f&&od9>0.01f){ float pu9=(1.0f-od9)*fminf(1,(float)dt*5.f); s->x+=ox9/od9*pu9; s->z+=oz9/od9*pu9; } }
+                    g_zBump[si]=(colResolve(&s->x,&s->z,0.42f)>0.01f);
+                    if(dd9&&g_zBump[si]) s->h+=(si&1?4.f:-4.f)*(float)dt;   /* held by a truck, they shuffle along it and round it: no pathfinding, no wedging */
+                    if(s->x<g_zaX0)s->x=g_zaX0; if(s->x>g_zaX1)s->x=g_zaX1;
+                    if(s->z<g_zaZ0)s->z=g_zaZ0; if(s->z>g_zaZ1)s->z=g_zaZ1;
+                    s->rotY=s->h;
+                    continue; } }
             if(g_slotBhv[si]==BHV_DOWN){ s->moving=0; s->spd=0.f; continue; }   /* the falling fall in place */
             if(g_slotAlt[si]>0.001f){   /* SKY LAYER v2 (jacob: much higher, various directions,
                  * changing direction, picking paths): free 3D wander over the whole space */
@@ -17570,6 +18259,13 @@ int main(int argc,char**argv){
              * because animation cannot be judged against a strobing neon floor */
         else glClearColor(0.006f,0.003f,0.014f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);   /* jacob: darker, we are IN SPACE */
+        /* ⛔ THE CROWD WAS HOLES (11-02). drawSet paints the sky with depth OFF over the whole frame, and the crowd draws BEFORE
+         * drawSet: every body's colour was wiped and its depth kept, so the ground behind it then failed the depth test and the
+         * sky's own ground band showed through, in the shape of a person. No tint, texture, sun or shadow could touch it, and on
+         * every door that has ever played on a set the crowd was flat dark cut-outs. In a door the sky now goes down first and
+         * drawSet stands down for the frame. The lab shows no crowd and keeps its order. REVA_SKYLATE=1 is the control. */
+        { static int late9=-1; if(late9<0){ const char*e9=getenv("REVA_SKYLATE"); late9=(e9&&e9[0]=='1'); }
+          if(!late9&&g_mode!=MODE_ANIM&&(g_setNI||g_nPipe||g_setSpace)){ memcpy(g_watVP,vp,64); skyDraw(); g_skyEarly=1; curProg=-1; } }
         /* STARFIELD (behind everything, twinkling on its own phases) */
         glUseProgram(sProg); glUniformMatrix4fv(sVP,1,GL_FALSE,vp); glUniform1f(sT,(float)tsec);
         glDepthMask(GL_FALSE); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE);
@@ -17766,7 +18462,8 @@ int main(int argc,char**argv){
                   float dhf=fmodf(fy-sl->rotY+9.42477f,6.28318f)-3.14159f;
                   sl->rotY+=dhf*fminf(1,(float)dt*2.2f); sl->h=sl->rotY; } }
             int canDonorLoco=(P->pbOK>=10);
-            int walking=(sl->spd>0.45f&&(P->walkIdx>=0||P->runIdx>=0||(canDonorLoco&&g_dnNWalks>0)));
+            int zDead=(CAB_ZAMN&&g_slotTeam[si]==3&&g_zombP&&canDonorLoco);   /* M0: the zombie cab's dead */
+            int walking=(sl->spd>0.45f&&(P->walkIdx>=0||P->runIdx>=0||(canDonorLoco&&g_dnNWalks>0)||zDead));
             int fastLoco=(g_slotBhv[si]==BHV_RUN||sl->spd>2.2f);   /* RUN is a speed, not just a behavior; sl->spd is low-passed so no flap */
             /* S4a THE BEHAVIOR CHANNEL, anim side: a fighting or dying slot plays its pack's
              * authored role clip once (mined at load); RUN swaps the gait-synced walk for the
@@ -17794,7 +18491,8 @@ int main(int argc,char**argv){
                  * Own clips first; a pack with neither strides on kaeli's through the donor
                  * bank -- the 116 walkless packs used to SLIDE across the floor. */
                 Pack*sp=P; int ci=-1;
-                if(g_slotFleeT[si]>0.f&&canDonorLoco&&g_dnFleeP){   /* S4f: the panic layer's AUTHORED body -- the scared walk */
+                if(zDead&&(ci=zombLoco(si,sl->spd,P))>=0) sp=g_zombP;   /* M0: the dead walk the Z4 bank, not the crowd's gait */
+                else if(g_slotFleeT[si]>0.f&&canDonorLoco&&g_dnFleeP){   /* S4f: the panic layer's AUTHORED body -- the scared walk */
                     sp=g_dnFleeP; ci=((si&1)&&g_dnFlee2>=0)?g_dnFlee2:(g_dnFlee>=0?g_dnFlee:g_dnFlee2); }
                 else if(fastLoco&&P->runIdx>=0) ci=P->runIdx;
                 else if(fastLoco&&canDonorLoco&&g_dnRunP&&donorOK(g_dnRunP,g_dnRun,P)){ sp=g_dnRunP; ci=g_dnRun; }
@@ -17805,10 +18503,13 @@ int main(int argc,char**argv){
                 if(ci>=0){ PClip*c=&sp->clips[ci];
                     /* GAIT SYNC (jacob: moonwalking): clip playback rides the slot's actual speed --
                      * at cruise 1.15 u/s the cycle runs ~0.7x, feet plant instead of sliding */
-                    sl->wph+=(float)dt*c->fps*fminf(2.5f,sl->spd*0.62f);
+                    sl->wph+=(float)dt*c->fps*fminf(2.5f,sl->spd*(zDead?g_zr.deadGait:0.62f));
                     double fp2=(double)sl->wph+(double)sl->phase;   /* P1.5: fractional */
                     if(sp!=P) donorPoseF(sp,ci,fp2,P,Q);
                     else clipSampleF(P,c,fp2,T,Q,S); } }
+            else if(zDead&&zombIdle(si,P)>=0){   /* M0: a standing dead body stands in the bank's idle, never a dance */
+                int zc=zombIdle(si,P); PClip*c=&g_zombP->clips[zc];
+                donorPoseF(g_zombP,zc,tsec*(double)c->fps+(double)sl->phase,P,Q); }
             else if(sl->mode==1&&P->nClips&&P->nDance&&g_mode==MODE_DANCE){   /* MOCAP DANCER (jacob: more variation):
                  * ~30% of the floor performs the real retargeted clips full-out, cycling numbers */
                 sl->clipT-=(float)dt;
@@ -18053,7 +18754,10 @@ int main(int argc,char**argv){
                 glUniformMatrix4fv(uBind,1,GL_FALSE,(float*)(P->pk+M->offBind));
                 GLuint*b=&P->vbo[mi*6];
                 int tex=P->meshTex[mi];
-                if(tex>=0&&(M->flags&2)){ glBindTexture(GL_TEXTURE_2D,P->tex[tex]); glUniform1f(uUse,1.0f); nrmBind(P,mi); }
+                if(tex>=0&&(M->flags&2)){ glBindTexture(GL_TEXTURE_2D,P->tex[tex]);
+                    /* ⭐ a texture wins over a tint outright, so the cab's "sickly green" never showed on a textured body. Part of the way, it does:
+                     * the shader mixes tint and texture by this (under 0.5 it stops alpha-testing, so dead_tint stays below that). */
+                    glUniform1f(uUse,(CAB_ZAMN&&g_zaStreet&&g_slotTeam[si]==3)?1.f-fminf(0.49f,g_zr.deadTint):1.0f); nrmBind(P,mi); }
                 else { glUniform1f(uUse,0.0f); if(g_curNrmLoc>=0) glUniform1f(g_curNrmLoc,0.f); }
                 glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
                 if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
@@ -18233,7 +18937,7 @@ int main(int argc,char**argv){
                     else SK_HOLD();
                     break; } }
             else
-            if(g_manual){
+            if(g_manual||CAB_ZAMN){   /* M0: the zombie cab's attract host moves like a thumb, so she animates like one */
                 static float gT9=0.f;   /* landing hysteresis (S4d): 1-frame ground touches must not flicker the clip */
                 if(g_mode==MODE_PLAT) gT9=GM.onG?gT9+(float)dt:0.f;
                 if(g_mode==MODE_ANIM){   /* THE LAB: the state IS the clip, no guessing */
@@ -18880,12 +19584,13 @@ int main(int argc,char**argv){
                 rvPitch*=1.f-fminf(1,(float)dt*4.f); rvRoll*=1.f-fminf(1,(float)dt*4.f);
                 rvHW=rvH; g_rvCarve=0; g_rvTravel=0; g_rvArrived=1; g_rvHead=rvH; g_rvAlt=rvAlt;
             } else
-            if(g_manual){   /* F310 DRIVE: camera-relative run/fly, A up / B down */
+            if(g_manual&&!g_cabAttract){   /* F310 DRIVE: camera-relative run/fly, A up / B down */
                 float lxn=fabsf(g_lx)>0.16f?g_lx:0.f, lyn=fabsf(g_ly)>0.16f?g_ly:0.f;
                 float mag=hypotf(lxn,lyn); if(mag>1.f)mag=1.f;
-                if(g_btnA) g_manAlt=fminf(30.f,g_manAlt+(float)dt*7.5f);
+                if(g_btnA&&!CAB_ZAMN) g_manAlt=fminf(30.f,g_manAlt+(float)dt*7.5f);   /* in the zombie cab A is the squirt, never lift */
                 if(g_btnX) g_manAlt=fmaxf(0.f,g_manAlt-(float)dt*9.f);
                 float top=(g_manAlt>0.4f)?12.5f:8.6f;
+                if(CAB_ZAMN&&g_zr.heroSpd>0.f) top=g_zr.heroSpd;
                 /* RT LOCK-ON: acquire ONCE on the PRESS (accidental bans came from the
                  * continuous re-scan); altitude-gated so sky judgments require flying up */
                 { static float rtPrev=0;
@@ -18907,8 +19612,12 @@ int main(int argc,char**argv){
                     g_boltT=0.95f; g_boltVictim=g_lockTgt;
                     g_boltTo[0]=slots[g_boltVictim].x; g_boltTo[1]=g_slotAlt[g_boltVictim]+1.5f; g_boltTo[2]=slots[g_boltVictim].z; }
                 g_btnBPrev=g_btnB;
-                g_manSpd+=(mag*top-g_manSpd)*fminf(1,(float)dt*4.f);
-                if(g_kbActive){
+                /* ⭐ SNAP (ZAMNC, 11-02): no ease in the zombie cab -- she is at speed the frame the stick moves and stopped the frame it
+                 * lets go, and she goes where the stick says NOW while her body catches up at hero_turn. Dead, she stands. */
+                int snap9=CAB_ZAMN&&g_zr.heroSnap>0.f;
+                if(CAB_ZAMN&&GM.stage==3) mag=0.f;
+                if(snap9) g_manSpd=mag*top; else g_manSpd+=(mag*top-g_manSpd)*fminf(1,(float)dt*4.f);
+                if(g_kbActive&&!CAB_ZAMN){   /* (the zombie cab's keys go through the stick path below: its lens is fixed) */
                     /* KEYBOARD DRIVE (jacob's WASD pass): the pad steers like a tank --
                      * a held left stick means "keep turning left", which on A/D would walk
                      * her in circles. So the MOUSE turns her and WASD moves in her frame,
@@ -18918,14 +19627,50 @@ int main(int argc,char**argv){
                     g_rvx+=(sinf(rvH)*fwd+cosf(rvH)*str)*g_manSpd*(float)dt;
                     g_rvz+=(cosf(rvH)*fwd-sinf(rvH)*str)*g_manSpd*(float)dt; }
                 else {
-                    if(mag>0.05f){ float des=rvH+atan2f(lxn,-lyn);
+                    /* M0: in the zombie cab the lens is FIXED (case 22 looks down -z), so the stick is the SCREEN -- up goes up the
+                     * picture (-z), right goes right (+x) -- and she turns fast; everywhere else it steers from her heading. */
+                    float mvH9=rvH;
+                    if(mag>0.05f){ float des=CAB_ZAMN?atan2f(-lxn,lyn):rvH+atan2f(lxn,-lyn);
                         float dh6=fmodf(des-rvH+9.42477f,6.28318f)-3.14159f;
-                        rvH+=dh6*fminf(1,(float)dt*3.4f); }
-                    g_rvx+=sinf(rvH)*g_manSpd*(float)dt; g_rvz+=cosf(rvH)*g_manSpd*(float)dt; }
+                        if(snap9){ float mt9=g_zr.heroTurn*0.0174533f*(float)dt; rvH+=(dh6>mt9)?mt9:((dh6<-mt9)?-mt9:dh6);
+                            if(rvH>3.14159f)rvH-=6.28318f; if(rvH<-3.14159f)rvH+=6.28318f;
+                            mvH9=des; }
+                        else { rvH+=dh6*fminf(1,(float)dt*(CAB_ZAMN?10.f:3.4f)); mvH9=rvH; } }
+                    g_rvx+=sinf(mvH9)*g_manSpd*(float)dt; g_rvz+=cosf(mvH9)*g_manSpd*(float)dt; }
                 rvAlt=g_skate?0.f:g_manAlt;   /* skate mode: the pad cannot lift her off the park */
                 { float pT2=(g_manAlt>0.4f?0.5f:(g_manSpd>4.0f?0.20f:0.f))*fminf(1.f,g_manSpd/11.f+0.35f);
-                  rvPitch+=(pT2-rvPitch)*fminf(1,(float)dt*2.f); }
-                rvRoll+=(-lxn*0.30f*(g_manAlt>0.4f?1.f:0.3f)-rvRoll)*fminf(1,(float)dt*3.f);
+                  rvPitch+=(pT2-rvPitch)*fminf(1,(float)dt*(snap9?8.f:2.f)); }
+                rvRoll+=(-(CAB_ZAMN?0.f:lxn)*0.30f*(g_manAlt>0.4f?1.f:0.3f)-rvRoll)*fminf(1,(float)dt*3.f);
+                rvHW=rvH; g_rvCarve=0; g_rvTravel=0; g_rvArrived=1; g_rvHead=rvH; g_rvAlt=rvAlt;
+            } else if(CAB_ZAMN){   /* ⭐ REVA VS ZOMBIES M0 (11-01): THE CAB'S ATTRACT HOST. Every door runs itself until the pad
+                 * is taken, and this door's host was still the DANCE host -- she walked toward whoever the club's director
+                 * was filming and stood pinned in the yard's corner. Now she plays the cab: the dead inside 7 u are faced and
+                 * squirted (g_cabFire, pulled by the cab's A), otherwise she walks -- runs past 18 u -- to the nearest
+                 * neighbour still standing. Same speed and clip ladder as a thumb on the stick (g_manSpd). */
+                int ng=-1, zt=-1; float nd=1e9f, zd=1e9f;
+                for(int i9=0;i9<NS;i9++){ if(g_slotHide[i9]) continue;
+                    float d9=hypotf(slots[i9].x-g_rvx,slots[i9].z-g_rvz);
+                    if(g_slotTeam[i9]==4&&d9<nd){ nd=d9; ng=i9; }
+                    else if(g_slotTeam[i9]==3&&d9<zd){ zd=d9; zt=i9; } }
+                float hw=rvH, sp9=0.f; int snap9=g_zr.heroSnap>0.f;
+                /* can a bullet get there? She stood and fired for the rest of the demo at one behind a truck, while the neighbours went. */
+                int sees9=1;
+                if(zt>=0&&zd<9.f){ float ux9=(slots[zt].x-g_rvx)/fmaxf(zd,0.01f), uz9=(slots[zt].z-g_rvz)/fmaxf(zd,0.01f);
+                    for(float t9=1.f;t9<zd;t9+=0.75f){ float wx9=g_rvx+ux9*t9, wz9=g_rvz+uz9*t9; if(colResolve(&wx9,&wz9,0.06f)>0.f){ sees9=0; break; } } }
+                if(GM.stage==3) sp9=0.f;
+                else if(zt>=0&&zd<7.f&&sees9) hw=atan2f(slots[zt].x-g_rvx,slots[zt].z-g_rvz);
+                else if(ng>=0){ hw=atan2f(slots[ng].x-g_rvx,slots[ng].z-g_rvz); sp9=snap9?g_zr.heroSpd:(nd>18.f?6.0f:3.4f); }
+                /* she has no pathfinding: held by a parked truck she ran at it for the rest of the demo. Held, she steps round it. */
+                { static float px9=0.f,pz9=0.f,held9=0.f,side9=0.f; float mv9=hypotf(g_rvx-px9,g_rvz-pz9); px9=g_rvx; pz9=g_rvz;
+                  if(sp9>0.f&&side9<=0.f){ if(mv9<sp9*(float)dt*0.5f) held9+=(float)dt; else held9=0.f; if(held9>0.4f){ side9=0.9f; held9=0.f; } }
+                  if(side9>0.f){ side9-=(float)dt; hw+=1.5708f; } }
+                float dh9=fmodf(hw-rvH+9.42477f,6.28318f)-3.14159f;
+                if(snap9){ rvH=hw; g_manSpd=sp9; }
+                else { rvH+=dh9*fminf(1,(float)dt*4.f); g_manSpd+=(sp9-g_manSpd)*fminf(1,(float)dt*4.f); }
+                g_manAlt=0.f;
+                g_rvx+=sinf(rvH)*g_manSpd*(float)dt; g_rvz+=cosf(rvH)*g_manSpd*(float)dt;
+                g_cabFire=(GM.stage==0&&zt>=0&&zd<9.f&&sees9&&fabsf(dh9)<0.35f);
+                rvAlt=0.f; rvPitch*=1.f-fminf(1,(float)dt*4.f); rvRoll*=1.f-fminf(1,(float)dt*4.f);
                 rvHW=rvH; g_rvCarve=0; g_rvTravel=0; g_rvArrived=1; g_rvHead=rvH; g_rvAlt=rvAlt;
             } else {
             if(CAMD.shot==9&&rvTgt!=CAMD.tgt){ rvTgt=CAMD.tgt; rvState=1; rvT=180; g_rvArrived=0;   /* jacob: NO teleport, no equalizing -- the journey is the show */
@@ -19248,7 +19993,9 @@ int main(int argc,char**argv){
              * straps still key correctly). REVA_HOLO=1 puts the hologram back. */
             static int holoMode=-1;
             if(holoMode<0){ const char*e=getenv("REVA_HOLO"); holoMode=(e&&e[0]=='1')?1:0; }
-            int skSolid = (g_mode==MODE_ANIM) ? 1 : (g_skate && !holoMode);   /* the lab is never a hologram */   /* the lab shows a SOLID body: a translucent hologram hides the very pops being hunted */
+            /* ⭐ M0 (11-01): in the zombie cab she is REVA VS ZOMBIES' Reva -- an android with a body on a street, not the
+             * venue's apparition -- so the cab draws her solid, as skate mode does. REVA_HOLO=1 still puts the hologram back. */
+            int skSolid = (g_mode==MODE_ANIM) ? 1 : ((g_skate||CAB_ZAMN) && !holoMode);   /* the lab is never a hologram */   /* the lab shows a SOLID body: a translucent hologram hides the very pops being hunted */
             GLint mModel=hModel, mPal=hPal, mBind=hBind, mVP=hVP;
             GLint mDqS=-1; int labDq=0;
             { if(g_dqs<0){ const char*e=getenv("REVA_LBS"); g_dqs=(e&&e[0]=='1')?0:1; }
@@ -19376,7 +20123,15 @@ int main(int argc,char**argv){
                  * draws on the SOLID program whatever the hero is wearing, and hands the
                  * hologram back with its own VP/model re-bound. Found by the first-person
                  * lens, which made the whole frame world. */
-                int setSwap=(g_setNI||g_setNA||g_scnN>0)&&!skSolid;
+                /* ⛔ M0 (11-01): AND NEVER ON HER DUAL-QUATERNION PROGRAM. A solid hero skinned by dual quaternions leaves
+                 * PRD[1] current, and PRD's palette slot is `dq` -- vec4 pairs. drawProp's identity palette is a mat4 upload
+                 * onto that vec4 array: GL_INVALID_OPERATION, nothing written, so every prop, every set actor and every held
+                 * prop was skinned by HER bone 0. A still root hid it for two months; r2moves running in the zombie cab (bone 0
+                 * = her hips) carried the whole street on her stride -- the lawns rose through the road and over her, 3 frames
+                 * in 7. REVA_LBS=1 (her on LBS) was the control: clean. The world goes down on PR[1] whenever she is on PRD. */
+                int dqWorld=skSolid&&labDq&&(g_setNI||g_nPipe||g_setSpace||g_setNA||g_scnN>0||heldAny());
+                int setSwap=((g_setNI||g_setNA||g_scnN>0)&&!skSolid)||dqWorld;
+                float wLp[NLIGHT*3], wLc[NLIGHT*3]; int wLit=0;   /* the lamps the world was lit with -- she reads them after */
                 GLint sModel=mModel,sPal=mPal,sBind=mBind,sUse=g_labUse,sTint=g_labTint;
                 if(setSwap){ Prog*SP=&PR[1]; glUseProgram(SP->prog); curProg=-1;
                     glUniformMatrix4fv(SP->uVP,1,GL_FALSE,curVP);
@@ -19403,7 +20158,8 @@ int main(int argc,char**argv){
                               for(int k9=0;k9<g_setNL&&k9<NLIGHT;k9++) g_stampK[k9]=g_setLk[k9];   /* ⭐ ep 12: and their reach */
                               if(ulp>=0) glUniform3fv(ulp,NLIGHT,slp9);
                               if(ulc>=0) glUniform3fv(ulc,NLIGHT,slc9);
-                              { GLint ulk=glGetUniformLocation(pcur,"lk"); if(ulk>=0) glUniform1fv(ulk,NLIGHT,g_stampK); } } }
+                              { GLint ulk=glGetUniformLocation(pcur,"lk"); if(ulk>=0) glUniform1fv(ulk,NLIGHT,g_stampK); }
+                              memcpy(wLp,slp9,sizeof wLp); memcpy(wLc,slc9,sizeof wLc); wLit=1; } }
                 if(g_setNI||g_nPipe||g_setSpace)   /* ⭐ 10-22: a set that is only space still paints its sky */
                     drawSet(sModel,sPal,sBind,sUse,sTint);
                 if(g_setNA){
@@ -19416,8 +20172,15 @@ int main(int argc,char**argv){
                     drawHeld(sModel,sPal,sBind,sUse,sTint);
                 /* ⭐ ep 9: THE PLACED SCREENS, AFTER THE WORLD -- drawSet's sky would wipe them otherwise */
                 if(g_setNI) scrDrawPlaced(vp);
-                if(setSwap){ glUseProgram(hProg); curProg=-1; g_curNrmLoc=-1;
-                    glUniformMatrix4fv(hVP,1,GL_FALSE,curVP); glUniformMatrix4fv(mModel,1,GL_FALSE,model); }
+                if(setSwap){
+                    if(skSolid){ Prog*AP9=labDq?&PRD[1]:&PR[1]; glUseProgram(AP9->prog); curProg=-1;   /* back to HER program */
+                        g_curNrmLoc=AP9->uNrm; g_labAlpha=AP9->uAlpha;
+                        glUniformMatrix4fv(AP9->uVP,1,GL_FALSE,curVP); glUniformMatrix4fv(mModel,1,GL_FALSE,model);
+                        /* ...lit by the world's lamps, as she was when the world drew on her program */
+                        if(wLit){ if(AP9->uLp>=0) glUniform3fv(AP9->uLp,NLIGHT,wLp); if(AP9->uLc>=0) glUniform3fv(AP9->uLc,NLIGHT,wLc);
+                                  if(AP9->uLk>=0) glUniform1fv(AP9->uLk,NLIGHT,g_stampK); } }
+                    else { glUseProgram(hProg); curProg=-1; g_curNrmLoc=-1;
+                        glUniformMatrix4fv(hVP,1,GL_FALSE,curVP); glUniformMatrix4fv(mModel,1,GL_FALSE,model); } }
             }
             if(g_mode==MODE_ANIM){ ragdollTick(P,world,model,0); jiggleTick(P,world,model,0); ctSolve(P,world,model,0); }   /* ⭐ limp / soft mass / THE CONTACT PASS, before her skin */
             /* H6: MORPHS -- blend the active targets into the position buffer on the
@@ -19866,6 +20629,10 @@ int main(int argc,char**argv){
                 glUniformMatrix4fv(mVP,1,GL_FALSE,curVP);
                 glUniformMatrix4fv(mModel,1,GL_FALSE,model);   /* restore: her matrix is used below */
             }
+            /* ⭐ (10-23) THE GLOSSY FLOOR, after every body that reflects in it (the real frame only) */
+            if(!vcPass&&g_gloss.on){ GLint pg9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pg9);
+                glossFloorPass(PR[1].prog,PR[1].uVP,PR[1].uModel,PR[1].uPal,PR[1].uBind,PR[1].uUse,PR[1].uTint,curVP);
+                glUseProgram((GLuint)pg9); curProg=-1; }
             }   /* end vcPass: feed target, then the frame */
             glDisable(GL_BLEND); glDepthMask(GL_TRUE);
             /* ⭐ ep 12: THE SMOKE -- after every opaque thing in the real frame (the set, the actors, the cast, the
@@ -19884,8 +20651,9 @@ int main(int argc,char**argv){
                 if(trailN[k2]<TRN) trailN[k2]++;
                 memmove(trail[k2][0],trail[k2][1],(TRN-1)*12);
                 trail[k2][TRN-1][0]=wx2; trail[k2][TRN-1][1]=wy2; trail[k2][TRN-1][2]=wz2; }
-            /* draw ribbons: hue-cycling, fading to the tail */
-            if(g_mode!=MODE_ANIM){ static float tvb[TRN*6]; glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
+            /* draw ribbons: hue-cycling, fading to the tail -- the VENUE's look (her tracers and glowsticks), so never in the lab
+             * and never in the zombie cab (M0, 11-01: a woman on a street at dusk does not leave rainbow trails) */
+            if(g_mode!=MODE_ANIM&&!CAB_ZAMN){ static float tvb[TRN*6]; glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
               glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE); glDepthMask(GL_FALSE);
               glBindBuffer(GL_ARRAY_BUFFER,trailVbo);
               for(int k2=0;k2<4;k2++){ if(trBone[k2]<0||trailN[k2]<2) continue;
@@ -20468,52 +21236,83 @@ int main(int argc,char**argv){
                 #undef AM_CABINIT
               }
               if(arcCab==1){   /* ---- ZAMN CAB: SAVE YOUR NEIGHBORS ---- */
-                const float YX=21.f, YZ0=-54.f, YZ1=-26.f, YCZ=-40.f;
-                if(g_rvx<-YX)g_rvx=-YX; if(g_rvx>YX)g_rvx=YX;
-                if(g_rvz<YZ0)g_rvz=YZ0; if(g_rvz>YZ1)g_rvz=YZ1;
+                const float YX=g_zaX1, YZ0=g_zaZ0, YZ1=g_zaZ1;   /* the yard's fence (symmetric); the street uses g_za* */
+                if(rvzPoll(dtf)) gmBanner("RULES RELOADED",1.0f);
+                if(g_rvx<g_zaX0)g_rvx=g_zaX0; if(g_rvx>g_zaX1)g_rvx=g_zaX1;
+                if(g_rvz<g_zaZ0)g_rvz=g_zaZ0; if(g_rvz>g_zaZ1)g_rvz=g_zaZ1;
                 int standing=0;
                 for(int i=0;i<NS;i++){ if(g_slotTeam[i]!=4||g_slotHide[i]) continue;
                     standing++;
+                    if(g_zr.ring>0.f){ float pu9=0.75f+0.25f*sinf(g_gameT*4.f+(float)i);   /* who you came for, at a glance */
+                        gmRing(slots[i].x,slots[i].z,1.15f,0.12f,1.35f*pu9,1.15f*pu9,0.40f*pu9,24);
+                        gmRing(slots[i].x,slots[i].z,1.25f,0.12f,1.35f*pu9,1.15f*pu9,0.40f*pu9,24); }
                     if(!slots[i].moving&&frnd()<dtf*0.25f){   /* neighbors mill about the yard */
-                        slots[i].tx=(frnd()*2.f-1.f)*(YX-3.f); slots[i].tz=YCZ+(frnd()*2.f-1.f)*11.f;
+                        zamnMill(slots[i].x,slots[i].z,&slots[i].tx,&slots[i].tz);
                         slots[i].state=1; slots[i].moving=1; }
                     if(hypotf(slots[i].x-g_rvx,slots[i].z-g_rvz)<1.5f){   /* SAVED */
-                        g_slotHide[i]=1; g_slotTeam[i]=0; GM.kills++; GM.xp++; GM.score+=100;
+                        g_slotHide[i]=1; g_slotTeam[i]=0; if(g_zaStreet) g_slotBan[i]=1;   /* saved is gone, never the dead to come */
+                        GM.kills++; GM.xp++; GM.score+=100;
+                        sfxPlay("pickup",0.8f,NULL,0);
                         gmBurst(slots[i].x,1.6f,slots[i].z,1.4f,1.2f,0.3f,10,1.6f);
                         gmBanner("NEIGHBOR SAVED",0.8f); standing--; } }
-                int zn=0;
+                int zn=0, wantN9=0, wantH9=0, wantW9=0;
                 for(int i=0;i<NS;i++){ if(g_slotTeam[i]!=3||g_slotHide[i]) continue;
                     zn++;
-                    int tgt=-1; float td=1e9f;   /* zombies want neighbors, then the hero */
+                    /* ⭐ WHAT THE DEAD WANT (ZAMNC, 11-02): the nearest neighbour in range, else her in range, else nothing, so they
+                     * wander, each on its own clock, and you can slip past them. One left far behind comes round again near her:
+                     * the GDD's dead do not run out. `dead_aggro 0` is the old rule: the nearest neighbour anywhere, always. */
+                    float ag9=g_zr.aggro>0.f?g_zr.aggro:1e9f;
+                    int tgt=-1; float td=ag9;
                     for(int j=0;j<NS;j++){ if(g_slotTeam[j]!=4||g_slotHide[j]) continue;
                         float dd=hypotf(slots[i].x-slots[j].x,slots[i].z-slots[j].z);
                         if(dd<td){ td=dd; tgt=j; } }
-                    if(tgt>=0){ slots[i].tx=slots[tgt].x; slots[i].tz=slots[tgt].z; }
-                    else { slots[i].tx=g_rvx; slots[i].tz=g_rvz; }
+                    float hd9=hypotf(slots[i].x-g_rvx,slots[i].z-g_rvz);
+                    if(tgt>=0){ slots[i].tx=slots[tgt].x; slots[i].tz=slots[tgt].z; wantN9++; }
+                    else if(hd9<ag9){ slots[i].tx=g_rvx; slots[i].tz=g_rvz; wantH9++; }
+                    else { wantW9++;
+                        if(g_zr.recycle>0.f&&hd9>g_zr.recycle){ zamnEdgeXZ(&slots[i].x,&slots[i].z); g_zWanT[i]=0.f; }
+                        g_zWanT[i]-=dtf;
+                        if(g_zWanT[i]<=0.f||g_zBump[i]){ g_zWanA[i]=frnd()*6.28318f; g_zWanT[i]=g_zr.wander*(0.5f+frnd()); g_zBump[i]=0; }
+                        float wx9=slots[i].x+sinf(g_zWanA[i])*6.f, wz9=slots[i].z+cosf(g_zWanA[i])*6.f;
+                        if(wx9<g_zaX0+1.f||wx9>g_zaX1-1.f||wz9<g_zaZ0+1.f||wz9>g_zaZ1-1.f){   /* the edge of the play area: back in */
+                            g_zWanA[i]=atan2f(0.5f*(g_zaX0+g_zaX1)-slots[i].x,0.5f*(g_zaZ0+g_zaZ1)-slots[i].z)+(frnd()-0.5f)*1.6f;
+                            wx9=slots[i].x+sinf(g_zWanA[i])*6.f; wz9=slots[i].z+cosf(g_zWanA[i])*6.f; }
+                        slots[i].tx=wx9; slots[i].tz=wz9; }
                     slots[i].state=1; slots[i].moving=1; slots[i].mate=-1;
                     if(tgt>=0&&hypotf(slots[i].x-slots[tgt].x,slots[i].z-slots[tgt].z)<1.2f){
-                        g_slotTeam[tgt]=3; g_slotSpdMul[tgt]=0.75f+GM.lvl*0.07f;   /* TURNED */
+                        g_slotTeam[tgt]=3; g_slotSpdMul[tgt]=zamnDeadSpd(GM.lvl);   /* TURNED */
                         GM.deaths++; standing--;
                         gmBurst(slots[tgt].x,1.5f,slots[tgt].z,0.9f,0.3f,1.2f,10,1.7f);
                         gmBanner("A NEIGHBOR WAS TAKEN",1.2f); }
                     if(hypotf(slots[i].x-g_rvx,slots[i].z-g_rvz)<1.2f&&GM.ifr<=0.f&&GM.stage==0){
                         GM.hp-=12.f; GM.ifr=0.9f;
+                        sfxPlay("hurt",0.8f,NULL,0);
                         float a9=atan2f(g_rvx-slots[i].x,g_rvz-slots[i].z);
                         g_rvx+=sinf(a9)*2.0f; g_rvz+=cosf(a9)*2.0f;
                         if(GM.hp<=0.f){ GM.hp=0.f; GM.stage=3;
-                            gmBanner("THE ZOMBIES ATE YOU - B TO RESTART",9.f); } } }
-                { int want=3+GM.lvl*2;
-                  if(GM.stage==0&&standing>0&&zn<want){
-                    for(int i=0;i<NS&&zn<want;i++){
-                        if(g_slotHide[i]||!g_slotDrawable[i]||g_slotTeam[i]||g_slotAlt[i]>0.f) continue;
-                        g_slotTeam[i]=3; g_slotSpdMul[i]=0.75f+GM.lvl*0.07f;
-                        float a9=frnd()*6.28f;   /* crawl in over the fence line */
-                        slots[i].x=sinf(a9)>0?YX-0.5f:-YX+0.5f; slots[i].z=YZ0+frnd()*(YZ1-YZ0);
-                        if(frnd()<0.5f){ slots[i].x=(frnd()*2.f-1.f)*YX; slots[i].z=cosf(a9)>0?YZ1-0.5f:YZ0+0.5f; }
+                            gmBanner("THE ZOMBIES ATE YOU - B OR E TO RESTART",9.f); } } }
+                { int want=(g_zaStreet?6:3)+GM.lvl*2;
+                  if(GM.stage==0&&standing>0&&zn<want){ int st9=rand()%NS;
+                    for(int n9=0;n9<NS&&zn<want;n9++){ int i=(st9+n9)%NS;
+                        if(g_slotBan[i]||!g_slotDrawable[i]||g_slotTeam[i]||g_slotAlt[i]>0.f) continue;
+                        if(g_slotHide[i]&&!g_zaStreet) continue;   /* the yard takes the floor's dancers; the street, its reserve */
+                        if(g_zaStreet&&!zamnCast(packs[slots[i].pack].label,1)) continue;
+                        g_slotHide[i]=0; g_slotTeam[i]=3; g_slotSpdMul[i]=zamnDeadSpd(GM.lvl);
+                        zamnEdgeXZ(&slots[i].x,&slots[i].z);
+                        slots[i].h=atan2f(g_rvx-slots[i].x,g_rvz-slots[i].z); slots[i].rotY=slots[i].h;
                         slots[i].tx=g_rvx; slots[i].tz=g_rvz; slots[i].state=1; slots[i].moving=1; zn++; } } }
                 { static int aPz=0;   /* THE SQUIRT GUN */
                   if(GM.tB>0.f) GM.tB-=dtf;
-                  if(g_btnA&&!aPz&&GM.tB<=0.f&&GM.stage==0){ GM.tB=0.25f; GM.tA=0.12f;
+                  int bA9=g_btnA||(g_cabFire&&g_cabAttract&&!aPz);   /* M0: the attract host pulls the trigger as a thumb would */
+                  /* ⭐ A FLYING BULLET (ZAMNC, 11-02): one a press, from a step ahead of her, where she is facing, so you aim by running at
+                   * them. The weapon layer flies it (wpnProjStep's cab rules). The attract host has a thumb too: it cannot pull 30 a second. */
+                  if(g_zr.bullet>0.f){
+                      if(bA9&&!aPz&&GM.tB<=0.f&&GM.stage==0){ float sx9=sinf(g_rvHead), cz9=cosf(g_rvHead);
+                          GM.tB=g_cabAttract?fmaxf(g_zr.shotCool,0.3f):g_zr.shotCool; GM.tA=0.12f;
+                          sfxPlay("shot",0.9f,NULL,0);
+                          wpnSpawnProj(g_rvx+sx9*g_zr.shotAhead,g_rvz+cz9*g_zr.shotAhead,sx9*g_zr.shotSpd,cz9*g_zr.shotSpd,-1,WPN_PISTOL);
+                          g_zShots++; } }
+                  else if(bA9&&!aPz&&GM.tB<=0.f&&GM.stage==0){ GM.tB=0.25f; GM.tA=0.12f;
                       int best=-1; float bs=9.f;
                       for(int i=0;i<NS;i++){ if(g_slotTeam[i]!=3||g_slotHide[i]) continue;
                           float dx9=slots[i].x-g_rvx, dz9=slots[i].z-g_rvz;
@@ -20525,29 +21324,47 @@ int main(int argc,char**argv){
                           gmLine(g_rvx,1.2f,g_rvz,slots[best].x,1.2f,slots[best].z,0.4f,0.9f,1.4f);
                           gmBurst(slots[best].x,1.3f,slots[best].z,0.4f,0.9f,1.4f,8,1.4f); }
                       else gmLine(g_rvx,1.2f,g_rvz,g_rvx+sinf(g_rvHead)*8.f,1.2f,g_rvz+cosf(g_rvHead)*8.f,0.4f,0.9f,1.4f); }
-                  aPz=g_btnA; }
+                  aPz=bA9; }
                 if(GM.stage==0&&standing==0){   /* the yard resolves: next level */
                     char b9[80]; snprintf(b9,sizeof b9,"LEVEL %d CLEAR - SAVED %d THIS ROUND",GM.lvl,GM.xp);
                     gmBanner(b9,3.f);
                     GM.lvl++; GM.xp=0; if(GM.hp<GM.hpMax) GM.hp+=25.f;
                     if(GM.hp>GM.hpMax) GM.hp=GM.hpMax;
-                    int k=0;
-                    for(int i=0;i<NS&&k<10;i++){ if(g_slotHide[i]||!g_slotDrawable[i]||g_slotTeam[i]||g_slotAlt[i]>0.f) continue;
-                        g_slotTeam[i]=4; g_slotSpdMul[i]=0.f;
-                        slots[i].x=(frnd()*2.f-1.f)*(YX-3.f); slots[i].z=YCZ+(frnd()*2.f-1.f)*11.f;
+                    int k=0, st9=rand()%NS;
+                    for(int n9=0;n9<NS&&k<10;n9++){ int i=(st9+n9)%NS; if(g_slotBan[i]||!g_slotDrawable[i]||g_slotTeam[i]||g_slotAlt[i]>0.f) continue;
+                        if(g_slotHide[i]&&!g_zaStreet) continue;
+                        if(g_zaStreet&&!zamnCast(packs[slots[i].pack].label,0)) continue;
+                        g_slotHide[i]=0; g_slotTeam[i]=4; g_slotSpdMul[i]=0.f;
+                        zamnNeighbourXZ(&slots[i].x,&slots[i].z);
                         slots[i].tx=slots[i].x; slots[i].tz=slots[i].z; slots[i].state=0; slots[i].moving=0;
                         slots[i].mate=-1; k++; } }
-                if(GM.stage==3){ static int bPz=0;
-                    if(g_btnB&&!bPz){ GM.stage=0; GM.hp=GM.hpMax; GM.ifr=2.f; gmBanner("BACK IN THE YARD",2.f); }
+                if(GM.stage==3){ static int bPz=0; static float go9=0.f; go9+=dtf;
+                    int bB9=g_btnB||(g_cabAttract&&go9>4.f);   /* M0: the attract host restarts on its own after 4 s */
+                    if(bB9&&!bPz){ GM.stage=0; GM.hp=GM.hpMax; GM.ifr=2.f; go9=0.f;
+                                   gmBanner(g_zaStreet?"BACK ON THE STREET":"BACK IN THE YARD",2.f); }
                     bPz=g_btnB; }
-                { float fy=0.25f;   /* the fence */
+                if(!g_zaStreet){ float fy=0.25f;   /* the fence (the yard only: the street is walled by its houses) */
                   gmLine(-YX,fy,YZ0, YX,fy,YZ0, 1.1f,0.9f,0.3f); gmLine(-YX,fy,YZ1, YX,fy,YZ1, 1.1f,0.9f,0.3f);
                   gmLine(-YX,fy,YZ0,-YX,fy,YZ1, 1.1f,0.9f,0.3f); gmLine( YX,fy,YZ0, YX,fy,YZ1, 1.1f,0.9f,0.3f);
                   for(int p9=-4;p9<=4;p9++){ gmLine(p9*(YX/4.5f),0.f,YZ0,p9*(YX/4.5f),1.4f,YZ0,0.8f,0.65f,0.2f);
                                              gmLine(p9*(YX/4.5f),0.f,YZ1,p9*(YX/4.5f),1.4f,YZ1,0.8f,0.65f,0.2f); } }
+                { static int dbg=-1; static long fc9=0; if(dbg<0){ const char*e9=getenv("REVA_ZAMNDBG"); dbg=e9?atoi(e9):0; }   /* M0: the cab's readout, once a second at 30 Hz; =2 every frame, with the numbers anim_bench/rvzcheck.py reads */
+                  if(dbg>=2&&g_frameNo%120==1){ int n9=0; for(int i=0;i<NS&&n9<14;i++) if((g_slotTeam[i]==3||g_slotTeam[i]==4)&&!g_slotHide[i]){ n9++;
+                          printf("[zamn3] f%lu slot %d team %d %s at %.1f,%.1f toon %d meshes %u\n",g_frameNo,i,g_slotTeam[i],packs[slots[i].pack].label,slots[i].x,slots[i].z,packs[slots[i].pack].toon,packs[slots[i].pack].nMeshes); } }
+                  if(dbg>=2){ int d0=-1, sh9=0; float sx9=0.f,sz9=0.f;
+                      for(int i=0;i<NS&&d0<0;i++) if(g_slotTeam[i]==3&&!g_slotHide[i]) d0=i;
+                      for(int p=0;p<WPROJ_MAX;p++) if(g_wproj[p].on){ if(!sh9){ sx9=g_wproj[p].x; sz9=g_wproj[p].z; } sh9++; }
+                      float nz0=1e9f,nz1=-1e9f; for(int i=0;i<NS;i++) if(g_slotTeam[i]==4&&!g_slotHide[i]){ if(slots[i].z<nz0)nz0=slots[i].z; if(slots[i].z>nz1)nz1=slots[i].z; }
+                      printf("[zamn2] f%lu hero %.4f %.4f man %.3f head %.3f | want n %d h %d w %d | d0 %d %.4f %.4f %.3f | shots %d %.4f %.4f fired %d | hp %.0f stage %d | nz %.2f %.2f\n",
+                             g_frameNo,g_rvx,g_rvz,g_manSpd,g_rvHead,wantN9,wantH9,wantW9,d0,d0>=0?slots[d0].x:0.f,d0>=0?slots[d0].z:0.f,d0>=0?slots[d0].spd:0.f,sh9,sx9,sz9,g_zShots,GM.hp,GM.stage,nz0,nz1); fflush(stdout); }
+                  if(dbg&&(fc9++%10)==0){ int nh=0,nzd=0; float nd=1e9f,zd=1e9f;
+                      for(int i=0;i<NS;i++){ if(g_slotHide[i]) continue; float d9=hypotf(slots[i].x-g_rvx,slots[i].z-g_rvz);
+                          if(g_slotTeam[i]==4){ nh++; if(d9<nd) nd=d9; } else if(g_slotTeam[i]==3){ nzd++; if(d9<zd) zd=d9; } }
+                      printf("[zamn] f%lu lvl %d stage %d hero %.1f,%.1f hp %.0f | neighbours %d nearest %.1f | dead %d nearest %.1f | saved %d taken %d score %ld | attract %d fire %d\n",
+                             g_frameNo,GM.lvl,GM.stage,g_rvx,g_rvz,GM.hp,nh,nh?nd:-1.f,nzd,nzd?zd:-1.f,GM.kills,GM.deaths,GM.score,g_cabAttract,g_cabFire); fflush(stdout); } }
                 snprintf(GM.l1,sizeof GM.l1,"LEVEL %d   SAVED %d   TAKEN %d",GM.lvl,GM.kills,GM.deaths);
                 snprintf(GM.l2,sizeof GM.l2,"SCORE %ld   HP %.0f   NEIGHBORS LEFT %d",GM.score,GM.hp,standing);
-                snprintf(GM.l3,sizeof GM.l3,"A SQUIRT   TOUCH A NEIGHBOR TO SAVE THEM");
+                snprintf(GM.l3,sizeof GM.l3,"%s   TOUCH A NEIGHBOR TO SAVE THEM",g_zr.bullet>0.f?"A OR SPACE SHOOTS":"A SQUIRT");
                 break; }
               else if(arcCab==2){   /* ---- RIFT RAVAGERS CAB: the invader grid (HUD-space) ---- */
                 int na=0; for(int b9=0;b9<24;b9++) if(GM.count&(1<<b9)) na++;
@@ -21206,7 +22023,9 @@ int main(int argc,char**argv){
                      * blink in lockstep. */
                     { static float bT9[SCN_BODIES]={1.1f,2.7f,1.9f,3.4f}, bP9[SCN_BODIES]={-1.f,-1.f,-1.f,-1.f};
                       float st9=animStepS((sfps>0.f)?(1.f/sfps):dtf);
-                      for(int b9=0;b9<SCN_BODIES&&b9<g_scnNCast;b9++){
+                      /* ⛔ (10-23) NOT b9<g_scnNCast: it is never set (2), and the third and fourth bodies of every scene
+                       * never blinked. A slot with no body has no `blink` (morphIdx(NULL) is -1) and is skipped. */
+                      for(int b9=0;b9<SCN_BODIES;b9++){
                           Pack*BP=b9?g_cast[b9].pk:g_heroPk;
                           float*BW=b9?g_castMorphW[b9]:g_heroMorphW;
                           if(morphIdx(BP,"blink")<0) continue;
@@ -21504,6 +22323,8 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"bloom="))){ float s=0,t=0; int n=sscanf(q+6,"%f,%f",&s,&t); g_bloom=s; if(n==2) g_bloomThr=t; printf("[post] bloom %.2f over %.2f\n",g_bloom,g_bloomThr); }
                         if((q=strstr(buf,"knee="))){ g_postKnee=(float)atof(q+5); printf("[post] default knee %.2f\n",g_postKnee); }
                         if((q=strstr(buf,"fxaa="))){ g_fxaa=atoi(q+5)?1:0; printf("[post] fxaa %d\n",g_fxaa); }
+                        if((q=strstr(buf,"grade="))){ g_grade=(float)atof(q+6); printf("[post] grade %.2f\n",g_grade); }
+                        if((q=strstr(buf,"vig="))){ g_vig=(float)atof(q+4); printf("[post] vignette %.2f\n",g_vig); }
                         if((q=strstr(buf,"fog="))){ float d=0,r=0,g=0,b=0; int n=sscanf(q+4,"%f,%f,%f,%f",&d,&r,&g,&b);
                             if(!strncmp(q+4,"off",3)){ d=0; n=1; }
                             g_fog[3]=d; if(n==4){ g_fog[0]=r; g_fog[1]=g; g_fog[2]=b; g_fogAuto=0; } else g_fogAuto=1;
@@ -21893,7 +22714,7 @@ int main(int argc,char**argv){
             gmN=0; }
         postEnd(W,H,g_tone);   /* ⭐ resolve the 3D frame to the screen: bloom, FXAA, the knee (09-11). The HUD lands sharp on top. */
         /* HUD — the terminal readout returns (green/pink CRT text, top-right) */
-        int labClean=(g_mode==MODE_ANIM&&!getenv("REVA_ANIMHUD"));   /* REVA_ANIMHUD=1 puts the readouts back */
+        int labClean=((g_mode==MODE_ANIM||CAB_ZAMN)&&!getenv("REVA_ANIMHUD"));   /* REVA_ANIMHUD=1 puts the readouts back. The zombie game is not a venue: no clock, no temperature, no chord */
         /* ⭐ THE HUD CANVAS (2026-09-30). Every readout was laid out in pixels for a 1280-wide window and ran off a
          * 640-wide one (and would off a composite CRT). The overlay now draws on a 1280-wide virtual canvas whose
          * height follows the aspect: at 1280x720 it is pixel-identical to before, elsewhere it scales. */
@@ -21914,7 +22735,8 @@ int main(int argc,char**argv){
           /* SUBTITLES: the speaker's line across the bottom, in her own colour, with a
            * drop shadow so it survives a bright frame. Centred by the font's own metric
            * (stb_easy_font is ~6px per character at scale 1). */
-          if(g_scnT>=0.f){ int li9=scnActive();
+          if(g_scnT>=0.f&&g_capOK) capDraw(HW,HH);   /* ⭐ (10-23) the captions (see capDraw); REVA_OLDCAPS=1 is the control */
+          else if(g_scnT>=0.f){ int li9=scnActive();
               if(li9>=0&&!g_scnL[li9].silent){ const char*tx=g_scnL[li9].text;   /* ⭐ ep 10: an ACTION line has no subtitle */
                   /* A SCRIM. The words landed on whoever was standing at the bottom of
                    * the frame -- kaeli's midriff ate a whole line in the two-shot. Four

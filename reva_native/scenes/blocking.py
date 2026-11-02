@@ -15,17 +15,24 @@ named, the extras who do not speak). Split out of THE WORLD AT THE END OF TIME's
  - a standing body on a room mark is TURNED to face the others (a body on a mark faces the mark; only its head turns),
    and MOVED out of furniture to free floor; a seat's mark is left facing its table. Each is said in the log.
  - a mark change is staged where the lenses measure it (a walk the engine cannot route is the plan's `snap=1`).
+ - (10-23) a lens is also tested for what ELSE is in its frame -- CLUTTER, the share of a ray grid that meets furniture
+   (a single that sees its face can still be half console backs) -- and for HEADROOM (a seated head is 0.81 of the
+   height, measured); a walk's wide sees where the walker starts, and narration holds its lens before cutting away.
 
 THE PLAN: {"set": room, "title", "axis": +1/-1 (the side of the line), "cast": {slot: (person, outfit, mark, clip)} --
 a mark is a room mark's name or (x, y, z, yaw) in metres -- "extras": [(person, clip, mark, outfit)], "lenses": {name:
 "cam=..."}, "lines": {slot id: {"keys": "hmark=... pclip=...", "lens": "wide|two[:a:b]|single[:a[:b]]|over:s:x,y,z|
-<named>|cam=...", "to": listener, "dur": s, "what": note, "pre": [extra lines]}}, "homes", "marks", "pair",
+over:s:@t|over:s:work|<named>|cam=...", "to": listener, "dur": s, "what": note, "pre": [extra lines]}}, "homes", "marks", "pair",
 "keep_facing", "bounds" (when the set has no `# BOUNDS` line)}.
 THE CALLER gives: HEIGHTS {person: metres} (else 1.70), ROOMS (a folder of <room>_{shell,fix,glow,glass}.glb in
 metres -- skate_src/setkit.py's builders write them; without them only the walls are known), the slots, the cue map,
-a header. Positions in metres; the engine's units are 1.75 a metre (U).
+a header. Positions in metres; the engine's units are 1.75 a metre (U) -- and an `over:s:x,y,z` point is in the
+ENGINE's units, as a named lens's cam= is. `over:s:@t` looks over s's shoulder at slot t's head, `over:s:work` at what s
+works at (the desk in front of it): an insert of hands at a console (10-23).
 
     python blocking.py --selftest     a synthetic room: a lens must go round a table, never through it
+    python blocking.py --split <scene.txt>   a finished script's long narration said as its sentences (10-23)
+    python blocking.py --push <scene.txt> [--home <set>]   a finished script's held lenses pushed in (push_holds)
 """
 import json, math, os, re, struct, sys
 import numpy as np
@@ -37,6 +44,8 @@ U = 1.75                                    # club units a metre
 HEIGHTS = {}                                # person -> standing height, metres (the caller fills it)
 DEFAULT_H = 1.70
 SLOTKEY = {0: "h", 1: "p", 2: "p2", 3: "p3"}
+PARA_BEAT = 0.35            # (10-23) the breath before a new paragraph of a narration (the voice reads ~170 wpm)
+CLUTTER_MAX = 0.22          # (10-23) a lens whose frame is more foreground furniture than this keeps looking (clutter)
 WARN = []
 FURNITURE = ("seat", "station", "table", "bunk", "bed", "chair", "bench")
 
@@ -164,7 +173,10 @@ class Stage:
             a = math.radians(yaw); r = 0.38 * height(self.who[s])
             return [x - math.sin(a) * r, y + 0.16, z - math.cos(a) * r]
         hh = height(self.who[s]) * f
-        if self.plan["cast"][s][3].startswith(("z_sit", "z_rm_sit")): hh *= 0.70
+        # ⛔ (10-23) MEASURED: a seated head is at 0.79-0.82 of the body's height (Pal, Marie-Claude and the navigator at
+        # 2.4's stations, backed out of their frames), not 0.92 x 0.70 = 0.64 -- every seated single aimed at a chest and
+        # cut off the head
+        if self.plan["cast"][s][3].startswith(("z_sit", "z_rm_sit")): hh = height(self.who[s]) * 0.81 * f / 0.92
         return [x, y + hh, z]
 
     def facing(self, s):
@@ -185,7 +197,7 @@ class Stage:
         for pers, clip, m, _ in self.plan.get("extras", []):
             x, y, z, _ = m if isinstance(m, tuple) else self.marks.get(m, (None,) * 4)
             if x is None: continue
-            out.append((None, [x, y + height(pers) * 0.92 * (0.70 if clip.startswith(("z_sit", "z_rm_sit")) else 1.0), z]))
+            out.append((None, [x, y + height(pers) * (0.81 if clip.startswith(("z_sit", "z_rm_sit")) else 0.92), z]))
         return out
 
     def clear(self, e, S, skip, edge=()):
@@ -237,6 +249,26 @@ class Stage:
         if not us: return False
         return max(us) > -k and min(us) < k and max(vs) > -0.9 and min(vs) < 0.9
 
+    def clutter(self, e, aim, fov, nx=8, ny=5):
+        """⭐ (10-23, jacob: "meh could be better") how much of the FRAME is foreground furniture: the share of a grid of rays
+        through a 16:9 frame of vertical fov `fov` that meet the room's triangles before the subject. A lens can see a
+        face clean and still be 55% the backs of console screens (2.4's singles, half of chapter 2's lenses over 20%)."""
+        F = furniture(self.room)
+        if F is None: return 0.0
+        e = np.asarray(e, float); f = np.asarray(aim, float) - e; dep = np.linalg.norm(f) * 0.90
+        f /= (np.linalg.norm(f) + 1e-12)
+        r = np.cross(f, [0.0, 1.0, 0.0]); rn = np.linalg.norm(r)
+        if rn < 1e-6: return 0.0
+        r /= rn; u = np.cross(r, f)
+        ty = math.tan(math.radians(fov) / 2.0); tx = ty * 16.0 / 9.0
+        hit = 0
+        for i in range(nx):
+            for j in range(ny):
+                d = f + r * (-1 + 2 * (i + 0.5) / nx) * tx + u * (-1 + 2 * (j + 0.5) / ny) * ty
+                d /= np.linalg.norm(d)
+                if seg_blocked(F, e, e + d * dep, 0.02, 1.0): hit += 1
+        return hit / float(nx * ny)
+
     def sees_face(self, s, e, slack=75.0):
         """a lens at e sees slot s's face: it is within `slack` degrees of the way the body faces"""
         fx, fz = self.facing(s)
@@ -257,7 +289,11 @@ class Stage:
         five-year-old's head, from behind it)."""
         S, L = self.head(spk), self.head(lst, 0.80)
         dx, dz = S[0] - L[0], S[2] - L[2]; d = math.hypot(dx, dz) or 1.0
-        aim = [S[0], S[1] - 0.02, S[2]]
+        # (10-23) HEADROOM: a seated head (measured) aims 0.15 below its centre (at 0.10 Pal's eyes sat 43% down the
+        # frame; a single's are about a third down); a standing one 0.03 ABOVE the estimate, which runs low on the
+        # cast's own bodies (Viktor's crown left a 1.27 m single at 0.92 x height - 0.10)
+        sit = self.plan["cast"][spk][3].startswith(("z_sit", "z_rm_sit")) if spk in self.plan["cast"] else False
+        aim = [S[0], S[1] - (0.15 if sit else -0.03), S[2]]
         ux, uz = dx / d, dz / d
         back = 0.80 if d < 3.0 else -0.25 * d
         if L[1] > S[1] + 0.30:  ey = L[1] - 0.22          # a grown-up hears a child: over the grown-up's SHOULDER, down at him
@@ -296,13 +332,30 @@ class Stage:
                 if math.dist(e, S) < 0.6: continue
                 if self.clear(e, S, (spk,)): return cam(e, [S[0], S[1] - 0.04, S[2]], 34)
             WARN.append("%s: no lens sees lying slot %d's face" % (self.plan["code"], spk))
-        for e, f, edge in (front + ots) if self.side_by_side(spk, lst) else (ots + front):
+        # (10-23) and when every lens above sees the face through a frame of furniture: higher (over the screens), wider
+        # round, farther back (the fov narrowed to keep the framing)
+        wider = []
+        for lift in (0.85, 0.35, 1.10):
+            for D in (1.9, 2.4):
+                for sw in (55, 20, 75):
+                    for sg in (1, -1):
+                        a = math.radians(sw) * sg
+                        vx, vz = fx * math.cos(a) - fz * math.sin(a), fx * math.sin(a) + fz * math.cos(a)
+                        wider.append((self.inside([S[0] + vx * D, S[1] + lift, S[2] + vz * D]), round(30 * 1.9 / D), ()))
+        best = None
+        for e, f, edge in ((front + ots) if self.side_by_side(spk, lst) else (ots + front)) + wider:
             if math.dist(e, S) < 0.9: continue             # pressed against a wall, into the face
             # (10-22) a back across the frame is not a single -- the listener's, or ANYBODY's between the lens and the
             # speaker (2.23: Marie-Claude across Billy's single from in front of him)
             # (the listener's shoulder stays in the frame's outer quarters; anybody else only may not reach its centre)
             if any(self.fills(e, S, o, f, 0.5 if (edge and o == lst) else 0.2) for o in self.pos if o != spk): continue
-            if self.sees_face(spk, e) and self.clear(e, S, (spk,), edge): return cam(e, aim, f)
+            if self.sees_face(spk, e) and self.clear(e, S, (spk,), edge):
+                c = self.clutter(e, aim, f)
+                if c <= CLUTTER_MAX: return cam(e, aim, f)
+                if best is None or c < best[0]: best = (c, e, f)
+        if best is not None:
+            WARN.append("%s: slot %d's cleanest single is still %.0f%% furniture in front" % (self.plan["code"], spk, best[0] * 100))
+            return cam(best[1], aim, best[2])
         WARN.append("%s: no lens sees slot %d's face (to %d) -- over the shoulder, unchecked" % (self.plan["code"], spk, lst))
         e, f, _ = ots[0]
         return cam(e, aim, f)
@@ -326,37 +379,303 @@ class Stage:
         dist = max(1.8, d * 1.15 + 1.0)
         aim = [mx, (A[1] + B[1]) / 2 - 0.25, mz]
         F = furniture(self.room)
-        first = None
-        for sg, y in ((1, 1.45), (1, 1.95), (-1, 1.45), (-1, 1.95)):          # (10-22) the side, then higher, then across
+        first, best = None, None
+        for sg, y in ((1, 1.45), (1, 1.95), (-1, 1.45), (-1, 1.95), (1, 2.35), (-1, 2.35)):   # (10-22) the side, then higher, then across
             e = self.inside([mx + sg * nx * dist, y, mz + sg * nz * dist])
             first = first or e
             if math.hypot(e[0] - mx, e[2] - mz) < 0.9: continue                # a wall pressed it into them
-            if not seg_blocked(F, e, A) and not seg_blocked(F, e, B): return cam(e, aim, fov)
+            if not seg_blocked(F, e, A) and not seg_blocked(F, e, B):
+                c = self.clutter(e, aim, fov)                                   # (10-23) a clean frame first
+                if c <= CLUTTER_MAX: return cam(e, aim, fov)
+                if best is None or c < best[0]: best = (c, e)
+        if best is not None: return cam(best[1], aim, fov)
         WARN.append("%s: no two-shot of %d and %d clears the furniture -- the first, unchecked" % (self.plan["code"], a, b))
         return cam(first, aim, fov)
 
-    def wide(self, fov=64, slots=None):
+    def wide(self, fov=64, slots=None, also=(), avoid=()):
+        """the farthest corner whose eye sees every head and whose frame is not furniture. `also`: head points the line
+        must also hold -- where a body that walks on it STARTS (10-23: a walk across the cabin began under the corner the
+        wide chose, and the frame was the top of Viktor's head)"""
         sl = slots or list(self.pos)
-        cx = sum(self.pos[s][0] for s in sl) / len(sl); cz = sum(self.pos[s][2] for s in sl) / len(sl)
+        pts = [self.pos[s] for s in sl] + [tuple(p) for p in also]
+        cx = sum(p[0] for p in pts) / len(pts); cz = sum(p[2] for p in pts) / len(pts)
         x0, x1, z0, z1, h = self.bounds
         F = furniture(self.room)
-        heads = [self.head(s) for s in sl]
-        corners = sorted(((math.hypot(ex - cx, ez - cz), ex, ez) for ex in (x0 + 0.35, x1 - 0.35)
+        heads = [self.head(s) for s in sl] + [list(p) for p in also]
+        # the corner farthest from the NEAREST of them (from their centre, a corner can sit on top of one of them)
+        corners = sorted(((min(math.hypot(ex - p[0], ez - p[2]) for p in pts), ex, ez) for ex in (x0 + 0.35, x1 - 0.35)
                           for ez in (z0 + 0.35, z1 - 0.35)), reverse=True)
+        best = None
         for dd, ex, ez in corners:                       # (10-22) the farthest corner whose eye sees every head
+            if any(math.hypot(ex - a[0], ez - a[2]) < 2.0 for a in avoid): continue   # (10-23) another corner's wide
             e = [ex, min(h - 0.35, 2.15), ez]
-            if not any(seg_blocked(F, e, P) for P in heads): return cam(e, [cx, 1.05, cz], fov)
+            if not any(seg_blocked(F, e, P) for P in heads):
+                c = self.clutter(e, [cx, 1.05, cz], fov)  # (10-23) and whose frame is not furniture
+                if c <= CLUTTER_MAX + 0.08: return cam(e, [cx, 1.05, cz], fov)
+                if best is None or c < best[0]: best = (c, e)
+        if best is not None: return cam(best[1], [cx, 1.05, cz], fov)
+        if avoid: return None                            # (10-23) no other corner: no second wide
         e = [corners[0][1], min(h - 0.35, 2.15), corners[0][2]]
         return cam(e, [cx, 1.05, cz], fov)
 
+    def closeup(self, s, single):
+        """⭐ (10-23, round 4) a CUT-IN on slot s: its tested single's own eye, aimed at the face, the fov 0.55 of it --
+        1.8 times the size on the same axis (a cut, not a jump), and a part of a frame already tested"""
+        n = _nums(single.split()[0])
+        S, e = self.head(s), [v / U for v in n[:3]]
+        if not self.sees_face(s, e, 80.0): return None   # a single from behind (2.3: a boy facing his mirror): no close-up
+        # the standing estimate runs ~0.1 m LOW on the cast's own bodies (the single's +0.03 is the same correction):
+        # at -0.05 a standing close-up of Viktor was his chin and his collar
+        sit = self.plan["cast"][s][3].startswith(("z_sit", "z_rm_sit")) if s in self.plan["cast"] else False
+        return cam(e, [S[0], S[1] + (-0.05 if sit else 0.09), S[2]], max(12, n[6] * 0.55))
+
+    def angle(self, s, avoid=(), fov=34):
+        """⭐ (10-23, round 4) ANOTHER ANGLE on slot s: round the body 60, 90, 120 degrees either side of its facing, 1.8
+        and 2.3 m out, level and a little above -- the first whose line to the head is clear (no furniture, nobody), that
+        sees the face within 100 degrees (a profile counts), is not a frame of furniture, and stands a metre or more from
+        every lens in `avoid` (what it will be cut with: a cut to the same angle is a jump)"""
+        S = self.head(s); fx, fz = self.facing(s)
+        away = [[v / U for v in _nums(x.split()[0])[:3]] for x in avoid if x]
+        for deg in (60, -60, 90, -90, 120, -120):
+            a = math.radians(deg)
+            vx, vz = fx * math.cos(a) - fz * math.sin(a), fx * math.sin(a) + fz * math.cos(a)
+            for D in (1.8, 2.3):
+                for lift in (0.0, 0.35):
+                    e = self.inside([S[0] + vx * D, S[1] + lift, S[2] + vz * D])
+                    if math.dist(e, S) < 1.0 or any(math.dist(e, w) < 1.0 for w in away): continue
+                    if not self.sees_face(s, e, 100.0) or not self.clear(e, S, (s,)): continue
+                    aim = [S[0], S[1] - 0.12, S[2]]
+                    if self.clutter(e, aim, fov) <= CLUTTER_MAX: return cam(e, aim, fov)
+        return None
+
+    def high(self, s, fov=44):
+        """⭐ (10-23, round 4) A HIGH ANGLE on slot s: in front of it and 0.95 m over its head, looking down on it and the
+        room round it -- where the ceiling allows, tested like the rest"""
+        S = self.head(s); fx, fz = self.facing(s)
+        for deg in (25, -25, 0, 50, -50):
+            a = math.radians(deg)
+            vx, vz = fx * math.cos(a) - fz * math.sin(a), fx * math.sin(a) + fz * math.cos(a)
+            for D in (1.5, 2.0):
+                e = self.inside([S[0] + vx * D, S[1] + 0.95, S[2] + vz * D])
+                if e[1] < S[1] + 0.5 or not self.clear(e, S, (s,)): continue    # a low ceiling: no high angle
+                aim = [S[0], S[1] - 0.25, S[2]]
+                if self.clutter(e, aim, fov) <= CLUTTER_MAX + 0.05: return cam(e, aim, fov)
+        return None
+
     def over(self, s, target, fov=40):
-        """over slot s's shoulder at a world point (a screen, the door)"""
+        """over slot s's shoulder at a world point (a screen, the door): the first shoulder, distance and height that sees
+        the point and whose frame is not furniture (10-23: the cabin's screen was shot from inside the bunk behind him)"""
         S = self.head(s, 0.85)
         dx, dz = target[0] - S[0], target[2] - S[2]; d = math.hypot(dx, dz) or 1.0
         ux, uz = dx / d, dz / d
+        F = furniture(self.room)
+        best = None
+        for side in (0.30, -0.30, 0.45, -0.45):
+            for back in (0.6, 0.9, 0.4):
+                for lift in (0.12, 0.30):
+                    e = self.inside([S[0] - ux * back - uz * side * self.axis, S[1] + lift, S[2] - uz * back + ux * side * self.axis])
+                    if math.dist(e, S) < 0.25 or seg_blocked(F, e, target, 0.02, 0.97): continue   # the point must be seen
+                    c = self.clutter(e, target, fov)
+                    if c <= CLUTTER_MAX: return cam(e, target, fov)
+                    if best is None or c < best[0]: best = (c, e)
+        if best is not None:
+            WARN.append("%s: the cleanest over-the-shoulder of slot %d is %.0f%% furniture" % (self.plan["code"], s, best[0] * 100))
+            return cam(best[1], target, fov)
         e = self.inside([S[0] - ux * 0.6 - uz * 0.30 * self.axis, S[1] + 0.12, S[2] - uz * 0.6 + ux * 0.30 * self.axis])
+        WARN.append("%s: no over-the-shoulder of slot %d sees its point -- the first, unchecked" % (self.plan["code"], s))
         return cam(e, target, fov)
 
+
+# ---------------------------------------------------------------------------------------------- long narration (10-23)
+SPLIT_AT = 150          # a narration longer than this is said as its sentences, a line each ...
+GROUP = 125             # ... in groups of about this many characters -- (10-23, round 4) were 260/210: at ~170 words a
+                        # minute a 210-character group is a 12 s shot; 2.3's shots averaged 9.4 s, chapter 3's 12.9 s
+SPLIT_SPEECH = 150      # (10-23, round 4) a SPEECH this long is said as its sentences too, cut with the listener's face
+GROUP_SPEECH = 110
+CUTIN_SECS = 11.0       # (10-23, round 4) a cutaway's one move running longer than this is cut in halfway
+_ABBR = re.compile(r"(?:\b(?:Mr|Mrs|Ms|Dr|St|Jr|Sr|vs|etc|Capt|Lt|Gen|Col|Sgt|No|Mt)\.|\b[A-Z]\.)$")
+LENS_KEYS = ("cam=", "cammove=", "camorbit=", "camat=", "camsecs=", "camtrack=", "campan=", "camshake=", "camhold=")
+
+
+def sentence_groups(text, target=GROUP):
+    """the text in runs of whole sentences of about `target` characters (an abbreviation or an initial ends none)"""
+    parts = re.split(r'(?<=[.!?])["\u201d\u2019)\]]*\s+(?=["\u201c\u2018(\[]?[A-Z0-9])', text.strip())
+    sents = []
+    for p in parts:
+        if sents and _ABBR.search(sents[-1]): sents[-1] += " " + p
+        else: sents.append(p)
+    groups, cur = [], ""
+    for s in sents:
+        if cur and len(cur) + 1 + len(s) > target: groups.append(cur); cur = s
+        else: cur = (cur + " " + s).strip()
+    if cur: groups.append(cur)
+    return groups
+
+
+def _nums(kv):
+    return [float(x.lstrip("=")) for x in kv.split("=", 1)[1].split(",")]
+
+
+def _piece(lens, j, m):
+    """the slot's lens, piece j of m: a move (cam -> cammove) or an orbit (deg0 -> deg1) cut into m equal pieces --
+    each its own eased move, since a cut separates it from the last"""
+    cam = next((k for k in lens if k.startswith("cam=")), None)
+    mov = next((k for k in lens if k.startswith("cammove=")), None)
+    orb = next((k for k in lens if k.startswith("camorbit=")), None)
+    keep = [k for k in lens if not k.startswith(("cam=", "cammove=", "camorbit=", "camsecs="))]
+    if cam and mov:
+        A, B = _nums(cam), _nums(mov)
+        if len(B) == 6: B = B + A[6:7]
+        a = [p + (q - p) * j / m for p, q in zip(A, B)]; b = [p + (q - p) * (j + 1) / m for p, q in zip(A, B)]
+        return ["cam=" + ",".join("%.2f" % v for v in a), "cammove=" + ",".join("%.2f" % v for v in b)] + keep
+    if orb:
+        v = orb.split("=", 1)[1].split(",")
+        d0, d1 = float(v[3]), float(v[4])
+        v[3], v[4] = "%.1f" % (d0 + (d1 - d0) * j / m), "%.1f" % (d0 + (d1 - d0) * (j + 1) / m)
+        return ["camorbit=" + ",".join(v)] + keep
+    return list(lens)
+
+
+def _tight(piece, k=0.6):
+    """(10-23, round 4) a piece of a lens, TIGHTER: its fov -- a cam=/cammove='s seventh number, a camorbit='s sixth --
+    times k (a lens with no fov of its own is left as it is)"""
+    out = []
+    for x in piece:
+        key, v = x.split("=", 1)
+        n = v.split(",")
+        i = 6 if key in ("cam", "cammove") else (5 if key == "camorbit" else -1)
+        if i >= 0 and len(n) > i:
+            n[i] = "%.1f" % max(10.0, float(n[i].lstrip("=")) * k)
+        out.append(key + "=" + ",".join(n))
+    return out
+
+
+def narration_lines(spk, keys, groups, alts=(), hold=1):
+    """⭐ (10-23, jacob: "better pacing") A LONG NARRATION IS SAID AS ITS SENTENCES, ON CUTS. 70 slots ran past 20 s on
+    one lens (the longest 84 s). Each group of sentences is its own line -- its own voice, its own captions -- and, given
+    `alts` (coverage of the room, already tested: the hero's single, the wide), the lines alternate: the slot's own
+    lens, a cut away, the slot's lens again further along its move (the move cut into as many pieces as it returns),
+    and so on. The first `hold` groups stay on the slot's lens (a body that walks on the line arrives before a single
+    measured where it ends up is cut to -- 2.3's first cut away caught Viktor's back on his way to the bunk). Without
+    coverage, or on a cutaway (`set=`): ONE move across every line -- camspan=N, which compile_scene.py turns into the
+    move's camsecs, so the engine carries it on through the sentences."""
+    lens = [k for k in keys if k.startswith(LENS_KEYS)]
+    per = [k for k in keys if k.startswith("to=")]          # (10-23) who it is said to: on every line of it
+    rest = [k for k in keys if k not in lens and k not in per]
+    n = len(groups)
+    moving = any(k.startswith(("cammove=", "camorbit=")) for k in lens)
+    cut = [k for k in keys if k.startswith("set=")]
+    est = sum(len(g) for g in groups) / 15.0                 # seconds, at the narrator's ~170 words a minute
+    if n >= 2 and not alts and est > CUTIN_SECS and not any(k.startswith(("camtrack=", "campan=", "camhold="))
+                                                         for k in lens) and any(k.startswith(("cam=", "camorbit="))
+                                                                                for k in lens):
+        # ⭐ (10-23, round 4) A LONG CUTAWAY IS CUT INTO PIECES: one move for 23 s (chapter 3's probing fire) or an orbit
+        # for a minute (his star) is one long look. Its own move or orbit, cut into pieces of about CUTIN_SECS, every
+        # other piece TIGHTER (the fov 0.6): a cut in, a cut back out, the motion running on through both
+        m = min(n, max(2, int(round(est / CUTIN_SECS))))
+        cum = [0]
+        for g in groups: cum.append(cum[-1] + len(g))
+        edges = [0]                                          # balanced by the TEXT, not the line count ("Wan-To knew
+        for k in range(1, m):                                # that." was a 1.5 s cut in), no piece under ~4 s
+            j = min(range(1, n), key=lambda i: abs(cum[i] - cum[-1] * k / float(m)))
+            if j > edges[-1] and cum[j] - cum[edges[-1]] >= 60: edges.append(j)
+        if len(edges) > 1 and cum[-1] - cum[edges[-1]] < 60: edges.pop()
+        edges.append(n)
+        m = len(edges) - 1
+        out = []
+        for k in range(m):
+            i0, i1 = edges[k], edges[k + 1]
+            if i1 <= i0: continue
+            piece = _piece(lens, k, m)
+            if k % 2: piece = _tight(piece)
+            mv = any(x.startswith(("cammove=", "camorbit=")) for x in piece)
+            head = (rest if k == 0 else cut) + piece + per + (["camspan=%d" % (i1 - i0)] if mv and i1 - i0 > 1 else [])
+            out.append("%d %s|%s" % (spk, " ".join(head), groups[i0]))
+            out += ["%d %s|%s" % (spk, " ".join(cut + per), g) for g in groups[i0 + 1:i1]]
+        return out
+    if n < 2 or not alts or any(k.startswith("set=") for k in keys):
+        k0 = rest + lens + per + (["camspan=%d" % n] if moving and n > 1 else [])
+        # ⛔ a CUTAWAY is the line's own (set= is not sticky): every sentence of it is played there, or the second one
+        # is back home under the cutaway's lens -- chapter 3's galaxy held for one sentence, then empty stars
+        cut = " ".join(k for k in keys if k.startswith("set=") or k in per)
+        return ["%d %s|%s" % (spk, " ".join(k0), groups[0])] + ["%d %s|%s" % (spk, cut, g) for g in groups[1:]]
+    h = max(1, min(hold, n))
+    pat = ["M"] * h + [("A" if k % 2 == 0 else "M") for k in range(n - h)]
+    runs, i = [], 0                                  # the slot's lens in runs: (first line, how many)
+    while i < n:
+        if pat[i] == "M":
+            j = i
+            while j < n and pat[j] == "M": j += 1
+            runs.append((i, j - i)); i = j
+        else: i += 1
+    out, a = [], 0
+    run_at = {s: (k, ln) for k, (s, ln) in enumerate(runs)}
+    for i, g in enumerate(groups):
+        if pat[i] == "A":
+            out.append("%d %s|%s" % (spk, " ".join([alts[a % len(alts)]] + per), g)); a += 1
+        elif i in run_at:
+            k, ln = run_at[i]
+            piece = _piece(lens, k, len(runs))
+            if ln > 1 and any(x.startswith(("cammove=", "camorbit=")) for x in piece): piece = piece + ["camspan=%d" % ln]
+            out.append("%d %s|%s" % (spk, " ".join((rest if i == 0 else []) + piece + per), g))
+        else:
+            out.append("%d %s|%s" % (spk, " ".join(per), g))          # the run's lens carries on
+    return out
+
+
+def coverage(st, cast, keys):
+    """a long narration's coverage of the room: the hero's single and the wide -- ⭐ (10-23, round 4) and a CUT-IN on the
+    single, ANOTHER ANGLE on the hero, a HIGH ANGLE and the wide from ANOTHER CORNER, so a cut every sentence or two
+    does not keep coming back to the same two pictures -- each tested, each dropped if it is the slot's own lens over
+    again (a cut to the same picture is a jump, not a cut). In the order they are cut to."""
+    out = []
+    sg = None
+    if 0 in cast and 0 in st.pos:
+        others = [s for s in cast if s != 0 and s in st.pos]
+        nw = len(WARN)
+        sg = st.single(0, others[0] if others else 0)
+        if sg and not st.sees_face(0, [v / U for v in _nums(sg.split()[0])[:3]], 80.0):
+            sg = None; del WARN[nw:]           # coverage is optional: a single that cannot see the face is not one (2.24)
+        out.append(sg)
+    w = st.wide()
+    out.append(w)
+    if sg:
+        out.append(st.closeup(0, sg))
+        out.append(st.angle(0, [sg, w] + [k for k in keys if k.startswith("cam=")]))
+        out.append(st.high(0))
+    out.append(st.wide(avoid=[[v / U for v in _nums(w.split()[0])[:3]]]))
+    out = [c for c in out if c]
+    cam0 = next((k for k in keys if k.startswith("cam=")), None)
+    if cam0:
+        A = _nums(cam0)
+        out = [c for c in out if math.dist(_nums(c)[:3], A[:3]) > 0.8 * U or math.dist(_nums(c)[3:6], A[3:6]) > 0.6 * U]
+    return out
+
+
+def split_script(path):
+    """a finished scene script's long narration lines (slot 4) said as their sentences, each move carried across them
+    (no coverage: a script without its plan has no room to measure) -- for a script not written by write_scene.
+    (10-23, round 4) and a new paragraph of the narration -- a narrator's line after a narrator's line -- waits a
+    beat=PARA_BEAT before it, as write_scene's do. Run it on an UNSPLIT script: a split one's moves are already spans."""
+    out, n, prev = [], 0, None
+    for ln in open(path, encoding="utf-8").read().split("\n"):
+        s = ln.strip()
+        if s and not s.startswith("#") and "|" in s and s[:1].isdigit():
+            spk = s.split()[0]
+            head, text = s.split("|", 1)
+            if spk == "4" and prev == "4" and text.strip() and "beat=" not in head:
+                head += " beat=%.2f" % PARA_BEAT
+                s = ln = head + "|" + text
+            prev = spk if text.strip() else "action"
+        if s and not s.startswith("#") and "|" in s and s.split()[0] == "4":
+            head, text = s.split("|", 1)
+            if len(text.strip()) > SPLIT_AT:
+                out.extend(narration_lines(4, head.split()[1:], sentence_groups(text.strip()))); n += 1
+                continue
+        out.append(ln)
+    open(path, "w", encoding="utf-8", newline="\n").write("\n".join(out))
+    print("%s: %d long narration line(s) said as their sentences" % (os.path.basename(path), n))
+    return n
 
 # ---------------------------------------------------------------------------------------------- the script
 def action_dur(text):
@@ -476,7 +795,7 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
     L = list(header) + ["cast %s%s" % (" ".join("%d=%s" % (s, cast[s][0]) for s in sorted(cast)),
                                         (" 4=%s" % narrator) if narrator else ""), ""]
     first = True
-    last_spk = None
+    last_spk, last_kind = None, None
     for slot, kind, cue, text in slots:
         o = plan.get("lines", {}).get(slot, {})
         if isinstance(o, str): o = {"keys": o}
@@ -502,12 +821,13 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
         for kv in o.get("keys", "").split():
             if kv.startswith("home="): st.go_home(kv[5:])
         # a mark changed on this line moves the stand-in the lenses measure from
-        moved = []
+        moved, starts = [], []
         for kv in o.get("keys", "").split():
             if "mark=" in kv:
                 kk, mv = kv.split("=", 1)
                 s = {"hmark": 0, "pmark": 1, "p2mark": 2, "p3mark": 3}.get(kk)
-                if s is not None and s in cast and mv != "off": st.pos[s] = st.mark(mv); moved.append((s, kk, mv))
+                if s is not None and s in cast and mv != "off":
+                    starts.append(st.head(s)); st.pos[s] = st.mark(mv); moved.append((s, kk, mv))
             if "clip=" in kv:
                 kk, cv = kv.split("=", 1)
                 s = {"hclip": 0, "pclip": 1, "p2clip": 2, "p3clip": 3}.get(kk)
@@ -534,7 +854,7 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
         elif lens in plan.get("lenses", {}):
             keys.append(plan["lenses"][lens])
         elif lens == "wide":
-            keys.append(st.wide())
+            keys.append(st.wide(also=starts))
         elif lens.startswith("two"):
             bits = lens.split(":")
             a, b = (int(bits[1]), int(bits[2])) if len(bits) == 3 else (spk if spk in cast else 0, next(s for s in cast if s != (spk if spk in cast else 0)))
@@ -546,9 +866,22 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
             keys.append(st.single(a, b))
         elif lens.startswith("over:"):
             _, s, tgt = lens.split(":", 2)
-            keys.append(st.over(int(s), [float(v) / U for v in tgt.split(",")]))
+            if tgt.startswith("@"):                      # (10-23) at another slot's head
+                P = st.head(int(tgt[1:]))
+            elif tgt == "work":                          # (10-23) at what it works at: the desk in front of it
+                H = st.head(int(s)); fx, fz = st.facing(int(s))
+                P = [H[0] + fx * 0.75, H[1] - 0.20, H[2] + fz * 0.75]
+            else:
+                P = [float(v) / U for v in tgt.split(",")]
+            keys.append(st.over(int(s), P))
         else:
             raise SystemExit("%s: unknown lens %r" % (slot, lens))
+        if kind == "speech" and spk in cast:      # (10-23) who it is SAID TO: the speaker's head finds them
+            to = o.get("to", last_spk if (last_spk is not None and last_spk != spk and last_spk in cast) else None)
+            if to is not None and to != spk and to in cast: keys.append("to=%d" % to)
+        if kind == "narr" and last_kind == "narr":  # (10-23) a new paragraph of the narration: a breath before it
+            keys.append("beat=%.2f" % PARA_BEAT)
+        last_kind = kind
         if kind == "action" and "dur=" not in " ".join(keys):
             keys.append("dur=%s" % o.get("dur", action_dur(text)))
         if kind == "speech" and spk in cast: last_spk = spk
@@ -556,7 +889,29 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
         L.append("# ---- %s (%s)%s" % (slot, tag, (" " + o["what"]) if o.get("what") else ""))
         for extra in o.get("pre", []):              # extra lines before this slot's own (a beat, a cutaway)
             L.append(extra)
-        L.append("%d %s|%s" % (spk, " ".join(keys), "" if kind == "action" else say(text)))
+        spoken = "" if kind == "action" else say(text)
+        if kind == "narr" and len(spoken) > SPLIT_AT:    # (10-23) said as its sentences, on cuts (narration_lines)
+            kk = " ".join(keys).split()                  # a plan's lens comes as ONE string, "cam=... cammove=..."
+            alts = [] if any(k.startswith("set=") for k in kk) else coverage(st, cast, kk)
+            L.extend(narration_lines(spk, kk, sentence_groups(spoken), alts, hold=2 if moved else 1))
+        elif kind == "speech" and len(spoken) > SPLIT_SPEECH and spk in cast:
+            # ⭐ (10-23, round 4) A LONG SPEECH IS CUT WITH THE LISTENER'S FACE: 2.4 held the navigator's 15 s and Pal's
+            # 12 s on one face each. Said as its sentences; the speaker's lens, then the one it is said to, listening
+            # (their own single, framed from the speaker's side), and the pair -- tested lenses all
+            kk = " ".join(keys).split()
+            to = next((int(k[3:]) for k in kk if k.startswith("to=")), None)
+            alts = []
+            if to is not None and to in st.pos and spk in st.pos:
+                cur = next((k for k in kk if k.startswith("cam=")), "")
+                nw = len(WARN)
+                rs = st.single(to, spk)                 # the listener's face -- only if a lens SEES it: a reaction shot
+                if rs and not st.sees_face(to, [v / U for v in _nums(rs.split()[0])[:3]], 80.0):   # is optional, and a
+                    rs = None; del WARN[nw:]            # back is not a reaction (2.24: Viktor's, over a shoulder)
+                alts = [c for c in (rs, st.two(spk, to)) if c and c != cur]
+            L.extend(narration_lines(spk, kk, sentence_groups(spoken, GROUP_SPEECH), alts, hold=1))
+        else:
+            L.append("%d %s|%s" % (spk, " ".join(keys), spoken))
+    L = push_holds(L, plan["set"])                # (10-23) no lens holds dead still
     open(os.path.join(out_dir or HERE, name + ".txt"), "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
     # the scene's sets: its room (and any other home it moves to), its extras, and every mark it named
     homes = {setname: dict(set=plan["set"], extras=plan.get("extras", []),
@@ -577,6 +932,91 @@ def write_scene(code, plan, slots, cues, name, header, say=lambda t: t, setname=
         S += h.get("setlines", [])
         open(os.path.join(SETS, hname + ".set"), "w", newline="\n").write("\n".join(S) + "\n")
     return name
+
+# ---------------------------------------------------------------------------------------------- no lens holds dead
+PUSH = ((36, 0.07), (55, 0.05), (999, 0.04))   # (10-23) a held lens moves in this share of its distance, by its fov
+LENS_ANY = ("cam=", "cammove=", "camorbit=", "camtrack=", "campan=", "camhold=", "camspan=", "camat=", "camshake=")
+
+
+def _est_secs(keys, text):
+    """a line's length before it is voiced: its dur=, else its words at the show's pace (~3 a second)"""
+    for k in keys:
+        if k.startswith("dur="): return float(k[4:])
+    return len(re.findall(r"[A-Za-z0-9']+", text)) / 3.0 + 0.3
+
+
+def _u(x):
+    return ("%.2f" % x).replace("-0.00", "0.00")
+
+
+_SPACE = {}
+
+
+def _space(name, depth=0):
+    """is this set SPACE -- a `space` line in it or in what it includes (depth 2, as the engine reads them)"""
+    if not name or depth > 2: return False
+    if name not in _SPACE:
+        ok = False
+        try:
+            for ln in open(os.path.join(SETS, name + ".set"), encoding="utf-8"):
+                w = ln.split()
+                if w and (w[0] == "space" or (w[0] == "include" and len(w) > 1 and _space(w[1], depth + 1))):
+                    ok = True; break
+        except OSError:
+            pass
+        _SPACE[name] = ok
+    return _SPACE[name]
+
+
+def push_holds(L, home=None):
+    """⭐ (10-23, jacob after the second sample: "Not yet. Keep refining the sample first.") NO LENS HOLDS DEAD STILL.
+    68% of 2.4's frames did not change at all (a frame difference per shot). A held lens -- a plain cam=, no move of
+    the plan's own -- is now a slow push in: 7% of its distance on a single, 5% on a two-shot, 4% on a wide, over its
+    line or over the RUN of lines that hold it (the same lens said again, or lines with no lens that carry it): one move,
+    camspan=N, never a jump back to where it began. A run under 1.5 s keeps its lens still; a run under 5 s moves
+    proportionally less. A cutaway's run is its own (set= on every line of it, or on none). In SPACE (the line's set=,
+    else `home`, carries a `space` line) a dolly moves nothing -- the stars are at infinity: chapter 3's probing fire held
+    23 s at 0.03 motion under its 4% push -- so there the lens ZOOMS, its fov narrowing 2.5 times the share."""
+    out, i = list(L), 0
+    while i < len(out):
+        ln = out[i]
+        if ln.startswith("#") or "|" not in ln or not ln[:1].isdigit():
+            i += 1; continue
+        head, text = ln.split("|", 1)
+        keys = head.split()[1:]
+        cams = [k for k in keys if k.startswith(LENS_ANY)]
+        if len(cams) != 1 or not cams[0].startswith("cam="):
+            i += 1; continue
+        cam, cut = cams[0], [k for k in keys if k.startswith("set=")]
+        run, secs, j = [i], _est_secs(keys, text), i + 1
+        while j < len(out):
+            lj = out[j]
+            if lj.startswith("#"):
+                j += 1; continue
+            if "|" not in lj or not lj[:1].isdigit(): break
+            hj, tj = lj.split("|", 1)
+            kj = hj.split()[1:]
+            cj = [k for k in kj if k.startswith(LENS_ANY)]
+            if (cj and cj != [cam]) or [k for k in kj if k.startswith("set=")] != cut: break
+            run.append(j); secs += _est_secs(kj, tj); j += 1
+        v = cam[4:].split(",")
+        if len(v) == 7 and secs >= 1.5:
+            n = [float(x) for x in v]
+            frac = next(f for lim, f in PUSH if n[6] <= lim) * min(1.0, secs / 5.0)
+            if _space(cut[0][4:] if cut else home):
+                mv = "cammove=" + ",".join(v[:6] + ["%.1f" % (n[6] * (1.0 - 2.5 * frac))])
+            else:
+                end = [n[k] + (n[3 + k] - n[k]) * frac for k in range(3)]
+                mv = "cammove=" + ",".join([_u(x) for x in end] + v[3:7])
+            h0, t0 = out[i].split("|", 1)
+            out[i] = "%s %s%s|%s" % (h0.rstrip(), mv, (" camspan=%d" % len(run)) if len(run) > 1 else "", t0)
+            for r in run[1:]:                       # the run's later lines carry the move: their own cam= goes
+                hr, tr = out[r].split("|", 1)
+                b = hr.split()
+                out[r] = "%s|%s" % (" ".join([b[0]] + [k for k in b[1:] if k != cam]) + (" " if len(b) == 1 else ""), tr)
+        i = j if len(run) > 1 else i + 1
+    return out
+
 
 # ---------------------------------------------------------------------------------------------- the self-test
 def _box(lo, hi):
@@ -626,4 +1066,11 @@ def single_cam(c):
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv: sys.exit(0 if selftest() else 1)
+    if "--split" in sys.argv: split_script(sys.argv[sys.argv.index("--split") + 1]); sys.exit(0)
+    if "--push" in sys.argv:      # (10-23) a finished script's held lenses pushed in (push_holds), in place
+        p = sys.argv[sys.argv.index("--push") + 1]
+        Lp = open(p, encoding="utf-8").read().split("\n")
+        hm = sys.argv[sys.argv.index("--home") + 1] if "--home" in sys.argv else None   # the script's home set
+        open(p, "w", encoding="utf-8", newline="\n").write("\n".join(push_holds(Lp, hm)))
+        print("pushed", p); sys.exit(0)
     print(__doc__)

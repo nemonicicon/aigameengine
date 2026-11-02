@@ -423,6 +423,14 @@ sick bay (`sets/sickbay.set`, written by `skate_src/ship/build_sickbay.py`):
 A prop's instance stands on its ROOT NODE (the baker's origin), not on its lowest vertex, so pieces built in room
 coordinates -- a ceiling at 2.9 m, a hood hanging from it -- all go in at `0 0 0` and stay where they were built.
 
+### `gloss y [F0] [max] [fade]` and the marker `Floor` -- a polished floor (10-23)
+
+A set's `gloss` line makes its floor reflect: everything above the plane `y` is drawn again through it, fading over
+`fade` units below it, and the floor itself -- a prop pack baked with `--marker Floor` -- is drawn last over that
+reflection with a Fresnel term (`F0` looking straight down, toward `max` at a grazing angle). The ship's rooms and the sick
+bay say `gloss 0 0.16 0.50 5.0`; their floors are their own packs (`rm_<room>_floor`, `sb_floor`, from
+`setkit.walls(floor=)`). REVA_NOGLOSS=1 is matte; engine_capabilities.md section 47.
+
 ### SETS BUILT BY CODE: `skate_src/setkit.py` (10-23)
 
 The kit every set builder draws with, split out of build_sickbay.py, which re-exports it: the six builders that borrow

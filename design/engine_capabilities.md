@@ -968,3 +968,104 @@ farewell dinner, Amelia in her robe, Billy in his shift beside Freddy in day clo
 the board's name), each actor keeps its own worn-pieces mask, and the mask goes on the pack as the actor is drawn.
 Proof: 2.29's table before/after with the same lens; `[set] actor N (<pack>) wears '<outfit>'` in the log.
 
+### 47 · THE FILM PASS: captions that read, the take's look, glossy floors -- BUILT (10-23)
+
+jacob, after chapters 1-3's rough cuts: "make voices better, and the captions/subtitles more readable. how about a little
+music/atmosphere too while you are at it. and a general like shader/reflections pass. overall it could be more refined/
+look better/ have better pacing." The sound and the pacing are the scene tools' (scene_direction.md "THE FILM MIX");
+the engine's part:
+
+**CAPTIONS.** They were stb_easy_font -- a segment font of six pixels a character -- on ONE line that shrank to fit, and a
+line was cut at 191 characters: 123 of the show's 340 spoken lines lost their ends on screen (a 600-character narration
+came up as one row of specks). Now `capDraw` sets a real typeface (Segoe UI Semibold, its italic for the narrator;
+`REVA_CAPFONT` / `REVA_CAPFONTI` name others, DejaVu on Linux) packed once into a 2048^2 alpha atlas at 64 px with 2x2
+oversampling -- stb_truetype, which door 11 already compiled in -- and draws textured quads on the HUD's 1280-wide canvas:
+near-white over a twelve-way dark outline and a soft rounded box, at most two rows, broken where the longer row is
+shortest. What it shows is the line's PAGE for that moment: compile_scene.py cuts every line into pages of two rows
+(~84 characters) at sentence ends and then the strongest stop, timed off the voice's own sentence timings, and writes
+them as `cap t0 t1 text` records under the line. A line without pages (an old .scn) is wrapped whole. The off-screen
+voice (slot 4) is italic with no name; an on-screen speaker's name sits over the box's corner in the slot's colour.
+UTF-8: Latin-1 and the book's punctuation (dashes, curly quotes, the ellipsis) are in the atlas. The scene's limits grew
+with it: `SCN_MAXL` 64 -> 256 lines (a narration is said as its sentences), `SCN_MAXE` 512 -> 2048 envelope frames (68 s),
+a line's text 192 -> 1536, the .scn reader's record 8192 -> 32768. `REVA_OLDCAPS=1` is the control.
+
+**THE TAKE'S LOOK** (driver.py `scene --film` turns all of it on):
+- `REVA_SSAA=2`: the 3D frame is drawn at twice the size into the post target and resolved by the post quad's own
+  bilinear tap, which at the screen's pixel centres IS a 2x2 box filter -- the ink's 1.3-px hulls and every stair-stepped
+  shadow edge come out antialiased, the HUD still drawn sharp at the window's size. The post pass turns on for it in the
+  lab (where it was off); FXAA stands down. Boot only, and never on the multi-cam wall (its panels are in screen pixels).
+- `grade=` / `REVA_GRADE` (0 off, 1 the show's): after the knee, a gentle S, the shadows a little cool and the highlights
+  a little warm, a touch more colour. `vig=` / `REVA_VIG` (0..1): the corners fall away.
+- THE RIM (`REVA_TOONRIM`, 0.30; 0 is the control): a cel band of the key light along a toon BODY's silhouette, full on
+  its lit side and a third on its shadow side -- what separates a figure from a room drawn in the same flat colours. Not
+  on a room's surfaces (uHemi). The body programs now get the EYE every frame (only the fog had it, and only with fog on).
+
+**THE GLOSSY FLOOR** (`gloss y [F0] [max] [fade]` in a set; the floor a pack of its own with the marker `Floor`). The floor
+is a second MIRROR, lying down: every body and prop above it is drawn a second time through its plane by the wall
+mirrors' own machinery (mirInst: the reflected model matrix, the winding flipped), fading with its depth below the floor
+(`uRefl`). The `Floor` pack is held back from drawSet and goes down LAST (`glossFloorPass`, after every body, the real
+frame only): its own colour plus the reflection under it times a Fresnel term -- F0 looking straight down, rising toward
+`max` at a grazing angle -- by glBlendFunc(ONE, SRC_ALPHA) with the floor writing F as its alpha. A closed room has the
+room's reflection under every floor pixel; one bounce (the floor seen in a wall mirror is drawn opaque, no ink on the
+floor's own pass). The ship's rooms and the sick bay carry `gloss 0 0.16 0.50 5.0` (setkit.walls(floor=), build_rooms,
+build_sickbay). `REVA_NOGLOSS=1` is the control; a set with no `gloss` line, or no `Floor` pack, is drawn as it always was.
+Proof: the cabin at F0 0.6 (a wet mirror: the bunks, Viktor's legs and the stools reflected in the right geometry), then at
+the show's 0.16 beside the control with the same lens; the caption, SSAA and rim A/B on 2.3's first shot
+(REVA_OLDCAPS=1 REVA_NOGLOSS=1 REVA_TOONRIM=0, no SSAA, no post).
+
+**ROUND 2** (jacob, on the first sample: "meh could be better"). Looked at a frame a line, the take's faults were in the
+light and the lenses, not in the pass:
+- THE KEY FROM THE LENS (`REVA_TOONKEY`, on; 0 is the control). A toon BODY's cel cut was taken on the set's one sun, and
+  under the ship's fixed sun two faces in three sat in the shadow tone, a hair's shadow carved across them in hard
+  purple. The cut is now taken on a key above and to the right of the camera, as a drawn show keys its characters; the
+  room's shadow maps still reach a body, as a dim (to 0.80), never as the cut. Rooms keep the set's light.
+- A ROOM LIT FROM ITS CEILING (`REVA_ROOMGRAD`, 1; 0 is the control): a room's own surfaces (uHemi) fall off 16% toward
+  the floor and lift 3% at the ceiling -- a wall is no longer one flat value from floor to ceiling.
+- The speaker's name sits OVER the caption box (0.66 of the caption's size), not on its edge.
+The lens half is the blocker's (scene_direction.md "THE LENS IS TESTED FOR WHAT ELSE IS IN IT"). Proof: V1|V2 sheets of
+2.3 and 2.4 -- the same moment of each chosen line in the sent take and the new one
+(`D:\worldattheendoftime\production\sample_1023\v1_vs_v2_2_3.png`, `..._2_4.png`).
+
+### 48 · THE PERFORMANCE LAYER: heads that find who is talking, speakers who move with their words -- BUILT (10-23)
+
+jacob, after the film pass's second sample: "Not yet. Keep refining the sample first." No note on what -- so the take was
+MEASURED (`anim_bench/stillcheck.py`: per shot, how much of the picture changes): 68% of 2.4's frames and 43% of 2.3's
+did not change at all. In a single only the mouth moved. The head layer under it (scnHeadLayer, jacob's "heads are not
+moving" of the first film) drifted 3 degrees over 20 s -- under a pixel a frame -- and its look-at had never run for this
+show: `lookTarget` wants FACE MARKS, which no code-built person carries (person.py makes none), and it knew two bodies,
+so every partner that could look aimed at the HERO -- in 2.4 a boy lurking unseen at the door. And it decided who was
+speaking with `who`, which is 1 for every partner: slot 3's jaw opened on slot 1's words.
+
+`perfLayer`, per scene SLOT, on top of the clip:
+- WHO TO LOOK AT. A listener looks at the line's speaker; the speaker at the one it is said to -- the line's `to=` (new,
+  not sticky; blocking.py writes it on every speech line whose listener it knows), else the last other speaker, else the
+  nearest body -- and under-turns to 0.72, the eyes finishing it (eyeAim / eyeMorphAim, on a rig that has eyes).
+  `hlook=0`/`plook=0` still refuse. Head to head: the eye marks where a body has them, the HEAD BONE where it does not.
+- THE LOOK IS ABSOLUTE. An offset on the clip's head is not a look: the sitting clips hold the head down at the console,
+  and "look at Marie" came out as a look at Marie's lap. Where the CLIP's head faces -- its rotations carried root to
+  head (perfHeadFwd), low-passed over 1.2 s so the clip's own nods still play -- is corrected to the target, at most 40
+  degrees of turn and 20 of pitch (two people side by side at consoles turn 40 and let the eyes do the rest).
+- ON AN OFF-SCREEN VOICE'S LINE, OR AN ACTION'S, A BODY LOOKS ABOUT: a new place every 3-5 s by slot, a third of the
+  time back to what it was doing. A turn is a critically damped SPRING (~0.45 s) on the scene clock, never a snap.
+- THE SPEAKER MOVES WITH ITS WORDS: a nod on each strong stress -- the rise of its own voice's envelope over 0.1 s,
+  convolved with a 0.4-s half sine, past 1.7 (the 80th percentile of 2.4's; the median is 1.0: every syllable rises,
+  only the stresses rise that far), ~4 degrees -- and a turn and a small tilt that drift with its voice and settle in
+  its pauses; the chest turns a fifth of the head's drift with it.
+- A LISTENER NODS as the speaker finishes a line (half the lines, chosen by slot and line).
+- EVERY BODY BREATHES (the chest, 0.24 Hz, desynchronised by slot) and nobody holds dead still (a drift of a degree).
+The neck takes 45% of every turn and the head 55%, about the bones' own axes -- measured, not assumed: on the code-built
+rigs and on r2moves the neck and head rest with X lateral, Y up, Z forward (local X nods, Y turns, Z tilts).
+Deterministic (the scene clock, the lines and the slot; the springs and the low-pass integrated on the scene clock) --
+no rand(), so [simhash] holds, and a held stop-motion exposure replays the latched face as before.
+`REVA_ACT=0` is the old layer, the control. `REVA_ACTDBG=1` prints each slot's target as it changes and, once a second,
+the clip's head direction, the correction asked and where the head is.
+⛔ `g_scnNCast` ("how many bodies the scene has") was declared 2 and never set: the blink loop stopped at slot 1, so the
+third and fourth people of every scene never blinked. Slots are now in the scene when they have a body.
+Proof: 2.4 went from 68% still to 9% (`stillcheck.py`), 2.3 43% -> 18%, chapter 3's opening 47% -> 41% (the measure undercounts a sparse star field: a flare every few seconds and a slow zoom are on its frames); frames of every
+line beside the second sample's (`D:\worldattheendoftime\production\sample_1023\v2_vs_v3_*.png`).
+
+**Round 4 (the same note again).** Two additions. CHEAT TO THE LENS: a body looking about at nothing in particular looks
+to the CAMERA's side of the room (its random turn takes the camera's side, and a quarter of the way toward it), as an
+actor cheats out -- not into the lens -- unless the lens is behind it: a look about turned away from a close lens gave a
+close-up of the back of Viktor's head at his mirror. And the WALK LOG IS TIMED: a walk's start, its arrival and a STUCK
+placing print the scene time (`[walk] t <s> slot <n> -> mark ...`), which is what scenes/foley.py times footsteps off.

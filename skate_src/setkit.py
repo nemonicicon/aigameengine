@@ -364,12 +364,13 @@ KICK, RAIL0, RAIL1, STRIP0, STRIP1, COVE = 0.13, 0.90, 0.98, 2.20, 2.27, 0.35
 DOOR_H = 2.05
 
 
-def walls(g, glow, x0, x1, z0, z1, doors, ribs_every=2.5, keep=None, ceil=2.9):
+def walls(g, glow, x0, x1, z0, z1, doors, ribs_every=2.5, keep=None, ceil=2.9, floor=None):
     """four inward-facing walls in bands -- kick, lower wall, the rail's backing, the wall in alternating bays, the
     strip's backing -- cut round the doors; ribs at the corners and every ~2.5 m; the light strip (glow); the cove and
     the ceiling (at ceil); the floor with its border. doors: [(side, s0, s1)], side back|right|front|left, s along
     that wall from its first corner (back: from x0, right: from z0, front: from x1, left: from z1). keep: {side:
-    [(s0, s1)]}, spans no rib may stand in (a screen's place)"""
+    [(s0, s1)]}, spans no rib may stand in (a screen's place). floor: a Geo of its own for the floor (a glossy floor is
+    its own pack, marker `Floor` -- the engine's `gloss`), else the floor goes in g"""
     A.box("cove", 16, 128, paint_cove)                 # the cove's uplight, painted once per atlas
     W = [  # origin, along, inward, length, which doors
         ((x0, z0), (1, 0), (0, 1), x1 - x0, "back"),
@@ -435,9 +436,10 @@ def walls(g, glow, x0, x1, z0, z1, doors, ribs_every=2.5, keep=None, ceil=2.9):
     quad(g, (i[0][0], ceil, i[0][1]), (i[1][0] - i[0][0], 0, 0), (0, 0, i[3][1] - i[0][1]), "ceiling", n=(0, -1, 0))
     # the floor and its border
     e = 0.30
-    quad(g, (x0 + e, 0, z0 + e), (x1 - x0 - 2 * e, 0, 0), (0, 0, z1 - z0 - 2 * e), "floor", n=(0, 1, 0))
+    fl = g if floor is None else floor
+    quad(fl, (x0 + e, 0, z0 + e), (x1 - x0 - 2 * e, 0, 0), (0, 0, z1 - z0 - 2 * e), "floor", n=(0, 1, 0))
     for (ax0, az0, ax1, az1) in [(x0, z0, x1, z0 + e), (x0, z1 - e, x1, z1), (x0, z0 + e, x0 + e, z1 - e), (x1 - e, z0 + e, x1, z1 - e)]:
-        quad(g, (ax0, 0, az0), (ax1 - ax0, 0, 0), (0, 0, az1 - az0), "floor_edge", n=(0, 1, 0))
+        quad(fl, (ax0, 0, az0), (ax1 - ax0, 0, 0), (0, 0, az1 - az0), "floor_edge", n=(0, 1, 0))
 
 
 def door_frame(g, glow, xa, xb, z, inward, depth=0.22):

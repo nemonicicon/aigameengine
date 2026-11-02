@@ -418,6 +418,10 @@ def scene(a):
                REVA_SHOT_PATH=win(os.path.join(tmp, "f.ppm")))
     # ⭐ --env on a SCENE too (09-11): the arms-up A/B wanted REVA_NOWMS=1 on a take and the
     # flag only existed on lab/bench/up, so the take never ran and the strip came back black.
+    # ⭐ (10-23) THE FILM LOOK (jacob: "a general like shader/reflections pass"): the engine draws the 3D frame at twice
+    # the size and resolves it in the post pass (the ink antialiased), with bloom, its grade and its vignette. --env wins.
+    if getattr(a, "film", False):
+        env.update(REVA_SSAA="2", REVA_POST="1", REVA_GRADE="1", REVA_VIG="0.6")
     for kv in (a.env or []):
         k, _, v = kv.partition("="); env[k] = v
     # ⭐ KEEP THE ENGINE'S WORD. `[stage] hclip 'x' NOT FOUND`, `[cue]`, `[step]` and
@@ -426,52 +430,126 @@ def scene(a):
     logp = os.path.splitext(os.path.abspath(a.out))[0] + ".log"
     logf = open(logp, "w")
     # ⭐ ep 12: --res WxH is the engine's argv[4] (it always forced the window size; the driver never passed it),
-    # so a scene can be filmed at 1080p. Frames are PPM until the mux: 6.2 MB each at 1920x1080 -- put --tmp on D:.
+    # so a scene can be filmed at 1080p. Each frame is a PPM (6.2 MB at 1920x1080) only until the encoder has it: since
+    # 10-24 a take is streamed, so --tmp holds a frame or two, not the take.
     pr = subprocess.Popen([exe, "400", "packs", a.subject] + ([a.res] if getattr(a, "res", "") else []),
                           cwd=NATIVE, env=env, stdout=logf, stderr=subprocess.STDOUT)
-    have, last_change, t0 = 0, time.time(), time.time()
-    while True:
-        if pr.poll() is not None:
-            break
-        n = len(glob.glob(os.path.join(tmp, "*.ppm")))
-        now = time.time()
-        if n != have:
-            have, last_change = n, now
-        if n >= frames:
-            break
-        if have > 0 and now - last_change > STALL:
-            print("   frames stopped at %d/%d (the scene ended) -- wrapping the take" % (n, frames))
-            break
-        if now - t0 > 3600:
-            print("   take exceeded an hour; stopping"); break
-        time.sleep(1.0)
-    time.sleep(0.7)
-    kill()
-    n = len(glob.glob(os.path.join(tmp, "*.ppm")))
-    logf.close()
-    print("captured %d frames   (engine log: %s)" % (n, logp))
-    if n < 10:
-        print("too few frames -- is scenes/%s.scn present?" % a.name); return 1
+    # ⭐ (10-24) THE TAKE IS STREAMED, NOT SPOOLED. jacob, told a re-record's peak: "thats too tight of space on the disk
+    # for me". Every frame sat on disk as a raw PPM until the take ended (2.76 MB each at 720p, ~4 GB a minute of scene:
+    # chapter 3's 13.6 min peaked at 54 GB) and was encoded only then. Now each frame goes into the encoder the moment
+    # the engine has written all of it, and is deleted: a take needs a few frames of disk and its own mp4. The --film dip
+    # to black wants the END, which a stream does not know until it gets there, so the last 0.6 s are held back in
+    # memory (~40 MB) and faded on the way out -- what ffmpeg's fade filter did, done here.
+    import collections
+    import numpy as np
+    film = getattr(a, "film", False)
     wav = os.path.join(NATIVE, "scenes", "%s.wav" % a.name)
     vf = []
     if a.crop:   # the conversation camera aims at the SPEAKER's head, so it lands dead
                  # centre -- a centre crop is a free close-up that always frames whoever
                  # is talking, with no tracking.
         vf.append("crop=560:315:360:150,scale=1280:720:flags=lanczos,eq=brightness=0.06:contrast=1.12")
-    elif a.grade:
+    elif a.grade and not film:
         vf.append("eq=brightness=0.02:contrast=1.07:saturation=1.04")
-    cmd = [FFMPEG, "-y", "-framerate", str(a.fps), "-start_number", "0",
-           "-i", os.path.join(tmp, "f_%05d.ppm")]
+    cmd = [FFMPEG, "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(a.fps), "-vcodec", "ppm", "-i", "-"]
     if os.path.exists(wav): cmd += ["-i", wav]
     if vf: cmd += ["-vf", ",".join(vf)]
     cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "19", "-preset", "veryfast"]
     if os.path.exists(wav): cmd += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
     cmd += [os.path.abspath(a.out)]
-    rc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
-    if rc.returncode != 0:
-        print(rc.stderr[-2000:]); return 1
-    for f in glob.glob(os.path.join(tmp, "*.ppm")): os.remove(f)
-    try: os.rmdir(tmp)
+    elogp = os.path.join(tmp, "_encode.log")
+    elog = open(elogp, "w")
+    enc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=elog)
+    fin, fout = max(1, int(round(0.35 * a.fps))), max(1, int(round(0.6 * a.fps)))
+    PPM = re.compile(rb"P6\s+(\d+)\s+(\d+)\s+(\d+)\s")
+    held, stale, size = collections.deque(), [], [0]
+
+    def whole(i):
+        """frame i's bytes once the engine has written all of it (then it is deleted), else None"""
+        p = os.path.join(tmp, "f_%05d.ppm" % i)
+        try:
+            if size[0] and os.path.getsize(p) < size[0]: return None
+            with open(p, "rb") as fh: b = fh.read()
+        except OSError:
+            return None
+        m = PPM.match(b)
+        if not m or len(b) < m.end() + int(m.group(1)) * int(m.group(2)) * 3: return None
+        size[0] = m.end() + int(m.group(1)) * int(m.group(2)) * 3
+        try: os.remove(p)
+        except OSError: stale.append(p)              # the engine still holds it open: gone at the next look
+        return b
+
+    def faded(b, s):
+        if s >= 0.999: return b
+        m = PPM.match(b)
+        px = np.frombuffer(b, np.uint8, offset=m.end()).astype(np.float32) * max(0.0, s)
+        return b[:m.end()] + np.clip(px + 0.5, 0, 255).astype(np.uint8).tobytes()
+
+    # ⛔ THE DIP TO BLACK AT THE END NEVER SHOWED: the capture runs ~1.5 s past the mix (the scene's clock outlives its
+    # last line) and -shortest cuts the picture at the sound's end, so a fade on the last 0.6 s of FRAMES was always cut
+    # off (every --film take until 10-24 ended at full brightness). The end is the shorter of the two: the sound's
+    # length is known before the first frame.
+    wav_dur = None
+    if film and os.path.exists(wav):
+        import wave
+        try:
+            with wave.open(wav) as w: wav_dur = w.getnframes() / float(w.getframerate())
+        except Exception:
+            wav_dur = None
+
+    def send(i, b, s=1.0):
+        if film:
+            if i < fin: s = min(s, i / float(fin))                       # in from black over 0.35 s
+            if wav_dur: s = min(s, (wav_dur - i / float(a.fps)) / 0.6)   # out to black as the sound ends
+            b = faded(b, s)
+        enc.stdin.write(b)
+
+    nxt, last_change, t0 = 0, time.time(), time.time()
+    try:
+        while True:
+            b = whole(nxt)
+            if b is not None:
+                held.append((nxt, b)); nxt += 1; last_change = time.time()
+                while len(held) > fout: send(*held.popleft())
+                if nxt >= frames: break
+                continue
+            for p in stale[:]:
+                try: os.remove(p); stale.remove(p)
+                except OSError: pass
+            now = time.time()
+            if pr.poll() is not None:
+                break
+            if nxt > 0 and now - last_change > STALL:
+                print("   frames stopped at %d/%d (the scene ended) -- wrapping the take" % (nxt, frames))
+                break
+            if now - t0 > 3600:
+                print("   take exceeded an hour; stopping"); break
+            time.sleep(0.03)
+        time.sleep(0.7)
+        kill()
+        while True:                                   # the engine's last frames, finished as it was stopped
+            b = whole(nxt)
+            if b is None: break
+            held.append((nxt, b)); nxt += 1
+        n = nxt
+        for i, b in held:                             # and out to black over the last 0.6 s, if the frames end first
+            send(i, b, min(1.0, (n - i) / (0.6 * a.fps)))
+        enc.stdin.close()
+    except OSError as e:                              # a broken pipe: the encoder stopped taking frames
+        print("   the encoder stopped taking frames (%s)" % e)
+    rc = enc.wait()
+    elog.close()
+    logf.close()
+    for p in stale + glob.glob(os.path.join(tmp, "*.ppm")):
+        try: os.remove(p)
+        except OSError: pass
+    print("captured %d frames   (engine log: %s)" % (nxt, logp))
+    if rc != 0:
+        print(open(elogp, encoding="utf-8", errors="replace").read()[-2000:]); return 1
+    if nxt < 10:
+        print("too few frames -- is scenes/%s.scn present?" % a.name); return 1
+    try:
+        os.remove(elogp); os.rmdir(tmp)
     except OSError: pass
     print("wrote %s (%.1f MB)   <-- WATCH IT" % (a.out, os.path.getsize(a.out) / 1e6))
     return 0
@@ -795,6 +873,9 @@ def main():
     sp.add_argument("--tmp"); sp.add_argument("--new", action="store_true")
     sp.add_argument("--res", default="", help="WxH render size, e.g. 1920x1080 (the engine's argv[4]; ep 12)")
     sp.add_argument("--env", action="append", help="extra REVA_* var, K=V (a control take)")
+    sp.add_argument("--film", action="store_true",
+                    help="(10-23) THE FILM LOOK: SSAA x2, the post pass, the engine's grade and vignette, and a dip to "
+                         "black at each end of the take (ffmpeg's eq grade is skipped: the engine grades)")
     sp.set_defaults(fn=scene)
 
     a = ap.parse_args()

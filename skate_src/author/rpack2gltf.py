@@ -6,7 +6,7 @@
     python skate_src/author/rpack2gltf.py reva_native/packs/v1_r2moves.rpack out/reva_moves.glb \
         --clips "z_*" --exclude "z_rm_sk_*,z_twisttest"
     python skate_src/author/rpack2gltf.py reva_native/packs/v1_clanker.rpack out/clanker.glb \
-        --clips "z_rm_sk_*" --board --mesh --materials-from D:/reva902/clanker/clanker.glb
+        --clips "z_rm_sk_*" --board --mesh --materials-from path/to/character.glb
 
 Written for a Godot 4 team (godot/ANIMATION_IMPORT.md): Godot's native 3D format is glTF, and a clip
 here is already what a glTF animation is -- per-bone LOCAL rotation / translation keys at a frame rate.
@@ -261,6 +261,10 @@ def export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src_mats, stem):
         return gtex[t]
 
     groups, skinkey, nv_all, nt_all, reused = {}, {}, 0, 0, 0
+    # ⭐ A WARDROBE (09-29, REVA): meshes named wear~<slot>~<piece>~<outfits> / skin~h=<pieces> / skin / head are her
+    # separate pieces -- each stays its OWN glTF mesh and node, named with its tag, so Godot's ClubWardrobe can put one
+    # on or take it off. A pack without tags exports as it always did (one body mesh per skin).
+    ward = any((R.sname(m["name"]) or "").startswith(("wear~", "skin~h=")) for m in meshes)
     for mi, m in enumerate(meshes):
         if not (m["flags"] & 4) or not m["nbones"]:
             print("   mesh %d: not skinned -- the engine does not draw it on a body, left out" % mi)
@@ -352,22 +356,27 @@ def export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src_mats, stem):
         if m["nidx"]:
             prim["indices"] = G.acc(np.frombuffer(R.buf, "<u4", m["nidx"], m["oIdx"]), "SCALAR", 5125)
             nt_all += m["nidx"] // 3
-        groups.setdefault(skin, []).append(prim)
+        groups.setdefault((mname, skin) if ward else skin, []).append(prim)
         nv_all += nv
     body = nodes[meshes[0]["node"]]["name"] if meshes else stem
     if body in {nodes[n]["name"] for n in keep}:
         body += "_mesh"
-    for skin, prims in groups.items():
-        nm = body if len(groups) == 1 else "%s_%d" % (body, skin)
+    for key, prims in groups.items():
+        if ward:
+            nm, skin = key
+        else:
+            skin = key
+            nm = body if len(groups) == 1 else "%s_%d" % (body, skin)
         G.j["meshes"].append({"name": nm, "primitives": prims})
         G.j["nodes"].append({"name": nm, "mesh": len(G.j["meshes"]) - 1, "skin": skin})
         G.j["scenes"][0]["nodes"].append(len(G.j["nodes"]) - 1)
     if struct.unpack_from("<I", R.buf, 4 + 14 * 4)[0]:
         print("   note: this pack carries a morph table (a face's shapes) -- NOT exported by --mesh")
-    return "%d meshes (%d verts, %d tris) on %s, %d texture(s)" % (
+    nskins = len({k[1] if ward else k for k in groups})
+    return "%d meshes (%d verts, %d tris) on %s, %d texture(s)%s" % (
         sum(len(p) for p in groups.values()), nv_all, nt_all,
-        "the skeleton's own skin" if reused and len(groups) == 1 else "%d skin(s)" % len(groups),
-        sum(1 for v in gtex.values() if v is not None))
+        "the skeleton's own skin" if reused and nskins == 1 else "%d skin(s)" % nskins,
+        sum(1 for v in gtex.values() if v is not None), (", a wardrobe of %d pieces" % len(groups)) if ward else "")
 
 
 def main():

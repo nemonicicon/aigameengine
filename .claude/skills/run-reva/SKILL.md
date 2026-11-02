@@ -143,7 +143,11 @@ $PY $D face /tmp/face.png --subject r2moves --jaw 0.7 --panel mouth --zoom 1.6
 ```bash
 # A CONVERSATION SCENE, recorded with its audio muxed in
 $PY $D scene /tmp/talk.mp4 --name porch --seconds 60 --fps 24 --set parsons --stage 30,-20,0
+# (10-23) THE FILM LOOK: --film = SSAA x2 + the post pass + the engine's grade and vignette + a dip to black at each end
+$PY $D scene /tmp/talk.mp4 --name wateot_2_3 --fps 24 --subject viktor --partner off --set _s2_3 --new --film
 ```
+A script that says `mix film room=<set> music=<mood>` is voiced by `say_kokoro.py` and compiled as a FILM (48 kHz stereo:
+rooms, the music and room-tone bed, conversation gaps, caption pages) -- design/scene_direction.md "THE FILM MIX".
 
 Scenes live in `reva_native/scenes/` (12 of them: `porch`, `denial`, `coldopen`,
 `the_spot`, `boarding`, `three_lawns`, `it_starts`, `tables`, `dogwalk`, `theleash`,
@@ -205,6 +209,23 @@ this also steers a **running** window.
 | `REVA_PDBG=1` | the partner's world position, for framing her |
 | `REVA_CAMLOCK=1` · `REVA_NOSKY=1` · `REVA_CLEAR=r,g,b` | measurement lens · ground the flyers · impossible backdrop |
 | `REVA_STAGEDBG=1` | is the partner *walking* to her mark or gliding to it |
+| `REVA_SSAA=2` · `REVA_GRADE=1` · `REVA_VIG=0.6` | (10-23) the take's look: 2x supersampling resolved in the post pass, the grade, the vignette -- `scene --film` sets all three + the post pass |
+| `REVA_OLDCAPS=1` · `REVA_NOGLOSS=1` · `REVA_TOONRIM=0` | (10-23) the controls: the old segment-font captions, a matte floor, no toon rim |
+| `REVA_TOONKEY=0` · `REVA_ROOMGRAD=0` | (10-23, round 2) the controls: a toon body's cel cut on the set's sun instead of the key from the lens; a room's surfaces flat floor to ceiling |
+| `REVA_ACT=0` · `REVA_ACTDBG=1` | (10-23, round 3) THE PERFORMANCE LAYER off (the old head layer, the control) · each slot's look target as it changes, and once a second the clip's head, the correction and the head |
+
+**A take is STREAMED** (10-24): `scene` pipes each finished frame into ffmpeg and deletes it -- `--tmp` holds a frame,
+not the take (it used to spool ~4 GB a minute of scene). `--film`'s fades are applied in the driver: in from black over
+0.35 s, out to black over the last 0.6 s of the SOUND (the picture is cut at the sound's end).
+
+**A take's FOLEY** (10-23, round 4): record the take, then `$PY reva_native/scenes/foley.py <scene.txt> <take.log>
+--child viktor,billy,freddy` (footsteps and sits from the take's timed `[walk] t` lines into the script's FOLEY block),
+`compile_scene.py <scene.txt>`, and lay the new mix under the same frames: `ffmpeg -i take.mp4 -i
+reva_native/scenes/<scene>.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest out.mp4`.
+
+**A take's numbers** (10-23): `$PY reva_native/anim_bench/stillcheck.py <take.mp4>` -- per shot, how much of the picture
+moves, and the share of the take that is a frozen frame. `$PY reva_native/anim_bench/takesheet.py lines <take.mp4>
+<scene.scn> <out.png>` -- one frame per line; `takesheet.py compare ...` -- two takes of a script, matched by line.
 
 Pass any of them with `--env K=V`.
 

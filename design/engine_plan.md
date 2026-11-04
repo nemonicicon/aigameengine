@@ -74,6 +74,19 @@ These are requirements, not options. Each came from jacob on 11-02 unless dated.
 | The webcam (11-04) | *"its up to you, I dont need the webcam to see the tv, it is for you. be careful with my tv. please."* It's mine to read; nothing of mine goes on the set outside the in-spec rules above |
 | jacob's eyes on the picture (11-04) | *"we need to find a good time for this."* Pending: a short reel on the PC of what steps 13 to 18 built |
 | The Pi's old build routes (11-04) | *"yes"*: the old renderer's `kms` and `sdl` routes come out of `build_pi.sh` with it; the direct Vulkan road stays |
+| Other languages' reach (11-04) | *"yes, capability for the larger scripts too."* Step 24 covers accented Latin, Cyrillic and Greek, and Chinese, Japanese and Korean, which need a bigger letter and a wider grid; built and left off |
+| The licence (11-04) | *"mit."* aigameengine goes public under MIT. Nothing of raylib's or Wicked's code is in the tree, see the review; the third-party code is stb (public domain), SDL2 (zlib, linked, not copied) and the Vulkan headers (Apache 2.0), each keeping its notice |
+| jacob's eyes on steps 13 to 18 (11-04) | *"both, and both, and I want you to tell me when its ready, and wait for me to say proceed before showing it so I can make sure I see it."* A short video and a sheet of stills, for the PC monitor and the tube; made ready, announced, and shown only on his "proceed" |
+| reva902 and the suit man in the kit (11-04) | *"i dont see any reason why not to address and take care of them now while we are working on the engine."* Committed to the kit with their README lines |
+| The loose ends of steps 14 to 16 (11-04) | *"yes"*: a seated body's shot, split screen's own conversation lens and a path map for a streaming world go into the sound-music-save step |
+| The 30 undecided files (11-04) | *"yes"*: the P(doom) show and the Bike Lane Bash doc stay home (`hold`); REVA's singing voice by math, its song tools and four public-domain songs go to the kit (`send`) |
+| Section 4 of the film notes (11-04) | *"Smalls (look-at, clip offset, per-mover colour/fade/frame) as one film step after 19. Mediums (beams as lights, camera track + roll, cloth on prop, post per frame) into their Phase 7 systems. None dropped."* So in the queue below |
+| Promoting (11-04) | *"End of step 18, one driver.py promote. Keep 11-02 as crowd_1102.exe until the lighthouse has been compared, then delete it. Before any of this: list the renderers in the tree by file and which ones step 18 removes. The software renderer stays, buildable and in the receipt. Only GL goes. If there is no software renderer, that becomes a step after 18 and promote waits for it."* The list is in the review; there is none of ours, so step 19 is one, and promote waits |
+| The robot-neko skill (11-04) | *"stays in reva"*: `hold`, out of the kit |
+| The kit's own docs (11-04) | *"Rewrite once, at step 18's end, in the promote commit... so they describe software + Vulkan behind one interface, buildvk, the games, and the receipt. Not now; they'd be rewritten twice."* |
+| The co-author line (11-04) | *"hell yeah bro couldnt have done it without you!"* It stays on every commit |
+| The reel (11-04) | *"at the end right before we push, so i can approve or not."* Made at step 18's end, before that push; shown on his "proceed"; the push waits on his approval |
+| Saves (11-04) | *"text, named slots, human-editable. Add a version line at the top of the file, and the loader bounds-checks everything it reads — an edited save must never crash the game. That's what makes a readable save a feature instead of a liability."* The shape of step 20's save |
 
 ## Is low level more efficient?
 
@@ -210,17 +223,20 @@ jacob approved this list on 11-03: *"ok, make sure you follow this, and dont sri
 
 17. [x] The toon pass on Vulkan.
 18. [ ] Film and the old game modes onto Vulkan, then GL comes out (jacob's word, 11-03, above; and 11-04, *"gl is cancer"*: its code stripped from every file, not left dead). It sits here because film needs the faces in step 14 and the toon in step 17.
-19. [ ] Sound, music and save in the table: `E->sound`, `E->music`, `E->save` and `E->load`, and `club.h` out of `engine.h` bar the math a deterministic game must use (added on jacob's word, 11-04: *"step after 18"*).
-20. [ ] Step 4: material data, specular with roughness and metal, reflections, surface detail. Before it (jacob, 11-04): `design/bike_lane_bash.md` read against this queue, and what the engine lacks mentioned here.
-21. [ ] Step 5: skin, hair, eyes, cloth.
-22. [ ] Step 6: particles, decals, level of detail, water, foliage.
-23. [ ] Step 7: 100 and 144 Hz, resolution and widescreen, the flat-panel look, depth of field, motion blur and TAA, HDR output.
+    At its end (jacob, 11-04): one `driver.py promote`, the 11-02 build kept as `crowd_1102.exe` until the lighthouse has been compared and then deleted; the kit's `README.md`, `CLAUDE.md` and `AGENTS.md` rewritten once, in the promote commit; the reel for jacob's eyes made before that push and shown on his "proceed". The promote waits for step 19.
+19. [ ] A software renderer, buildable and in the receipt (added on jacob's rule, 11-04: *"The software renderer stays, buildable and in the receipt. Only GL goes. If there is no software renderer, that becomes a step after 18 and promote waits for it."* There is none of ours: the review lists what there is, and which kind this is to be is his to say).
+20. [ ] Sound, music and save in the table: `E->sound`, `E->music`, `E->save` and `E->load`, and `club.h` out of `engine.h` bar the math a deterministic game must use (added on jacob's word, 11-04: *"step after 18"*). A save is text, in named slots, human-editable, with a version line at the top, and the loader bounds-checks everything it reads. With the loose ends of steps 14 to 16 (jacob, 11-04: *"yes"*): a seated body's conversation shot, split screen's own conversation lens, a path map for a streaming world.
+21. [ ] Film's small asks (jacob, 11-04): a scene body looking at a point from the set's timeline, a clip's start offset for scene bodies and set actors, and a mover's colour, fade and picture-frame per timeline frame.
+22. [ ] Step 4: material data, specular with roughness and metal, reflections, surface detail. Before it (jacob, 11-04): `design/bike_lane_bash.md` read against this queue, and what the engine lacks mentioned here.
+23. [ ] Step 5: skin, hair, eyes, cloth, for film's bodies and the people a game builds alike, at film's standard with the rungs scaling it. With film's cloth on a prop (jacob, 11-04).
+24. [ ] Step 6: particles, decals, level of detail, water, foliage. With film's beams as real lights that cast and move per frame (jacob, 11-04).
+25. [ ] Step 7: 100 and 144 Hz, resolution and widescreen, the flat-panel look, depth of field, motion blur and TAA, HDR output. With film's camera track with roll, and post per frame (jacob, 11-04).
 
 **Phase 8**
 
-24. [ ] Text beyond ASCII, and a way to swap a game's words for another language's: built and left off (added on jacob's word, 11-04).
-25. [ ] Licence, notices, pinned toolchain, fuzz-tested file readers, packaging, a Pi image.
-26. [ ] Online play.
+26. [ ] Text beyond ASCII, and a way to swap a game's words for another language's: accented Latin, Cyrillic and Greek, and the larger scripts too, Chinese, Japanese and Korean, which need a bigger letter and a wider grid. Built and left off (added on jacob's word, 11-04).
+27. [ ] Licence (MIT, jacob 11-04), notices, pinned toolchain, fuzz-tested file readers, packaging, a Pi image.
+28. [ ] Online play.
 
 **Not in this sequence, because they wait on jacob's word:** the kit sync and push, the fresh-card test, the PAL work, SD and SSD, tuning for the Pi, and the gates' Pi replays. Committed on his word 11-04. The webcam is aimed at the tube since 11-04; what it watches there waits for the Pi's turn unless jacob says.
 
@@ -250,7 +266,7 @@ jacob, 11-04: *"take a good look at this project, let me know how we are doing. 
 11. **Not in the plan at all:** text beyond ASCII and other languages. The TV font is 8x8 ASCII and the captions take UTF-8. Public someday means other languages someday; a scope question for Phase 8.
 12. **The webcam** can't be read: `obs64.exe` holds the camera, and OBS's virtual camera shows a placeholder.
 
-**Waiting on jacob, asked before and not answered:** the skate session's cloth script and wardrobe (section 3 of `design/skate_game_handoff.md`), the kit sync and push, film's 29 UNDECIDED manifest files, promoting the exes, and section 4 of `design/pdoom_engine_notes.md`.
+**Waiting on jacob, asked before and not answered:** the skate session's cloth script and wardrobe (section 3 of `design/skate_game_handoff.md`), the kit sync and push, film's 29 UNDECIDED manifest files, promoting the exes, and section 4 of `design/pdoom_engine_notes.md`. **Answered 11-04:** the cloth script and the wardrobe, done (46ad7df here, 7ce0fcd in the kit, the script compiling in the kit's own Godot). The kit synced and pushed: 209af33 from reva 1570bbb, the engine built from the kit's folder alone with the sample's receipt holding there. On the way the sync learnt to list an untracked folder's files (46db75a) and the driver to build the UTF-8 manifest object itself (1570bbb). Still open, re-asked in plainer words: the 29 undecided files, promoting, and section 4. **The kit looked at (11-04), on jacob's question:** in sync (597 files), the scrub's self-test reproduces the 09-27 cut except in the kit's own three files and four that differ only by line endings, the engine's C carries no door and no machine path, and the kit builds from its own folder with the sample's receipt holding. Found: the sync's machine-path finder only knew jacob's home and other drives, so `C:\MyVeryOwnVideoGames` paths went through unreported, and it only looked at what a sync was writing. Widened (9f1be3f), five lines scrubbed and synced (kit 31cde96), and 93 were left in `skate_src` tools from earlier syncs. On jacob's *"Yes, clean them"*: the zombie door's 56 one-shot `patch_*.py` scripts and film's one, which patch reva's own files by absolute path, are never sent and came out of the kit (7,285 lines); the other 31 lines, in the mob1, town, kaeli, guns, film, reva2, anima, x3d and robot neko scripts, got scrub lines with an environment override and a relative default (5e9326f, kit e8c204c). The kit reports none now, and a search of every tracked text file in it finds none. The kit's own `README.md`, `CLAUDE.md` and `AGENTS.md` still describe the old renderer's build line and none of the games, the driver's `buildvk` or the receipt: to rewrite when step 18 takes the old renderer out.
 
 **The way on, as the queue has it:** finish step 18 (the lighthouse door, the build lines, the old renderer out, one look at each piece the take doesn't show, the write-up, the tick), then 19, 20, 21 and 22 (section 3 of the film notes read before each of the last three), then 23 and 24. jacob's answers below may change it, and nothing else does.
 

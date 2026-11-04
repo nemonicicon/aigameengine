@@ -1,0 +1,38 @@
+# AULD LANG SYNE (Robert Burns, 1788, to the traditional tune; public domain): the first verse, as it is usually sung.
+# Melody and harmony read from flutetunes.com's MIDI, down a minor seventh from G into her range (A, E3 to F#4).
+bpm 84
+meter 4
+chordstart 1
+chords A:4 E:4 A:4 D:4 A:4 E:4 F#m:2 D:1 E:1 A:4
+
+say Should auld acquaintance be forgot, and never brought to mind?
+E3  1    SH UW D
+A3  1.5  AO L D
+A3  0.5  AX
+A3  1    K W EY N
+C#4 1    T AX N S
+B3  1.5  B IY
+A3  0.5  F AX R
+B3  1    G AO T
+C#4 1    AE N D
+A3  1.5  N EH
+A3  0.5  V AX R
+C#4 1    B R AO T
+E4  1    T UW
+F#4 3    M AY N D
+
+say Should auld acquaintance be forgot, and days of auld lang syne?
+F#4 1    SH UW D
+E4  1.5  AO L D
+C#4 0.5  AX
+C#4 1    K W EY N
+A3  1    T AX N S
+B3  1.5  B IY
+A3  0.5  F AX R
+B3  1    G AO T
+C#4 1    AE N D
+A3  1.5  D EY Z
+F#3 0.5  AX V
+F#3 1    AO L D
+E3  1    L AE NG
+A3  4    S AY N

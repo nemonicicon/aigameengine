@@ -1,0 +1,66 @@
+# DAISY BELL (Harry Dacre, 1892; public domain): the song a computer first sang, Bell Labs on an IBM 704, 1961.
+# Melody and harmony read from flutetunes.com's MIDI of the chorus, down a minor seventh from G into her range (A, E3 to E4). Its
+# one turn on "mar-" is one note here, and "u-" is added where the sung tune has it (the flute setting rests there).
+bpm 144
+meter 3
+chords A:12 D:6 A:6 E7:6 A:3 F#m:3 B7:6 E:6 E7:6 A:6 F#m:3 D:3 A:3 E7:3 A:3 E7:3 A:3 E7:3 A:3 E7:3 A:6
+
+say Daisy, Daisy, give me your answer, do.
+E4  3    D EY
+C#4 3    Z IY
+A3  3    D EY
+E3  3    Z IY
+F#3 1    G IH V
+G#3 1    M IY
+A3  1    Y AO R
+F#3 2    AE N
+A3  1    S AX R
+E3  5    D UW
+-   1
+
+say I'm half crazy, all for the love of you.
+B3  3    AY M
+E4  3    HH AE F
+C#4 3    K R EY
+A3  3    Z IY
+F#3 1    AO L
+G#3 1    F AO R
+A3  1    DH AX
+B3  2    L AH V
+C#4 1    AX V
+B3  5    Y UW
+
+say It won't be a stylish marriage, I can't afford a carriage,
+C#4 1    IH T
+D4  1    W OW N T
+C#4 1    B IY
+B3  1    AX
+E4  2    S T AY0
+C#4 1    L IH SH
+B3  1    M AE
+A3  4    R IH JH
+B3  1    AY
+C#4 2    K AE N T
+A3  1    AX
+F#3 2    F OW R D
+A3  1    AX
+F#3 1    K AE
+E3  4    R IH JH
+
+say But you'll look sweet upon the seat of a bicycle built for two.
+E3  1    B AH T
+A3  2    Y UW L
+C#4 1    L UW K
+B3  2    S W IY T
+E3  1    AX
+A3  2    P AO N
+C#4 1    DH AX
+B3  2    S IY T
+C#4 0.5  AO V
+D4  0.5  AX
+E4  1    B AY0
+C#4 1    S IH
+A3  1    K AX L
+B3  2    B IH L T
+E3  1    F AO R
+A3  6    T UW

@@ -1,0 +1,50 @@
+# REVA's own words, off her sheet (D:/reva902/reva_sheet/sheet5.png). A minor, low, a little behind the beat.
+#   <note> <beats> <phonemes>      - <beats> is a rest. Phonemes in sing_math.py; a syllable has one vowel.
+#   say <words>                    the words of the notes that follow
+bpm 66
+
+say You call it a bug.
+A3  0.5  Y UW
+C4  1    K AO L
+B3  0.5  IH T
+A3  0.5  AX
+E3  1    B AH G
+-   0.5
+
+say I call it character development.
+A3  0.5  AY
+C4  1    K AO L
+D4  0.5  IH T
+E4  0.5  K AE
+D4  0.5  R IH K
+C4  0.5  T AX R
+B3  0.25 D IH
+C4  0.75 V EH
+B3  0.5  L AX P
+A3  1.5  M AX N T
+-   1.5
+
+say Another crash? Adorable.
+E3  0.25 AX
+A3  0.5  N AH
+C4  0.5  DH AX R
+E4  1.75 K R AE SH
+-   0.5
+D4  0.25 AX
+C4  1    D OW R
+B3  0.25 AX
+A3  1.5  B AX L
+-   1.5
+
+say Fine. You're tolerable. For now.
+E4  1.5  F AY N
+-   0.5
+D4  1    Y UW R
+-   0.5
+C4  0.5  T AO
+B3  0.25 L AX R
+A3  0.25 AX
+G3  1    B AX L
+-   0.5
+A3  0.5  F AO R
+A3  3    N AW

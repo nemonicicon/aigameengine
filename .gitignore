@@ -115,3 +115,11 @@ godot/characters/**/*.png.import
 
 # Godot: its import cache is rebuilt from the sources; the .import files (loop modes) are kept
 godot/.godot/
+
+# the games keep their small packs and props in git as reva does, and so do the golden packs
+!reva_native/anim_bench/golden/**/*.rpack
+!reva_native/games/*/packs/
+!reva_native/games/*/packs/*.rpack
+!reva_native/games/*/props/
+!reva_native/games/*/props/*.rpack
+!reva_native/games/rocks/sheet.png

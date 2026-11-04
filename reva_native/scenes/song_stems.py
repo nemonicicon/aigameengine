@@ -3,7 +3,7 @@
 
     <a python 3.11 venv with demucs and soundfile>/python song_stems.py SONG.wav OUTDIR [--model htdemucs] [--threads 6] [--shifts 1]
 
-Not the club's python: it wants torch, so it lives in its own environment (on this machine D:/reva902/pdoom/tools/py311). Runs on the CPU, about real time to a few times slower.
+Not the club's python: it wants torch, so it lives in its own environment (a python of its own, beside the song). Runs on the CPU, about real time to a few times slower.
 """
 import argparse, os, time
 import numpy as np

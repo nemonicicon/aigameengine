@@ -1,8 +1,8 @@
 {
- "reva": "54c8fb06f6b39a6d1412c6b00dd02e5074091d19",
- "reva_subject": "The queue after jacob's answers of 11-04, and the sync's last undecided files decided",
- "synced": "2026-11-04T11:16:27-08:00",
- "kit_base": "e8c204c63a64f6c338e91d89b75d6c6eb120c305",
+ "reva": "679ad1fa67f9f6500ab510954c1e1b38ad66c779",
+ "reva_subject": "The singing tools' one machine path, scrubbed on the way out",
+ "synced": "2026-11-04T11:18:35-08:00",
+ "kit_base": "d2fe0d57e5b853711644e27001ce3c0859016edb",
  "files": {
   ".claude/skills/build-the-capability/SKILL.md": "d3c765ec20897d336609c3644e5995ebbc01e564",
   ".claude/skills/film-craft/SKILL.md": "530faf4932b504f15389ee63a24aab0aff0da37b",
@@ -324,7 +324,7 @@
   "reva_native/scenes/smoke_test.txt": "a0fbaab65c76f19e6bd832ecf40ccfba25ac9339",
   "reva_native/scenes/song_notes.py": "b8df14babf83af52a7b63251fa71a7d38d19b981",
   "reva_native/scenes/song_sounds.py": "98fc2d8a66a157fb20c8434bf8104ca0dc25fc92",
-  "reva_native/scenes/song_stems.py": "ee87c972b7549167bff4297e29de549bcd5d018c",
+  "reva_native/scenes/song_stems.py": "e3349776ee9f630aea44f62273c18c49f974ca3f",
   "reva_native/scenes/songmap.py": "5b5781d2da78e9db8f71d460ed2b4a441e0e1d75",
   "reva_native/scenes/songs/_vowels.sing": "ba9904a7582df997dfb6f813dc24a884be6d76ee",
   "reva_native/scenes/songs/auld_lang_syne.sing": "a65454f2fe09c5ad94ae1410376591e7e1a2ed55",

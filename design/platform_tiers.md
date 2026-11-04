@@ -12,8 +12,9 @@ without touching its logic, because the game never talks to the GPU: it runs its
 and emits display lists, and a renderer that is free to run at any rate interprets them. Two
 separations, and the club now has the first:
 
-1. **The sim runs on whole ticks** (`REVA_TICK`, default 60). Wall time only decides how many
-   ticks a frame gets (1..4, snapped against vsync jitter, capped so a stall is not a debt). A
+1. **The sim runs on whole ticks, one at a time** (`REVA_TICK`, default 60; 11-02: a frame that owes
+   k ticks passes through the loop k times and draws on the last). Wall time only decides how many
+   ticks a frame owes (1..4, snapped against vsync jitter, capped so a stall is not a debt). A
    display faster than the tick waits for the boundary. `REVA_FIXEDSTEP` is one tick per frame
    with the tick equal to the step, byte for byte what it was.
 2. **The picture is not the sim.** Not yet: sim and draw are one loop today. Interpolating a
@@ -92,10 +93,8 @@ already past 30 fps before a single body's skinning is paid for. So the rungs cu
 | `high` (default) | 100% | 2048² | 0.12 | on | 4 | 0.92 + 4.2 + 0.92 ≈ 6.1 MPix (today's club) |
 | `ultra` | 100% | 4096² | 0.12 | on | 8 | 0.92 + 16.8 + 0.92 ≈ 18.6 MPix |
 
-`REVA_TIER=<rung>` picks one; `auto` starts at `high` and measures: a frame over the tick by a
-third for ~45 frames steps down a rung, a frame inside half the tick for 30 s steps up (with a
-30 s cool-down after any step down, so it cannot oscillate). Under `REVA_FIXEDSTEP` auto never
-moves. The sun map is set at boot only (the map is allocated once); the rest changes any frame.
+`REVA_TIER=<rung>` picks one. There is no `auto` any more, jacob 11-02: "I've never liked automatic
+cuts that measure performance, normally leads to a seesaw effect." The sun map is set at boot only (the map is allocated once); the rest changes any frame.
 
 **How the render scale works.** The 3D frame is drawn into a sub-rect of the post target, and
 the post quad, which already runs once over every screen pixel, upsamples it: no second target,

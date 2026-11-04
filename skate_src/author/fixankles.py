@@ -18,7 +18,7 @@ rewritten in place; a .bak is written first if none exists.
 """
 import sys, os, struct, math
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0] if "\\" in __file__ or "/" in __file__ else ".")
-from rpack import Rpack
+from rpack import Rpack, save_pack
 from authorlib import fk_world, q_between, qmul, qinv, qnorm
 
 def main(path, target=(0.0, -0.30, 0.95)):
@@ -94,7 +94,7 @@ def main(path, target=(0.0, -0.30, 0.95)):
                 newq = qnorm(qmul(qinv(pw), qmul(A, qmul(pw, loc))))
                 struct.pack_into("<4f", buf, offD + f * 16, *newq)
                 fixed += 1
-    open(path, "wb").write(buf)
+    save_pack(path, bytes(buf))
     print("%s: corrected %d ankle keyframes across %d clips" % (path, fixed, len(clip_ids)))
 
 if __name__ == "__main__":

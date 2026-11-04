@@ -361,6 +361,11 @@ def hide_sets(skin_parts, pieces, outward):
                 # the legs its skirt swings away from)
                 hw = getattr(pc, "hide_where", None)
                 if hw is not None and not hw(p): continue
+                # pc.hide_surely(p): where it covers the skin whatever a ray says. A ray off the inside of an arm goes through a sleeve's far wall or misses, and an elbow left drawn comes through.
+                sure = getattr(pc, "hide_surely", None)
+                if sure is not None and sure(p):
+                    hit.add(pc.name)
+                    continue
                 loc, nn, idx, d = t.ray_cast(p - n * 0.002, n, pc.maxd + 0.002)
                 if loc is None:
                     # ⛔ AND OUT FROM THE BODY'S AXIS: at a crotch or an armpit the skin's own normal points down or

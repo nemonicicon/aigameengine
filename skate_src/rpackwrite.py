@@ -32,6 +32,7 @@ glb2rpack_anim.py does (deforms-nothing first, then deepest, then lightest; a pr
 climbs to its nearest surviving ancestor).
 """
 import struct, math
+import rpackchunks
 
 MAXB = 256          # the engine's MAXB (measured: 1023 mat4 fit; 256 is the cap the loader enforces)
 
@@ -223,7 +224,7 @@ def rigid_skin(nv, node):
 
 
 # ----------------------------------------------------------------- the writer
-def write_pack(dst, nodes, meshes, clips, textures, verbose=True):
+def write_pack(dst, nodes, meshes, clips, textures, verbose=True, fresh=False):
     nN = len(nodes)
     for i, nd in enumerate(nodes):
         assert nd['parent'] < i, 'node %d (%s) is not parent-first' % (i, nd.get('name'))
@@ -333,7 +334,7 @@ def write_pack(dst, nodes, meshes, clips, textures, verbose=True):
     for b in blobs:
         out += b
     assert len(out) == total
-    open(dst, 'wb').write(out)
+    rpackchunks.bake_write(dst, out, fresh)
     if verbose:
         print(dst)
         print('  nodes %d   meshes %d   clips %d   textures %d   %d B' % (nN, nM, len(clips), nTex, len(out)))

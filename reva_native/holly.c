@@ -20,7 +20,7 @@
 /* [linux-sdl port 2026-09-30] The DRM/GBM half is the STANDALONE renderer only. holly_fbo.c
  * (inside the club) needs the model + shader half on any platform: Windows, or Linux built
  * with -DREVA_SDL, where the club presents through SDL and no KMS device is open. */
-#if defined(_WIN32) || defined(REVA_SDL)
+#if defined(_WIN32) || defined(REVA_SDL) || defined(REVA_VK)
 #define HOLLY_NO_KMS 1
 #endif
 #include <EGL/egl.h>
@@ -59,13 +59,13 @@
 
 static volatile sig_atomic_t running = 1;
 static volatile sig_atomic_t want_shot = 0;
-static void on_signal(int s) { (void)s; running = 0; }
-static void on_usr1(int s) { (void)s; want_shot = 1; }
+__attribute__((unused)) static void on_signal(int s) { (void)s; running = 0; }
+__attribute__((unused)) static void on_usr1(int s) { (void)s; want_shot = 1; }
 
 // Taking the display away from Chromium also took away the remote debugger,
 // which was the only way to see what reva was actually drawing. kill -USR1
 // puts it back: the framebuffer, as a PPM, which scp reads fine.
-static void grab_screenshot(int w, int h) {
+__attribute__((unused)) static void grab_screenshot(int w, int h) {
   uint8_t *px = malloc((size_t)w * h * 4);
   if (!px) return;
   glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);

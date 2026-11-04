@@ -19,7 +19,7 @@ usage:
 """
 import sys, struct
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0] if "\\" in __file__ or "/" in __file__ else ".")
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack
 
 def add_morph(path, mesh_idx, name, sparse):
     """sparse = [(vidx, dx, dy, dz), ...]; appends the morph, repoints header slot 14."""
@@ -55,7 +55,7 @@ def add_morph(path, mesh_idx, name, sparse):
     h[13] = len(out)
     h[14] = newOffM
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out))
     print("%s: morph '%s' (%d sparse deltas) -> %d morphs, %dB"
           % (path, name, len(sparse), len(ents), len(out)))
     return len(ents) - 1
@@ -108,7 +108,7 @@ def drop_morphs(path, names):
     for r in keep: out.extend(struct.pack("<4I", *r))
     h = list(HDR.unpack_from(out, 4)); h[14] = off; h[13] = len(out)
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out), forget=set(names))
     return n - len(keep)
 
 def main():

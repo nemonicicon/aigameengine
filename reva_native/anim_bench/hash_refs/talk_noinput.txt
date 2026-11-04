@@ -1,0 +1,41 @@
+[simhash] tick 60 exact 44900103e801bcfe coarse c08d45cb550f305b (every)
+[packet] tick 60 0152f3c135eb8525 draws 4 sun 4 hud 0 lines 0 mem 17328
+[simhash] tick 120 exact ebbe0110c45d1b5f coarse c08d45cb550f305b (every)
+[packet] tick 120 f0b48e1de341bb64 draws 4 sun 4 hud 0 lines 0 mem 17328
+[simhash] tick 180 exact f0c1289274b749df coarse 21daae92b0a61f3b (every)
+[packet] tick 180 4e4bb2edba613a4c draws 4 sun 4 hud 0 lines 0 mem 17328
+[simhash] tick 240 exact 677708a4a0a38ddb coarse 3403e986a9585e35 (every)
+[packet] tick 240 35e2273e9bdb84f6 draws 4 sun 4 hud 0 lines 0 mem 17328
+[simhash] tick 300 exact 6b388c38d49fa55e coarse 861be113475d61f8 (every)
+[packet] tick 300 6af0a333031d1180 draws 4 sun 4 hud 3 lines 0 mem 26976
+[simhash] tick 360 exact c21dd40d3d0c9dad coarse 66e5d6116f4dd555 (every)
+[packet] tick 360 300837754f9d377a draws 4 sun 4 hud 3 lines 0 mem 26816
+[simhash] tick 420 exact 6bdb8efaff98d9c2 coarse e6f50355691c8f4f (every)
+[packet] tick 420 995d9e6f998e0ed8 draws 4 sun 4 hud 3 lines 0 mem 21408
+[simhash] tick 480 exact 62085d1c1588bfc0 coarse 048bf9b1a2ce737a (every)
+[packet] tick 480 8059f0533b66ae0a draws 4 sun 4 hud 5 lines 0 mem 44864
+[simhash] tick 540 exact ff28690662240d96 coarse 994ab5340bfc3e0f (every)
+[packet] tick 540 36849b8852f1cf33 draws 4 sun 4 hud 5 lines 0 mem 61120
+[simhash] tick 600 exact 04cd701b80d4e84f coarse 89b2e1a65d6767d5 (every)
+[packet] tick 600 27171ef7b3abc492 draws 4 sun 4 hud 5 lines 0 mem 44864
+[simhash] tick 660 exact bffbf0354c58e55b coarse c5472af574e057f5 (every)
+[packet] tick 660 9229ec6198a06bd8 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 720 exact bbbc25726be78018 coarse 52f5dbf857890fc6 (every)
+[packet] tick 720 343a51646f507fc9 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 780 exact 83d2a8d04b19b782 coarse 60dbe45f1cc28e12 (every)
+[packet] tick 780 c9c1df090f77a318 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 840 exact fcacc8505481fb16 coarse e44c2d1b3223fb5d (every)
+[packet] tick 840 9e7b09463aa4f724 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 900 exact 8abe0df49e877940 coarse d3e44a6fa49d2d30 (every)
+[packet] tick 900 a8e6d03b16d3f3a0 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 960 exact c3f7c545396758cf coarse b7e163ba3779ff3d (every)
+[packet] tick 960 3dfdbf5f647238c0 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 1020 exact 4e56b72790572453 coarse 214542a88f546a42 (every)
+[packet] tick 1020 a9ab7ca7cbf435e2 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 1080 exact fadd34263983e685 coarse 55dbcf8d417742c0 (every)
+[packet] tick 1080 27c37d55e5d60d65 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 1140 exact 90eb4ad333e46a96 coarse 96efe52850ebc842 (every)
+[packet] tick 1140 5fb77a1c433a2bc1 draws 4 sun 4 hud 5 lines 0 mem 34208
+[simhash] tick 1200 exact 5ff7f84af5f6a8fb coarse 925f9a53b2ca1506 (every)
+[simhash] tick 1200 exact 5ff7f84af5f6a8fb coarse 925f9a53b2ca1506 (end)
+[packet] tick 1200 986d5120fb6ce873 draws 4 sun 4 hud 5 lines 0 mem 34208

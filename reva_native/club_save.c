@@ -23,7 +23,7 @@ void saveLoad(void){
     char ln[160]; while(fgets(ln,sizeof ln,f)){
         char*eq=strchr(ln,'='); if(!eq||ln[0]=='#') continue; *eq=0;
         char*v=eq+1; size_t n=strlen(v); while(n&&(v[n-1]=='\n'||v[n-1]=='\r')) v[--n]=0;
-        if(g_svN<SAVE_MAX){ snprintf(g_svKey[g_svN],48,"%s",ln); snprintf(g_svVal[g_svN],96,"%s",v); g_svN++; } }
+        if(g_svN<SAVE_MAX){ snprintf(g_svKey[g_svN],48,"%.47s",ln); snprintf(g_svVal[g_svN],96,"%.95s",v); g_svN++; } }
     fclose(f); printf("[save] %d key(s) from %s\n",g_svN,SAVE_PATH); }
 void saveFlush(void){
     if(saveOff()||!g_svDirty) return;

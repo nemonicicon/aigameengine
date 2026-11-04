@@ -116,7 +116,11 @@ def main():
                 d = dmax * k ** 0.6                           # deepest at the middle, nothing at the corners
                 if d <= 1e-6: continue
                 lu = mu + smile * (1.0 - (a / mw) ** 2)       # the line's own height there (a smile curves it)
-                if 0.00115 <= off < 0.00125 and abs(u - lu) <= 0.006:                         # the mouth's ink line
+                if 0.0013 <= off < 0.00138 and abs(u - lu) <= 0.006:                           # the upper teeth: from under the top lip, a third of the way down
+                    du = -0.34 * d if u < lu else LIFT * d; n_ink += 1
+                elif 0.00125 <= off < 0.0013 and abs(u - lu) <= 0.006:                         # the tongue: the bottom of the opening
+                    du = -0.94 * d if u < lu else -0.62 * d; n_ink += 1
+                elif 0.00115 <= off < 0.00125 and abs(u - lu) <= 0.006:                       # the mouth's ink line
                     du = -d if u < lu else LIFT * d; n_ink += 1
                 elif 0.00095 <= off < 0.00105 and abs(a) <= 0.45 * mw and abs(u - (mu - lowlip)) <= 0.006:
                     du = -0.95 * d; n_shadow += 1                                              # the lower lip's shadow

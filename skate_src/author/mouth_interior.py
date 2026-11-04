@@ -41,7 +41,7 @@ one texture, no engine-side art path.
 """
 import sys, os, math, struct, io as _io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack, note_tool
 from authorlib import rig_map, fk_world
 from fingers import m4_trs, m4_mul, m4_inv_affine, xform, MESH
 
@@ -75,7 +75,7 @@ def _n(v):
     return [c / l for c in v]
 
 
-def build(path, report=False, depth=CAV_DEPTH, tooth=TOOTH_H, drop=False):
+def build(path, report=False, depth=CAV_DEPTH, tooth=TOOTH_H, drop=False, mesh=None):
     p = Rpack(path)
     names = p.node_names()
     assert "face_mouth" in names, "run face_marks.py first"
@@ -124,16 +124,19 @@ def build(path, report=False, depth=CAV_DEPTH, tooth=TOOTH_H, drop=False):
             if nd["parent"] in fam and i not in fam:
                 fam.add(i); grew = True
     if nodes[head]["parent"] >= 0: fam.add(nodes[head]["parent"])
-    rec0 = p.MESH.unpack_from(p.buf, p.offMeshes)
+    # ⭐ (11-02) `--mesh head`: the face surface is that piece (jaw.py's --mesh); its indices count from its own first vertex
+    mi0, vbase, vcount = p.mesh_span(mesh) if mesh else (0, 0, None)
+    rec0 = p.MESH.unpack_from(p.buf, p.offMeshes + mi0 * 60)
+    SPM = SP[vbase:vbase + vcount] if mesh else SP
     _tris = []
     if rec0[3]:
         idx = struct.unpack_from("<%dI" % rec0[3], p.buf, rec0[11])
-        headish = set(i for i, v in enumerate(SP) if v[3] in fam)
+        headish = set(i for i, v in enumerate(SPM) if v[3] in fam)
         lim = 3.5 * hw
         for t in range(0, len(idx), 3):
             a, b, c = idx[t], idx[t + 1], idx[t + 2]
             if (a in headish) + (b in headish) + (c in headish) < 2: continue
-            A, B, C = SP[a][:3], SP[b][:3], SP[c][:3]
+            A, B, C = SPM[a][:3], SPM[b][:3], SPM[c][:3]
             if min(math.dist(A, M), math.dist(B, M), math.dist(C, M)) > lim: continue
             _tris.append((A, B, C))
 
@@ -430,7 +433,7 @@ def _write(p, path, verts, nors, uvs, bind, tris, head, jawN, W, M, hw, fam):
     HDR.pack_into(out, 4, *h)
 
     tmp = path + ".tmpint"
-    open(tmp, "wb").write(out)
+    save_pack(tmp, bytes(out), like=path)
     try:
         q = Rpack(tmp)
         assert q.nMeshes == p.nMeshes + 1, "mesh count did not grow"
@@ -448,6 +451,7 @@ def _write(p, path, verts, nors, uvs, bind, tris, head, jawN, W, M, hw, fam):
     if not os.path.exists(path + ".int.bak"):
         open(path + ".int.bak", "wb").write(p.buf)
     os.replace(tmp, path)
+    note_tool(path, "mouth_interior.py", sys.argv[2:])   # what this made is in the mesh: a new bake runs it again
     print("mouth_interior: %s written -- mesh %d is '%s' (backup at .int.bak)"
           % (path, p.nMeshes, MESH_NAME))
     return 0
@@ -457,4 +461,4 @@ if __name__ == "__main__":
     a = sys.argv[1:]
     def arg(nm, d):
         return float(a[a.index(nm) + 1]) if nm in a else d
-    sys.exit(build(a[0], "--report" in a, arg("--depth", CAV_DEPTH), arg("--teeth", TOOTH_H)))
+    sys.exit(build(a[0], "--report" in a, arg("--depth", CAV_DEPTH), arg("--teeth", TOOTH_H), mesh=a[a.index("--mesh") + 1] if "--mesh" in a else None))

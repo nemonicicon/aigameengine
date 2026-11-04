@@ -26,7 +26,7 @@ def _chain(person, name, joints, parent="Head"):
                               parent if k == 0 else "%s%d" % (name, k), "body"))
 
 
-def wedge(P, base, tip, width, thick, across, mat="M_Hair", ws=None, bend=None):
+def wedge(P, base, tip, width, thick, across, mat="M_Hair", ws=None, bend=None, uv=None):
     """a sculpted lock: a flat wedge from a wide base to a point. ws = weights for its four stations
     (base, 40%, 75%, tip)"""
     ws = ws or [HEAD] * 4
@@ -41,11 +41,11 @@ def wedge(P, base, tip, width, thick, across, mat="M_Hair", ws=None, bend=None):
                      P.v(c - nm * (thick * tsc), w)])
     for A, B in zip(secs[:-1], secs[1:]):
         for j in range(4):
-            P.f((A[j], A[(j + 1) % 4], B[(j + 1) % 4], B[j]), mat)
+            P.f((A[j], A[(j + 1) % 4], B[(j + 1) % 4], B[j]), mat, uv)
     c0 = P.v(base - d * 0.004, ws[0])
-    for j in range(4): P.f((c0, secs[0][(j + 1) % 4], secs[0][j]), mat)
+    for j in range(4): P.f((c0, secs[0][(j + 1) % 4], secs[0][j]), mat, uv)
     tp = P.v(tip, ws[3])
-    for j in range(4): P.f((tp, secs[-1][j], secs[-1][(j + 1) % 4]), mat)
+    for j in range(4): P.f((tp, secs[-1][j], secs[-1][(j + 1) % 4]), mat, uv)
 
 
 def locks(person, P):
@@ -187,6 +187,43 @@ def curls(person, P):
         at.loft(P, rings, "M_Hair", cap0=P.v(q + Vector((0, 0, rr)), HEAD), cap1=P.v(q - Vector((0, 0, rr)), HEAD))
 
 
+def spike_tiers(person, P):
+    """spec hair["spikes"]: rows of tapered spikes round the head, each from high on the scalp down to its point, which flicks out past the head's widest line. The surface narrows to the chin, so a hem's point hangs from the WIDEST radius, not from the jaw. swing: the point is on a chain"""
+    rng = __import__("random").Random(5); hh, zc = person.S["head_h"], person.Z["chin"]
+    for ti, tr in enumerate(person.S["hair"].get("spikes", ())):
+        for i in range(tr["n"]):
+            a = tr["a0"] + (tr["a1"] - tr["a0"]) * i / (tr["n"] - 1) + rng.uniform(-3.0, 3.0); u1 = tr["u1"] + rng.uniform(-tr["jit"], tr["jit"])
+            base = person.face_xyz(a, tr["u0"], person.S["hair"]["thick"] * 0.6)
+            q = person.head_pt(math.radians(a), zc + 0.62 * hh, plain=True); v = Vector((q.x, q.y - person.head_cy, 0.0)); dv = v.normalized()
+            tip = Vector((0.0, person.head_cy, zc + u1 * hh)) + dv * (v.length + tr["out"] * rng.uniform(0.7, 1.3))
+            across = Vector((dv.y, -dv.x, 0.0)) * -1.0; bend = dv * tr["lift"]; ws = None
+            if tr["swing"]:
+                nm = "Hair_Spike_%d_%d_" % (ti, i); jm = base + (tip - base) * 0.5 + bend; _chain(person, nm, [base, jm, tip])
+                b1, b2 = nm + "1", nm + "2"; ws = [norm_w({"Head": 0.6, b1: 0.4}), {b1: 1.0}, norm_w({b1: 0.35, b2: 0.65}), {b2: 1.0}]
+            tones = person.S["hair"].get("tones"); uv = ("swatch", tones[rng.randrange(len(tones))]) if tones else None      # a few tones, so spikes read as spikes, not as one flat slab
+            wedge(P, base, tip, tr["w"] * rng.uniform(0.82, 1.18), tr["th"], across, ws=ws, bend=bend, uv=uv)
+
+
+def curl_bangs(person, P):
+    """spec hair["curl_bangs"]: a fringe of short curled locks: each comes down the forehead from the hairline and winds into a small spiral at its end, lying ON the forehead so the curl shows from the front. ⛔ A helix wound out from the skin was a tangle from any lens"""
+    c = person.S["hair"].get("curl_bangs")
+    if not c: return
+    n, span = c["n"], c["span"]; th = person.S["hair"]["thick"]; rng = __import__("random").Random(11); F = person.S["head_h"]
+    for i in range(n):
+        a0 = -span + 2.0 * span * i / (n - 1) + rng.uniform(-3.0, 3.0); side = rng.choice((-1.0, 1.0))                        # no two alike, and they wind either way: a row of the same curl read as a trim
+        short = (1.0 - 0.40 * abs(a0) / span) * rng.uniform(0.72, 1.12); drop = (c["u0"] - c["u1"]) * short; m = 26; pts = []; rad = []
+        u_top = c["u0"] + rng.uniform(-0.02, 0.02); u_end = u_top - drop; R9 = c["r"] * rng.uniform(0.80, 1.25); R0 = R9 / F; ang = R0 * F / (person.HB * 0.98) * 57.3; wire = c["wire"] * rng.uniform(0.85, 1.15)
+        for k in range(m + 1):
+            t = k / m
+            if t < 0.48:
+                v = t / 0.48; a, u = a0 + side * 1.5 * math.sin(math.pi * v), u_top + (u_end + R0 - u_top) * v
+            else:
+                v = (t - 0.48) / 0.52; w = math.pi * 2.0 * 1.15 * v; r9 = 1.0 - 0.72 * v                                       # from the top of the circle, winding round and in
+                a, u = a0 + side * ang * (1.0 - r9 * math.cos(w)), u_end + R0 - R0 * r9 * math.sin(w)
+            pts.append(person.face_xyz(a, u, th * (0.62 - 0.30 * t) + 0.0015)); rad.append(wire * (1.0 - 0.70 * t ** 1.6))
+        at.tube(P, pts, rad, "M_Hair", [HEAD] * len(pts), nseg=8)
+
+
 def beard(person, P):
     """spec hair["beard"] = {n, spread, len, width, thick, chin_u}: a WISPY beard -- n thin strands from the chin
     (spread degrees either side of the middle), the middle longest, each on a two-bone chain so it flies about
@@ -219,6 +256,8 @@ def hair_part(person):
     P = Part("hair", smooth=True) if hr.get("bald") else person.build_hair()
     if "curtain" in hr: curtain(person, P, hr["curtain"])
     locks(person, P)
+    spike_tiers(person, P)
+    curl_bangs(person, P)
     curls(person, P)
     beard(person, P)
     return P

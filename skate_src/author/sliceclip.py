@@ -33,7 +33,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR, append_clips  # noqa: E402
+from rpack import Rpack, HDR, append_clips, save_pack# noqa: E402
 
 
 def rename_clip(path, old, new):
@@ -60,7 +60,7 @@ def rename_clip(path, old, new):
     h[11] = newOffStr
     h[13] = len(out)
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out))
 
 
 def main(argv=None):

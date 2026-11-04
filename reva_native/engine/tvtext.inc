@@ -1,0 +1,190 @@
+/* ---- THE TV'S TEXT (11-02, engine plan Phase 2) ---------------------------------------------------------------
+ * A character grid, the way a console has always done it: an 8x8 font on whole pixels, 35 columns by 24 rows inside the title-safe box (80% of the standard's
+ * active picture, 704 x 480), and the same layout at 480i, 240p and on a PC. A cell is 16 x 16 at 480i, 16 x 8 at 240p, and whole-number square on a window, so no
+ * mode ever scales a glyph and blurs it. A game says which column and row, and doesn't know the mode. ⛔ Nothing is tuned to one set: a set that overscans more is what
+ * the player's own screen fit is for (Phase 4). This is also where 2D goes through for both renderers: hudTris draws on GL and Vulkan.
+ * THE READING SIZE (11-03, engine plan Phase 4, the last screen of setup): the player picks the smallest letters they can read, which covers small sets and poor decoders together. The bigger two are 23 x 12 and
+ * 17 x 12 cells in the same safe box, on whole pixels, and the same shape on the glass at 480i and 240p. A game always places its text on 35 x 24 and doesn't know: its lines land in proportion, and a line that no
+ * longer fits drops a size, wraps at its spaces, or moves out of the way of the one before it, in the order of their rows (tvFlush). At the smallest size none of that runs. */
+#include "tvfont.inc"
+#define TV_SAFE 0.80f
+typedef struct { unsigned char x,y,w,h; } TvRun;
+static TvRun g_tvRun[96][32]; static int g_tvNRun[96];
+static int g_tvOk=0,g_tvW=0,g_tvH=0,g_tvSx=1,g_tvSy=1,g_tvX0=0,g_tvY0=0;
+static int g_tvCx=-1,g_tvCy=-1;   /* where a screen fit puts the grid's middle; -1 is the raster's */
+static const struct { int cols,rows; const char*name; } TV_READ[3]={{TV_COLS,TV_ROWS,"small"},{23,12,"medium"},{17,12,"large"}};
+static int g_tvRead=0,g_tvCols=TV_COLS,g_tvRows=TV_ROWS,g_tvComp=0;   /* the player's reading size, and the grid it gives */
+static int tvReadOf(const char*n){ for(int i=0;i<3;i++) if(!strcmp(n,TV_READ[i].name)) return i; return -1; }
+#define TV_PEAK 0.8f   /* persistent text stays well below peak white: wear goes with beam current and static bright text is what burns (design: research, section 7) */
+static GLuint g_hudProg,g_hudVbo; static GLint g_hudScr,g_hudCol;
+/* flat 2D, on a canvas of cw x ch with 0,0 at the top left, in whatever blend state the HUD block set. Sprites waiting in a batch go down first: what's drawn later is on top, whatever it is */
+static void sprFlush(void);
+static void hudTris(const float*xy,int nVerts,float cw,float ch,float r,float g,float b,float a){
+    sprFlush();
+#ifdef REVA_PACKET
+    if(!g_noDraw) gfxHud(xy,nVerts,cw,ch,r,g,b,a);
+#endif
+#ifndef REVA_VK
+    glUseProgram(g_hudProg); glUniform2f(g_hudScr,cw,ch); glUniform4f(g_hudCol,r,g,b,a);
+    glBindBuffer(GL_ARRAY_BUFFER,g_hudVbo); glBufferData(GL_ARRAY_BUFFER,nVerts*8,xy,GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
+    for(int k2=1;k2<5;k2++) glDisableVertexAttribArray(k2);
+    glDrawArrays(GL_TRIANGLES,0,nVerts);
+#endif
+}
+/* a glyph is a few rectangles: each row's runs, grown downward while the rows below repeat them */
+static void tvFontInit(void){
+    for(int c=0;c<96;c++){ char a[8][9]; int n=0;
+        for(int y=0;y<8;y++){ memcpy(a[y],TV_FONT[(c/16)*8+y]+(c%16)*9,8); a[y][8]=0; }
+        for(int y=0;y<8;y++) for(int x=0;x<8;x++){ if(a[y][x]!='#') continue;
+            int w=1; while(x+w<8&&a[y][x+w]=='#') w++;
+            int h=1; for(;y+h<8;h++){ int ok=1; for(int i=0;i<w;i++) if(a[y+h][x+i]!='#') ok=0; if(!ok) break; }
+            for(int j=0;j<h;j++) for(int i=0;i<w;i++) a[y+j][x+i]='.';
+            if(n<32){ TvRun*R=&g_tvRun[c][n++]; R->x=(unsigned char)x; R->y=(unsigned char)y; R->w=(unsigned char)w; R->h=(unsigned char)h; } }
+        g_tvNRun[c]=n; } }
+/* the safe box and the cell, from the raster, for one reading size. composite: the 720-wide standard rasters, where 704 x the lines is the active picture and a pixel isn't square. */
+static void sprInit(int W,int H,int composite);
+static void tvUse(int read){ int W=g_tvW,H=g_tvH,c=TV_READ[read].cols,r=TV_READ[read].rows;
+    float sw=TV_SAFE*(g_tvComp?704.f*(float)W/720.f:(float)W), sh=TV_SAFE*(float)H;
+    g_tvCols=c; g_tvRows=r;
+    g_tvSx=(int)(sw/(float)(c*8)); g_tvSy=(int)(sh/(float)(r*8));
+    if(g_tvSx<1) g_tvSx=1;
+    if(g_tvSy<1) g_tvSy=1;
+    if(!g_tvComp){ int s=g_tvSx<g_tvSy?g_tvSx:g_tvSy; g_tvSx=g_tvSy=s; }
+    g_tvX0=(W-c*8*g_tvSx)/2; g_tvY0=(H-r*8*g_tvSy)/2;
+    if(g_tvCx>=0){ int x9=g_tvCx-c*4*g_tvSx, y9=g_tvCy-r*4*g_tvSy, xm=W-c*8*g_tvSx, ym=H-r*8*g_tvSy;
+        g_tvX0=x9<0?0:(x9>xm?xm:x9); g_tvY0=y9<0?0:(y9>ym?ym:y9); } }
+static void tvInit(int W,int H,int composite){
+    if(!g_tvOk){ tvFontInit(); g_tvOk=1; }
+    sprInit(W,H,composite);
+    g_tvW=W; g_tvH=H; g_tvComp=composite;
+    tvUse(g_tvRead);
+    printf("[tv] %dx%d: a cell is %dx%d, the grid starts at %d,%d, %d x %d cells\n",W,H,8*g_tvSx,8*g_tvSy,g_tvX0,g_tvY0,g_tvCols,g_tvRows); }
+static float* tvRect(float*o,float x0,float y0,float x1,float y1){
+    *o++=x0;*o++=y0; *o++=x1;*o++=y0; *o++=x1;*o++=y1; *o++=x0;*o++=y0; *o++=x1;*o++=y1; *o++=x0;*o++=y1; return o; }
+/* size 1 is one cell a character; size 2 is two wide and two tall */
+static void tvPrint(float col,float row,int size,const char*s,float dx,float dy,float r,float g,float b,float a){
+    static float v[2*6*32*128]; float*o=v; float px=(float)(g_tvSx*size),py=(float)(g_tvSy*size);
+    float cx=(float)g_tvX0+col*8.f*(float)g_tvSx+dx,cy=(float)g_tvY0+row*8.f*(float)g_tvSy+dy;
+    for(int i=0;s[i]&&i<128;i++){ int c=(unsigned char)s[i]-32; if(c<0||c>95) c='?'-32;
+        for(int k=0;k<g_tvNRun[c];k++){ const TvRun*R=&g_tvRun[c][k];
+            o=tvRect(o,cx+R->x*px,cy+R->y*py,cx+(R->x+R->w)*px,cy+(R->y+R->h)*py); }
+        cx+=8.f*px; }
+    int n=(int)((o-v)/2); if(n>0) hudTris(v,n,(float)g_tvW,(float)g_tvH,r,g,b,a); }
+/* text at a column and row of the grid in use, with a hard shadow one font pixel down and right: a picture behind it is never the same brightness all the way along */
+static void tvDraw(float col,float row,int size,const char*s,float r,float g,float b){
+    tvPrint(col,row,size,s,(float)(g_tvSx*size),(float)(g_tvSy*size),0.f,0.f,0.f,0.85f);
+    tvPrint(col,row,size,s,0.f,0.f,r*TV_PEAK,g*TV_PEAK,b*TV_PEAK,1.f); }
+/* a bar in cells, filled to frac, on a dark back */
+static void tvBarDraw(float col,float row,float cols,float frac,float r,float g,float b){
+    float v[12],x0=(float)g_tvX0+col*8.f*(float)g_tvSx,y0=(float)g_tvY0+row*8.f*(float)g_tvSy,w=cols*8.f*(float)g_tvSx,h=7.f*(float)g_tvSy;
+    if(frac<0.f) frac=0.f;
+    if(frac>1.f) frac=1.f;
+    tvRect(v,x0,y0,x0+w,y0+h); hudTris(v,6,(float)g_tvW,(float)g_tvH,0.f,0.f,0.f,0.7f);
+    float fw=(float)(int)(w*frac); if(fw>0.f){ tvRect(v,x0,y0,x0+fw,y0+h); hudTris(v,6,(float)g_tvW,(float)g_tvH,r*TV_PEAK,g*TV_PEAK,b*TV_PEAK,1.f); } }
+
+/* ---- fitting a game's 35 x 24 onto bigger letters. The frame's text waits here until the HUD is done, because where a line goes depends on what else is on the page. Only strings and counts go into it, so it's the same on every machine, and the sim never sees it */
+enum { TV_LEFT, TV_RIGHT, TV_CENTRE, TV_BARS };
+#define TV_ITEMS 192
+#define TV_WRAP 12
+typedef struct { int how,size,asked,nl,y,y0,h,group,view; float col,row,cols,frac,r,g,b,x0,x1,ax; short st[TV_WRAP],len[TV_WRAP]; char s[128]; } TvItem;   /* asked: the size the game said. y0, ax: where it would like to go */
+static int g_tvView=-1,g_tvNViews=1;   /* E->tvView: whose picture of a split screen the text goes in. -1 is the whole screen */
+/* that picture's part of the grid. The cells stay the same size, so it's fewer of them, and the safe box is still the whole screen's */
+static void tvViewRect(int view,int*c0,int*r0,int*c,int*r){ *c0=0; *r0=0; *c=g_tvCols; *r=g_tvRows; if(view<0||g_tvNViews<2) return;
+    *r=g_tvRows/2; *r0=(g_tvNViews>2?view/2:view)*(*r);
+    if(g_tvNViews>2){ *c=(g_tvCols-1)/2; *c0=(view%2)*(*c+1); } }
+static TvItem g_tvItem[TV_ITEMS]; static int g_tvNItem=0; static int g_tvGroup=0;   /* what's in one group gets a dark panel behind it, wherever the layout puts it */
+static void tvQueue(int how,float col,float row,float cols,float frac,int size,const char*s,float r,float g,float b){
+    if(g_tvNItem>=TV_ITEMS){ static int told=0; if(!told){ told=1; printf("[tv] more than %d pieces of text in one frame: the rest aren't drawn\n",TV_ITEMS); fflush(stdout); } return; }
+    TvItem*t=&g_tvItem[g_tvNItem++]; t->how=how; t->group=g_tvGroup; t->view=g_tvView; t->col=col; t->row=row; t->cols=cols; t->frac=frac; t->size=t->asked=size<1?1:size; t->r=r; t->g=g; t->b=b; snprintf(t->s,sizeof t->s,"%s",s); }
+/* break at spaces, and at a group of them if one's in reach, because that's where a hint's parts meet ("A TRY IT   B NOT NOW"). A word longer than the grid is cut. How many lines it took */
+static int tvWrapAt(TvItem*t,int limit){ const char*s=t->s; int at=0,n=(int)strlen(s); t->nl=0;
+    while(t->nl<TV_WRAP){ while(s[at]==' ') at++;
+        if(at>=n) break;
+        int end=at+limit;
+        if(end>=n) end=n;
+        else { int e=end,g=0; for(int i=end;i>at&&!g;i--) if(s[i]==' '&&s[i-1]==' ') g=i;
+            while(e>at&&s[e]!=' ') e--;
+            if(g) end=g; else if(e>at) end=e; }
+        int m=end-at; while(m>0&&s[at+m-1]==' ') m--;
+        t->st[t->nl]=(short)at; t->len[t->nl]=(short)m; t->nl++; at=end; }
+    return t->nl; }
+/* the same number of lines at the narrowest measure that still gives it, so a paragraph's lines come out even and its last word isn't left alone */
+static void tvWrap(TvItem*t,int limit){ const int k=tvWrapAt(t,limit); if(k<2) return;
+    int word=0,run=0; for(const char*p=t->s;;p++){ if(*p&&*p!=' ') run++; else { if(run>word) word=run; run=0; if(!*p) break; } }
+    int best=limit; for(int l=limit-1;l>=word&&tvWrapAt(t,l)==k;l--) best=l;
+    tvWrapAt(t,best); }
+/* how big it is on this grid and where it would like to go: in proportion, whole rows and whole cells */
+static void tvMeasure(TvItem*t){ const int c=g_tvCols,r=g_tvRows;
+    if(t->how==TV_BARS){ float w=(float)(int)(t->cols*(float)c/(float)TV_COLS+0.999f), x=(float)(int)(t->col*(float)c/(float)TV_COLS+0.5f);
+        if(w<3.f) w=3.f;
+        if(w>(float)c) w=(float)c;
+        if(x+w>(float)c) x=(float)c-w;
+        t->x0=x; t->x1=x+w; t->h=1; t->nl=0; }
+    else { int n=(int)strlen(t->s),mx=0;
+        while(t->size>1&&n*t->size>c) t->size--;   /* a size down on a bigger cell is still the size the game was looking at */
+        tvWrap(t,c/t->size);
+        for(int i=0;i<t->nl;i++) if(t->len[i]>mx) mx=t->len[i];
+        float w=(float)(mx*t->size);
+        if(t->how==TV_LEFT){ float x=(float)(int)(t->col*(float)c/(float)TV_COLS+0.5f); t->x0=(x+w>(float)c)?(float)c-w:x; }
+        else if(t->how==TV_RIGHT) t->x0=(float)c-w;
+        else t->x0=((float)c-w)*0.5f;
+        t->x1=t->x0+w; t->h=t->nl*t->size; }
+    int y=(int)(t->row*(float)r/(float)TV_ROWS+0.5f);
+    if(y+t->h>r) y=r-t->h;
+    t->y0=y<0?0:y; t->ax=t->x0; }
+/* did the game leave a blank row between these two? Then they'd rather stay apart */
+static int tvBlank(const TvItem*a,const TvItem*b){ const TvItem*f=(a->row<=b->row)?a:b,*s=(f==a)?b:a; return s->row>=f->row+(float)f->asked+1.f; }
+/* who's in the way of this one where it is now: on the same row two pieces always keep a cell between them, or they'd read as one */
+static int tvHit(const int*ord,int n,const TvItem*t,int gaps){
+    for(int i=0;i<n;i++){ const TvItem*o=&g_tvItem[ord[i]]; const int g=(gaps&&tvBlank(o,t))?1:0;
+        if(o->h>0&&t->y<o->y+o->h+g&&o->y<t->y+t->h+g&&t->x0<o->x1+1.f&&o->x0<t->x1+1.f) return ord[i]; }
+    return -1; }
+/* the page, 1 if everything found a place */
+static int tvLay(const int*ord,int n,int gaps){ const int c=g_tvCols,r=g_tvRows; int fit=1;
+    /* down it, by the rows the game asked for: each takes its place, and whatever's in the way pushes it on. A piece anchored on the left tries beside what's in its way first, so a label keeps its bar */
+    for(int k=0;k<n;k++){ TvItem*t=&g_tvItem[ord[k]]; const float w=t->x1-t->x0; t->y=t->y0; t->x0=t->ax; t->x1=t->ax+w;
+        for(;;){ const int hit=tvHit(ord,k,t,gaps);
+            if(hit<0) break;
+            const TvItem*o=&g_tvItem[hit];
+            if((t->how==TV_LEFT||t->how==TV_BARS)&&!tvBlank(o,t)&&o->x1+1.f+w<=(float)c){ t->x0=o->x1+1.f; t->x1=t->x0+w; continue; }
+            t->y++; t->x0=t->ax; t->x1=t->ax+w; } }
+    /* and back up it if that ran off the bottom, so the order stays */
+    for(int k=n-1;k>=0;k--){ TvItem*t=&g_tvItem[ord[k]];
+        if(t->y+t->h>r) t->y=r-t->h;
+        if(t->y<0) t->y=0;
+        while(t->y>0&&tvHit(ord+k+1,n-k-1,t,gaps)>=0) t->y--;
+        if(tvHit(ord+k+1,n-k-1,t,gaps)>=0) fit=0; }
+    return fit; }
+/* one picture's text, on the grid it has */
+static void tvFlushView(int view,const int all){ const int c=g_tvCols; static int ord[TV_ITEMS]; int n=0,maxg=0;
+    for(int i=0;i<all;i++){ TvItem*t=&g_tvItem[i]; if(t->view!=view) continue; tvMeasure(t); int k=n++; if(t->group>maxg) maxg=t->group;
+        while(k>0&&g_tvItem[ord[k-1]].row>t->row){ ord[k]=ord[k-1]; k--; }
+        ord[k]=i; }
+    if(!n) return;
+    /* with the blank rows the game left, if there's room for them */
+    if(!tvLay(ord,n,1)&&!tvLay(ord,n,0)){ static int told=0; if(!told){ told=1; printf("[tv] more text in a frame than the %s reading size has room for: some of it overlaps\n",TV_READ[g_tvRead].name); fflush(stdout); } }
+    /* the panels, round where each group's pieces landed */
+    for(int g=1;g<=maxg;g++){ float x0=1e9f,x1=-1e9f,y0=1e9f,y1=-1e9f; int any=0;
+        for(int i=0;i<all;i++){ const TvItem*t=&g_tvItem[i]; if(t->group!=g||t->view!=view) continue; any=1; if(t->x0<x0) x0=t->x0; if(t->x1>x1) x1=t->x1; if((float)t->y<y0) y0=(float)t->y; if((float)(t->y+t->h)>y1) y1=(float)(t->y+t->h); }
+        if(!any) continue;
+        { float v[12]; const float cw=8.f*(float)g_tvSx,ch=8.f*(float)g_tvSy; tvRect(v,(float)g_tvX0+(x0-0.5f)*cw,(float)g_tvY0+(y0-0.25f)*ch,(float)g_tvX0+(x1+0.5f)*cw,(float)g_tvY0+(y1+0.25f)*ch); hudTris(v,6,(float)g_tvW,(float)g_tvH,0.f,0.f,0.f,0.62f); } }
+    /* drawn in the order the game drew them */
+    for(int i=0;i<all;i++){ const TvItem*t=&g_tvItem[i]; char b9[sizeof t->s]; if(t->view!=view) continue;
+        if(t->how==TV_BARS){ tvBarDraw(t->x0,(float)t->y,t->x1-t->x0,t->frac,t->r,t->g,t->b); continue; }
+        for(int l=0;l<t->nl;l++){ const int m=t->len[l]; memcpy(b9,t->s+t->st[l],(size_t)m); b9[m]=0;
+            const float x=(t->how==TV_LEFT)?t->x0:(t->how==TV_RIGHT)?(float)(c-m*t->size):((float)(c-m*t->size))*0.5f;
+            tvDraw(x,(float)(t->y+l*t->size),t->size,b9,t->r,t->g,t->b); } } }
+static void tvFlush(void){ const int all=g_tvNItem; if(!all) return;
+    g_tvNItem=0; tvFlushView(-1,all);
+    for(int v=0;v<g_tvNViews&&g_tvNViews>1;v++){ const int wc=g_tvCols,wr=g_tvRows,wx=g_tvX0,wy=g_tvY0; int c0,r0,c,r; tvViewRect(v,&c0,&r0,&c,&r);
+        g_tvCols=c; g_tvRows=r; g_tvX0=wx+c0*8*g_tvSx; g_tvY0=wy+r0*8*g_tvSy; tvFlushView(v,all);
+        g_tvCols=wc; g_tvRows=wr; g_tvX0=wx; g_tvY0=wy; } }
+/* what everything else calls. At the smallest size it's what it always was */
+static void tvText(float col,float row,int size,const char*s,float r,float g,float b){ if(g_tvRead||g_tvView>=0) tvQueue(TV_LEFT,col,row,0.f,0.f,size,s,r,g,b); else tvDraw(col,row,size,s,r,g,b); }
+/* the same, ending at the grid's right edge, and centred on it */
+static void tvTextR(float row,int size,const char*s,float r,float g,float b){ if(g_tvRead||g_tvView>=0) tvQueue(TV_RIGHT,0.f,row,0.f,0.f,size,s,r,g,b); else tvDraw((float)TV_COLS-(float)(strlen(s)*size),row,size,s,r,g,b); }
+static void tvTextC(float row,int size,const char*s,float r,float g,float b){ if(g_tvRead||g_tvView>=0) tvQueue(TV_CENTRE,0.f,row,0.f,0.f,size,s,r,g,b); else tvDraw(((float)TV_COLS-(float)(strlen(s)*size))*0.5f,row,size,s,r,g,b); }
+static void tvBar(float col,float row,float cols,float frac,float r,float g,float b){ if(g_tvRead||g_tvView>=0) tvQueue(TV_BARS,col,row,cols,frac,1,"",r,g,b); else tvBarDraw(col,row,cols,frac,r,g,b); }
+static void apiTvGrid(int*cols,int*rows){ int c0,r0,c,r; tvViewRect(g_tvView,&c0,&r0,&c,&r); if(cols) *cols=c; if(rows) *rows=r; }
+static void apiTvView(int view){ g_tvView=(view<0||g_tvNViews<2)?-1:(view>=g_tvNViews?g_tvNViews-1:view); }

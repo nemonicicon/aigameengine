@@ -29,7 +29,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR   # noqa: E402
+from rpack import Rpack, HDR, save_pack# noqa: E402
 
 
 def mesh_names(R):
@@ -97,7 +97,7 @@ def main(argv=None):
     h[7] = off            # offMeshes
     h[13] = len(out)      # total
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(bytes(out))
+    save_pack(path, bytes(out))
 
     R2 = Rpack(path)
     print("%s: dropped %d record(s) -- %s" % (a.subject, len(dropped), ", ".join(sorted(want))))

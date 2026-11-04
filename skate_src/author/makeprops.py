@@ -231,6 +231,13 @@ def main():
         ("cig_ember#FF6A1E*",  *cyl(YP, YE, R * 1.02, R * 0.98)),
         ("cig_ash#6E6863",     *cyl(YE, L, R * 0.98, R * 0.80, cap1=True)),
     ])
+    # a joint (design/pdoom_video.md): a card roach at the lips, the paper swelling toward the burning end
+    write_meshes("joint", [
+        ("jnt_roach#D9C7A2",   *cyl(0.0, 0.016, 0.0030, 0.0032, cap0=True)),
+        ("jnt_paper",          *cyl(0.016, 0.078, 0.0032, 0.0056)),
+        ("jnt_ember#FF6A1E*",  *cyl(0.078, 0.084, 0.0058, 0.0054)),
+        ("jnt_ash#6E6863",     *cyl(0.084, 0.090, 0.0054, 0.0036, cap1=True)),
+    ])
 
     print("\nAll flat-shaded and untextured on purpose: the shader takes a per-instance")
     print("TINT when a prop has no texture, which is the look the town kit already has.")

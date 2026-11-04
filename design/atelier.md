@@ -62,8 +62,25 @@ stockings_latex`, her chest `skin~h=bra_latex,sportsbra,tank`, …).
 - **Soft mass.** Bones named `breast` (+ a `_tip` child) are the engine's JIGGLE (`jiggleTick`: a damped spring, 3.2 Hz,
   overshoots and settles like flesh); set actors jiggle now too, not only the hero and the cast. In Godot, ClubHair
   springs them stiff, with almost no gravity.
-- **Per-vertex cloth** (the engine's §16 particle solver: bending, self-collision, body-mesh collision) stays PARKED; the
-  chains are what runs natively in both engines today.
+- **Per-vertex cloth** (the engine's §16 particle solver: bending, self-collision, body-mesh collision) stays PARKED in the engine. For a whole garment see `reva_native/clubcloth/` and `engine_capabilities.md` 38: plain C, running in
+  Godot on the alien since 11-02. The tailor's part is two numbers a point, in the mesh's second UV: how far it may go from the skinned pose, how near the skin it may come. Chains stay as what runs where the library isn't built.
+
+### What a fast character taught the chains (jacob's alien skater, 11-02)
+
+jacob, looking at the first film: "the body is all dissconnected and strange, very wierd". Three lessons, and they hold for any character that moves fast:
+
+- **Chains on the hems, not down the garment.** Hung from the ribs and the top of the thigh, a chain was the length of the garment: the cloth hung straight down while the leg swung away, 35 cm off its pose at
+  26 m/s, and his shins floated free of his shorts. On the last 8 to 16 cm, a chain can only ever go about as far as it's long, and the garment above it goes with the body.
+- **In the body's space, with air by speed.** Godot's springs in the world only catch up with the body at stiffness / drag m/s: at his 8 m/s the cloth just flew flat behind him, and a respawn flung it. `set_center_from(CENTER_FROM_NODE)`
+  to the skeleton, and `external_force` from his real speed, is the same look with a known bound: a chain trails at atan(speed x air / stiffness). REVA's settings were tuned at a walk; `ClubHair.attach()` still defaults to the world.
+- **Hide only what can't be uncovered.** A hide set says what's covered at rest. Skin under a swinging hem, or an arm that merely faces the side of a tee, needs a `hide_where`: the first opened holes you could see through, the second left a hole in his arm.
+
+- **A hem over a layer needs room to hang.** Low-poly cloth within a centimetre of low-poly cloth cuts through it in a jagged line as soon as the body leans. The layer under goes with the hips above the hip joint (lower behind, or a thigh swung back lifts it through the hem), a top stands 2 cm clear of it, and a short chain's gravity stays low (0.4 against a stiffness of 1.5).
+
+A hole film checks it: `tools/perf/perf_probe.gd`'s `clothes_holes` plan draws everything hidden in one colour, so whatever shows in a frame is somewhere the clothes opened up.
+
+**Dressing a character that came from somewhere else** (no build script of ours, clips we can't re-export): `meshform.py` measures a dress form off a finished rig, `author/glb_redress.py` swaps its meshes inside its glb with the skeleton, bind matrices and every clip byte for byte.
+A mesh can't take a bone's name: Godot's importer keeps node names unique, renames the bone (his `head` became `head_2`), and the clips made for that character elsewhere go on without it, silently. `redress()` refuses one. `sewing.zip_seams()` makes a garment one surface before it's cut low-poly: panels of different resolutions meet vertex to edge, and the cut opened them (a tee with 5 boundary loops, a sweatshirt with 17, slits at the shoulders, a forearm showing at both cuffs). Check a garment's openings against what it was cut with. `DontGetDropped/tools/anim/alien_fab.py` and `alien_dress.py` are the worked example.
 
 ## The road to Fabrication Mode (the sheet)
 
@@ -92,6 +109,11 @@ stockings_latex`, her chest `skin~h=bra_latex,sportsbra,tank`, …).
      free edge pinned (`grip`): a PBD ring on the slope of her hips crept 5-8 cm down.
    - **Cloth buckles; it does not push back.** A fabric's `compress` (how hard it resists shortening) is separate from
      its stretch, as in Vellum and Marvelous Designer — without it nothing can be gathered.
+   - **A pair of legs parts where the body's do** (jacob, 11-03, on the alien's shorts: they "separate lower than
+     regular shorts"). Baggy legs meet only the body in the sewing machine, not each other, so they hung through each
+     other nearly to the hem, and the join sank with them: his old shorts parted 21 cm under his crotch, ours 6.6.
+     `trousers(rise_ease=, leg_clear=)`: a crotch ease of a tailor's few centimetres, and each panel a `wall` that
+     `sew()` keeps it on its own side of. 2.7 cm under now, and nothing has to squeeze the legs apart afterwards.
 
    **Bugs the patterns exposed in the machine**: each panel's `fabric` was ignored (only `sew(fabric=)` was read — the
    coat's wool and the tie's silk were all the default jersey); a seam chained across panels counted the jump from one
@@ -116,3 +138,7 @@ stockings_latex`, her chest `skin~h=bra_latex,sportsbra,tank`, …).
 `skate_src/reva902/atelier.py` (the tailor) · `reva_body.py` (her body, face, hair, breast bones, rig) ·
 `reva_wardrobe.py` (her designs) · `build_reva.py` (builds everything, splits the skin, bakes one painted, shadowed
 texture, rigs, exports, renders each outfit). Sheets: `D:/reva902/reva_sheet/`.
+
+For a character that came from somewhere else: `skate_src/atelier/meshform.py` (a dress form measured off its finished rig), `sewing.zip_seams`, `skate_src/author/glb_redress.py` (its meshes swapped inside its glb).
+
+Reading a finished garment, each a few lines of Blender with a glb: `skate_src/atelier/garment_split_read.py` (where a pair of legs parts), `garment_fold_read.py` (sharp folds, which show as shards), `garment_skin_read.py` (which skin stays drawn under it), `garment_cuff_read.py` (how far a sleeve's end is from the shoulder).

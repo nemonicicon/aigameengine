@@ -259,7 +259,14 @@ the driver does *not* need that.
 
 ## Test
 
-There is no unit-test suite for the engine. The bench instruments are the tests:
+⭐ **Start with the sim's receipt** (11-02): about 10 seconds, no window, the same answer on any machine.
+
+```bash
+$PY $D check                                           # builds the no-display engine, runs anim_bench/hashcheck.py
+$PY reva_native/anim_bench/warncheck.py                # the warning ratchet: new warnings fail
+```
+
+`check` says whether the sim still does exactly what it did. It says nothing about the picture. Otherwise the bench instruments are the tests:
 
 ```bash
 $PY reva_native/anim_bench/facecheck.py                # the face, incl. the see-through test

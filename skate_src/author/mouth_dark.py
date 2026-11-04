@@ -20,7 +20,7 @@ like everything else here); a .tex.bak is written first.
 """
 import sys, os, math, struct, io as _io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack
 from authorlib import rig_map, fk_world
 from fingers import m4_trs, m4_mul, xform
 
@@ -115,7 +115,7 @@ def main(path, amount=0.72, dry=False):
     h = list(HDR.unpack_from(o, 4)); h[13] = len(o); HDR.pack_into(o, 4, *h)
     if not os.path.exists(path + ".tex.bak"):
         open(path + ".tex.bak", "wb").write(p.buf)
-    open(path, "wb").write(o)
+    save_pack(path, bytes(o))
     print("   painted the interior dark (%.0f%%), texture %d -> %d bytes"
           % (amount * 100, tlen, len(blob)))
     return 0

@@ -14,7 +14,14 @@
 # ⛔ No `-Dmain=SDL_main` here -- that is the MinGW SDL2main shim, and Linux has no shim.
 set -e
 cd "$(dirname "$0")"
+# the game's one file (GAME=games/x/x.c picks another); the kit has only the sample. EXTRA=-DREVA_NODOORS builds without the old game modes.
+GAME=${GAME:-games/rvz/rvz.c}
+[ -f "$GAME" ] || GAME=games/sample/sample.c
+if [ "$1" = headless ]; then   # no display, no GPU: the sim only (engine plan, Phase 1). Then: python3 anim_bench/hashcheck.py
+  gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_HEADLESS -o crowd_headless crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c $GAME gl_null.c gfx_packet.c -lSDL2 -lm
+  echo "built crowd_headless"; exit 0
+fi
 OUT=${1:-crowd_linux}
 # -ffp-contract=off: no fused multiply-add, so the sim hash (REVA_SIMHASH) can agree between x86 and ARM
-gcc -O2 -ffp-contract=off -DREVA_SDL -o "$OUT" crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c -lSDL2 -lEGL -lGLESv2 -lm
+gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -o "$OUT" crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c $GAME -lSDL2 -lEGL -lGLESv2 -lm
 echo "built $OUT"

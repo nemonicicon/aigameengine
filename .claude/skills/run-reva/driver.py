@@ -45,8 +45,9 @@ FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
     os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
     "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
 
-SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
-LIBS = ["-Dmain=SDL_main", "-lmingw32", "-lSDL2main", "-lSDL2", "-lEGL", "-lGLESv2", "-lm"]
+GAME = "games/rvz/rvz.c" if os.path.exists(os.path.join(NATIVE, "games", "rvz", "rvz.c")) else "games/sample/sample.c"   # the game's one file; the kit has only the sample
+SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", GAME, "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
+LIBS = ["-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lEGL", "-lGLESv2", "-lm"]
 
 # the face rig's panel rectangles in the saved 1280x720 image (crowd_kms.c, g_labFace):
 # eight heads across the top half, then the mouth and the eyes big across the bottom.
@@ -65,7 +66,7 @@ def win(p):
 
 
 def kill(_a=None):
-    for exe in ("crowd.exe", "crowd_new.exe"):
+    for exe in ("crowd.exe", "crowd_new.exe", "crowd_band.exe", "crowd_vk.exe"):
         subprocess.run(["taskkill", "/IM", exe, "/F"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return 0
@@ -86,7 +87,7 @@ def build(a):
     # you hand it is only inherited by the child. Passing "gcc" here fails with
     # WinError 2 even though env["PATH"] starts with mingw64. Name it absolutely; the
     # env PATH still matters, because the linker looks up its DLLs through it.
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-o", out] + SRC + LIBS
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-o", out] + SRC + LIBS
     print("build: " + " ".join(cmd))
     r = subprocess.run(cmd, cwd=NATIVE, env=env,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -98,6 +99,46 @@ def build(a):
     p = os.path.join(NATIVE, out)
     print("build OK -> %s (%d bytes)" % (p, os.path.getsize(p)))
     return 0
+
+
+def other_game(a):
+    """the game asked for on the command line, when it isn't the one this tree builds by default"""
+    return a.game or ("sample" if a.sample else None)
+
+
+def buildvk(a):
+    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe. gl_null.c stands in for GL and gfx_vk.c draws. Only what has come across to gfx.h shows up. reva_native/rvz_vk.bat plays it."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    name = other_game(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it
+    exe = f"crowd_{name}_vk.exe" if name else "crowd_vk.exe"
+    src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_VK", "-DKHRONOS_STATIC"] + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + ["gl_null.c", "gfx_packet.c", "gfx_vk.c"] + [l for l in LIBS if l not in ("-lEGL", "-lGLESv2", "-lm")] + ["-lvulkan-1", "-lm"]
+    r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
+    if r.returncode != 0 or errs:
+        print("\n".join(errs[:40]) or r.stdout[-4000:])
+        print("buildvk FAILED rc=%d" % r.returncode)
+        return 1
+    print("buildvk OK -> %s" % os.path.join(NATIVE, exe))
+    return 0
+
+
+def check(a):
+    """⭐ THE SIM'S RECEIPT (11-02, engine plan Phase 1). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window, the same answer on any machine.
+    It says whether the sim still does exactly what it did. It says nothing about the picture; that's what eyes and `bench` are for."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    # --nodoors: the engine as the kit gets it, with no old game modes. It must print the same hashes. --game NAME: the same with that game, against its own hashes.
+    name = other_game(a)
+    exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"
+    src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DKHRONOS_STATIC"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gl_null.c", "gfx_packet.c"] + [l for l in LIBS if l not in ("-lEGL", "-lGLESv2")]
+    r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    errs = [l for l in r.stdout.splitlines() if " error" in l or "undefined reference" in l or l.startswith("cc1")]
+    if r.returncode != 0 or errs:
+        print("\n".join(errs[:40]) or r.stdout[-4000:])
+        print("check: build FAILED rc=%d" % r.returncode)
+        return 1
+    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--game", name] if name else []) + (["--bless"] if a.bless else []), cwd=NATIVE).returncode
 
 
 def promote(_a):
@@ -409,7 +450,7 @@ def scene(a):
     # stopped growing for STALL seconds, which covers every other way a scene can end.
     STALL = 8.0
     kill()
-    exe = os.path.join(NATIVE, "crowd_new.exe" if a.new else "crowd.exe")
+    exe = os.path.join(NATIVE, a.exe or ("crowd_new.exe" if a.new else "crowd.exe"))
     env = dict(os.environ, REVA_WINDOWED="1",
                REVA_LABCTL="anim_bench/lab_ctl.txt", REVA_AUTOMODE="11",
                REVA_ANIMSUBJ=a.subject, REVA_ANIMSTATE="0",
@@ -782,6 +823,8 @@ def main():
     sp.set_defaults(fn=up)
     sub.add_parser("down").set_defaults(fn=down)
     sub.add_parser("build").set_defaults(fn=build)
+    sp = sub.add_parser("buildvk"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildvk)
+    sp = sub.add_parser("check"); sp.add_argument("--bless", action="store_true"); sp.add_argument("--nodoors", action="store_true"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=check)
     sub.add_parser("promote").set_defaults(fn=promote)
 
     sp = sub.add_parser("packs"); sp.add_argument("name", nargs="?"); sp.set_defaults(fn=packs)
@@ -849,7 +892,7 @@ def main():
     sp.add_argument("--env", action="append", help="extra REVA_* var, e.g. REVA_NOCLOTH=1")
     sp.set_defaults(fn=bench)
 
-    sp = sub.add_parser("scene"); sp.add_argument("out")
+    sp = sub.add_parser("scene"); sp.add_argument("out"); sp.add_argument("--exe", help="an exe of its own in reva_native, instead of crowd.exe or --new's crowd_new.exe")
     sp.add_argument("--name", default="club_night"); sp.add_argument("--seconds", type=float, default=60.0)
     sp.add_argument("--fps", type=int, default=30); sp.add_argument("--subject", default="r2moves")
     sp.add_argument("--partner", default="kmoves"); sp.add_argument("--pclip", default="idle")

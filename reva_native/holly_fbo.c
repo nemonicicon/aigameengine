@@ -12,6 +12,9 @@
 #undef main
 
 #include "holly_fbo.h"
+#ifdef REVA_VK
+#include "gfx.h"
+#endif
 
 static struct {
   int ok, w, h;
@@ -38,8 +41,10 @@ int holly_fbo_init(int w, int h, const char *model_path) {
    * which took the whole club down on a checkout that has the engine and no head -- while every
    * caller already treats a failed init as "no screens tonight" (holly_fbo_texture()==0). Say it
    * loudly and let the floor run. */
+#ifndef REVA_VK
   { const char *gv = (const char *)glGetString(GL_VERSION);
     if (!gv || !strstr(gv, "ES 3")) { fprintf(stderr, "[holly] ⛔ NEEDS AN ES3 CONTEXT, have '%s' -- venue screens stay dark\n", gv ? gv : "?"); return 0; } }
+#endif
   { const char *mp = model_path ? model_path : "holly.hlm";
     FILE *probe = fopen(mp, "rb");
     if (!probe) { fprintf(stderr, "[holly] ⛔ NO HEAD MODEL: %s (%s) -- venue screens stay dark\n", mp, strerror(errno)); return 0; }
@@ -74,6 +79,11 @@ int holly_fbo_init(int w, int h, const char *model_path) {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)H.model.tex_w, (GLsizei)H.model.tex_h, 0, GL_RGB,
                GL_UNSIGNED_BYTE, H.model.texels);
+#ifdef REVA_VK
+  { unsigned char *rgba = (unsigned char *)malloc((size_t)H.model.tex_w * H.model.tex_h * 4);
+    if (rgba) { const unsigned char *in = (const unsigned char *)H.model.texels; for (size_t i = 0, n = (size_t)H.model.tex_w * H.model.tex_h; i < n; i++) { rgba[i * 4] = in[i * 3]; rgba[i * 4 + 1] = in[i * 3 + 1]; rgba[i * 4 + 2] = in[i * 3 + 2]; rgba[i * 4 + 3] = 255; }
+      gfxTexture(H.tex, (int)H.model.tex_w, (int)H.model.tex_h, rgba); free(rgba); } }
+#endif
   glGenerateMipmap(GL_TEXTURE_2D);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -123,6 +133,9 @@ int holly_fbo_init(int w, int h, const char *model_path) {
   glGenTextures(1, &H.color);
   glBindTexture(GL_TEXTURE_2D, H.color);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, H.w, H.h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+#ifdef REVA_VK
+  gfxTargetMake(H.color, H.w, H.h, 1);
+#endif
   /* NEAREST: this is a low-res arena screen, and letting the sampler blur it would undo the
    * crush that makes the jaw stretch read as a mouth in the first place. */
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -180,6 +193,22 @@ void holly_fbo_render(float open, float wide, float seal, double t) {
                           mat4_rot_x(sinf((float)t / 2.6f) * 0.035f));
   model_m.m[13] += sinf((float)t / 2.1f) * 0.012f;
   mat4 mvp = mat4_mul(proj, mat4_mul(view, model_m));
+#ifdef REVA_VK
+  { GfxHead g9; memset(&g9, 0, sizeof g9); g9.target = H.color; g9.vbo = H.vbo; g9.ebo = H.ebo; g9.tex = H.tex; g9.nIndex = H.model.index_count;
+    for (uint32_t i = 0; i < H.model.morph_count && i < 8; i++) g9.morph[i] = H.morph_vbo[i];
+    memcpy(g9.mvp, mvp.m, 64); memcpy(g9.model, model_m.m, 64); shape_weights(&H.model, open, wide, seal, g9.weights);
+    g9.open = open; g9.wide = wide; g9.seal = seal; g9.lipY = RIG_LIP_Y; g9.falloff = RIG_FALLOFF; g9.lipHalf = RIG_LIP_HALF; g9.drop = RIG_DROP; g9.pivotY = RIG_PIVOT_Y; g9.pivotZ = RIG_PIVOT_Z; g9.angle = RIG_ANGLE; g9.mouthW = RIG_MOUTH_W; g9.round = RIG_ROUND; g9.spread = RIG_SPREAD; g9.press = RIG_PRESS; g9.mouthDark = RIG_MOUTH_DARK; g9.aperture = RIG_APERTURE; g9.edge = RIG_EDGE; g9.edgeSharp = RIG_EDGE_SHARP; g9.lift = RIG_LIFT; g9.minY = H.model.min_y; g9.height = H.model.height; g9.centerX = H.model.center_x; g9.halfWidth = H.model.half_width; g9.deform = H.rigged ? 0.f : 1.f;
+    if (!H.rigged) { g9.ivbo = H.ivbo; g9.iebo = H.iebo; g9.flatN = 3;
+      float amt = open * (1.0f - seal);
+      mat4 jaw = mat4_translate(0, H.model.min_y + RIG_PIVOT_Y * H.model.height, RIG_PIVOT_Z * H.model.height);
+      jaw = mat4_mul(jaw, mat4_rot_x(amt * RIG_ANGLE));
+      jaw = mat4_mul(jaw, mat4_translate(0, -(H.model.min_y + RIG_PIVOT_Y * H.model.height) - amt * RIG_DROP * H.model.height, -RIG_PIVOT_Z * H.model.height));
+      mat4 jm = mat4_mul(mvp, jaw);
+      g9.flat[0].first = H.cavity_start; g9.flat[0].count = H.cavity_count; g9.flat[0].col[0] = 0.078f; g9.flat[0].col[1] = 0.043f; g9.flat[0].col[2] = 0.043f; memcpy(g9.flat[0].mvp, mvp.m, 64);
+      g9.flat[1].first = H.upper_start; g9.flat[1].count = H.upper_count; g9.flat[1].col[0] = 0.29f; g9.flat[1].col[1] = 0.255f; g9.flat[1].col[2] = 0.216f; memcpy(g9.flat[1].mvp, mvp.m, 64);
+      g9.flat[2].first = H.lower_start; g9.flat[2].count = H.lower_count; g9.flat[2].col[0] = 0.29f; g9.flat[2].col[1] = 0.255f; g9.flat[2].col[2] = 0.216f; memcpy(g9.flat[2].mvp, jm.m, 64); }
+    gfxHead(&g9); return; }
+#endif
 
   glBindFramebuffer(GL_FRAMEBUFFER, H.fbo);
   glViewport(0, 0, H.w, H.h);

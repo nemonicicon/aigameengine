@@ -205,6 +205,10 @@ def build_mouth(P, person, f, mk):
     line = [(-mw + 2 * mw * i / N, mu - f.get("smile", 0.0) * (1 - (2 * i / N - 1) ** 2) * -1.0) for i in range(N + 1)]
     lw = f.get("mouth_ink", 0.0011) * person.S["head_h"] / 0.22
     strip(P, person, line, taper(N + 1, lw * 0.35, lw, lw * 0.35, 0.5), 0.0012, "ink")
+    if f.get("mouth_inside"):                       # shut, these are hairlines on the ink line; mouths.py opens them with her lips: the upper teeth, the tongue below them
+        tl = [(-mw * 0.66 + 1.32 * mw * i / 12, mu + f.get("smile", 0.0) * (1 - (2 * i / 12 - 1) ** 2)) for i in range(13)]
+        strip(P, person, tl, 0.00005, 0.00128, "tongue")
+        strip(P, person, tl, 0.00005, 0.00134, "teeth")
     # the lower lip: a short shadow stroke under the middle
     ll = [(-mw * 0.40 + 0.8 * mw * i / 6, mu - f.get("lower_lip", 0.045)) for i in range(7)]
     strip(P, person, ll, taper(7, lw * 0.2, lw * 0.9, lw * 0.2, 0.5), 0.0010, "lip_shadow")

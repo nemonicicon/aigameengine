@@ -488,6 +488,17 @@ def sew(panels, seams, field, pins=None, steps=320, iters=18, dt=1.0 / 120.0, th
     PQ = np.array([pin_pos[v] for v in PV]) if len(PV) else np.zeros((0, 3))
     colors = color_edges(E, N)
     bcolors = color_edges(BE, N) if len(BE) else []
+    # ⭐ A LEG KEEPS TO ITS OWN SIDE: a panel's `wall` is (side, heights, distances), how near the middle of him it may
+    # come at each height. Cloth only meets the body here, not itself: sewn baggy, each leg of a pair hung through the
+    # other down to the hem, and only came apart after the fact, in a squeeze that had no idea where the cloth would go
+    walls = [(off[p.name], len(cloth[p.name][0]), p.wall) for p in panels if getattr(p, "wall", None)]
+
+    def keep_sides(Q):
+        for o_, n_, (sg, zs, xs) in walls:
+            q = Q[o_:o_ + n_]
+            w = np.interp(q[:, 2], zs, xs)
+            over = q[:, 0] * sg < w
+            q[over, 0] = sg * w[over]
     Wm = np.ones(N)
     if len(PV): Wm[PV] = 0.0                                  # a pinned point does not move for a constraint
     STEP_MAX, VMAX = 0.004, 2.5
@@ -521,6 +532,7 @@ def sew(panels, seams, field, pins=None, steps=320, iters=18, dt=1.0 / 120.0, th
         if hit.any():
             gn = grad[hit] / np.maximum(np.linalg.norm(grad[hit], axis=1), 1e-9)[:, None]
             X[hit] += gn * (thick - dist[hit])[:, None]
+        keep_sides(X)
     zspan("relaxed")
     if debug:                                                    # where the cloth starts INSIDE something
         d_, g_ = field.sample(X)
@@ -611,6 +623,7 @@ def sew(panels, seams, field, pins=None, steps=320, iters=18, dt=1.0 / 120.0, th
             if hit.any():
                 gn = grad[hit] / np.maximum(np.linalg.norm(grad[hit], axis=1), 1e-9)[:, None]
                 P[hit] += gn * (thick - dist[hit])[:, None]
+            keep_sides(P)
         Vn = (P - X) / dt * DV[:, None]
         if t < stitch_time * gravity_at:                      # sewing is QUASI-STATIC: the needle, not a whip
             Vn *= sew_damp
@@ -857,6 +870,155 @@ def to_part(res, seamlines, skin_parts, outward, name, mat, uv=None, thick=0.002
             if b is not None: spec = ("box", b)
         P.f(t, mat, spec)
     return P
+
+
+def soften_weights(P, which, passes):
+    """Each of these vertices' bone weights blended with its neighbours', `passes` times. Do it BEFORE a garment goes back to the rig's rest (Form.unpose): it goes back through the inverse of its own skinning, and with an arm's share changing sharply from point to point an underarm crushes and turns its triangles inside out, and they stay that way in most poses, as bright shards. After, its rest shape and its weights no longer match, and it doesn't help."""
+    near = [set() for _ in P.V]
+    for f in P.F:
+        for i in range(len(f)):
+            near[f[i]].add(f[(i + 1) % len(f)])
+            near[f[(i + 1) % len(f)]].add(f[i])
+    for _ in range(passes):
+        was = [dict(w) for w in P.W]
+        for i in which:
+            total = {b: x * 2.0 for b, x in was[i].items()}
+            count = 2.0
+            for j in near[i]:
+                for b, x in was[j].items():
+                    total[b] = total.get(b, 0.0) + x
+                count += 1.0
+            P.W[i] = {b: x / count for b, x in total.items()}
+
+
+def unzip_parts(bm, part_of, apart=0.002):
+    """what only touches comes apart again, after zip_seams: it welds whatever's within reach, and two baggy legs touch all down the inner thigh, a sleeve touches the body below the armpit. ⛔ jacob's alien, 11-03: the legs of his shorts sewn together nearly to the hem, a sweatshirt with a window under each arm, and all of it looking fine until he moved.
+    part_of(face) names the part a face is on. A vertex with faces on two parts is left alone if an edge with two faces crosses between them: that's a seam meant to be there, a crotch or an armhole. Otherwise each part gets its own copy, a little way apart so nothing welds them by position later, with the weights of its own neighbours.
+    Returns how many vertices came apart."""
+    dl = bm.verts.layers.deform.verify()
+    part = {f: part_of(f) for f in bm.faces}
+    came_apart = []
+    for v in list(bm.verts):
+        groups = {}
+        for f in v.link_faces:
+            groups.setdefault(part[f], []).append(f)
+        if len(groups) < 2:
+            continue
+        if any(len(e.link_faces) == 2 and part[e.link_faces[0]] != part[e.link_faces[1]] for e in v.link_edges):
+            continue
+        came_apart.append(v)
+        for key in list(groups)[1:]:
+            nv = bm.verts.new(v.co, v)
+            came_apart.append(nv)
+            for f in groups[key]:
+                nf = bm.faces.new([nv if x is v else x for x in f.verts], f)
+                part[nf] = key
+                bm.faces.remove(f)
+    for e in [e for e in bm.edges if not e.link_faces]:
+        bm.edges.remove(e)
+    split = set(came_apart)
+    moves = []
+    for v in came_apart:
+        round_it = [e.other_vert(v) for e in v.link_edges]
+        own = [o for o in round_it if o not in split] or round_it
+        if not own:
+            continue
+        mid = sum((o.co for o in own), v.co * 0.0) / len(own)
+        way = mid - v.co
+        moves.append((v, way.normalized() * apart if way.length > 1e-9 else way))
+        weights = {}
+        for o in own:
+            for g, x in o[dl].items():
+                weights[g] = weights.get(g, 0.0) + x / len(own)
+        v[dl].clear()
+        for g, x in weights.items():
+            v[dl][g] = x
+    for v, way in moves:
+        v.co += way
+    bm.verts.index_update()
+    return len(came_apart)
+
+
+def zip_seams(bm, reach=0.012, longest_hole=0.105):
+    """a garment's seams made one surface, in a bmesh of the settled cloth. The sewing machine leaves panels of different resolutions meeting vertex to edge: closed to the eye, and sharing
+    nothing, so a low-poly cut opens them. ⛔ jacob's alien, 11-02: a tee with 5 boundary loops and a sweatshirt with 17, slits at the shoulders, and his forearm showing through at both cuffs.
+    Each boundary edge is split wherever another boundary vertex lies on it, boundary vertices within reach are welded (only those: cloth folded against itself stays two layers), and what's
+    left that's shorter round than longest_hole (the four panels' corner under a crotch, a seam's end) closes to a point. What stays open is what was cut open.
+    Returns the openings left, longest first: (length, centre)."""
+    import bmesh
+    for _ in range(3):
+        bm.verts.ensure_lookup_table()
+        bm.edges.ensure_lookup_table()
+        cell = reach * 8.0
+        grid = {}
+        edges = [e for e in bm.edges if e.is_boundary]
+        for e in edges:
+            a, b = e.verts[0].co, e.verts[1].co
+            n = max(1, int((b - a).length / cell))
+            for k in range(n + 1):
+                p = a.lerp(b, k / n)
+                grid.setdefault((int(p.x // cell), int(p.y // cell), int(p.z // cell)), set()).add(e)
+        cuts = {}
+        for v in [v for v in bm.verts if v.is_boundary]:
+            c = v.co
+            ci = (int(c.x // cell), int(c.y // cell), int(c.z // cell))
+            best, best_d, best_t = None, reach, 0.0
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        for e in grid.get((ci[0] + dx, ci[1] + dy, ci[2] + dz), ()):
+                            if v in e.verts:
+                                continue
+                            a, b = e.verts[0].co, e.verts[1].co
+                            ab = b - a
+                            t = (c - a).dot(ab) / max(ab.length_squared, 1e-12)
+                            if t <= 0.0 or t >= 1.0:
+                                continue
+                            d = (a + ab * t - c).length
+                            if d < best_d and (c - a).length > reach and (c - b).length > reach:
+                                best, best_d, best_t = e, d, t
+            if best is not None:
+                cuts.setdefault(best, []).append(best_t)
+        if not cuts:
+            break
+        for e, ts in cuts.items():
+            # along the edge from its first vertex: each cut leaves the rest of the edge still to cut
+            start = e.verts[0]
+            done = 0.0
+            cur = e
+            for t in sorted(ts):
+                new_edge, new_vert = bmesh.utils.edge_split(cur, start, (t - done) / (1.0 - done))
+                # edge_split's new edge is the piece on the far side of the new vertex from `start`
+                cur = new_edge if start not in new_edge.verts else cur
+                start = new_vert
+                done = t
+        bmesh.ops.remove_doubles(bm, verts=[v for v in bm.verts if v.is_boundary], dist=reach)
+    bmesh.ops.remove_doubles(bm, verts=[v for v in bm.verts if v.is_boundary], dist=reach)
+    left, closing = [], []
+    seen = set()
+    for s in [e for e in bm.edges if e.is_boundary]:
+        if s in seen:
+            continue
+        loop, stack = [], [s]
+        while stack:
+            e = stack.pop()
+            if e in seen:
+                continue
+            seen.add(e)
+            loop.append(e)
+            for v in e.verts:
+                stack.extend(x for x in v.link_edges if x.is_boundary and x not in seen)
+        length = sum(e.calc_length() for e in loop)
+        verts = list({v for e in loop for v in e.verts})
+        centre = sum((v.co for v in verts), verts[0].co * 0.0) * (1.0 / len(verts))
+        if length < longest_hole:
+            closing.append((verts, centre.copy()))
+        else:
+            left.append((length, tuple(centre)))
+    for verts, centre in closing:
+        bmesh.ops.pointmerge(bm, verts=verts, merge_co=centre)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    return sorted(left, key=lambda r: -r[0])
 
 
 class Layers:

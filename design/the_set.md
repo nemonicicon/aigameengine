@@ -463,6 +463,7 @@ The lines chapters 1-3 added (engine_capabilities.md sections 41-46):
 - `stretch` on a `starbody`: the star is drawn out along x to `k` times its radius over `rise` s, thinned the other
   two ways to keep its volume, heaving (3.3-13's particle rack). The rest of the space lines (`space`, `far`,
   `milkyway`, `beam`, `starspot`, `starloop`, `starweb`) are sections 41-42.
+- ⭐ **THE SET'S TIMELINE (11-03, `engine/settrack.inc`):** `track <file> [seconds]` plays a file of sky, lights, beams and props against the scene's clock (the clock plus `seconds` is the file's clock, so a take can start mid-song); `mover <stem> [r g b]` is a prop it places, the Nth line being the file's Nth mover row, hidden at scale 0 and never a collider. The file: one line `TRK2 <fps> <frames> <lights> <beams> <movers>`, then little-endian floats per frame: sky r g b; lights x y z r g b; beams x y z ux uy uz length r0 r1 r g b k; movers x y z yaw pitch roll sx sy sz. Written by code (`skate_src/band/lightshow.py`). A set with no `track` line never reaches it. A set may have 5 lights: NLIGHT is 6 and the top slot is reserved for a held light.
 - ⛔ **A room's SHELL is not furniture.** A pack marked `NoCast` + `Open` is never solid to the contact pass -- built
   in room coordinates, it threw the hero toward the ceiling on every clip until it was excluded.
 - ⭐ **A room tells the scene generator where its walls are**: `# BOUNDS x0 x1 z0 z1 ceiling` (metres) on its set file,
@@ -470,3 +471,5 @@ The lines chapters 1-3 added (engine_capabilities.md sections 41-46):
   tests every lens against.
 - ⭐ **A body that LIES needs a mark AT the bed** (`bunk_lie` on the mattress, 2.1's `vik_pan` in the pan): a mark at a
   bunk's edge or beside a pan is for sitting or standing, and a lying clip on it lies on the floor.
+
+**TRK2 (11-03).** A mover now takes three scales and its (x y z) is its own origin, so a piece can squash and stretch and turn about its middle. A TRK1 file still reads: one scale, stood on its lowest point. Budgets: `SET_MAXP` 384 stems, `SET_MAXI` 4096 instances; a row costs 36 bytes a frame, so 1423 movers across the song is 244 MB of track.

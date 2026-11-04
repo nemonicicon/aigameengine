@@ -26,7 +26,11 @@ def canon_of(name):
     while n and (n[-1].isdigit() or n[-1] == "_"): n = n[:-1]
     EX = {"pelvis": 0, "neck_": 4, "clavicle_l": 6, "upperarm_l": 7, "lowerarm_l": 8,
           "clavicle_r": 9, "upperarm_r": 10, "lowerarm_r": 11, "thigh_l": 12,
-          "calf_l": 13, "thigh_r": 14, "calf_r": 15, "chest": 2}
+          "calf_l": 13, "thigh_r": 14, "calf_r": 15, "chest": 2,
+          # snake_case with the side trailing: the DontGetDropped alien (upper_arm_L, forearm_L, shin_L). Half of it matched UE's
+          # thigh_l and the rest fell through to -1, so no score could solve an arm or a knee on it (11-02).
+          "shoulder_l": 6, "upper_arm_l": 7, "forearm_l": 8, "shoulder_r": 9, "upper_arm_r": 10, "forearm_r": 11,
+          "shin_l": 13, "shin_r": 15}
     if n in EX: return EX[n]
     if n.startswith("spine_"): return 1
     SUF = [("leftshoulder", 6), ("rightshoulder", 9), ("leftforearm", 8),

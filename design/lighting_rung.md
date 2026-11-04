@@ -1,5 +1,7 @@
 # The lighting rung, and an outside review of the engine (2026-11-02)
 
+*The engine order below is replaced by Phase 7 of [engine_plan.md](engine_plan.md). jacob, 11-03: "yes add the lighting, please, we need more capability and functionality here." The game-feel rung is game work and can continue in reva.*
+
 jacob pasted two notes from outside advice ("this may be bad advice, i dont know. check it out ... add/flag anything
 you notice/think is missing"). Each claim below was checked against `crowd_kms.c` and the bake tools that night. This is a
 proposal, not a decision: nothing here is built, and his word is still owed on the order.
@@ -27,8 +29,8 @@ proposal, not a decision: nothing here is built, and his word is still owed on t
 
 1. **Bugs before shaders.** That same night two bugs were found by looking: every door's crowd on a set was body-shaped holes
    (the sky painted over it), and every `frnd()` on Windows returned 0..65536. Neither is a shading model, and the first
-   was a bigger "looks bad" than anything on the list. When `crowd.exe` is promoted, every door gets its first
-   look in two months: look at each one before starting a lighting rung, because there may be more.
+   was a bigger "looks bad" than anything on the list. Look at what you are about to light before lighting it, because
+   there may be more. Not by sweeping the doors: jacob, 11-02, most of them are half made, so checking them "doesent make any sense".
 2. **There is no linear colour.** 0 lines mention sRGB or gamma, and nothing linearises a texture, so all lighting runs on
    gamma-encoded values. This sits UNDER the note's step 1: ACES on gamma-space light is wrong, and adding lights goes wrong
    the same way. It is the real 2005 tell. It re-lights every set and every show, so it needs its own A/B.
@@ -45,8 +47,8 @@ proposal, not a decision: nothing here is built, and his word is still owed on t
 
 ## Proposed order
 
-1. jacob plays `reva_native/rvz.bat`. His hands decide the next rung.
-2. Promote `crowd_new.exe` (keep the old one as `crowd_0911.exe`), then look at every door. Costs nothing, and owed for two months.
+1. ~~jacob plays `reva_native/rvz.bat`~~ done 11-02: *"works decently, feels a bit like zamn."* His hands decide the next rung.
+2. ~~Promote~~ done 11-02: `crowd.exe` is from 87f5b6c, the old build is `crowd_0911.exe`.
 3. The game-feel rung on Reva vs Zombies: hit-stop, shake on a hit (`camshake` exists), the dead telegraphing a bite, music.
    It is the game in build, and lighting will not make it fun.
 4. The lighting rung, each step with an off-switch and a look on a realistic body AND a toon one:

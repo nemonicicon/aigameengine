@@ -374,6 +374,36 @@ def hold_world_rotation(nodes, node, wq_target, q_override=None, t_override=None
     rp = wq[p] if p >= 0 else [0, 0, 0, 1]
     return qnorm(qmul(qinv(rp), wq_target))
 
+# ---- a clip's own pose ----------------------------------------------------------------
+def clip_pose(p, clip, frame=0.0, loop=False):
+    """A clip's pose at a frame, fractional, as the ({node: q}, {node: t}) overrides fk_world and the solvers take. loop wraps
+    the frame round the clip and blends the last frame into the first; a number is the cycle's true length in this pack's frames,
+    for a clip keyed at another rate than the pack's bake (the alien's jog is 15 keys at 24 fps, 0.625 s, baked to 19 frames at 30:
+    the wrap from the last frame to the first is shorter than a frame). Otherwise it holds at the ends. Every score over a base
+    pose used to unpack the track bytes by hand (z_bow, z_hello, z_hug ...): written once here for z_ft, which reads a body's
+    own walk, jog and run to find where a step has to land (11-02)."""
+    import struct as _st
+    names = p.clip_names()
+    ci = names.index(clip) if isinstance(clip, str) else clip
+    frames = p.clip(ci)["frames"]
+    if loop:
+        period = float(frames) if loop is True else float(loop)
+        frame = frame % period
+        f0 = min(int(math.floor(frame)), frames - 1); f1 = (f0 + 1) % frames
+        u = (frame - f0) / max(1e-9, (f0 + 1 if f0 < frames - 1 else period) - f0)
+    else:
+        frame = max(0.0, min(frames - 1.0, frame))
+        f0 = int(math.floor(frame)); f1 = min(frame and f0 + 1 or f0, frames - 1); u = frame - f0
+    q, t = {}, {}
+    for (node, typ, data) in p.tracks(ci):
+        if typ == 0:
+            a = list(_st.unpack_from("<4f", data, f0 * 16)); b = list(_st.unpack_from("<4f", data, f1 * 16))
+            q[node] = qnorm(qslerp(a, b, u))
+        elif typ == 1:
+            a = _st.unpack_from("<3f", data, f0 * 12); b = _st.unpack_from("<3f", data, f1 * 12)
+            t[node] = [a[k] + (b[k] - a[k]) * u for k in range(3)]
+    return q, t
+
 # ---- the expressive layer (P6e): hands, toes, faces, tails ---------------------------
 # jacob 08-27: "fingers faces and tails and toes... very important for animations."
 # Fleet survey: fingers on 113 of 134 packs, toes near-universal, eyes on ~20, jaw on 3,
@@ -752,6 +782,9 @@ def rig_map(p):
             if "idle" in lo and not any(w in lo for w in ("lay", "sleep", "sit", "crouch")):
                 base = nm; break
     m["_base_clip"] = base
+    # A two-joint spine (the DontGetDropped alien: spine, chest) has no third bone to bend: the top one stands in, so a score
+    # that asks for spine_03 turns the chest instead of refusing the whole rig (11-02).
+    if m["spine_03"] < 0 and m["spine_02"] >= 0: m["spine_03"] = m["spine_02"]
     m["_missing"] = [k for k, v in m.items() if not k.startswith("_") and (v is None or v < 0)]
     return m
 

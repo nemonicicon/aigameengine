@@ -26,8 +26,14 @@ usage:
 library:
   p = Rpack(path); p.clip_names(); p.tracks(ci)
   append_clips(path, [(name, fps, frames, {(node,type): [floats...]}), ...])
+
+A pack with chunks (RPK2, skate_src/rpackchunks.py): Rpack reads it merged, and every tool that rewrites a body goes through save_pack, which keeps its chunks.
 """
 import struct, sys, os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import rpackchunks
+from rpackchunks import save as save_pack, note_tool
 
 HDR = struct.Struct("<15I")
 CLIP = struct.Struct("<IfIII")
@@ -69,7 +75,8 @@ def lint_name(name):
 class Rpack:
     def __init__(self, path):
         self.path = path
-        self.buf = open(path, "rb").read()
+        self.file = open(path, "rb").read()
+        self.buf = rpackchunks.merged(self.file)   # what the engine sees: the body, with what's in its chunks added
         if self.buf[:4] != b"RPK1":
             raise ValueError("%s: not an RPK1 pack" % path)
         h = HDR.unpack_from(self.buf, 4)
@@ -131,6 +138,16 @@ class Rpack:
 
     # ---- meshes ----
     MESH = struct.Struct("<15I")   # name,node,verts,idxCount,boneCount,flags,offPos,...
+
+    def mesh_span(self, name):
+        """a mesh by name: (its index, where its vertices start in skinned_positions' list, how many). The FIRST of that name:
+        a body split by its wardrobe (REVA 902) has mesh 0 as whatever came first, not the skin"""
+        strs = self.strings(); base = 0
+        for mi in range(self.nMeshes):
+            rec = self.MESH.unpack_from(self.buf, self.offMeshes + mi * 60)
+            if strs[rec[0]].decode("utf-8", "replace") == name: return mi, base, rec[2]
+            base += rec[2]
+        raise ValueError("%s has no mesh %r" % (self.path, name))
 
     def mesh_positions(self):
         """All meshes' RAW vertex positions -- MESH space, which is NOT rig space for
@@ -210,6 +227,9 @@ def append_clips(path, clips, force=False):
         hits = lint_name(name)
         if hits and not force:
             raise ValueError("clip '%s' would trip the miners: %s" % (name, "; ".join(hits)))
+    if open(path, "rb").read()[-4:] == b"RPK2":   # a finished pack's body stays as it is, and what's compressed with it
+        rpackchunks.add_clips(path, clips)
+        return os.path.getsize(path)
     p = Rpack(path)
     out = bytearray(p.buf)
 
@@ -257,7 +277,7 @@ def append_clips(path, clips, force=False):
     h[11] = newOffStr                 # offStr
     h[13] = len(out)                  # total
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out))
     return len(out)
 
 def drop_clip(path, name):
@@ -278,7 +298,7 @@ def drop_clip(path, name):
     h = list(HDR.unpack_from(out, 4))
     h[4] = len(keep); h[9] = off; h[13] = len(out)
     HDR.pack_into(out, 4, *h)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out), forget={name})
     return True
 
 def main(argv):
@@ -314,7 +334,7 @@ def main(argv):
         h = list(HDR.unpack_from(out, 4))
         h[4] = len(keep); h[9] = newOff; h[13] = len(out)
         HDR.pack_into(out, 4, *h)
-        open(path, "wb").write(out)
+        save_pack(path, bytes(out), forget={n for n in p2.clip_names() if n.startswith(prefix)})
         print("%s: dropped %d clip(s), %d remain" % (path, p2.nClips - len(keep), len(keep)))
         return 0
     if cmd == "copyclip":

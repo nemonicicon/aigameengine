@@ -41,7 +41,7 @@ and the rest pose is re-skinned and asserted unmoved afterwards.
 """
 import sys, os, math, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack, note_tool
 from authorlib import rig_map, fk_world, quantise4
 from fingers import m4_trs, m4_mul, m4_inv_affine, xform, NODE, MESH
 
@@ -120,8 +120,10 @@ def jaw_weight(P, F, head_w, xw, fwd_sign):
     return max(0.0, min(1.0, w))
 
 
-def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN):
+def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN, mesh=None):
+    # ⭐ (11-02) `--mesh head`: a body split into pieces binds the one piece that IS her face. Without it, one skinned mesh, as ever.
     p = Rpack(path)
+    mi, vbase, vcount = p.mesh_span(mesh) if mesh else (0, 0, None)
     names = p.node_names()
     if JAW_NAME in names:
         print("jaw: %s already carries %s" % (os.path.basename(path), JAW_NAME))
@@ -139,6 +141,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
              F["mouth"][1] + hinge_up * F["span"],
              F["mouth"][2] - fwd_sign * hinge_back * F["iod"]]
     SP = p.skinned_positions(with_bones=True)
+    if mesh: SP = SP[vbase:vbase + vcount]
     # the head family owns the flesh that may be re-bound at all
     fam = {head}
     grew = True
@@ -183,8 +186,8 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
         return 0
 
     # ---------------- the write, fingers.py's ----------------
-    assert p.nMeshes == 1, "this pack has %d meshes; the tool binds one skinned mesh" % p.nMeshes
-    rec = list(MESH.unpack_from(p.buf, p.offMeshes))
+    assert mesh or p.nMeshes == 1, "this pack has %d meshes; the tool binds one skinned mesh (--mesh NAME picks one)" % p.nMeshes
+    rec = list(MESH.unpack_from(p.buf, p.offMeshes + mi * 60))
     (mName, mNode, verts, idxCount, boneCount, flags, offPos, offNorm, offUV,
      offJ, offWt, offIdx, offBM, offIBM, offBind) = rec
     bm = list(struct.unpack_from("<%dH" % boneCount, p.buf, offBM))
@@ -218,7 +221,6 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
              MW[14] - W[mNode][14]))
     assert spread < 1e-3, ("the head's own chain disagrees about the bind frame; "
                            "refusing to guess")
-    assert boneCount + 1 <= 64, "bone map would exceed the engine's MAXB of 64"
 
     out = bytearray(p.buf)
     def place(b, align=4):
@@ -268,7 +270,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
 
     rec[4] = len(newMap); rec[9] = newOffJ; rec[10] = newOffWt
     rec[12] = newOffBM; rec[13] = newOffIBM
-    MESH.pack_into(out, p.offMeshes, *rec)
+    MESH.pack_into(out, p.offMeshes + mi * 60, *rec)
     h = list(HDR.unpack_from(out, 4))
     h[1] = p.nNodes + 1; h[6] = newOffNodes; h[11] = newOffStr; h[13] = len(out)
     HDR.pack_into(out, 4, *h)
@@ -276,7 +278,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
     # leaves the broken pack on disk and the operator has to know to restore the .bak --
     # exactly what happened here on kaeli's first run. fingers.py now does the same.
     tmp = path + ".tmpjaw"
-    open(tmp, "wb").write(out)
+    save_pack(tmp, bytes(out), like=path)
     try:
         q = Rpack(tmp)
         before = p.skinned_positions(); after = q.skinned_positions()
@@ -292,6 +294,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN)
     if not os.path.exists(path + ".jaw.bak"):
         open(path + ".jaw.bak", "wb").write(p.buf)
     os.replace(tmp, path)
+    note_tool(path, "jaw.py", sys.argv[2:])   # what this made is in the mesh: a new bake runs it again
     print("jaw: %s written (backup at .jaw.bak)" % path)
     return 0
 
@@ -311,4 +314,5 @@ if __name__ == "__main__":
     def arg(nm, d):
         return float(a[a.index(nm) + 1]) if nm in a else d
     sys.exit(build(a[0], "--report" in a,
-                   arg("--back", HINGE_BACK_IOD), arg("--up", HINGE_UP_SPAN)))
+                   arg("--back", HINGE_BACK_IOD), arg("--up", HINGE_UP_SPAN),
+                   mesh=a[a.index("--mesh") + 1] if "--mesh" in a else None))

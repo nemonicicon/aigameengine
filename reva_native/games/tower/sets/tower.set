@@ -1,0 +1,24 @@
+# the tower game's level. `climb` says its surfaces are walked on: engine/spans.inc reads where from the triangles. make_assets.py writes this file.
+climb
+prop tw_level 0 0 0 0 1
+mark start 0 0 16 180
+mark spawn 22 0 24 180
+mark beacon0 4 3.0 -6 0
+mark beacon1 -4 6.5 -12 0
+mark beacon2 -3 6.5 9 0
+trigger beacon0 4 3.0 -6 4 4 4
+trigger beacon1 -4 6.5 -12 4 4 4
+trigger beacon2 -3 6.5 9 4 4 4
+mark route0 26 0 -10 0
+mark route1 10 0 -10 0
+mark route2 4 0 -6 0
+mark route3 8 0 -13 0
+mark route4 -1 0 -13 0
+mark route5 -3 0 -12 0
+mark route6 -3 0 2 0
+mark route7 -3 0 9 0
+mark crate0 7.2 3.0 -5 0
+mark crate1 8 0 12 0
+mark crate2 8 1.6 12 0
+mark crate3 -8 0 14 0
+mark lift 3 0 -2 0

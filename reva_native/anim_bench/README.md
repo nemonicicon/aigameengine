@@ -139,6 +139,25 @@ curve: both known-bads are still caught.
   another runtime constant.
 - reva's own rest pose holds the left arm ~48 deg out, so her masked stand inherits it.
 
+## Real motion as the reference (2026-11-02)
+
+jacob, on a gait I had passed: "how can you look at how he is moving and say it is okay?" I can't. I get frames and numbers, and no bench says a gait is good. What these do is show where a clip leaves what real people do, and a video at 1x goes to jacob's eye.
+
+| tool | answers |
+|---|---|
+| `gaitlab.py` | every joint's angle through the stride, side by side, phase 0 at the left foot landing. Sources: `<pack>#<clip>[:seconds]`, `bvh:<file>`, `loop:<pack>#<clip>`, `take:<Kimodo folder>`. Also speed, Froude number, stride, feet and hands apart, hip and head bob. Compare a laying with its source before showing it |
+| `gaitenvelope.py` | `build` an envelope from clean cycles of real people (`gait_envelope.json`: statistics only), `check` a clip against it (flags, never a verdict), `selftest` each real subject against an envelope without them. In the walking bands (10 to 18 subjects) a real person gets a median of 1 flag. Jog and run have 2 subjects each: too few to trust the edges, and the tool says so |
+| `../../skate_src/author/bvhtake.py` | a BVH (CMU, 100STYLE) or an in-place loop behind the Rpack interface, so `z_km.py` and every bench can read it |
+
+The motion itself lives in jacob's library `D:/free_3dmodels`, not here: CMU (free for commercial use, no reselling the raw data, credit asked), 100STYLE (CC-BY 4.0), Quaternius UAL 1 and 2 (CC0). Real numbers, CMU: a walk at 1.0 to 1.4 m/s takes 1.12 s a stride, 1.58 legs long; a brisk one at 1.4 to 1.8 takes 0.98 s; a run at 3.4 to 4.0 takes 0.74 s, 3 legs long. Feet about 0.1 legs apart across the line of travel.
+
+Three things that cost a day:
+- **A laying that isn't faithful hides the source.** Check it against the source with `gaitlab.py --rms` first. Upper body within a degree is what's possible; hips placed by their joints, not the pelvis bone; no constant hip drop, since 1.5% of a leg bends a straight knee 20 degrees.
+- **A body's time goes with the square root of its size** (dynamic similarity). A clip keeps its pace; the bake is what changes, and the game's speed comes from the clip, never the other way round.
+- **Check motion on an exported build.** A game's export can drop what its editor finds. Every headless check here and in the game passed while the rider had no gaits at all.
+- **Measure the ways in and out, not only the gaits.** Every state to every other, on the pose as drawn: the worst joint speed and the biggest change in a frame. Then read the worst one frame by frame: how high the feet are when the body lands, what the node above the skeleton did. A cross-fade can't cover a turn above the skeleton, or a foot that hasn't reached the floor.
+- **A clip clean on the bench can still pop in the game.** Run the game with each layer between the clip and the screen switched off, and compare: the worst change of a joint's velocity in one frame, against the clip alone. That's how the foot plant's grab and a facing correction that crabbed the body 25 degrees showed up, both invisible to foot-slip numbers.
+
 ## GIF captures use the WALL (jacob, 2026-08-27)
 
 Every move delivered for the eyes gate is captured on the nine-angle wall (`grid=9`),

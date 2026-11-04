@@ -564,7 +564,7 @@ def top(F, name, hem, ease=0.08, neck_drop=0.05, back_drop=0.012, neck_w=0.075, 
 
 # ------------------------------------------------------------------ trousers and shorts
 def trousers(F, name, waist, hem, ease_hip=0.05, ease_leg=0.10, hem_w=None, ext_f=None, ext_b=None, clear_min=0.006,
-             rise_ease=0.022, fabric=None, waistband=None):
+             rise_ease=0.022, fabric=None, waistband=None, leg_clear=None):
     """four panels (front and back, each leg), drafted the way a pattern cutter drafts them: the CROTCH LINE is the
     hip's quarter plus a crotch extension (hip/16 in front, hip/8 behind -- the fabric that wraps between the legs),
     the leg narrows from there to the knee and the hem round a crease, the front a little narrower than the back;
@@ -574,7 +574,9 @@ def trousers(F, name, waist, hem, ease_hip=0.05, ease_leg=0.10, hem_w=None, ext_
     jogged 7 cm at the crotch line, the jog was laid round past the side seam, and both hips grew a fin.
     waistband: {"h", "stretch", "fabric"} -- an ELASTIC CASING instead of a pinned waist: a band the body's girth less
     its stretch, the waist gathered into it (Titan's waistband is 3% of waist-to-floor, snapped to an elastic's width).
-    `waist` stays the top of the finished waistband."""
+    `waist` stays the top of the finished waistband.
+    leg_clear: (at the crotch, at the hem), how far each leg's inner wall stands off the inside of his leg: below where
+    the legs part, cloth stays on its own side of that line. Baggy legs need it, or they hang through each other."""
     T = F.torso
     wb = dict(waistband) if waistband else None
     if wb: waist = waist - wb.get("h", 0.030)          # the legs end where the band begins
@@ -661,6 +663,14 @@ def trousers(F, name, waist, hem, ease_hip=0.05, ease_leg=0.10, hem_w=None, ext_
             # extra cloth gathered where the squeeze added up, and both hips grew a flap. An elastic casing gathers it
             # evenly (each stitch at the same share of the way round)
             panels.append(Panel("%s_%s%s" % (name, part, sd), edges, place, fabric, pin=[] if wb else ["waist"]))
+            if leg_clear:
+                # nothing where the legs join and a little below (it settles), opening over 3 cm to as near his leg as it's allowed
+                zs = np.linspace(hem - 0.03, cz, 24)
+                def room(v, L=L, sg=sg):
+                    inner = sg * L.pt(-math.pi / 2, v).x
+                    t = max(0.0, min(1.0, (cz - v) / max(cz - hem, 1e-6)))
+                    return max(0.0, inner - (leg_clear[0] + (leg_clear[1] - leg_clear[0]) * t)) * smoothstep_(cz - 0.012, cz - 0.042, v)
+                panels[-1].wall = (sg, zs, np.array([room(v) for v in zs]))
         seams.append(Seam("%s_front%s:out" % (name, sd), "%s_back%s:out" % (name, sd), when=(0.0, 0.8)))
         seams.append(Seam("%s_front%s:inseam" % (name, sd), "%s_back%s:inseam" % (name, sd), when=(0.0, 0.8)))
     seams.append(Seam("%s_frontL:crotch" % name, "%s_frontR:crotch" % name, when=(0.2, 1.0)))

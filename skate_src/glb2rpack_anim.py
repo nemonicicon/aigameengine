@@ -21,6 +21,7 @@ Usage:
     glb2rpack_anim.py <in.glb> <out.rpack> [--fps 30] [--scale S] [--maxbones 64]
 """
 import sys, os, json, struct, base64, argparse, math
+import rpackchunks
 
 # ⭐ MATCHES THE ENGINE'S MAXB, which was raised from 64 to 256 after MEASURING the
 # hardware (MAX_VERTEX_UNIFORM_VECTORS=4095 = 1023 mat4). At 64 this pruned 57 of a Daz
@@ -32,6 +33,11 @@ MAXB = 256
 def read_glb(path):
     d = open(path, 'rb').read()
     if d[:4] != b'glTF':
+        # A .gltf with its .bin beside it (11-02, Quaternius's library comes that way).
+        if str(path).lower().endswith('.gltf'):
+            js = json.loads(d)
+            buf = js['buffers'][0]
+            return js, open(os.path.join(os.path.dirname(str(path)), buf['uri']), 'rb').read() if 'uri' in buf else b''
         raise SystemExit('not a binary GLB: ' + path)
     off, js, bin_ = 12, None, b''
     while off < len(d):
@@ -211,6 +217,8 @@ def main():
                     help='cut a range out of a clip: SUBSTR:START:END:ROLE (seconds). '
                          'A demo reel holds several performances back to back; this is how '
                          'one of them becomes a usable clip.')
+    ap.add_argument('--fresh', action='store_true',
+                    help='start over: drop what was authored on the pack this replaces. Without it a bake keeps whatever the old pack had and this one has not')
     a = ap.parse_args()
 
     js, bin_ = read_glb(a.src)
@@ -864,7 +872,7 @@ def main():
     for b in blobs:
         out += b
 
-    open(a.dst, 'wb').write(out)
+    rpackchunks.bake_write(a.dst, out, a.fresh)
     print(a.dst)
     print('  nodes %d   meshes %d   clips %d   textures %d' % (nN, nM, len(clips), nTex))
     for b in built:

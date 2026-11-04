@@ -23,7 +23,7 @@ on these packs, and the honest fix for that is a re-ingest, not deeper surgery.
 """
 import sys, struct, math
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0] if "\\" in __file__ or "/" in __file__ else ".")
-from rpack import Rpack, _m4_trs, _m4_mul
+from rpack import Rpack, _m4_trs, _m4_mul, save_pack
 
 def inv_affine(m):
     a = [[m[0], m[4], m[8]], [m[1], m[5], m[9]], [m[2], m[6], m[10]]]
@@ -120,7 +120,7 @@ def main(path):
                     nn = [Mi[0]*rn[0]+Mi[4]*rn[1]+Mi[8]*rn[2], Mi[1]*rn[0]+Mi[5]*rn[1]+Mi[9]*rn[2], Mi[2]*rn[0]+Mi[6]*rn[1]+Mi[10]*rn[2]]
                     struct.pack_into("<3f", buf, offNorm + v * 12, *nn)
                 total += 1
-    open(path, "wb").write(buf)
+    save_pack(path, bytes(buf))
     print("%s: flipped %d foot vertices (backup at .bak)" % (path, total))
 
 if __name__ == "__main__":

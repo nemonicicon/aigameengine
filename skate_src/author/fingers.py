@@ -56,7 +56,7 @@ a rigid slab.
 """
 import sys, os, math, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack, note_tool
 from authorlib import rig_map, fk_world, quantise4
 
 MESH = struct.Struct("<15I")
@@ -446,7 +446,7 @@ def main(path, report=False):
     # the operator has to know to restore the .bak (which is exactly what a failed gate
     # cost on kaeli's first jaw run). ----
     tmp = path + ".tmpfingers"
-    open(tmp, "wb").write(out)
+    save_pack(tmp, bytes(out), like=path)
     try:
         q2 = Rpack(tmp)
         before = p.skinned_positions()
@@ -462,6 +462,7 @@ def main(path, report=False):
     if not os.path.exists(path + ".bak"):
         open(path + ".bak", "wb").write(p.buf)
     os.replace(tmp, path)
+    note_tool(path, "fingers.py", sys.argv[2:])   # what this made is in the mesh: a new bake runs it again
     from authorlib import find_hands as _fh
     n2 = q2.nodes(); nm2 = q2.node_names(); RM2 = rig_map(q2)
     hands = _fh(q2, n2, nm2, RM2["hand_l"], RM2["hand_r"])

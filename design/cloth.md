@@ -117,6 +117,8 @@ Measured on a T-pose with a fixed lens, where nothing should move at all:
 injected. ⛔ And the 0.00 % control is also what proves it was *not* z-fighting: static geometry
 z-fights identically every frame, it does not shimmer.
 
+⛔ **Made again, 11-03, in `reva_native/clubcloth`,** with this very section in the repo: a pull of 1.5/s moving only `cur` was a spring at 6.1 Hz. It passed every check on clipping for a week. What caught it was a bench with a known answer, a hanging sheet's period: `reva_native/clubcloth/bench_clubcloth.c`. Build a thing that can fail on physics before tuning anything.
+
 ⛔ **A fix that stops the vibration by stopping the simulation is not a fix.** On a moving body
 the solver still differs from pure skinning on **5.4 %** of pixels — that difference is the
 drape. Check it, every time damping or follow changes.

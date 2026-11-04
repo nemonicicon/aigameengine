@@ -45,7 +45,7 @@ change, so clips, morphs and weights all stay valid.
 """
 import sys, os, math, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rpack import Rpack, HDR
+from rpack import Rpack, HDR, save_pack
 from authorlib import rig_map, fk_world, face_points
 from fingers import (m4_trs, m4_mul, m4_inv_affine, xform, NODE, q_between, qrot, qinv)
 
@@ -343,7 +343,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
     HDR.pack_into(out, 4, *h)
     if not os.path.exists(path + ".marks.bak"):
         open(path + ".marks.bak", "wb").write(p.buf)
-    open(path, "wb").write(out)
+    save_pack(path, bytes(out))
 
     q = Rpack(path)
     n2 = q.nodes(); nm2 = q.node_names()

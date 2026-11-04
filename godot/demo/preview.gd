@@ -6,7 +6,8 @@ extends SceneTree
 ##
 ## Frame 0 warms up (textures, shaders); frames 1-4 are front, three-quarter, side, back (the character faces
 ## +Z, glTF's forward). ship_character.py tiles 1-4 into preview_godot.png. The pose is the clip held at `t`
-## seconds; hair=1 hangs ClubHair on it first (the frames then show its settled rest, not a swing).
+## seconds; hair=1 hangs ClubHair on it first (the frames then show its settled rest, not a swing). A character with
+## a WARDROBE (meshes tagged wear~ / skin~h=, ClubWardrobe) is dressed in outfit=<name>, or its first outfit.
 
 var who: Node3D
 var cam: Camera3D
@@ -48,6 +49,7 @@ func _init() -> void:
 	var ps: PackedScene = load(args.get("file", "res://characters/x3d/x3d.glb"))
 	who = ps.instantiate()
 	get_root().add_child(who)
+	ClubWardrobe.attach(who, args.get("outfit", ""))      # no tags: nothing changes
 	var aps := who.find_children("*", "AnimationPlayer", true, false)
 	var clip: String = args.get("clip", "z_rm_sk_ride")
 	if not aps.is_empty() and (aps[0] as AnimationPlayer).has_animation(clip):
@@ -70,6 +72,8 @@ func _frame_it() -> void:
 	var box := AABB()
 	var first := true
 	for mi in who.find_children("*", "MeshInstance3D", true, false):
+		if not (mi as MeshInstance3D).is_visible_in_tree():
+			continue                                 # a piece of the wardrobe she is not wearing
 		var b: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
 		box = b if first else box.merge(b)
 		first = false

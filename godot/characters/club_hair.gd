@@ -13,7 +13,24 @@ class_name ClubHair
 ## club's solver, the stiffness keeps it near its pose. Measured on x3d: standing, it hangs where it is posed
 ## (on vs off 0.1-0.7% of pixels); riding a 4 m circle at 2 m/s, it swings out and trails.
 
-const NAMES := ["tail", "pony", "braid", "hair", "bang", "tress", "ribbon"]
+const NAMES := ["tail", "pony", "braid", "hair", "bang", "tress", "ribbon", "cloth", "breast"]
+## per family: stiffness, drag, gravity. Hair swings and hangs; CLOTH (a garment's free panel, bones named Cloth_*:
+## REVA's jacket hanging at her elbows, her bandana) is a little looser and heavier; SOFT MASS (bones named breast)
+## springs back to its pose and barely feels gravity -- the club engine's jiggle (jiggleTick), in Godot's springs.
+const FAMILY := {
+	"hair": [3.5, 0.5, 1.0],
+	"cloth": [2.5, 0.6, 1.0],
+	"breast": [12.0, 0.35, 0.05],
+}
+
+
+static func family(bone_name: String) -> String:
+	var lo := bone_name.to_lower()
+	if lo.contains("breast"):
+		return "breast"
+	if lo.contains("cloth"):
+		return "cloth"
+	return "hair"
 
 
 static func is_chain_name(bone_name: String) -> bool:
@@ -60,6 +77,7 @@ static func attach(root: Node, stiffness: float = 3.5, drag: float = 0.5, gravit
 		push_error("ClubHair: no Skeleton3D under %s" % root.name)
 		return null
 	var sk: Skeleton3D = found[0]
+	ClubStretch.attach(sk)                        # drapes held between two limbs turn (and stretch) before they swing
 	var chains := find_chains(sk)
 	if chains.is_empty():
 		push_warning("ClubHair: %s has no hair chains (bone names with %s)" % [root.name, ", ".join(NAMES)])
@@ -73,9 +91,12 @@ static func attach(root: Node, stiffness: float = 3.5, drag: float = 0.5, gravit
 		sim.set_end_bone_name(i, chains[i][1])
 		sim.set_extend_end_bone(i, true)          # the last bone swings too
 		sim.set_end_bone_length(i, 0.05)
-		sim.set_stiffness(i, stiffness)
-		sim.set_drag(i, drag)
-		sim.set_gravity(i, gravity)
+		var fam := family(chains[i][0])
+		var k: Array = FAMILY[fam]
+		# the hair's own settings are the ones passed in (the demo tunes them); cloth and soft mass keep theirs
+		sim.set_stiffness(i, stiffness if fam == "hair" else k[0])
+		sim.set_drag(i, drag if fam == "hair" else k[1])
+		sim.set_gravity(i, gravity if fam == "hair" else k[2])
 		sim.set_radius(i, 0.02)
 	print("ClubHair: %s -- %d chain(s): %s" % [root.name, chains.size(), str(chains)])
 	return sim

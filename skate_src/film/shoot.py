@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 NATIVE = os.path.join(ROOT, "reva_native")
 # ⛔ THE FILM AND ITS TAKES DO NOT LIVE ON C: -- a take is gigabytes of PPM before
-# it is a megabyte of mp4. jacob, 2026-09-03: "start using D:\reva902".
+# it is a megabyte of mp4. jacob, 2026-09-03: "start using [the takes drive]".
 OUTROOT = os.environ.get("REVA_OUTROOT", "out")
 DRIVER = os.path.join(ROOT, ".claude", "skills", "run-reva", "driver.py")
 PY = os.environ.get("CLUB_PYTHON", sys.executable)

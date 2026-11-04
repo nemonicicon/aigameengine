@@ -3,9 +3,9 @@
 Run headless, in the artery's proven shape (see skate_src/guns/bake_guns.sh):
 
     "C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" \\
-        "C:\\MyVeryOwnVideoGames\\Unreal Projects\\ZAMNRemake\\ZAMNRemake.uproject" \\
+        "<your UE project>.uproject" \\
         -run=pythonscript \\
-        -script="C:\\MyVeryOwnVideoGames\\reva\\skate_src\\anima\\ue_export_textures.py" \\
+        -script="<this repo>\\skate_src\\anima\\ue_export_textures.py" \\
         -stdout -FullStdOutLogOutput -unattended -nosplash -nullrhi
 
 ⛔ THE PATHS ARE HARDCODED AND THE INVOCATION USES BACKSLASHES ON PURPOSE. A first attempt

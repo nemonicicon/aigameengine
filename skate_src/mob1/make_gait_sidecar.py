@@ -13,8 +13,8 @@ engine loads next to the rpack:  <clip name> <club units per second>
 """
 import bpy, os, math
 
-SRC = r"C:\MyVeryOwnVideoGames\Unreal Projects\CivicDefenseV2\Source\FBX"
-OUT = r"C:\MyVeryOwnVideoGames\reva\reva_native\v1_mob1.gait"
+SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "v1_mob1.gait")   # club-engine kit: machine-independent paths
 CLUB = 1.75   # club units per metre
 
 # clip name in the pack  ->  its root-motion sibling

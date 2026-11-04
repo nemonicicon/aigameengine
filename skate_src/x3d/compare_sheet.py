@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """compare_sheet.py -- x3d's sheet-scale renders against her character sheet: side by side, overlaid, scored.
 
-    python skate_src/x3d/compare_sheet.py D:/reva902/x3d/x3d_sheet.png D:/reva902/x3d/build [--out compare.png]
+    python skate_src/x3d/compare_sheet.py <x3d_sheet.png> <build dir> [--out compare.png]
 
 build_x3d.py renders cmp_front/side/back.png at the sheet's own scale (1 px = 2.42 mm) through the same crop
 windows cut here, in the sheet's pose (arms hanging), on a transparent film. For each view:

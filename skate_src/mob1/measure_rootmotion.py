@@ -8,7 +8,7 @@ against it instead of trusted.
 """
 import bpy, os, math
 
-SRC = r"C:\MyVeryOwnVideoGames\Unreal Projects\CivicDefenseV2\Source\FBX"
+SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
 PAIRS = [
     ("Walk_02_Cheerful",  r"Walks\Root_Motion\Walk_02_Cheerful_Loop.fbx"),
     ("Walk_13_Power",     r"Walks\Root_Motion\Walk_13_Power_Walk_Loop.fbx"),

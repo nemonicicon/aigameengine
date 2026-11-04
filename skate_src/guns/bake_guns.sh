@@ -21,8 +21,8 @@ GUNS="skate_src/guns"
 
 if [ ! -d "$GUNS/export" ] || [ "$1" = "--reexport" ]; then
     echo "== UE export =="
-    "$UE" "C:\\MyVeryOwnVideoGames\\reva\\skate_src\\guns\\GunExport\\GunExport.uproject" \
-        -run=pythonscript -script="C:\\MyVeryOwnVideoGames\\reva\\skate_src\\guns\\ue_export_guns.py" \
+    "$UE" "$(cygpath -w "$(dirname "$0")/GunExport/GunExport.uproject")" \
+        -run=pythonscript -script="$(cygpath -w "$(dirname "$0")/ue_export_guns.py")" \
         -stdout -FullStdOutLogOutput -unattended -nosplash -nullrhi > "$GUNS/ue_guns.log" 2>&1
     grep -c "GUNS: .* -> OK" "$GUNS/ue_guns.log"
 fi

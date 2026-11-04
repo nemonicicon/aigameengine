@@ -17,7 +17,7 @@ low-poly way: every mesh in it UVs into ONE shared 2048 colour palette
 """
 import unreal, os
 
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\town\export"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # club-engine kit: machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/AssetsvilleTown/Meshes/"
 

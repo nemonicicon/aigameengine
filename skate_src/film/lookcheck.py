@@ -131,7 +131,7 @@ def main(argv=None):
     ap.add_argument("--fps", type=int, default=5, help="capture fps; a sheet needs 12 frames, not 2000")
     ap.add_argument("--secs", type=float, default=0.0, help="0 = the scene's own length")
     # ⛔ CAPTURES DO NOT LIVE ON C:. jacob, 2026-09-03: "we are low on space on the c
-    # drive. can you start using D:\reva902". A frame is an uncompressed 2.76 MB PPM and a
+    # drive. can you start using [the takes drive]". A frame is an uncompressed 2.76 MB PPM and a
     # sweep of nine scenes stages tens of thousands of them; C: was down to 61 GB and D:
     # has 734. The capture TEMP follows this directory (the driver puts _capframes beside
     # the output), so pointing --out at D: moves the staging as well as the results.

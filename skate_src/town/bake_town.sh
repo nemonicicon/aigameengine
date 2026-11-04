@@ -54,8 +54,8 @@ ROAD="$T/export/T_roadSet_opaque.png"
 
 if [ ! -d "$T/export" ] || [ "$1" = "--reexport" ]; then
     echo "== UE export =="
-    "$UE" "C:\\MyVeryOwnVideoGames\\reva\\skate_src\\guns\\GunExport\\GunExport.uproject" \
-        -run=pythonscript -script="C:\\MyVeryOwnVideoGames\\reva\\skate_src\\town\\ue_export_town.py" \
+    "$UE" "$(cygpath -w "$(dirname "$0")/../guns/GunExport/GunExport.uproject")" \
+        -run=pythonscript -script="$(cygpath -w "$(dirname "$0")/ue_export_town.py")" \
         -stdout -FullStdOutLogOutput -unattended -nosplash -nullrhi > "$T/ue_town.log" 2>&1
     grep -c "TOWN: .* -> OK" "$T/ue_town.log"
 fi

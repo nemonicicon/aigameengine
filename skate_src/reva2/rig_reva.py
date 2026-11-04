@@ -36,7 +36,7 @@ import numpy as np
 D = os.path.join(os.environ.get("REVA_SRC", "models/reva_meshy"),
                  "Meshy_AI_REVA_Holographic_Neon_0629075151_image-to-3d-texture_fbx")
 FBX = os.path.join(D, "Meshy_AI_REVA_Holographic_Neon_0629075151_image-to-3d-texture.fbx")
-OUT = os.environ.get("REVA_OUT", r"C:\MyVeryOwnVideoGames\reva\skate_src\reva2\reva2.glb")
+OUT = os.environ.get("REVA_OUT", os.path.join(os.environ.get("CLUB_OUT", "out"), "reva2.glb"))   # club-engine kit: machine-independent paths
 TRI_TARGET = int(os.environ.get("REVA_TRIS", "100000"))
 TEX = int(os.environ.get("REVA_TEX", "4096"))
 VOXEL = float(os.environ.get("REVA_VOXEL", "0.010"))

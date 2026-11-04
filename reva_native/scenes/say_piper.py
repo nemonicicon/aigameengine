@@ -38,7 +38,7 @@ PEOPLE = {
     # THE WORLD AT THE END OF TIME, scene 2.1 -- a TEMPORARY cast (jacob, 10-18: "a rough cut of scene 2.1 on
     # temporary voices", then "i like piper"). The only installed Piper model with men in it is LibriTTS (904
     # speakers, one `speaker` each); I cannot hear them, so the four were picked by MEASURED pitch and pace off one
-    # line said by 113 of them (D:/worldattheendoftime/production/voices/audition/spk_NNN.wav): men read 99-152 Hz,
+    # line said by 113 of them (the audition folder's spk_NNN.wav): men read 99-152 Hz,
     # women 170-255. Recast by changing a number.
     "narrator": dict(model="en_US-libritts_r-medium", speaker=248, length_scale=1.02, noise_scale=0.620,
                   noise_w_scale=0.80, note="the narrator (V.O.): a low man (106 Hz), unhurried"),

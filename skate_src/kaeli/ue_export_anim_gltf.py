@@ -1,5 +1,5 @@
 ﻿import unreal, os
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\kaeli\export\anim_glb"
+OUT = "out/kaeli/anim_glb"   # club-engine kit: machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/TopDown/Models/ZAMN_Cleo"
 opts = unreal.GLTFExportOptions()

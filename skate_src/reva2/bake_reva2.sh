@@ -11,7 +11,7 @@
 # jaw, mouth_interior -- see design/faces.md).
 #
 # The source is jacob's Meshy zip, Meshy_AI_REVA_Holographic_Neon_0629075151_image-to-3d-
-# texture_fbx.zip, unzipped to D:\reva902\reva_meshy (the default); override with
+# texture_fbx.zip, unzipped to reva_meshy (the default); override with
 # REVA_SRC=<dir holding the Meshy_AI_REVA_..._fbx folder>. REVA_TRIS / REVA_TEX /
 # REVA_VOXEL / REVA_OUT / REVA_PREVIEW=<dir> (rig overlay renders) are the knobs.
 #

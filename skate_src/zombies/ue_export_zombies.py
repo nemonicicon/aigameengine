@@ -19,7 +19,7 @@ way merge_mob1.py fused the CivicDefenseV2 mocap -- one rig, named clips, one rp
 """
 import unreal, os
 
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\zombies\export"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "zombies")   # club-engine kit: machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/ZombieAnimationPack/Animations/Mannequin_UE5"
 

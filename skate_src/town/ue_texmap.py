@@ -21,8 +21,8 @@ Output: skate_src/town/texmap.txt   -- "<meshname> <texturename>" per line
 """
 import unreal, os
 
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\town\export"
-MAP = r"C:\MyVeryOwnVideoGames\reva\skate_src\town\texmap.txt"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # club-engine kit: machine-independent paths
+MAP = os.path.join("skate_src", "town", "texmap.txt")   # club-engine kit: machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/AssetsvilleTown/Meshes/"
 

@@ -4,7 +4,7 @@ set -u
 SET="${1:-ztest}"
 CAM="${2:--4.2,2.2,-5.2,0,1.5,0,32}"
 SP="${CLUB_OUT:-out}/shoot_set"; mkdir -p "$SP"
-N="/c/MyVeryOwnVideoGames/reva/reva_native"
+N="$(cd "$(dirname "$0")/../../reva_native" && pwd)"
 cd "$N" || exit 1
 rm -rf "$SP/zf"; mkdir -p "$SP/zf"
 printf 'seq=%s face=0 grid=0 dqs=0 clip=z_upright set=%s sun=50,210,1.3,1.0,0.96,0.90 sky=0.44,0.50,0.62 cam=%s\n' \

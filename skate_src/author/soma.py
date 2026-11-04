@@ -2,7 +2,7 @@
 """soma.py -- a Kimodo take as a body the kit can read: the SOMA-30 skeleton and one generated motion behind the Rpack interface, so rig_map,
 fk_world, clip_pose, retarget.Basis and the benches work on it without a pack on disk. The first half of the text-to-motion lane (11-02).
 
-    take = SomaTake("C:/MyVeryOwnVideoGames/kimodo/out/walk_s1")     # a folder kmd-generate wrote: root_positions.f32, local_rotations_xyzw.f32
+    take = SomaTake("out/walk_s1")     # a folder kmd-generate wrote: root_positions.f32, local_rotations_xyzw.f32
 
 The names are NOT passed through. ⛔ SOMA calls the THIGH "LeftLeg" and the shin "LeftShin"; the kit's matchers read LeftLeg as the shin (Mixamo's
 word for it) and would lay thigh rotation on the shin. Its three spine bones and two neck bones are renamed to what the canon resolves too.

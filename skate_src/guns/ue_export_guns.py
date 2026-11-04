@@ -10,7 +10,7 @@ engine draws with drawProp() at whatever matrix the hand bone gives it.
 """
 import unreal, os
 
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\guns\export"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "guns")   # club-engine kit: machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 
 NAMES = [

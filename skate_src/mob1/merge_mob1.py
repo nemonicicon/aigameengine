@@ -3,7 +3,7 @@ onto one UE-mannequin armature -> mob1.glb (the club's second donor bank).
 
     blender --background --factory-startup --python merge_mob1.py
 
-Input : C:\\MyVeryOwnVideoGames\\Unreal Projects\\CivicDefenseV2\\Source\\FBX\\...
+Input : <your UE project>\\Source\\FBX\\...
 Output: skate_src/mob1/mob1.glb  (one rig, 20 named clips, stub mesh for the baker)
 
 Clip names ARE the engine contract (donor election is by EXACT name; the census
@@ -16,8 +16,8 @@ The UE scale-compensation convention crushed kaeli's first bake to a point
 """
 import bpy, os
 
-SRC = r"C:\MyVeryOwnVideoGames\Unreal Projects\CivicDefenseV2\Source\FBX"
-OUT = r"C:\MyVeryOwnVideoGames\reva\skate_src\mob1\mob1.glb"
+SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "mob1.glb")   # club-engine kit: machine-independent paths
 
 NAME = {
     r"Mobility\In_Place\MOB1_Walk_F_IPC.fbx":                    "w_walk",

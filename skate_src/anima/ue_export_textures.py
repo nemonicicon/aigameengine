@@ -31,7 +31,7 @@ import os
 import unreal
 
 SRC = "/Game/Anima/Characters/Textures"
-OUT = r"C:\MyVeryOwnVideoGames\reva\models\_out\anima_tex"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex")   # club-engine kit: machine-independent paths
 
 
 def wanted(name):

@@ -13,8 +13,9 @@ fact we can READ rather than a similarity we infer.
 Also dumps each skeletal mesh's slot order, because the slot NAME is what Blender matches on.
 """
 import unreal
+import os  # club-engine kit: machine-independent paths
 
-OUT = r"C:\MyVeryOwnVideoGames\reva\models\_out\anima_tex\MATERIALS.txt"
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex", "MATERIALS.txt")   # club-engine kit: machine-independent paths
 ROOT = "/Game/Anima/Characters"
 
 lines = []

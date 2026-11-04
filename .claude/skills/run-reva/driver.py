@@ -78,6 +78,7 @@ def build(a):
     warns it can fail SILENTLY with exit 1 and no output. Either way the fix is this
     prepend, so it is not optional and not left to the caller."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
     out = "crowd_new.exe"
     # ⛔ (10-22) A RUNNING crowd_new.exe CANNOT BE OVERWRITTEN: `looks` / `up` leave a live window holding it, and the
     # link then dies with nothing but "ld returned 1 exit status". Close it first.
@@ -101,6 +102,15 @@ def build(a):
     return 0
 
 
+def rc_object(env):
+    """crowd_win_rc.o is the UTF-8 manifest, built from crowd_win.rc: a fresh clone has the .rc and not the .o (git ignores *.o), and without it
+    fopen dies on a non-ASCII pack name. The kit's first build failed at the link for want of it (11-04), so every build makes it when it's missing."""
+    if os.path.exists(os.path.join(NATIVE, "crowd_win_rc.o")) or not os.path.exists(os.path.join(NATIVE, "crowd_win.rc")):
+        return
+    r = subprocess.run([os.path.join(MINGW, "windres.exe"), "crowd_win.rc", "-O", "coff", "-o", "crowd_win_rc.o"], cwd=NATIVE, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    print("windres: crowd_win_rc.o " + ("built" if r.returncode == 0 else "FAILED: " + r.stdout[-400:]))
+
 def other_game(a):
     """the game asked for on the command line, when it isn't the one this tree builds by default"""
     return a.game or ("sample" if a.sample else None)
@@ -109,6 +119,7 @@ def other_game(a):
 def buildvk(a):
     """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe. gl_null.c stands in for GL and gfx_vk.c draws. Only what has come across to gfx.h shows up. reva_native/rvz_vk.bat plays it."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
     name = other_game(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it
     exe = f"crowd_{name}_vk.exe" if name else "crowd_vk.exe"
     src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
@@ -127,6 +138,7 @@ def check(a):
     """⭐ THE SIM'S RECEIPT (11-02, engine plan Phase 1). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window, the same answer on any machine.
     It says whether the sim still does exactly what it did. It says nothing about the picture; that's what eyes and `bench` are for."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
     # --nodoors: the engine as the kit gets it, with no old game modes. It must print the same hashes. --game NAME: the same with that game, against its own hashes.
     name = other_game(a)
     exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"

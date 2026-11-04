@@ -123,3 +123,5 @@ godot/.godot/
 !reva_native/games/*/props/
 !reva_native/games/*/props/*.rpack
 !reva_native/games/rocks/sheet.png
+!godot/characters/*/*.glb
+!godot/characters/*/*.png

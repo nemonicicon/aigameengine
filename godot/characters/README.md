@@ -8,6 +8,14 @@ Hair physics for any of them: `ClubHair.attach(instance)` (`club_hair.gd`).
 
 ![clanker](clanker/preview_godot.png)
 
+## [R.E.V.A. 902 -- the club's own, with her wardrobe](reva902/README.md)
+
+![reva902](reva902/preview_godot.png)
+
+## [The Suit Man](suitman/README.md)
+
+![suitman](suitman/preview_godot.png)
+
 ## [X3D -- the skater girl, ready for Godot 4](x3d/README.md)
 
 ![x3d](x3d/preview_godot.png)

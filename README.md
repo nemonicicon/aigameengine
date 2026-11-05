@@ -184,9 +184,9 @@ The plan's queue of 29 steps is built. What is true of it, plainly:
   under an emulator. The Vulkan build has not been RUN on Linux since the old renderer came out: the machine
   this was checked on has no display and no Vulkan driver. `roam`, `talk` and `people` have only made their
   packs on Windows.
-- **The CI** (`.github/workflows/club.yml`) has not been seen to pass on GitHub in its present form. Every step
-  of it was run from this repository's files in a Debian container first, on another version of gcc than the
-  runner's.
+- **The CI** (`.github/workflows/club.yml`): every step of it was run from this repository's files in a Debian
+  container before it was first pushed, on another version of gcc than GitHub's runner has. Whether it holds on
+  the runner is on this repository's Actions page, run by run.
 - **On a real Raspberry Pi 4:** the engine as it was on 11-04 ran on the direct road at 240p and 480i on a
   composite tube. The Pi's hashes were the PC's when the two were last compared, on 11-02. Nothing built since
   11-04 has been on one. Performance on the Pi is the plan's last phase, and it hasn't started.

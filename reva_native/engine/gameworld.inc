@@ -34,15 +34,16 @@ static int pathFind(int cx,int cz,int yq,unsigned*hOut){ const unsigned h=((unsi
 /* could a body walk this? It's E->walk itself, in short steps, its feet rising as it goes, so what the map says is what a body will do. ⛔ Asking whether what's ahead is in the way doesn't do: a body on a stair has the next step's riser in its circle all the way up, and it walks up it */
 static int wnStep(float x0,float z0,float y0,float x1,float z1,float r,float*yOut){ float px=x0,pz=z0,y=y0; const int n=4; for(int i=1;i<=n;i++){ const float tx=x0+(x1-x0)*(float)i/(float)n,tz=z0+(z1-z0)*(float)i/(float)n; float x=tx,z=tz; const float g=spWalk(px,pz,&x,&z,y,r); if(fabsf(x-tx)>1e-3f||fabsf(z-tz)>1e-3f) return 0; px=x; pz=z; y=g; } if(y0-y>2.5f) return 0; *yOut=y; return 1; }
 /* the map: a point every half a unit, on each surface there, and the eight ways on from it */
-typedef struct { float x,y,z,g,f; int nb[8],parent,next,heapMark; short cx,cz,yq; unsigned stamp; } WalkNode;
-static WalkNode*g_wn=NULL; static int g_wnN=0,g_wnCap=0,g_wnFor=-1,*g_wnHash=NULL,*g_wnQ=NULL,*g_wnHeap=NULL; static float g_wnX0=0.f,g_wnZ0=0.f; static unsigned g_wnStamp=0;
+typedef struct { float x,y,z,g,f; int nb[8],parent,next,heapMark; short cx,cz,yq,cell; unsigned stamp; } WalkNode;   /* cell: which streamed cell's place it is, -1 for the set's own */
+static WalkNode*g_wn=NULL; static int g_wnN=0,g_wnCap=0,g_wnFor=-1,*g_wnHash=NULL,*g_wnQ=NULL,*g_wnHeap=NULL; static float g_wnX0=0.f,g_wnZ0=0.f; static unsigned g_wnStamp=0; static int g_wnCellCur=-1;
+static void wnJobDrop(void);
 #define WN_HASH 65536
 #define WN_MAX 262144
 static int wnFind(int cx,int cz,int yq,unsigned*hOut){ const unsigned h=((unsigned)(cx*73856093)^(unsigned)(cz*19349663)^(unsigned)(yq*83492791))&(WN_HASH-1u); if(hOut) *hOut=h; for(int i=g_wnHash[h];i>=0;i=g_wn[i].next) if(g_wn[i].cx==cx&&g_wn[i].cz==cz&&g_wn[i].yq==yq) return i; return -1; }
 static int wnAdd(int cx,int cz,float y){ const short yq=(short)floorf(y*4.f+0.5f); unsigned h; const int e=wnFind(cx,cz,yq,&h); if(e>=0) return e; if(g_wnN>=WN_MAX) return -1;
     if(g_wnN>=g_wnCap){ g_wnCap=g_wnCap?g_wnCap*2:8192; g_wn=(WalkNode*)realloc(g_wn,(size_t)g_wnCap*sizeof(WalkNode)); g_wnQ=(int*)realloc(g_wnQ,(size_t)g_wnCap*sizeof(int)); g_wnHeap=(int*)realloc(g_wnHeap,(size_t)g_wnCap*2u*sizeof(int)); }
-    const int i=g_wnN++; WalkNode*W=&g_wn[i]; memset(W,0,sizeof *W); W->x=g_wnX0+(float)cx*PATH_STEP; W->y=y; W->z=g_wnZ0+(float)cz*PATH_STEP; W->cx=(short)cx; W->cz=(short)cz; W->yq=yq; W->next=g_wnHash[h]; g_wnHash[h]=i; for(int d=0;d<8;d++) W->nb[d]=-1; return i; }
-static void wnBuild(void){ const double t0=wall_ms(); if(!g_wnHash) g_wnHash=(int*)malloc(sizeof(int)*WN_HASH); for(int i=0;i<WN_HASH;i++) g_wnHash[i]=-1; g_wnN=0; g_wnFor=g_spBuilt; const SpGrid*G=&g_sp; if(!G->col) return; const float r=0.42f; g_wnX0=floorf(G->x0/PATH_STEP)*PATH_STEP; g_wnZ0=floorf(G->z0/PATH_STEP)*PATH_STEP; const int nx=(int)((float)G->W*SP_CELL/PATH_STEP)+1,nz=(int)((float)G->H*SP_CELL/PATH_STEP)+1;
+    const int i=g_wnN++; WalkNode*W=&g_wn[i]; memset(W,0,sizeof *W); W->x=g_wnX0+(float)cx*PATH_STEP; W->y=y; W->z=g_wnZ0+(float)cz*PATH_STEP; W->cx=(short)cx; W->cz=(short)cz; W->yq=yq; W->cell=(short)g_wnCellCur; W->next=g_wnHash[h]; g_wnHash[h]=i; for(int d=0;d<8;d++) W->nb[d]=-1; return i; }
+static void wnBuild(void){ const double t0=wall_ms(); if(!g_wnHash) g_wnHash=(int*)malloc(sizeof(int)*WN_HASH); for(int i=0;i<WN_HASH;i++) g_wnHash[i]=-1; g_wnN=0; g_wnFor=g_spBuilt; g_wnCellCur=-1; wnJobDrop(); const SpGrid*G=&g_sp; if(!G->col){ g_wnX0=g_wnZ0=0.f; return; } const float r=0.42f; g_wnX0=floorf(G->x0/PATH_STEP)*PATH_STEP; g_wnZ0=floorf(G->z0/PATH_STEP)*PATH_STEP; const int nx=(int)((float)G->W*SP_CELL/PATH_STEP)+1,nz=(int)((float)G->H*SP_CELL/PATH_STEP)+1;
     /* everywhere a person could stand: the ground, and the top of anything walkable */
     for(int cz=0;cz<nz;cz++) for(int cx=0;cx<nx;cx++){ const float x=g_wnX0+(float)cx*PATH_STEP,z=g_wnZ0+(float)cz*PATH_STEP; const float g=spGround(x,z,0.f); if(!spBlocked(x,z,g,r)) wnAdd(cx,cz,g); const int c=spCol(G,x,z); if(c<0) continue;
         for(int s=G->col[c];s>=0;s=G->sp[s].next){ const SpSpan*S=&G->sp[s]; if(!S->walk) continue; const float t=spGround(x,z,S->y1); if(fabsf(t-S->y1)<0.3f&&!spBlocked(x,z,t,r)) wnAdd(cx,cz,t); } }
@@ -53,20 +54,77 @@ static void wnBuild(void){ const double t0=wall_ms(); if(!g_wnHash) g_wnHash=(in
             float t; if(!wnStep(x0,z0,y0,nxx,nzz,r,&t)) continue;
             const int n=wnAdd(c1x,c1z,t); g_wn[i].nb[d]=n; } }
     printf("[path] %s: a map of %d places, %.0f ms\n",g_setCur,g_wnN,wall_ms()-t0); fflush(stdout); }
+/* ---- THE MAP OF A STREAMING WORLD (step 20, 11-04). A cell's part of the map is made once its columns are in, a budget of it a tick so a frame never waits for it, and it goes when the
+ * cell goes. The budget is a count and not a clock, so a measured run makes the same map at the same ticks. Until a cell's part is in, a way through it is the column search below. */
+#define WN_STAND_BUDGET 600
+#define WN_LINK_BUDGET 500
+#define WN_JOBQ 64
+static int g_wnJobQ[WN_JOBQ],g_wnJobQN=0; static struct { int on,ci,phase,cx,cz,i,x0,z0,x1,z1; } g_wnJob;
+static void wnJobDrop(void){ g_wnJob.on=0; }
+static void wnStreamReset(void){ g_wnJobQN=0; g_wnJob.on=0; }
+static void wnJobPush(int ci,int front){ for(int i=0;i<g_wnJobQN;i++) if(g_wnJobQ[i]==ci) return; if(g_wnJobQN>=WN_JOBQ) return; if(front){ for(int i=g_wnJobQN;i>0;i--) g_wnJobQ[i]=g_wnJobQ[i-1]; g_wnJobQ[0]=ci; } else g_wnJobQ[g_wnJobQN]=ci; g_wnJobQN++; }
+static void wnCellIn(int ci){ if(g_wnFor!=g_spBuilt) wnBuild(); if(g_wnJob.on&&g_wnJob.ci==ci) return; wnJobPush(ci,0); }
+/* a cell's gone: its places go, the map closes up, and a job that was under way starts again, because the places shifted under it */
+static void wnCellOut(int ci){
+    for(int i=0;i<g_wnJobQN;i++) if(g_wnJobQ[i]==ci){ for(int k=i+1;k<g_wnJobQN;k++) g_wnJobQ[k-1]=g_wnJobQ[k]; g_wnJobQN--; i--; }
+    if(g_wnJob.on){ const int rc=g_wnJob.ci; g_wnJob.on=0; if(rc!=ci) wnJobPush(rc,1); }
+    if(!g_wnN){ return; }
+    int*map=(int*)malloc(sizeof(int)*(size_t)g_wnN); if(!map) return; int n=0;
+    for(int i=0;i<g_wnN;i++){ if(g_wn[i].cell==ci) map[i]=-1; else { map[i]=n; if(n!=i) g_wn[n]=g_wn[i]; n++; } }
+    if(n==g_wnN){ free(map); return; }
+    g_wnN=n; for(int i=0;i<WN_HASH;i++) g_wnHash[i]=-1;
+    for(int i=0;i<n;i++){ WalkNode*W=&g_wn[i]; for(int d=0;d<8;d++) W->nb[d]=W->nb[d]>=0?map[W->nb[d]]:-1; unsigned h; wnFind(W->cx,W->cz,W->yq,&h); W->next=g_wnHash[h]; g_wnHash[h]=i; }
+    free(map); }
+/* one slice of the job under way: 1 while there's more of it */
+static int wnJobSlice(void){ StCell*C=&g_st.c[g_wnJob.ci]; const SpGrid*G=C->grid; if(!G||!G->col||SDL_AtomicGet(&C->state)!=ST_HERE) return 0;
+    static const signed char D[8][2]={{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}}; static const int OPP[8]={1,0,3,2,7,6,5,4}; const float r=0.42f;
+    if(g_wnJob.phase==0){ int budget=WN_STAND_BUDGET; g_wnCellCur=g_wnJob.ci;   /* everywhere in it a person could stand */
+        for(;g_wnJob.cz<=g_wnJob.z1;g_wnJob.cz++){ for(;g_wnJob.cx<=g_wnJob.x1;g_wnJob.cx++){ if(budget--<=0){ g_wnCellCur=-1; return 1; }
+                const float x=g_wnX0+(float)g_wnJob.cx*PATH_STEP,z=g_wnZ0+(float)g_wnJob.cz*PATH_STEP; const float g=spGround(x,z,0.f); if(!spBlocked(x,z,g,r)) wnAdd(g_wnJob.cx,g_wnJob.cz,g);
+                const int c=spCol(G,x,z); if(c<0) continue;
+                for(int s=G->col[c];s>=0;s=G->sp[s].next){ const SpSpan*S=&G->sp[s]; if(!S->walk) continue; const float t=spGround(x,z,S->y1); if(fabsf(t-S->y1)<0.3f&&!spBlocked(x,z,t,r)) wnAdd(g_wnJob.cx,g_wnJob.cz,t); } }
+            g_wnJob.cx=g_wnJob.x0; }
+        g_wnCellCur=-1; g_wnJob.phase=1; g_wnJob.i=0; return 1; }
+    /* the ways on from each of its places, the way a body walks them, and back into them from the places next door that were there first */
+    int budget=WN_LINK_BUDGET;
+    for(;g_wnJob.i<g_wnN;g_wnJob.i++){ const int i=g_wnJob.i; if(g_wn[i].cell!=g_wnJob.ci) continue; if(budget--<=0) return 1;
+        const float y0=g_wn[i].y,x0=g_wn[i].x,z0=g_wn[i].z; const int c0x=g_wn[i].cx,c0z=g_wn[i].cz;
+        for(int d=0;d<8;d++){ const float nxx=x0+(float)D[d][0]*PATH_STEP,nzz=z0+(float)D[d][1]*PATH_STEP; const int c1x=c0x+D[d][0],c1z=c0z+D[d][1];
+            float t; if(!wnStep(x0,z0,y0,nxx,nzz,r,&t)) continue;
+            int n=wnFind(c1x,c1z,(short)floorf(t*4.f+0.5f),NULL);
+            if(n<0&&c1x>=g_wnJob.x0&&c1x<=g_wnJob.x1&&c1z>=g_wnJob.z0&&c1z<=g_wnJob.z1){ g_wnCellCur=g_wnJob.ci; n=wnAdd(c1x,c1z,t); g_wnCellCur=-1; }   /* somewhere new inside the cell: the list grows, and it gets its turn */
+            if(n<0){ continue; }   /* never a step out into a cell that isn't here: there's always ground at 0, and it would go on for ever */
+            g_wn[i].nb[d]=n;
+            if(g_wn[n].cell!=g_wnJob.ci&&g_wn[n].nb[OPP[d]]<0){ float t2; if(wnStep(g_wn[n].x,g_wn[n].z,g_wn[n].y,x0,z0,r,&t2)&&fabsf(t2-y0)<0.3f) g_wn[n].nb[OPP[d]]=i; } } }
+    { static const char*dbg=(const char*)1; if(dbg==(const char*)1) dbg=getenv("REVA_TALKDBG"); if(dbg){ int n=0; for(int i=0;i<g_wnN;i++) if(g_wn[i].cell==g_wnJob.ci) n++; printf("[path] cell %s: %d places on the map, %d in all\n",C->stem,n,g_wnN); fflush(stdout); } }
+    C->grid->mapped=1; return 0; }
+/* once a tick in a streaming world: the next cell's part of the map, a slice of it */
+static void wnStreamStep(void){ if(!g_st.on) return; if(g_wnFor!=g_spBuilt) wnBuild();
+    if(!g_wnJob.on){ if(!g_wnJobQN) return; int pick=0; float pd=1e30f;   /* the nearest one to her first: it's the one a way is about to be asked across */
+        for(int i=0;i<g_wnJobQN;i++){ const StCell*Q=&g_st.c[g_wnJobQ[i]]; const float dx=Q->x-g_rvx,dz=Q->z-g_rvz,d=dx*dx+dz*dz; if(d<pd){ pd=d; pick=i; } }
+        const int ci=g_wnJobQ[pick]; for(int i=pick+1;i<g_wnJobQN;i++) g_wnJobQ[i-1]=g_wnJobQ[i]; g_wnJobQN--;
+        const StCell*C=&g_st.c[ci]; const SpGrid*G=C->grid; if(!G||!G->col) return;
+        memset(&g_wnJob,0,sizeof g_wnJob); g_wnJob.on=1; g_wnJob.ci=ci;
+        float b[4]={(G->x0-g_wnX0)/PATH_STEP,(G->z0-g_wnZ0)/PATH_STEP,(G->x0+(float)G->W*SP_CELL-g_wnX0)/PATH_STEP,(G->z0+(float)G->H*SP_CELL-g_wnZ0)/PATH_STEP};
+        for(int k=0;k<4;k++){ if(b[k]<-30000.f) b[k]=-30000.f; if(b[k]>30000.f) b[k]=30000.f; }
+        g_wnJob.x0=(int)floorf(b[0]); g_wnJob.z0=(int)floorf(b[1]); g_wnJob.x1=(int)ceilf(b[2]); g_wnJob.z1=(int)ceilf(b[3]); g_wnJob.cx=g_wnJob.x0; g_wnJob.cz=g_wnJob.z0; }
+    if(!wnJobSlice()) g_wnJob.on=0; }
 /* the nearest place on the map, at about this height */
 static int wnNear(float x,float y,float z){ const int cx=(int)floorf((x-g_wnX0)/PATH_STEP+0.5f),cz=(int)floorf((z-g_wnZ0)/PATH_STEP+0.5f); int best=-1; float bd=1e30f; for(int rad=0;rad<6&&best<0;rad++) for(int dz=-rad;dz<=rad;dz++) for(int dx=-rad;dx<=rad;dx++){ if(rad&&abs(dx)!=rad&&abs(dz)!=rad) continue; for(int yq=(int)floorf(y*4.f)-16;yq<=(int)floorf(y*4.f)+16;yq++){ const int i=wnFind(cx+dx,cz+dz,yq,NULL); if(i<0) continue; const float ex=g_wn[i].x-x,ey=(g_wn[i].y-y)*2.f,ez=g_wn[i].z-z,e=ex*ex+ey*ey+ez*ez; if(e<bd){ bd=e; best=i; } } } return best; }
 /* can a body walk straight from here to there, at its own height? */
 static int pathLine(const float*a,const float*b,float r){ const float dx=b[0]-a[0],dz=b[2]-a[2],d=sqrtf(dx*dx+dz*dz); const int n=(int)(d/0.2f)+1; float y=a[1],px=a[0],pz=a[2]; for(int i=1;i<=n;i++){ const float t=(float)i/(float)n,tx=a[0]+dx*t,tz=a[2]+dz*t; float x=tx,z=tz; const float g=spWalk(px,pz,&x,&z,y,r); if(fabsf(x-tx)>1e-3f||fabsf(z-tz)>1e-3f) return 0; if(y-g>SP_STEP*1.5f) return 0; px=x; pz=z; y=g; } return fabsf(y-b[1])<0.5f; }
 static int pathLineLive(const float*a,const float*b,float r){ return pathLine(a,b,r); }
 /* a search of the map */
-static int wnSearch(float x0,float y0,float z0,float x1,float y1,float z1,float r,float*xyz,int max){ const double t0=wall_ms(); if(g_wnFor!=g_spBuilt) wnBuild(); const int s=wnNear(x0,y0,z0),e=wnNear(x1,y1,z1); xyz[0]=x0; xyz[1]=y0; xyz[2]=z0; if(s<0||e<0) return 1;
-    g_wnStamp++; int hn=0,best=s,goal=-1,seen=0; float bestH=1e30f; WalkNode*W=g_wn; const WalkNode*E0=&W[e]; { WalkNode*A=&W[s]; A->stamp=g_wnStamp; A->g=0.f; A->parent=-1; const float dx=E0->x-A->x,dy=E0->y-A->y,dz=E0->z-A->z; A->f=sqrtf(dx*dx+dy*dy+dz*dz); g_wnHeap[hn++]=s; }
+static int wnSearch(float x0,float y0,float z0,float x1,float y1,float z1,float r,float*xyz,int max){ const double t0=wall_ms(); if(g_wnFor!=g_spBuilt) wnBuild(); const int s=wnNear(x0,y0,z0),e=wnNear(x1,y1,z1); xyz[0]=x0; xyz[1]=y0; xyz[2]=z0; if(s<0||(e<0&&!g_st.on)) return 1;
+    /* in a streaming world the place asked for can be in a cell whose part of the map isn't in yet: then it heads for the place itself, and gives the way to as near as the map goes */
+    g_wnStamp++; int hn=0,best=s,goal=-1,seen=0; float bestH=1e30f; WalkNode*W=g_wn; const float E0[3]={e>=0?W[e].x:x1,e>=0?W[e].y:y1,e>=0?W[e].z:z1}; { WalkNode*A=&W[s]; A->stamp=g_wnStamp; A->g=0.f; A->parent=-1; const float dx=E0[0]-A->x,dy=E0[1]-A->y,dz=E0[2]-A->z; A->f=sqrtf(dx*dx+dy*dy+dz*dz); g_wnHeap[hn++]=s; }
     while(hn>0){ const int cur=g_wnHeap[0]; hn--; if(hn>0){ g_wnHeap[0]=g_wnHeap[hn]; int k=0; for(;;){ const int l=2*k+1,rr=l+1; int m=k; if(l<hn&&(W[g_wnHeap[l]].f<W[g_wnHeap[m]].f||(W[g_wnHeap[l]].f==W[g_wnHeap[m]].f&&g_wnHeap[l]<g_wnHeap[m]))) m=l; if(rr<hn&&(W[g_wnHeap[rr]].f<W[g_wnHeap[m]].f||(W[g_wnHeap[rr]].f==W[g_wnHeap[m]].f&&g_wnHeap[rr]<g_wnHeap[m]))) m=rr; if(m==k) break; const int t=g_wnHeap[m]; g_wnHeap[m]=g_wnHeap[k]; g_wnHeap[k]=t; k=m; } }
-        seen++; const WalkNode*C=&W[cur]; { const float dx=E0->x-C->x,dy=E0->y-C->y,dz=E0->z-C->z,h=sqrtf(dx*dx+dy*dy+dz*dz); if(h<bestH){ bestH=h; best=cur; } } if(cur==e){ goal=cur; break; } const float gC=C->g;
+        seen++; if(seen>(e<0?20000:60000)) break;   /* no end to reach on the map, or one that's walled off: it stops looking and gives the nearest it found */
+        const WalkNode*C=&W[cur]; { const float dx=E0[0]-C->x,dy=E0[1]-C->y,dz=E0[2]-C->z,h=sqrtf(dx*dx+dy*dy+dz*dz); if(h<bestH){ bestH=h; best=cur; } } if(cur==e){ goal=cur; break; } const float gC=C->g;
         for(int d=0;d<8;d++){ const int n=C->nb[d]; if(n<0) continue; WalkNode*Q=&W[n]; const float dy=C->y-Q->y; const float ng=gC+(d>=4?1.4142f:1.f)*PATH_STEP+(dy>0.f?dy:-dy)*0.5f; if(Q->stamp==g_wnStamp&&ng>=Q->g) continue;
             /* what's been spawned or has moved since the map was made */
-            { int stop=0; for(int g2=0;g2<g_spNLive&&!stop;g2++) if(!g_spLive[g2]->soft&&spBlockCount(g_spLive[g2],Q->x,Q->z,Q->y,r)>0) stop=1; if(stop) continue; }
-            const float ex=E0->x-Q->x,ey=E0->y-Q->y,ez=E0->z-Q->z; Q->stamp=g_wnStamp; Q->g=ng; Q->f=ng+sqrtf(ex*ex+ey*ey+ez*ez); Q->parent=cur; if(hn<g_wnCap*2){ int k=hn++; g_wnHeap[k]=n; while(k>0){ const int p=(k-1)/2; if(W[g_wnHeap[p]].f<=W[g_wnHeap[k]].f) break; const int t2=g_wnHeap[p]; g_wnHeap[p]=g_wnHeap[k]; g_wnHeap[k]=t2; k=p; } } } }
+            { int stop=0; for(int g2=0;g2<g_spNLive&&!stop;g2++) if(!g_spLive[g2]->soft&&!g_spLive[g2]->mapped&&spBlockCount(g_spLive[g2],Q->x,Q->z,Q->y,r)>0) stop=1; if(stop) continue; }
+            const float ex=E0[0]-Q->x,ey=E0[1]-Q->y,ez=E0[2]-Q->z; Q->stamp=g_wnStamp; Q->g=ng; Q->f=ng+sqrtf(ex*ex+ey*ey+ez*ez); Q->parent=cur; if(hn<g_wnCap*2){ int k=hn++; g_wnHeap[k]=n; while(k>0){ const int p=(k-1)/2; if(W[g_wnHeap[p]].f<=W[g_wnHeap[k]].f) break; const int t2=g_wnHeap[p]; g_wnHeap[p]=g_wnHeap[k]; g_wnHeap[k]=t2; k=p; } } } }
     const int end=goal>=0?goal:best; static int chain[WN_MAX]; int nC=0;
     for(int i=end;i>=0&&nC<WN_MAX;i=W[i].parent) chain[nC++]=i;
     float A[3]={x0,W[s].y,z0};
@@ -76,7 +134,8 @@ static int wnSearch(float x0,float y0,float z0,float x1,float y1,float z1,float 
     { static const char*dbg=(const char*)1; if(dbg==(const char*)1) dbg=getenv("REVA_TALKDBG"); if(dbg){ printf("[path] %d points, %d places looked at, %.2f ms, %s\n",out,seen,wall_ms()-t0,goal>=0?"there":"as near as it could get"); fflush(stdout); } }
     return out; }
 static int apiPath(float x0,float y0,float z0,float x1,float y1,float z1,float radius,float*xyz,int max){ if(!xyz||max<1) return 0; const float r=radius>0.f?radius:0.42f; const double t0=wall_ms();
-    if(g_spOn&&!g_st.on&&fabsf(r-0.42f)<0.1f) return wnSearch(x0,y0,z0,x1,y1,z1,r,xyz,max);
+    if(g_spOn&&fabsf(r-0.42f)<0.1f){ if(!g_st.on) return wnSearch(x0,y0,z0,x1,y1,z1,r,xyz,max);
+        if(g_wnN&&wnNear(x0,y0,z0)>=0) return wnSearch(x0,y0,z0,x1,y1,z1,r,xyz,max); }   /* a streaming world: on the map once the cell she's in has its part of it, and the search below until then */
     if(!g_spOn){ static float ox[256],oz[256]; const int n=navPath(x0,z0,x1,z1,ox,oz,max<256?max:256); if(n<=0){ xyz[0]=x0; xyz[1]=0.f; xyz[2]=z0; return 1; } for(int i=0;i<n;i++){ xyz[i*3]=ox[i]; xyz[i*3+1]=0.f; xyz[i*3+2]=oz[i]; } return n; }
     for(int i=0;i<PATH_HASH;i++) g_pnHash[i]=-1;
     int nN=0,hn=0,best=0,goal=-1; float bestH=1e30f; const float y00=spGround(x0,z0,y0);
@@ -119,7 +178,6 @@ static int apiAttach(int body,int prop,const char*bone,float x,float y,float z,f
     Att*A=&g_att[k]; memset(A,0,sizeof *A); A->on=1; A->body=body; A->prop=prop; A->node=-1; snprintf(A->bone,sizeof A->bone,"%s",bone); A->off[0]=x; A->off[1]=y; A->off[2]=z; A->scale=scale>0.f?scale:1.f; float qa[4],qb[4],qc[4],t[4]; qaxis(qa,0,1,0,yaw); qaxis(qb,1,0,0,pitch); qaxis(qc,0,0,1,roll); qmul(t,qa,qb); qmul(A->q,t,qc); g_attN++; if(k>=g_attHi) g_attHi=k+1; return k+1; }
 static void apiDetach(int h){ if(h<1||h>ATT_MAX||!g_att[h-1].on) return; g_att[h-1].on=0; g_attN--; }
 static void apiDetachAll(int body){ for(int i=0;i<g_attHi;i++) if(g_att[i].on&&g_att[i].body==body){ g_att[i].on=0; g_attN--; } }
-#ifdef REVA_PACKET
 /* a body's been posed: what's on it, at the bone, this frame */
 static void attDraw(int body,Pack*P,M4*W,const float*model){ if(!g_attN||g_noDraw) return; for(int i=0;i<g_attHi;i++){ Att*A=&g_att[i]; if(!A->on||A->body!=body) continue;
         if(A->pk!=P){ A->pk=P; A->node=attBoneOf(P,A->bone); if(A->node<0){ static int said=0; if(said++<8){ printf("[attach] %s has no bone called %s\n",P->label,A->bone); fflush(stdout); } } } if(A->node<0) continue;
@@ -127,9 +185,6 @@ static void attDraw(int body,Pack*P,M4*W,const float*model){ if(!g_attN||g_noDra
         const unsigned owner=g_vkOwner; const float use=g_vkUse; float tint[3]; memcpy(tint,g_vkTint,12); g_vkOwner=((unsigned)GFX_KIND_OBJECT<<28)|((0x8000u+(unsigned)i)<<12); g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; Face*fc=g_faceCur; g_faceCur=NULL;
         for(unsigned mi=0;mi<Q->nMeshes;mi++){ const PMesh*M=&Q->meshes[mi]; if(!(M->flags&4)) continue; g_vkMirror=1|2; vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,0,NULL); g_vkMirror=0; if(g_shadowOn) vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,GFX_SHADOW,NULL); }
         g_faceCur=fc; g_vkOwner=owner; g_vkUse=use; memcpy(g_vkTint,tint,12); } }
-#else
-static void attDraw(int body,Pack*P,M4*W,const float*model){ (void)body; (void)P; (void)W; (void)model; }
-#endif
 
 /* ---- A MUSIC CLOCK. E->musicClock says the music that's just started has this many beats a minute, its first beat this many seconds in, and so many beats to a bar. E->musicBeat says where it is, in beats, and GameExport.beat falls on the tick each one comes round. In a live game it follows the sound itself, because a late frame slows the game by a hair and the sound doesn't stop for it, and a tape keeps what it read, so a replay's the same session. In anything measured it's the tick clock, and no sound's involved. */
 static struct { int on,bar,last,hasNext; float bpm,first,t,next; double dev0; } g_mclk;
@@ -138,7 +193,7 @@ static float apiMusicTime(void){ return g_mclk.on?g_mclk.t:0.f; }
 static float apiMusicBeat(void){ return g_mclk.on?(g_mclk.t-g_mclk.first)*g_mclk.bpm/60.f:0.f; }
 /* what it'll read at the next tick. A tape's written before the tick that uses it, so this is worked out then, and kept */
 static float musicClockRead(void){ if(!g_mclk.on) return -1.f; float t=g_mclk.t+simStepS();
-    if(g_fixedStepMs<=0.0&&!g_tapeRep&&sfxReady()){ const float dev=(float)(musicSeconds()-g_mclk.dev0),err=dev-t; if(dev>0.f){ if(err>0.25f||err<-0.25f) t=dev; else t+=err*0.05f; } }
+    if(g_fixedStepMs<=0.0&&!g_tapeRep&&!g_netOn&&sfxReady()){   /* (step 29) and in a session it's the tick's: every machine's sound card keeps its own time */ const float dev=(float)(musicSeconds()-g_mclk.dev0),err=dev-t; if(dev>0.f){ if(err>0.25f||err<-0.25f) t=dev; else t+=err*0.05f; } }
     g_mclk.next=t; g_mclk.hasNext=1; return t; }
 static void musicClockStep(void){ if(!g_mclk.on) return; const float t=g_tapeMusicIn>=0.f?g_tapeMusicIn:(g_mclk.hasNext?g_mclk.next:musicClockRead()); g_mclk.hasNext=0;
     g_mclk.t=t; const int b=(int)floorf((t-g_mclk.first)*g_mclk.bpm/60.f); if(b!=g_mclk.last){ g_mclk.last=b; if(b>=0&&g_game->beat) g_game->beat(b); } }

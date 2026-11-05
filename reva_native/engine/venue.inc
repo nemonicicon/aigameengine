@@ -1,6 +1,5 @@
-#ifdef REVA_PACKET
 /* ---- THE DANCE FLOOR AS DATA (11-02, engine plan Phase 2) --------------------------------------------------------------------------------
- * On GL the floor is one quad under a large per-pixel shader. In the packet it is what that shader works out, per tile, on the CPU: the same iterated sin-warp, flashes and families, and the
+ * The old road drew the floor as one quad under a large per-pixel shader. In the packet it is what that shader worked out, per tile, on the CPU: the same iterated sin-warp, flashes and families, and the
  * light pools sampled at each tile's middle. A pixel of it then costs next to nothing, which is the lever on the tube. Only tiles the lens can see, near enough to read. */
 #define VENUE_TILES 6000
 static void venueFloor(const float*vp,const float*eye,float beat,const float*flp,const float*flc){ if(WORLD_OFF) return;
@@ -58,4 +57,3 @@ static void venueLaser(const float*m,float r,float g,float b,float amp){ if(WORL
     for(int i=0;i<6&&g_lasN<14*6;i++){ float*o=g_lasV+g_lasN*9; g_lasN++; float x=q[i][0],y=q[i][1],vy=-y/30.f,k=amp*(1.f-vy*0.75f);
         o[0]=m[0]*x+m[4]*y+m[12]; o[1]=m[1]*x+m[5]*y+m[13]; o[2]=m[2]*x+m[6]*y+m[14]; o[3]=r*k; o[4]=g*k; o[5]=b*k; o[6]=0.5f*(1.f-vy); o[7]=0.f; o[8]=0.f; } }
 static void venueLasersEnd(void){ if(WORLD_OFF) return; gfxFxTris(g_lasV,g_lasN,GFX_FX_ADD,0); g_lasN=0; }
-#endif

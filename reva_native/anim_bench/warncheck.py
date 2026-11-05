@@ -12,15 +12,15 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 GCC = os.environ.get("CC") or (r"C:\msys64\mingw64\bin\gcc.exe" if os.name == "nt" else "gcc")
-CORE = ["club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "gl_null.c", "gfx_packet.c"]
+CORE = ["club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", "gfx_packet.c"]
 GAMES = sorted(os.path.relpath(p, ROOT).replace(os.sep, "/") for p in glob.glob(os.path.join(ROOT, "games", "*", "*.c")))   # every game's file
-BASE = ["-O1", "-std=gnu17", "-ffp-contract=off", "-Wall", "-Wextra", "-DKHRONOS_STATIC", "-fno-diagnostics-show-caret"]
+BASE = ["-O1", "-std=gnu17", "-ffp-contract=off", "-Wall", "-Wextra", "-fno-diagnostics-show-caret"]
 if os.name == "nt":
     BASE.append("-Dmain=SDL_main")
 BUILDS = [("no display", ["-DREVA_HEADLESS"] + ([] if os.name == "nt" else ["-DREVA_SDL"]), ["crowd_kms.c"] + CORE + GAMES),
           ("as the kit gets it", ["-DREVA_HEADLESS", "-DREVA_NODOORS"] + ([] if os.name == "nt" else ["-DREVA_SDL"]), ["crowd_kms.c"]),
           ("the renderer", ["-DREVA_VK", "-I."], ["crowd_kms.c", "gfx_vk.c"]),
-          ("film's", [] if os.name == "nt" else ["-DREVA_SDL"], ["crowd_kms.c"])]
+          ("the engine's own rasterizer", ["-DREVA_SOFT", "-I."] + ([] if os.name == "nt" else ["-DREVA_SDL"]), ["crowd_kms.c", "gfx_soft.c", "gfx_packet.c"])]
 if os.name != "nt":
     BUILDS[2] = ("the renderer", ["-DREVA_VK", "-I/usr/include/libdrm"], ["crowd_kms.c", "gfx_vk.c"])
     BUILDS.append(("a game on the Pi", ["-DREVA_NODOORS", "-DREVA_VK", "-DREVA_GAMELIB", "-I/usr/include/libdrm"], ["crowd_kms.c"]))

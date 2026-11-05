@@ -13,8 +13,7 @@
  *     wind    x y z [gust]              direction, and how much it gusts
  *
  * ⭐ NO RPACK AND NO BONES. The grid is generated at load and owns its VBOs; every joint
- * is bone 0 and the palette is the identity, so it rides the existing mesh shader with
- * nothing added to it. A curtain is one line in a .set.
+ * is bone 0 and the palette is the identity, so it rides the mesh path with nothing added to it. A curtain is one line in a .set.
  * ⛔ A SHEET IS NOT PINNED -- it is dropped and caught. Pinning its top row (which is what
  * the garment solver does, correctly, for a shirt) would hold a bedsheet in mid-air. */
 #define SCL_MAX    10
@@ -29,19 +28,31 @@ typedef struct {
     float ru, rv, rd, rb;              /* rest lengths: along u, along v, diagonal, bend */
     float tint[3];
     float phase;                       /* so two curtains do not luff in lockstep */
-    GLuint vb, nb, ib, jb, wb, ib32; unsigned nIdx; int gl;
+    unsigned vb, nb, ib, jb, wb, ib32; unsigned nIdx; int gl;
+    int mover, rode; float loc[SCL_W][3];   /* (step 23) its pinned edge rides the set timeline's Nth mover: where that edge is in the mover's own space. -1 for none */
 } SetCloth;
 static SetCloth g_scl[SCL_MAX]; static int g_nScl=0;
 static float g_sclBox[SCL_MAXBOX][6]; static int g_nSclBox=0;
+static int g_sclBoxMover[SCL_MAXBOX]; static float g_sclBoxLoc[SCL_MAXBOX][3];   /* (step 23) a solid that rides a mover, and where it is in the mover's own space */
 static float g_sclT=0.f;
 static int   g_sclOff=0;
 
+/* (step 23, film's cloth on a prop) `curtain ... mover=N`, `sheet ... mover=N`, `solid ... mover=N`: the cloth's pinned edge, or the box a sheet lies on, rides the set timeline's Nth
+ * mover, so a house curtain goes up with its rail and a dust sheet comes off with what pulls it. With mover=, a line's x y z are in the mover's own space, and a sheet's first row
+ * is pinned as a curtain's is. The first time the mover's placed, the whole cloth goes there with it; after that only its pinned edge is carried and the rest follows as cloth does. */
+static const SetInst* sclMoverInst(int mover){ for(int i=0;i<g_setNI;i++) if(g_setI[i].mover==mover) return g_setI[i].hid?NULL:&g_setI[i]; return NULL; }
+static void sclRide(SetCloth*S){ if(S->mover<0) return; const SetInst*I=sclMoverInst(S->mover); if(!I) return;
+    for(int c=0;c<SCL_W;c++){ const float*l=S->loc[c]; float w[3]; for(int k=0;k<3;k++) w[k]=I->m[k]*l[0]+I->m[4+k]*l[1]+I->m[8+k]*l[2]+I->m[12+k];
+        if(c==0&&!S->rode){ S->rode=1; const float d[3]={w[0]-S->cur[0][0],w[1]-S->cur[0][1],w[2]-S->cur[0][2]}; for(int i=0;i<SCL_N;i++) for(int k=0;k<3;k++){ S->cur[i][k]+=d[k]; S->prv[i][k]+=d[k]; } }
+        for(int k=0;k<3;k++){ S->cur[c][k]=w[k]; S->prv[c][k]=w[k]; } } }
+static void sclBoxesRide(void){ for(int q=0;q<g_nSclBox;q++){ if(g_sclBoxMover[q]<0) continue; const SetInst*I=sclMoverInst(g_sclBoxMover[q]); if(!I) continue; const float*l=g_sclBoxLoc[q];
+        for(int k=0;k<3;k++) g_sclBox[q][k]=I->m[k]*l[0]+I->m[4+k]*l[1]+I->m[8+k]*l[2]+I->m[12+k]; } }
 static void sclAdd(int kind,float x,float y,float z,float w,float h,float yawDeg,
-                   const float*rgb){
+                   const float*rgb,int mover){
     if(g_nScl>=SCL_MAX) return;
     SetCloth*S=&g_scl[g_nScl];
     memset(S->pin,0,sizeof S->pin);
-    S->used=1; S->kind=kind; S->gl=0; S->nIdx=0;
+    S->used=1; S->kind=kind; S->gl=0; S->nIdx=0; S->mover=mover; S->rode=0;
     S->tint[0]=rgb[0]; S->tint[1]=rgb[1]; S->tint[2]=rgb[2];
     S->phase=(float)g_nScl*1.7f;
     float a=yawDeg*0.0174532925f, ca=cosf(a), sa=sinf(a);
@@ -56,8 +67,8 @@ static void sclAdd(int kind,float x,float y,float z,float w,float h,float yawDeg
         for(int k=0;k<3;k++){
             float p=(k==0?x:(k==1?y:z))+ux[k]*fu*w+uv[k]*fv*h;
             S->cur[i][k]=p; S->prv[i][k]=p; S->nrm[i][k]=(k==1)?1.f:0.f; }
-        /* ⭐ ONLY A CURTAIN IS PINNED, and only its top row -- that IS the rail. */
-        if(kind==0&&r==0) S->pin[i]=1; }
+        /* ⭐ ONLY A CURTAIN IS PINNED, and only its top row -- that IS the rail. (step 23: and a sheet's first row, when a mover carries it) */
+        if((kind==0||mover>=0)&&r==0){ S->pin[i]=1; for(int k=0;k<3;k++) S->loc[c][k]=S->cur[i][k]; } }
     S->ru=w/(float)(SCL_W-1);
     S->rv=h/(float)(SCL_H-1);
     S->rd=sqrtf(S->ru*S->ru+S->rv*S->rv);
@@ -179,21 +190,21 @@ static void sclStep(SetCloth*S,float dtFull){
              * points away from the light and the curtain goes BLACK the moment the wind
              * turns it edge-on and past -- which is exactly what the six-frame strip
              * showed. Flip it toward the viewer: two-sided lighting for a dot product
-             * per vertex, and no shader change. */
+             * per vertex. */
             float vx=g_camPos[0]-S->cur[i][0], vy=g_camPos[1]-S->cur[i][1], vz=g_camPos[2]-S->cur[i][2];
             if(S->nrm[i][0]*vx+S->nrm[i][1]*vy+S->nrm[i][2]*vz < 0.f)
                 for(int k=0;k<3;k++) S->nrm[i][k]=-S->nrm[i][k]; } } }
 
-static void sclDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
+static void sclDraw(void){
     if(!g_nScl||g_sclOff) return;
     static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     static int stamp=-1;
     int step=((int)g_frameStamp!=stamp); stamp=(int)g_frameStamp;
-    if(step) g_sclT+=(float)g_chDt;
+    if(step){ g_sclT+=(float)g_chDt; sclBoxesRide(); }
     for(int q=0;q<g_nScl;q++){
         SetCloth*S=&g_scl[q];
         if(!S->used) continue;
-        if(step) sclStep(S,(float)g_chDt);
+        if(step){ sclRide(S); sclStep(S,(float)g_chDt); }
         if(!S->gl){
             unsigned short idx[(SCL_W-1)*(SCL_H-1)*6]; unsigned n=0;
             for(int r=0;r<SCL_H-1;r++) for(int c=0;c<SCL_W-1;c++){
@@ -204,35 +215,20 @@ static void sclDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
             unsigned char jz[SCL_N*4], wz[SCL_N*4];
             for(int i=0;i<SCL_N;i++){ jz[i*4]=jz[i*4+1]=jz[i*4+2]=jz[i*4+3]=0;
                 wz[i*4]=255; wz[i*4+1]=wz[i*4+2]=wz[i*4+3]=0; }
-            glGenBuffers(1,&S->vb); glGenBuffers(1,&S->nb); glGenBuffers(1,&S->ib);
-            glGenBuffers(1,&S->jb); glGenBuffers(1,&S->wb);
-            glBindBuffer(GL_ARRAY_BUFFER,S->vb); glBufferData(GL_ARRAY_BUFFER,sizeof S->cur,S->cur,GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER,S->nb); glBufferData(GL_ARRAY_BUFFER,sizeof S->nrm,S->nrm,GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER,S->jb); glBufferData(GL_ARRAY_BUFFER,sizeof jz,jz,GL_STATIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER,S->wb); glBufferData(GL_ARRAY_BUFFER,sizeof wz,wz,GL_STATIC_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,S->ib); glBufferData(GL_ELEMENT_ARRAY_BUFFER,(GLsizeiptr)(n*2),idx,GL_STATIC_DRAW);
-#ifdef REVA_PACKET
-            { static unsigned ix9[(SCL_W-1)*(SCL_H-1)*6]; for(unsigned k9=0;k9<n;k9++) ix9[k9]=idx[k9]; glGenBuffers(1,&S->ib32); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,S->ib32); glBufferData(GL_ELEMENT_ARRAY_BUFFER,(GLsizeiptr)(n*4),ix9,GL_STATIC_DRAW); }   /* the packet's indices are 32 bits */
-#endif
+            S->vb = gfxBufferNew(); S->nb = gfxBufferNew(); S->ib = gfxBufferNew();
+            S->jb = gfxBufferNew(); S->wb = gfxBufferNew();
+             gfxBufferData(S->vb, sizeof S->cur, S->cur, 1);
+             gfxBufferData(S->nb, sizeof S->nrm, S->nrm, 1);
+             gfxBufferData(S->jb, sizeof jz, jz, 0);
+             gfxBufferData(S->wb, sizeof wz, wz, 0);
+             gfxBufferData(S->ib, (long)(n*2), idx, 0);
+            { static unsigned ix9[(SCL_W-1)*(SCL_H-1)*6]; for(unsigned k9=0;k9<n;k9++) ix9[k9]=idx[k9]; S->ib32 = gfxBufferNew();  gfxBufferData(S->ib32, (long)(n*4), ix9, 0); }   /* the packet's indices are 32 bits */
             S->gl=1; }
-        glBindBuffer(GL_ARRAY_BUFFER,S->vb); glBufferSubData(GL_ARRAY_BUFFER,0,sizeof S->cur,S->cur);
-        glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-        glBindBuffer(GL_ARRAY_BUFFER,S->nb); glBufferSubData(GL_ARRAY_BUFFER,0,sizeof S->nrm,S->nrm);
-        glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0);
-        glBindBuffer(GL_ARRAY_BUFFER,S->jb); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
-        glBindBuffer(GL_ARRAY_BUFFER,S->wb); glEnableVertexAttribArray(3); glVertexAttribPointer(3,4,GL_UNSIGNED_BYTE,GL_TRUE,0,0);
-        glDisableVertexAttribArray(4);
-        glUniformMatrix4fv(uModel,1,GL_FALSE,I9);
-        glUniformMatrix4fv(uPal,1,GL_FALSE,I9);
-        glUniformMatrix4fv(uBind,1,GL_FALSE,I9);
-        glUniform1f(uUse,0.f); glUniform3f(uTint,S->tint[0],S->tint[1],S->tint[2]);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,S->ib);
-        glDrawElements(GL_TRIANGLES,(GLsizei)S->nIdx,GL_UNSIGNED_SHORT,0);
-#ifdef REVA_PACKET
+         gfxBufferSub(S->vb, 0, sizeof S->cur, S->cur);
+         gfxBufferSub(S->nb, 0, sizeof S->nrm, S->nrm);
         if(!g_noDraw){ GfxMesh m9; memset(&m9,0,sizeof m9); m9.id=((unsigned)GFX_KIND_PROP<<28)|((0xf000u+(unsigned)q)<<12); m9.vb[0]=S->vb; m9.vb[1]=S->nb; m9.vb[4]=S->ib32; m9.nIndex=S->nIdx; m9.nVerts=SCL_N; m9.model=I9; memcpy(m9.tint,S->tint,12); m9.flags=g_shadowPass?GFX_SHADOW:0; gfxMesh(&m9); }
-#endif
         }
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
+      }
 
 static int setParse(const char*name,int depth);
 /* ⭐ ep 11: THE HALF-PIPE ----------------------------------------------------------------------------------
@@ -251,8 +247,8 @@ typedef struct {
     char   name[32];
     float  c[3], yaw, W, F, R, V, D, col[3];
     float  ax[3], cr[3];       /* A: the axis (sin Y,0,cos Y); C: across it (cos Y,0,-sin Y). C x Y = A */
-    GLuint vbo[2]; int nv, nSurf, nSide;   /* one buffer: riding surface + decks | sides + ends | coping */
-    GLuint vk[6];   /* and each of those three on its own, positions and normals, for the packet */
+    unsigned vbo[2]; int nv, nSurf, nSide;   /* one buffer: riding surface + decks | sides + ends | coping */
+    unsigned vk[6];   /* and each of those three on its own, positions and normals, for the packet */
 } HalfPipe;
 static HalfPipe g_pipe[PIPE_MAX]; static int g_nPipe=0;
 static float pipeHalfLen(const HalfPipe*H){ return 0.5f*H->F+1.5707963f*H->R+H->V; }
@@ -320,17 +316,15 @@ static void pipeBuild(HalfPipe*H){
             pipeDir(H,cosf(a0),sinf(a0),m0); pipeDir(H,cosf(a1),sinf(a1),m1);
             pipeQuad(P,N,&v,a,b,c,d,m0,m1,m1,m0); } }
     H->nv=v;
-    glGenBuffers(2,H->vbo);
-    glBindBuffer(GL_ARRAY_BUFFER,H->vbo[0]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)v*12,P,GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER,H->vbo[1]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)v*12,N,GL_STATIC_DRAW);
-#ifdef REVA_PACKET
-    { const int part9[4]={0,H->nSurf,H->nSurf+H->nSide,v}; glGenBuffers(6,H->vk); for(int k9=0;k9<3;k9++){ glBindBuffer(GL_ARRAY_BUFFER,H->vk[k9*2]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(part9[k9+1]-part9[k9])*12,P+part9[k9]*3,GL_STATIC_DRAW); glBindBuffer(GL_ARRAY_BUFFER,H->vk[k9*2+1]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(part9[k9+1]-part9[k9])*12,N+part9[k9]*3,GL_STATIC_DRAW); } }
-#endif
+    gfxBuffersNew(2,H->vbo);
+     gfxBufferData(H->vbo[0], (long)v*12, P, 0);
+     gfxBufferData(H->vbo[1], (long)v*12, N, 0);
+    { const int part9[4]={0,H->nSurf,H->nSurf+H->nSide,v}; gfxBuffersNew(6,H->vk); for(int k9=0;k9<3;k9++){  gfxBufferData(H->vk[k9*2], (long)(part9[k9+1]-part9[k9])*12, P+part9[k9]*3, 0);  gfxBufferData(H->vk[k9*2+1], (long)(part9[k9+1]-part9[k9])*12, N+part9[k9]*3, 0); } }
     free(P); free(N);
     printf("[halfpipe] %s: mesh %d tris (%d profile points: surface+decks %d, sides+ends %d, coping %d)\n",
            H->name,v/3,np,H->nSurf/3,H->nSide/3,(v-H->nSurf-H->nSide)/3); fflush(stdout); }
 static void pipeClear(void){
-    for(int i=0;i<g_nPipe;i++){ if(g_pipe[i].vbo[0]) glDeleteBuffers(2,g_pipe[i].vbo); if(g_pipe[i].vk[0]) glDeleteBuffers(6,g_pipe[i].vk); }
+    for(int i=0;i<g_nPipe;i++){ if(g_pipe[i].vbo[0]) gfxBuffersDrop(2,g_pipe[i].vbo); if(g_pipe[i].vk[0]) gfxBuffersDrop(6,g_pipe[i].vk); }
     memset(g_pipe,0,sizeof g_pipe); g_nPipe=0; }
 static void pipeAdd(const char*nm,const float*v9,const float*col,int hasCol){
     if(g_nPipe>=PIPE_MAX){ printf("[halfpipe] %s REFUSED: PIPE_MAX (%d) is full\n",nm,PIPE_MAX); fflush(stdout); return; }
@@ -404,7 +398,9 @@ static int setLoad(const char*name){
     g_setNRt=0;              /* ⭐ ep 10: a set's routes go with it */
     pipeClear();             /* ⭐ ep 11: and its half-pipes */
     g_setNL=0;
-    g_setSpace=0; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0; g_gloss.on=0; if(g_stk){ free(g_stk); g_stk=NULL; } g_stkFrames=0; g_stkLast=-1; g_nMover=0;
+    ptSetClear(); dcSetClear(); lensClear(); g_stkNC=g_stkNP=0; memset(g_stkCam,0,sizeof g_stkCam); g_beamLight=6.f; g_setSpace=0; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0; g_gloss.on=0; if(g_stk){ free(g_stk); g_stk=NULL; } g_stkFrames=0; g_stkLast=-1; g_nMover=0;
+    g_stkNK=0; memset(g_stkLook,0,sizeof g_stkLook); g_clipStartS=0.f; stkSheetsDrop();   /* (step 21) and what the timeline gave: the looks, the pictures, where clips start */
+    g_setEnvOn=0;   /* (step 22) and where its surroundings are baked from */
     memset(&g_stb,0,sizeof g_stb);   /* ⭐ 10-22: and Wan-To's star */   /* ⭐ 10-22: and its space */
     /* ⛔ A SET OWNS ITS CLOTH. Leaving the last level's curtains up is the same class of
      * bug as the club's own lamp sprites hanging over the road in a day sheet. */
@@ -427,6 +423,7 @@ static int setLoad(const char*name){
             spBuild(name);
 #ifdef REVA_VK
             probesLoad(name);
+            envLoad(name);   /* (step 22) and its surroundings, for reflections */
 #endif
             clipAuditSetLoaded();   /* ⭐ ep 10: the clipping audit's world grid, when the audit is on */
             printf("[set] %s: %d props + %d actors + %d cloth + %d water from %d packs\n",
@@ -458,6 +455,7 @@ static int setLoad(const char*name){
 static int setParse(const char*name,int depth){
     char pth[512]; snprintf(pth,sizeof pth,"sets/%s.set",name);
     FILE*f=fopen(pth,"rb");
+    if(f) netSigFile(pth);   /* (step 29) a session's machines must have read the same set */
     if(!f){ printf("[set] %s NOT FOUND\n",pth); fflush(stdout); return 0; }
     char ln[2048]; int nline=0, miss=0;   /* ⭐ ep 10: 512 -> 2048 -- a route of 28 marks is ~240 chars */
     while(fgets(ln,sizeof ln,f)){
@@ -465,6 +463,8 @@ static int setParse(const char*name,int depth){
         if(!strchr(ln,'\n')&&!feof(f)){ int c9; while((c9=fgetc(f))!=EOF&&c9!='\n'){ }
             printf("[set] %s: a line longer than %d chars was CUT -- its tail is dropped\n",pth,(int)sizeof ln-1); fflush(stdout); }
         if(ln[0]=='#'||ln[0]=='\n'||ln[0]=='\r') continue;
+        /* (step 28) a number in a set is a place, a size, a colour or a count: a line with one that isn't a number, or is past any world's size, isn't read (engine/packcheck.inc) */
+        if(!txtNumsOk(ln,1e8)){ printf("[set] %s: a line with a number in it that isn't one, left out: %.70s\n",pth,ln); fflush(stdout); continue; }
         /* A STREET IS A FILE, A CAST IS ANOTHER. The film shoots many scenes on the same
          * 514 lines of suburbia; copying them per shot is how street.py would stop being
          * the source of truth. Depth-limited: a street plus a cast, and no cycles. */
@@ -513,11 +513,12 @@ static int setParse(const char*name,int depth){
             continue; }
         /* ⭐ CLOTH IN THE LEVEL FILE. A curtain is one line. */
         if(!strncmp(ln,"curtain ",8)||!strncmp(ln,"sheet ",6)){
-            int kind=(ln[0]=='s');
+            int kind=(ln[0]=='s'), mv9=-1;
+            { char*g9=strstr(ln," mover="); if(g9){ mv9=atoi(g9+7); for(char*w9=g9;*w9&&*w9!='\n'&&*w9!='\r';w9++) *w9=' '; } }   /* (step 23) it rides a mover */
             float cw,ch; float col[3]={0.82f,0.80f,0.74f};
             int nf=sscanf(ln+(kind?6:8),"%f %f %f %f %f %f %f %f %f",
                           &x,&y,&z,&cw,&ch,&yaw,&col[0],&col[1],&col[2]);
-            if(nf>=6) sclAdd(kind,x,y,z,cw,ch,yaw,col);
+            if(nf>=6) sclAdd(kind,x,y,z,cw,ch,yaw,col,mv9);
             continue; }
         /* ⭐ ep 11: halfpipe <name> x y z yaw W F R V D [r g b] -- a vert ramp you can ride (hpipe=) */
         if(!strncmp(ln,"halfpipe ",9)){
@@ -534,8 +535,10 @@ static int setParse(const char*name,int depth){
             if(nf>=5) watAdd(x,y,z,ww,wd,col);
             continue; }
         if(!strncmp(ln,"solid ",6)&&g_nSclBox<SCL_MAXBOX){
-            float*B=g_sclBox[g_nSclBox];
+            float*B=g_sclBox[g_nSclBox]; int mv9=-1;
+            { char*g9=strstr(ln," mover="); if(g9){ mv9=atoi(g9+7); for(char*w9=g9;*w9&&*w9!='\n'&&*w9!='\r';w9++) *w9=' '; } }
             if(sscanf(ln,"solid %f %f %f %f %f %f",&B[0],&B[1],&B[2],&B[3],&B[4],&B[5])==6){
+                g_sclBoxMover[g_nSclBox]=mv9; memcpy(g_sclBoxLoc[g_nSclBox],B,12);
                 printf("[cloth] solid box at %.2f,%.2f,%.2f half %.2f,%.2f,%.2f%c",
                        B[0],B[1],B[2],B[3],B[4],B[5],10);
                 g_nSclBox++; }
@@ -683,12 +686,54 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"track ",6)){ char p9[256]; float o9=0.f;   /* ⭐ 11-03: the set's timeline (settrack.inc) */
             if(sscanf(ln,"track %255s %f",p9,&o9)>=1) trackLoad(p9,o9);
             continue; }
-        if(!strncmp(ln,"mover ",6)){ char st9[64]; float c9[3]={1.f,1.f,1.f}; int n9=sscanf(ln,"mover %63s %f %f %f",st9,c9,c9+1,c9+2);
+        if(!strncmp(ln,"mover ",6)){ char st9[64]; float c9[3]={1.f,1.f,1.f}; int gc9=0,gr9=0;
+            { char*g9=strstr(ln," grid="); if(g9){ if(sscanf(g9+6,"%dx%d",&gc9,&gr9)!=2){ gc9=gr9=0; printf("[set] mover: grid=CxR, as in grid=4x2 -- %s\n",ln); } for(char*w9=g9;*w9&&*w9!='\n'&&*w9!='\r';w9++) *w9=' '; } }   /* (step 21) its texture is a sheet of pictures */
+            int n9=sscanf(ln,"mover %63s %f %f %f",st9,c9,c9+1,c9+2);
+            g_texKeep=(gc9>0&&gr9>0);
             int pi9=(n9>=1)?setPack(st9):-1;
+            g_texKeep=0;
             if(pi9>=0&&g_setNI<SET_MAXI){ SetInst*I9=&g_setI[g_setNI++]; memset(I9,0,sizeof *I9); I9->pk=pi9; I9->mover=g_nMover++; I9->hid=1; I9->m[15]=1.f;
-                I9->tinted=(n9>=4); memcpy(I9->tint,c9,12); }
+                I9->tinted=(n9>=4); memcpy(I9->tint,c9,12);
+                if(gc9>0&&gr9>0) stkSheet(pi9,gc9,gr9); }
             else printf("[set] mover: no such prop, or the set is full -- %s\n",ln);
+            if(g_texKeepPx){ stbi_image_free(g_texKeepPx); g_texKeepPx=NULL; }
             continue; }
+        if(!strncmp(ln,"reflect ",8)){ float v9[3];   /* (step 22) where the bake looks out from for this set's surroundings (engine/bake.inc) */
+            if(sscanf(ln,"reflect %f %f %f",v9,v9+1,v9+2)==3){ memcpy(g_setEnvAt,v9,12); g_setEnvOn=1; }
+            else printf("[set] reflect: want `reflect x y z` -- %s\n",ln);
+            continue; }
+        if(!strncmp(ln,"clipstart ",10)){ float s9=0.f;   /* (step 21) a take that starts part of the way into its performances: every z_rm_ clip starts this far in */
+            if(sscanf(ln,"clipstart %f",&s9)==1&&s9>=0.f){ g_clipStartS=s9; printf("[set] every z_rm_ clip starts %.2f s in\n",s9); }
+            else printf("[set] clipstart: want `clipstart <seconds>` -- %s\n",ln);
+            continue; }
+        /* ⭐ FOLIAGE (queue step 24): `scatter <prop> x0 z0 x1 z1 count [y=H] [seed=N] [scale=a,b] [sway=A] [rgb=r,g,b[,amount]]` puts count copies of a prop about a patch of ground,
+         * each turned its own way and its own size, the same every time for a seed. sway: how far its top leans in the set's wind, as a share of its height
+         * (grass 0.25, a tree 0.03). rgb: a colour washed over its own, by amount (0.35), and each copy takes a little more or less of it, so a field isn't one green.
+         * `grass x0 z0 x1 z1 [per-unit]` is scatter with a grass patch's numbers. The machine's `foliage` setting draws that many in a
+         * hundred of them. They're instances like any prop: culled one by one, copies of one mesh in one call, a lighter copy far off. */
+        if(!strncmp(ln,"scatter ",8)||!strncmp(ln,"grass ",6)){ const int gr9=(ln[0]=='g'); char st9[64]; float a9[4],cnt9=0.f,y9=0.f,s0=0.8f,s1=1.25f,sw9=gr9?0.25f:0.04f,c9[4]={1.f,1.f,1.f,0.35f}; unsigned sd9=902u; int ok9,col9=0;
+            if(gr9){ snprintf(st9,sizeof st9,"fol_grass"); float per9=0.7f; ok9=sscanf(ln,"grass %f %f %f %f %f",a9,a9+1,a9+2,a9+3,&per9)>=4; cnt9=per9*fabsf((a9[2]-a9[0])*(a9[3]-a9[1])); s0=0.85f; s1=1.3f; }
+            else ok9=sscanf(ln,"scatter %63s %f %f %f %f %f",st9,a9,a9+1,a9+2,a9+3,&cnt9)==6;
+            if(!ok9){ printf("[set] want `scatter <prop> x0 z0 x1 z1 count [y= seed= scale=a,b sway= rgb=r,g,b]` or `grass x0 z0 x1 z1 [per-unit]` -- %s",ln); continue; }
+            { const char*q9; if((q9=strstr(ln," y="))) sscanf(q9+3,"%f",&y9); if((q9=strstr(ln," seed="))) sscanf(q9+6,"%u",&sd9); if((q9=strstr(ln," scale="))) sscanf(q9+7,"%f,%f",&s0,&s1); if((q9=strstr(ln," sway="))) sscanf(q9+6,"%f",&sw9); if((q9=strstr(ln," rgb="))) col9=sscanf(q9+5,"%f,%f,%f,%f",c9,c9+1,c9+2,c9+3)>=3; }
+            int pi9=setPack(st9); if(pi9<0){ miss++; continue; }
+            int n9=(int)(cnt9*(float)g_gfxFoliage/100.f+0.5f), put9=0; Pack*Q9=&g_setPk[pi9]; const float k9=(Q9->scale>1e-6f)?Q9->scale:1.f;
+            for(int j9=0;j9<n9&&g_setNI<SET_MAXI;j9++){ float r9[5]; for(int c=0;c<5;c++){ sd9=sd9*1103515245u+12345u; r9[c]=(float)((sd9>>16)&0x7fffu)/32768.f; }
+                SetInst*I9=&g_setI[g_setNI++]; memset(I9,0,sizeof *I9); I9->pk=pi9; I9->mover=-1; const float sc9=(s0+(s1-s0)*r9[2])*k9, yw9=r9[3]*6.2831853f;
+                float q9[4],t9[3]={a9[0]+(a9[2]-a9[0])*r9[0],y9-Q9->mny*sc9,a9[1]+(a9[3]-a9[1])*r9[1]},s9[3]={sc9,sc9,sc9}; qaxis(q9,0,1,0,yw9); m4_trs(I9->m,t9,q9,s9);
+                I9->sway=sw9; I9->swayPh=t9[0]*0.9f+t9[2]*0.7f; if(col9){ memcpy(I9->tint,c9,12); I9->wash=c9[3]*(0.4f+1.2f*r9[4]); if(I9->wash>0.49f) I9->wash=0.49f; } put9++; }   /* under a half, or a far picture stops being cut out by its alpha */
+            printf("[set] %s: %d of %s over %.0f x %.0f (the machine draws %d in a hundred)\n",gr9?"grass":"scatter",put9,st9,fabsf(a9[2]-a9[0]),fabsf(a9[3]-a9[1]),g_gfxFoliage);
+            continue; }
+        if(!strncmp(ln,"beamlight ",10)){ float s9=6.f; if(sscanf(ln,"beamlight %f",&s9)==1&&s9>=0.f){ g_beamLight=s9; printf("[set] its beams light what they point at, by %.1f times their strength\n",s9); } else printf("[set] beamlight: want `beamlight <scale>`, 0 for none -- %s",ln); continue; }
+        if(!strncmp(ln,"emitter ",8)){ ptSetLine(ln); continue; }
+        if(!strncmp(ln,"decal ",6)){ dcSetLine(ln); continue; }
+        /* (step 25) `lens [roll=DEG] [focus=<distance>|aim[,soft]] [shutter=0..1]` and `film [sepia=] [grain=] [burn=] [flash=] [weave=x,y]`: the set's own lens and look, until something says otherwise (engine/post.inc) */
+        if(!strncmp(ln,"lens ",5)){ const char*q9; if((q9=strstr(ln," roll="))) g_camRoll=(float)atof(q9+6); if((q9=strstr(ln," focus="))) lensFocusSay(q9+7); if((q9=strstr(ln," shutter="))) g_lensShutter=(float)atof(q9+9);
+            printf("[set] its lens: rolled %.1f, focused %s%.2f (soft %.2f), shutter %.2f\n",g_camRoll,g_lensFocus<0.f?"on its aim ":"at ",g_lensFocus<0.f?0.f:g_lensFocus,g_lensDof,g_lensShutter); continue; }
+        if(!strncmp(ln,"film ",5)){ const char*q9; if((q9=strstr(ln," sepia="))) g_filmSepia=(float)atof(q9+7); if((q9=strstr(ln," grain="))) g_filmGrain=(float)atof(q9+7); if((q9=strstr(ln," burn="))) g_filmBurn=(float)atof(q9+6);
+            if((q9=strstr(ln," flash="))) g_filmFlash=(float)atof(q9+7);
+            if((q9=strstr(ln," weave="))) sscanf(q9+7,"%f,%f",&g_filmWeave[0],&g_filmWeave[1]);
+            printf("[set] its film: sepia %.2f, grain %.2f, burn %.2f, flash %.2f, weave %.4f,%.4f\n",g_filmSepia,g_filmGrain,g_filmBurn,g_filmFlash,g_filmWeave[0],g_filmWeave[1]); continue; }   /* (step 24) a mark thrown at the set: engine/decals.inc */   /* (step 24) particles: smoke, fire, sparks ... at a place, or riding a mover */
         if(!strncmp(ln,"beam ",5)){ float v9[15]; v9[13]=1.f; v9[14]=2.f;   /* ⭐ 10-22: a glowing volume (see beamDraw) */
             int n9=sscanf(ln,"beam %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5,v9+6,v9+7,
                           v9+8,v9+9,v9+10,v9+11,v9+12,v9+13,v9+14);
@@ -724,8 +769,7 @@ static int setParse(const char*name,int depth){
                 g_setLc[g_setNL*3]=lr*lpw; g_setLc[g_setNL*3+1]=lg*lpw; g_setLc[g_setNL*3+2]=lb*lpw;
                 g_setLk[g_setNL]=(nl>=8)?lightReachK(lrc):0.f;   /* ⭐ ep 12: the lamp's reach */
                 g_setNL++; }
-            /* ⛔ THIS SAID "cap is 3 (the shader's lp[3])" for as long as NLIGHT has been 6. */
-            else if(nl>=6) printf("[set] light cap is %d of the shader's %d practicals (the top slot is reserved for a held light) -- ignoring\n",NLIGHT-1,NLIGHT);
+            else if(nl>=6) printf("[set] light cap is %d of %d practicals (the top slot is reserved for a held light) -- ignoring\n",NLIGHT-1,NLIGHT);
             continue; }
         if(!strncmp(ln,"actor ",6)){
             char ap[64],ac[64],ab[64]; float ax,ay,az,ayw,asc,art=1.f,asp=0.f,aln=0.f;
@@ -737,12 +781,19 @@ static int setParse(const char*name,int depth){
             { char*q9=strstr(lb9," outfit="); if(q9){ char*v9=q9+8; int k9=0;
                   while(v9[k9]&&v9[k9]!=' '&&v9[k9]!='\t'&&v9[k9]!='\n'&&v9[k9]!='\r'&&k9<31){ of9[k9]=v9[k9]; k9++; }
                   of9[k9]=0; for(char*w9=q9;w9<v9+k9;w9++) *w9=' '; } }
+            /* (step 23) `eyes=r,g,b[,amount]` anywhere on the line: her eyes glow. Taken out of the line the same way */
+            float ey9[4]={0.f,0.f,0.f,0.f};
+            { char*q9=strstr(lb9," eyes="); if(q9){ char*v9=q9+6; int k9=0; while(v9[k9]&&v9[k9]!=' '&&v9[k9]!='\t'&&v9[k9]!='\n'&&v9[k9]!='\r') k9++;
+                  eyesSay(ey9,v9); for(char*w9=q9;w9<v9+k9;w9++) *w9=' '; } }
             int na=sscanf(lb9,"actor %63s %63s %f %f %f %f %f %f %f %f %63s",
                           ap,ac,&ax,&ay,&az,&ayw,&asc,&art,&asp,&aln,ab);
             if(na<7||g_setNA>=SET_MAXA) continue;
             int pi2=setPack(ap); if(pi2<0) continue;
             Pack*AP2=&g_setPk[pi2];
             SetActor*A=&g_setA[g_setNA++];
+            /* (step 21) `clip>12.5s` starts her clip that many seconds in, and `clip>0.33` that far through it. Taken off the name here, before anything looks the clip up */
+            A->cueS=A->cueF=-1.f; A->cued=0; memcpy(A->eye,ey9,16);
+            { char*g9=strchr(ac,'>'); if(g9){ *g9=0; const char*v9=g9+1; const size_t L9=strlen(v9); if(L9&&v9[L9-1]=='s') A->cueS=(float)atof(v9); else { A->cueF=(float)atof(v9); if(A->cueF<0.f) A->cueF=0.f; if(A->cueF>1.f) A->cueF=1.f; } } }
             A->nCue=0; A->curCue=-1; A->nWp=0; A->onPath=0; A->cspd=0.f; A->leash=-1;
             memset(&A->wms,0,sizeof A->wms);
             A->hasLook=0;
@@ -812,7 +863,7 @@ static int setParse(const char*name,int depth){
         int pi=setPack(stem); if(pi<0){ miss++; continue; }
         if(g_setNI>=SET_MAXI){ printf("[set] instance cap %d hit\n",SET_MAXI); break; }
         SetInst*I=&g_setI[g_setNI++];
-        I->pk=pi; I->mover=-1; I->hid=0;
+        I->pk=pi; I->mover=-1; I->hid=0; I->wash=I->fade=0.f; I->pic=0; I->sway=I->swayPh=0.f;
         /* The pack's OWN scale rides along -- a town prop is baked at club scale and
          * reports 1.0, but a character reports the factor that takes its rig units to
          * the world, and -mny*scale is what stands it on the floor instead of burying

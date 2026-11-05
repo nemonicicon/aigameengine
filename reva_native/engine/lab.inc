@@ -172,68 +172,32 @@ static float g_stageMinSep=0.f;    /* MEASURED floor on how close the scene may 
 static float g_heroShoulderW=0.f, g_partShoulderW=0.f;
 static float g_labAimY=0.75f;                  /* ctl aimy=: close-up column aim height above the wall aim (0.75 = chest; ~1.3 = faces) */
 static int   g_labFace=0;                      /* ctl face=4|8: the FACE RIG -- head-aimed close panels */
-static int   g_labDqsOn=1;                     /* ctl dqs=0: force LBS in the lab (DQS balloons soft-bound shoulders) */
 static int   g_labHi5=0;                       /* print the inter-body hand distance (the contact gate) */
 static float g_labHeroHand[3]={0,0,0};         /* hero's right hand, world -- filled during her draw */
 static int   g_labHeroHandOK=0;
 
-/* ---- H2: DUAL-QUATERNION palette upload (homecoming) ------------------------------
- * Converts a matrix palette to 2 vec4 per bone: real quat from the (de-scaled) 3x3,
- * dual = 0.5 * t_quat * real. The shader hemisphere-corrects against the strongest
- * influence, so no correction is needed here. Falls through to plain LBS matrices
- * when dq==0 -- one call site serves both paths. */
-static int g_dqs=-1;   /* env REVA_LBS=1 forces 0 */
-static GLint g_labUse=-1, g_labTint=-1;
-/* ⭐ THE TOON PASS (10-18). Four programs draw bodies (PR and PRD, opaque and cutout); their uniform locations
- * are looked up once per program here. toonCel() before a body mesh's draw (0 for every non-toon pack: uniforms
- * persist per program), toonInkDraw() right after it while its index buffer is still bound. */
+/* ⭐ THE TOON PASS (10-18; on Vulkan since queue step 17). The numbers below reach the renderer through toonTell, and a toon
+ * body's draw carries GFX_TOON (vkMesh): the cel cut, the rim and the ink hull are the renderer's. */
 static float g_toonCel=0.30f, g_toonInk=0.0020f, g_toonRim=0.30f; static int g_toonOff=-1;
 static int g_toonKeyCam=1; static float g_roomGrad=1.f;   /* ⭐ (10-23) the key from the lens, the room's ceiling light (REVA_TOONKEY, REVA_ROOMGRAD) */   /* ⭐ (10-23) the rim: REVA_TOONRIM */
 static const float g_inkC[3]={0.110f,0.086f,0.118f};
-typedef struct { GLuint prog; GLint cel, inkc, ink, asp, con, ca, cb, cr, hm, hmi, bc, hmr, wy, hemi, emis, rim, refl, gloss; } ToonLoc;
-static ToonLoc g_tl[8]; static int g_ntl=0;
-static ToonLoc*toonLoc(void){ GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr);
-    for(int i=0;i<g_ntl;i++) if(g_tl[i].prog==(GLuint)pr) return &g_tl[i];
-    if(g_ntl>=8) return NULL;
-    ToonLoc*t=&g_tl[g_ntl++]; t->prog=(GLuint)pr;
-    t->cel=glGetUniformLocation(pr,"uCel"); t->inkc=glGetUniformLocation(pr,"uInkC");
-    t->ink=glGetUniformLocation(pr,"uInk"); t->asp=glGetUniformLocation(pr,"uAsp");
-    t->con=glGetUniformLocation(pr,"uColOn"); t->ca=glGetUniformLocation(pr,"uCapA"); t->cb=glGetUniformLocation(pr,"uCapB");
-    t->cr=glGetUniformLocation(pr,"uCapR"); t->hm=glGetUniformLocation(pr,"uHeadM"); t->hmi=glGetUniformLocation(pr,"uHeadMI");
-    t->bc=glGetUniformLocation(pr,"uBodyC"); t->hmr=glGetUniformLocation(pr,"uHeadMIR");
-    t->wy=glGetUniformLocation(pr,"uWaistY");
-    t->hemi=glGetUniformLocation(pr,"uHemi"); t->emis=glGetUniformLocation(pr,"uEmis");
-    t->rim=glGetUniformLocation(pr,"uRim"); t->refl=glGetUniformLocation(pr,"uRefl"); t->gloss=glGetUniformLocation(pr,"uGloss");
-    return t; }
 /* ⭐ (10-23) THE GLOSSY FLOOR (jacob: "a general like shader/reflections pass"). A set's `gloss y [F0] [max] [fade]` makes
  * its floor a second MIRROR, lying down: every body and prop above it is drawn a second time through its plane (mirInst,
  * as the wall mirrors are), fading with its depth below it (uRefl: a polished floor shows what is near it), while the
  * floor itself -- a pack carrying the marker `Floor` -- is held back from drawSet. It goes down LAST, here, after
  * every body: its own colour plus the reflection under it times a Fresnel term (F0 looking straight down, rising
- * toward `max` at a grazing angle) -- glBlendFunc(ONE, SRC_ALPHA) with the floor's alpha set to F. In a closed room
+ * toward `max` at a grazing angle) -- blended ONE over SRC_ALPHA (the renderer's gloss pass) with the floor's alpha set to F. In a closed room
  * every floor pixel has the room's reflection under it. One bounce: a reflection is not reflected again, and the floor
  * seen in a wall mirror is drawn opaque. No `Floor` pack, no `gloss` line, or REVA_NOGLOSS=1: the floor is drawn as it
  * always was, in drawSet. */
-static void glossFloorPass(GLuint prog,GLint uVP,GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint,const float*vp){
+static void glossFloorPass(void){
     if(!g_gloss.on||!g_setNI) return;
-    glUseProgram(prog); glUniformMatrix4fv(uVP,1,GL_FALSE,vp);
-    ToonLoc*tl=toonLoc();
-    glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE);
-    glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA);
-    if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,g_gloss.f0,g_gloss.fmax,0.f,1.f);
-    glActiveTexture(GL_TEXTURE0);
     g_glossDraw=1; int n=0;
     for(int i=0;i<g_setNI;i++){ SetInst*I=&g_setI[i]; if(!g_setPk[I->pk].floor) continue;
-        if(I->tinted){ glUniform1f(uUse,0.f); glUniform3f(uTint,I->tint[0],I->tint[1],I->tint[2]); }
-        else         { glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
-#ifdef REVA_PACKET
-        if(I->tinted){ g_vkUse=0.f; memcpy(g_vkTint,I->tint,12); } else { g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }
+        setInstLook(I);
         g_vkOwner=((unsigned)GFX_KIND_PROP<<28)|(((unsigned)i&0xffffu)<<12);
-#endif
-        drawProp(&g_setPk[I->pk],I->m,uModel,uPal,uBind); n++; }
+        drawProp(&g_setPk[I->pk],I->m); setInstLookOff(); n++; }
     g_glossDraw=0;
-    if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,0.f,0.f,0.f,0.f);
-    glDisable(GL_BLEND); glDepthMask(GL_TRUE); glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
     { static int said=0; if(!said){ said=1; printf("[gloss] %d floor piece(s) drawn over their reflections\n",n); fflush(stdout); } } }
 
 /* ⭐ PER-VERTEX COLLISION (10-18). headMats: the measured head ellipsoid on the POSED head bone (rotation only --
@@ -259,50 +223,6 @@ static int headMatsM(Pack*P,const float*w,float*Mo,float*MI){
         MI[12+i]=(-(ax[i][0]*t[0]+ax[i][1]*t[1]+ax[i][2]*t[2])-P->headC[i])/r; }
     MI[15]=1.f;
     return 1; }
-static void colSet(Pack*P,M4*W,unsigned mi){
-    int live9=g_skirtLive; g_skirtLive=0;   /* ⭐ this mesh is HANGING CLOTH (skirtPrep): simulated, world space */
-    ToonLoc*t=toonLoc(); if(!t||t->con<0) return;
-    if(live9){ glUniform1f(t->con,3.f); if(t->bc>=0) glUniform3f(t->bc,g_skirtBC[0],g_skirtBC[1],g_skirtBC[2]); return; }
-    if(g_vcolOn<0){ const char*e=getenv("REVA_VCOLLIDE"); g_vcolOn=!(e&&e[0]=='0');
-        printf("[vcol] per-vertex collision: %s\n",g_vcolOn?"ON (packs with a VertexCollide node)":"OFF (REVA_VCOLLIDE=0)"); fflush(stdout); }
-    float on=0.f;
-    if(P&&W&&P->vcol&&g_vcolOn&&mi<P->nMeshes){ const char*n=packStr(P,P->meshes[mi].name);
-        if(n&&(strstr(n,"~skirt~")||strstr(n,"~cloth"))) on=1.f;
-        else if(n&&!strncmp(n,"wear~hair~",10)) on=2.f; }
-    glUniform1f(t->con,on);
-    if(on<0.5f) return;
-    if(!P->boneRok) measureBoneR(P);
-    float A[12],B[12],R[4]; int nc=0;
-    for(int k=0;k<12;k++){ A[k]=0.f; B[k]=0.f; } for(int k=0;k<4;k++) R[k]=0.f;
-    if(on<1.5f){ const int segs[4][2]={{12,13},{13,-2},{14,15},{15,-3}};
-        for(int q=0;q<4;q++){ int a=P->pb[segs[q][0]];
-            int b=segs[q][1]>=0?P->pb[segs[q][1]]:(segs[q][1]==-2?P->footL:P->footR);
-            float r=P->boneR[segs[q][0]];
-            if(a>=0&&b>=0&&(unsigned)a<P->nNodes&&(unsigned)b<P->nNodes&&r>0.f){
-                /* a THIGH starts a fifth of the way down: its sphere at the hip joint reaches out of the hip */
-                float k0=(q==0||q==2)?0.2f:0.f;
-                for(int k=0;k<3;k++){ A[nc*3+k]=W[a][12+k]+(W[b][12+k]-W[a][12+k])*k0; B[nc*3+k]=W[b][12+k]; }
-                R[nc]=r*1.06f; nc++; } } }   /* a hair over the leg: the cloth rides outside the trousers */
-    else { int a=P->pb[4], b=P->pb[5]; float r=P->boneR[4];
-        if(a>=0&&b>=0&&(unsigned)a<P->nNodes&&(unsigned)b<P->nNodes&&r>0.f){
-            for(int k=0;k<3;k++){ A[k]=W[a][12+k]; B[k]=W[b][12+k]; } R[0]=r; nc=1; } }
-    { static float vr=-1.f; if(vr<0.f){ const char*e=getenv("REVA_VCOLR"); vr=(e&&*e)?(float)atof(e):1.f; }
-      for(int k=0;k<4;k++) R[k]*=vr; }   /* REVA_VCOLR: scale the capsules -- the test that the push RUNS at all */
-    glUniform3fv(t->ca,4,A); glUniform3fv(t->cb,4,B); glUniform1fv(t->cr,4,R);
-    if(t->bc>=0){ int hp=P->pb[0]; if(hp>=0&&(unsigned)hp<P->nNodes) glUniform3f(t->bc,W[hp][12],W[hp][13],W[hp][14]); }
-    if(t->wy>=0){ int sp9=P->pb[1], hp=P->pb[0];                 /* the waist: where the spine starts */
-        float wy=(sp9>=0&&(unsigned)sp9<P->nNodes)?W[sp9][13]:((hp>=0&&(unsigned)hp<P->nNodes)?W[hp][13]+0.2f:1e9f);
-        glUniform1f(t->wy,wy); }
-    { static int dbg=-1, said=0; if(dbg<0){ const char*e=getenv("REVA_VCOLDBG"); dbg=(e&&e[0]=='1'); }
-      if(dbg&&said<24){ said++;
-        printf("[vcoldbg] %s mesh %u '%s' on %.0f prog %u loc con %d ca %d cr %d | caps %d r %.3f %.3f %.3f %.3f | A0 %.3f %.3f %.3f B0 %.3f %.3f %.3f\n",
-               P->label,mi,packStr(P,P->meshes[mi].name),on,t->prog,t->con,t->ca,t->cr,nc,R[0],R[1],R[2],R[3],
-               A[0],A[1],A[2],B[0],B[1],B[2]); fflush(stdout); } }
-    if(on>1.5f){ float Mo[16],MI[16],MoR[16],MIR[16];
-        if(headMats(P,W,Mo,MI)&&headMatsM(P,P->headW0,MoR,MIR)){
-            glUniformMatrix4fv(t->hm,1,GL_FALSE,Mo); glUniformMatrix4fv(t->hmi,1,GL_FALSE,MI);
-            if(t->hmr>=0) glUniformMatrix4fv(t->hmr,1,GL_FALSE,MIR); }
-        else glUniform1f(t->con,0.f); } }   /* no head measured: no hair rule (never the cloth rule on hair) */
 static int toonOn(const void*Pv,int toon){
     if(g_toonOff<0){ const char*e=getenv("REVA_NOTOON"); g_toonOff=(e&&*e&&*e!='0');
         const char*c=getenv("REVA_TOONCEL"); if(c&&*c) g_toonCel=(float)atof(c);
@@ -310,107 +230,7 @@ static int toonOn(const void*Pv,int toon){
         const char*rm=getenv("REVA_TOONRIM"); if(rm&&*rm) g_toonRim=(float)atof(rm);
         printf("[toon] cel %.2f ink %.4f%s\n",g_toonCel,g_toonInk,g_toonOff?" -- OFF (REVA_NOTOON)":""); fflush(stdout); }
     return Pv&&toon&&!g_toonOff; }
-#ifdef REVA_PACKET
 static void toonTell(void){ gfxToonSet(g_toonCel,g_toonOff?0.f:g_toonRim,(float)g_toonKeyCam,g_roomGrad,g_toonInk,g_inkC); }
-#endif
-static void toonCelSet(int on){ ToonLoc*t=toonLoc(); if(t&&t->cel>=0) glUniform1f(t->cel,on?g_toonCel:0.f);
-    if(t&&t->rim>=0) glUniform1f(t->rim,(on&&!g_toonOff)?g_toonRim:0.f); }
-/* ⭐ THE SHIP'S SETS (10-18). hemi: the cel cut taken on the surface's facing UP (0.5+0.5*N.y) times the sun's
- * shadow, not on the sun's direction -- a room is lit from its ceiling, so every wall reads lit and every underside
- * falls into the shadow tone, while the bodies keep the key. glow: uEmis 1, the surface at its own colour. Both
- * reset to 0 after the prop. Not in the sun's own pass (its program has neither). */
-static void toonSetLook(int hemi,int glow){ if(g_shadowPass) return; ToonLoc*t=toonLoc(); if(!t) return;
-    if(t->hemi>=0) glUniform1f(t->hemi,hemi?1.f:0.f);
-    if(t->emis>=0) glUniform1f(t->emis,glow?1.f:0.f); }
-static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei verts){
-    if(!on||g_toonInk<=0.f||g_glossDraw) return;   /* ⭐ (10-23) a glossy floor's own pass: no hull (a flat floor's is under it) */
-    if(meshName&&strstr(meshName,"~face~")) return;          /* the face's drawn shapes are decals: no line */
-    ToonLoc*t=toonLoc(); if(!t||t->ink<0||t->inkc<0) return;
-    GLint vpv[4]; glGetIntegerv(GL_VIEWPORT,vpv);
-    GLboolean cull=glIsEnabled(GL_CULL_FACE); GLint cf=GL_BACK; glGetIntegerv(GL_CULL_FACE_MODE,&cf);
-    glEnable(GL_CULL_FACE); glCullFace(GL_FRONT);
-    glUniform1f(t->ink,g_toonInk);
-    if(t->asp>=0) glUniform2f(t->asp,(float)vpv[3]/(float)(vpv[2]>0?vpv[2]:1),1.f);
-    glUniform4f(t->inkc,g_inkC[0],g_inkC[1],g_inkC[2],1.f);
-    /* ⛔ A DEPTH BIAS: where a surface and an ink hull meet at the SAME depth (two cloth walls pressed together, a
-     * fold) the hull won and drew black blotches; pushed a hair back, the surface wins and the silhouette is unchanged */
-    glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(2.5f,4.f);   /* slope-scaled: a grazing surface's depth runs fast */
-    if(idxCount) glDrawElements(GL_TRIANGLES,idxCount,GL_UNSIGNED_INT,0); else glDrawArrays(GL_TRIANGLES,0,verts);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glUniform1f(t->ink,0.f); glUniform4f(t->inkc,0.f,0.f,0.f,0.f);
-    glCullFace((GLenum)cf); if(!cull) glDisable(GL_CULL_FACE); }
-/* ⭐ (10-22) MIRRORS (engine_capabilities.md section 44). The book: "half the walls on the ship were mirrored to
- * make the rooms seem more spacious" (p18-19); 2.9 turns on Marie-Claude catching "a glimpse of herself in the
- * wall mirror". A mirror is an OPENING in a wall with the room's reflection behind it -- the old game-engine mirror:
- * every body and prop in front of the glass is drawn a SECOND time through the glass's plane (its model matrix
- * reflected), right after its own draw, from the pose already solved. No second camera, no second step of the sim
- * (the frame is one loop that simulates as it draws -- a reflected CAMERA would have stepped every cloth twice). The
- * depth test does the masking: the real wall round the opening hides the reflected room everywhere else, so a
- * set's room must be closed (nothing of another room behind its mirror wall). A reflection flips the winding: the
- * ink hull culls the other side (glFrontFace CW). Props cull BACK faces in the reflection -- the reflected copy of
- * the mirror's own wall lies IN its plane, facing away. The model matrix is read back from the program, so the call
- * site needs nothing but its uniform (the hanging cloth, drawn in world space, reflects the same way). One bounce:
- * a reflection is not reflected again. REVA_NOMIRROR=1 is the control. */
-static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,GLsizei verts,int flags){
-    /* flags: 1 cull back faces (props); 2 no ink -- a mirror's backing and its glass, reflected through their OWN mirror,
-     * land just inside the room facing away, and an inverted hull drawn from behind blacked the first mirror out */
-    int cull=flags&1;
-    if((!g_nMir&&!g_gloss.on)||g_shadowPass||uModel<0) return;
-    if(g_mirOff<0){ const char*e=getenv("REVA_NOMIRROR"); g_mirOff=(e&&e[0]!='0')?1:0;
-        if(g_mirOff) printf("[mirror] REVA_NOMIRROR: mirrors are dark openings\n"); }
-    if(g_mirOff) return;
-    GLint pr=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr); if(!pr) return;
-    float cur[16]; glGetUniformfv((GLuint)pr,uModel,cur);
-    GLboolean cf0=glIsEnabled(GL_CULL_FACE);
-    static int dbg=-1, ndbg=0; if(dbg<0){ const char*e=getenv("REVA_MIRDBG"); dbg=(e&&e[0]!='0')?1:0; }
-    ToonLoc*tl=toonLoc();
-    int nFl=(g_gloss.on&&!g_glossDraw)?1:0;   /* ⭐ (10-23) the glossy floor, lying down; never reflected in itself */
-    for(int k=0;k<g_nMir+nFl;k++){ Mirror*M=(k<g_nMir)?&g_mir[k]:&g_glossM; int fl=(k>=g_nMir);
-        float dt=(cur[12]-M->p[0])*M->n[0]+(cur[13]-M->p[1])*M->n[1]+(cur[14]-M->p[2])*M->n[2];
-        if(dbg&&ndbg<40){ ndbg++; printf("[mirror] %s prog %d uModel %d t %.2f %.2f %.2f -> mirror %d dt %.2f%s (glerr %x)\n",
-            meshName?meshName:"?",(int)pr,(int)uModel,cur[12],cur[13],cur[14],k,dt,dt<-0.5f?" SKIP":"",glGetError()); fflush(stdout); }
-        if(dt<-0.5f) continue;                     /* behind the glass: nothing of it shows in it */
-        float mm[16]; m4_mul(mm,M->R,cur);
-        glUniformMatrix4fv(uModel,1,GL_FALSE,mm);
-        glFrontFace(GL_CW);
-        if(cull){ glEnable(GL_CULL_FACE); glCullFace(GL_BACK); }
-        if(fl&&tl&&tl->refl>=0) glUniform4f(tl->refl,M->p[1],1.f/g_gloss.fade,0.f,1.f);
-        if(g_glossDraw&&!fl){ glDisable(GL_BLEND); if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,0.f,0.f,0.f,0.f); }
-        if(idxCount) glDrawElements(GL_TRIANGLES,idxCount,GL_UNSIGNED_INT,0); else glDrawArrays(GL_TRIANGLES,0,verts);
-        if(!(flags&2)) toonInkDraw(toon,meshName,idxCount,verts);
-        if(fl&&tl&&tl->refl>=0) glUniform4f(tl->refl,0.f,0.f,0.f,0.f);
-        if(g_glossDraw&&!fl){ glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA); if(tl&&tl->gloss>=0) glUniform4f(tl->gloss,g_gloss.f0,g_gloss.fmax,0.f,1.f); }
-        if(cull&&!cf0) glDisable(GL_CULL_FACE);
-        glFrontFace(GL_CCW); }
-    glUniformMatrix4fv(uModel,1,GL_FALSE,cur); }
-static GLint g_labMouthP=-1, g_labMouthS=-1, g_labOpen=-1;   /* the aperture, for hero AND partner */   /* the ACTIVE lab program's texture/tint locs (PR vs PRD) */
-static void skinPal(GLint loc,GLint locS,int dq,const float*mats,int n,float s){
-    if(g_dqs<0){ const char*e=getenv("REVA_LBS"); g_dqs=(e&&e[0]=='1')?0:1; }
-    if(!dq||!g_dqs){ glUniformMatrix4fv(loc,n,GL_FALSE,mats); return; }
-    static float buf[64*8];
-    float is=(s>1e-6f)?1.f/s:1.f;
-    for(int b=0;b<n&&b<64;b++){ const float*m=&mats[b*16]; float q[4];
-        float r00=m[0]*is,r10=m[1]*is,r20=m[2]*is;
-        float r01=m[4]*is,r11=m[5]*is,r21=m[6]*is;
-        float r02=m[8]*is,r12=m[9]*is,r22=m[10]*is;
-        float tr=r00+r11+r22;
-        if(tr>0){ float sq=sqrtf(tr+1.f)*2.f;
-            q[3]=0.25f*sq; q[0]=(r21-r12)/sq; q[1]=(r02-r20)/sq; q[2]=(r10-r01)/sq; }
-        else if(r00>r11&&r00>r22){ float sq=sqrtf(1.f+r00-r11-r22)*2.f;
-            q[3]=(r21-r12)/sq; q[0]=0.25f*sq; q[1]=(r01+r10)/sq; q[2]=(r02+r20)/sq; }
-        else if(r11>r22){ float sq=sqrtf(1.f+r11-r00-r22)*2.f;
-            q[3]=(r02-r20)/sq; q[0]=(r01+r10)/sq; q[1]=0.25f*sq; q[2]=(r12+r21)/sq; }
-        else { float sq=sqrtf(1.f+r22-r00-r11)*2.f;
-            q[3]=(r10-r01)/sq; q[0]=(r02+r20)/sq; q[1]=(r12+r21)/sq; q[2]=0.25f*sq; }
-        float ql=sqrtf(q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3]);
-        if(ql>1e-8f){ q[0]/=ql; q[1]/=ql; q[2]/=ql; q[3]/=ql; }
-        float tx=m[12],ty=m[13],tz=m[14];
-        buf[b*8+0]=q[0]; buf[b*8+1]=q[1]; buf[b*8+2]=q[2]; buf[b*8+3]=q[3];
-        buf[b*8+4]=0.5f*( tx*q[3]+ty*q[2]-tz*q[1]);
-        buf[b*8+5]=0.5f*(-tx*q[2]+ty*q[3]+tz*q[0]);
-        buf[b*8+6]=0.5f*( tx*q[1]-ty*q[0]+tz*q[3]);
-        buf[b*8+7]=0.5f*(-tx*q[0]-ty*q[1]-tz*q[2]); }
-    glUniform4fv(loc,2*n,buf); if(locS>=0) glUniform1f(locS,s); }
 
 /* ================= MORPH BLENDING, for ANY body ==============================
  * Was hero-only and capped at 80k vertices. A conversation needs it on both faces,
@@ -468,7 +288,7 @@ static int faceGizmo(Pack*P,M4*world,const float*model,float*v,int cap,float scl
     return n; }
 /* Arm the mouth aperture for a body: where her lip line sits in BIND space and how
  * far open the jaw is right now. Everything without face marks passes 0 and the
- * shader leaves the face alone. */
+ * renderer leaves the face alone. */
 /* how far this body's mouth is open, 0..1 -- one source of truth for the aperture */
 static float mouthOpenOf(Pack*P,const float*wts){
     float open=0.f;
@@ -483,22 +303,6 @@ static float mouthOpenOf(Pack*P,const float*wts){
     if(P&&P->fmJaw>=0) open=g_jawOpen[(P==g_heroPk)?0:1];
     else if(P&&P->fmMouth>=0){ int j=morphIdx((Pack*)P,"jaw"); if(j>=0&&wts) open=wts[j]; }
     return open<0.f?0.f:(open>1.f?1.f:open); }
-/* THE APERTURE IS A SKIN EFFECT AND MUST NEVER CUT THE INTERIOR. The discard is keyed
- * on the REST position, and the teeth, tongue and cavity sit exactly where the hole
- * is -- so armed for the interior mesh it would delete the very geometry it exists to
- * reveal. Depth alone cannot separate them either: the gate reaches 1.1 mouth
- * half-widths back, which is past the teeth. So the interior is its OWN MESH and the
- * opening is switched off while it draws. */
-static void mouthMeshArm(Pack*P,unsigned mi,const float*wts,GLint uOpen){
-    if(uOpen<0||!P) return;
-    glUniform1f(uOpen,((int)mi==P->fmInterior)?0.f:mouthOpenOf(P,wts)); }
-static void mouthArm(Pack*P,const float*wts,GLint uMouthP,GLint uMouthS,GLint uOpen){
-    if(uOpen<0) return;
-    float open=mouthOpenOf(P,wts);
-    if(!P||P->fmMouth<0||P->fmEyeL<0){ glUniform1f(uOpen,0.f); return; }
-    if(uMouthP>=0) glUniform4f(uMouthP,P->mouthBind[0],P->mouthBind[1],P->mouthBind[2],P->mouthBind[5]);
-    if(uMouthS>=0) glUniform2f(uMouthS,P->mouthBind[3],P->mouthBind[4]);
-    glUniform1f(uOpen,open<0.f?0.f:(open>1.f?1.f:open)); }
 /* a node's world position through a body's model matrix -- the face marks reach the
  * camera the same way the hands reach the contact gates */
 static void ptWorld(const float*mw,const float*model,float*dst){
@@ -544,12 +348,10 @@ static void morphBlend(Pack*P,float*wts,int*wasAct){
                 unsigned vi9=*(unsigned*)(sd9+s9*16); float*dl9=(float*)(sd9+s9*16+4);
                 if(vi9>=lo9&&vi9-lo9<cnt9){ float*d9=mbuf+(size_t)(vi9-lo9)*3;
                     d9[0]+=dl9[0]*w9; d9[1]+=dl9[1]*w9; d9[2]+=dl9[2]*w9; } } }
-        glBindBuffer(GL_ARRAY_BUFFER,P->vbo[mesh9*6]);
-        glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)((size_t)lo9*12),(GLsizeiptr)((size_t)cnt9*12),mbuf);
+        gfxBufferSub(P->vbo[mesh9*6], (long)((size_t)lo9*12), (long)((size_t)cnt9*12), mbuf);
         if(getenv("REVA_MORPHDBG")){ static int said9=0; if(said9<4){ said9++;
-            GLenum e9=glGetError();
-            printf("[morph] mesh %u verts %u  range %u..%u (%u)  vbo %u  err 0x%x  w=[%.2f %.2f %.2f %.2f]\n",
-                   mesh9,M9->verts,lo9,hi9,cnt9,P->vbo[mesh9*6],e9,
+            printf("[morph] mesh %u verts %u  range %u..%u (%u)  vbo %u  w=[%.2f %.2f %.2f %.2f]\n",
+                   mesh9,M9->verts,lo9,hi9,cnt9,P->vbo[mesh9*6],
                    wts[0],wts[1],wts[2],wts[3]); fflush(stdout); } } }
     *wasAct=act; }
 

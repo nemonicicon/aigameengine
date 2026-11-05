@@ -13,17 +13,20 @@
 #define VOICE_IDLE 3600   /* a minute of ticks with nobody using it, and its memory goes. Asking again reads it again */
 static int g_talkOn=0;   /* a conversation's up: its voices aren't placed in the world */
 static void apiHeroFace(float yaw){ g_heroFaceY=yaw; g_heroFaceOn=1; }
+/* (step 23) eyes that glow, on any body, -1 the hero: a colour and how much, 0 to put them out. What's drawn and not the rules */
+static void apiBodyEyes(int i,float r,float g,float b,float amount){ float*o=i<0?g_heroEye:(i<1024?g_slotEye[i]:NULL); if(!o) return; o[0]=r; o[1]=g; o[2]=b; o[3]=amount<0.f?0.f:amount; g_eyeEver=1; }
 static int g_faceHeroHashed=0;   /* the receipt's already had the hero's pose this frame, from before the face went on */
 typedef struct { char name[24]; float want,now,rate; short idx[8]; int n; } FaceShape;
 struct Face { int body,on; Pack*pk; FaceShape s[FACE_SHAPES]; int nS; int shared,wasAct; short iBlink[4],iJaw[8],iSmile[4]; int nBlink,nJaw,nSmile;
     float t,open,fed,blink,blinkAt,blinkT,nodT; unsigned dice;
     int lineOn,pending,voice,sfx,uses; float lineT,lineLen,rate; float*env,*vis; int nEnv,nVis,ownEnv; char words[168];
     int look,lookBody; float lookP[3],S[4],aim,yawT,pitchT;
+    float eyeY; int eyeYOK;   /* (step 20) where its eyes really are, above its feet, as last posed: a seated body's are lower than its rest pose says */
     float w[MORPH_MAX]; };
 typedef struct { char path[96]; SDL_atomic_t state; float*pcm; int n; float*env; int nEnv,slot,idle,uses,missing,want; } FaceVoice;
 static Face g_faces[FACE_POOL]; static short g_faceOf[FACE_HERO+1]; static int g_faceN=0;
 static FaceVoice g_fv[VOICE_MAX]; static int g_fvN=0;
-static struct { char L[12][36]; int n; float t,len; int who,on; } g_cap; static int g_faceCapOff=0;
+static struct { char L[12][128]; int n; float t,len; int who,on; } g_cap;   /* a row is 31 letters, and a letter past ASCII is up to four bytes (step 26) */ static int g_faceCapOff=0;
 /* who has this body's face, -1 being the hero */
 static Face* faceOf(int i){ const int k=i<0?FACE_HERO:i; if(k>FACE_HERO||(i>=0&&(i>=g_NS||i>=1024))) return NULL; return g_faceOf[k]?&g_faces[g_faceOf[k]-1]:NULL; }
 static Face* faceGet(int i){ const int k=i<0?FACE_HERO:i; if(k>FACE_HERO||(i>=0&&(i>=g_NS||i>=1024))) return NULL; if(g_faceOf[k]) return &g_faces[g_faceOf[k]-1];
@@ -73,8 +76,15 @@ static float* faceVisOf(const char*text,float secs,int*nOut){ const int n=(int)(
     /* a jaw has mass: straight between neighbours chatters at 30 Hz */
     for(int pass=0;pass<2;pass++){ float pv=o[0]; for(int i=0;i<n;i++){ const float c=o[i],nx=o[i+1<n?i+1:i]; o[i]=(pv+2.f*c+nx)*0.25f; pv=c; } }
     *nOut=n; return o; }
-static void capSet(const char*words,float secs,int who){ g_cap.n=0; g_cap.on=0; if(!words||!words[0]||g_faceCapOff) return; const char*p=words; int cols=31;
-    while(*p&&g_cap.n<12){ while(*p==' ') p++; const char*e=p,*br=NULL; while(*e&&e-p<cols){ if(*e==' ') br=e; e++; } if(*e&&br&&*e!=' ') e=br; const int n=(int)(e-p); memcpy(g_cap.L[g_cap.n],p,(size_t)n); g_cap.L[g_cap.n][n]=0; g_cap.n++; p=e; }
+/* (step 26) the line in the language chosen, looked up whole before it's broken into rows: a conversation's file is translated a line at a time, like any other text.
+ * Rows are counted in letters, which past ASCII aren't bytes; a row never ends inside one; and it can end beside a letter of the scripts that have no spaces (tvBreak's rule) */
+static void capSet(const char*words,float secs,int who){ g_cap.n=0; g_cap.on=0; if(!words||!words[0]||g_faceCapOff) return; words=langWord(words); const char*p=words; const int cols=31;
+    while(*p&&g_cap.n<12){ while(*p==' ') p++;
+        const char*e=p,*br=NULL; unsigned was=0; int k=0,u=1;
+        while(*e&&k<cols){ const unsigned c=tvLetter(e,&u); if(c==' '||(k&&(TV_WIDECH(c)||TV_WIDECH(was))&&!tvNoStart(c)&&!tvNoEnd(was))) br=e; e+=u; was=c; k++; }
+        if(*e&&*e!=' '){ const unsigned c=tvLetter(e,&u); if((TV_WIDECH(c)||TV_WIDECH(was))&&!tvNoStart(c)&&!tvNoEnd(was)) br=e; if(br) e=br; }
+        int n=(int)(e-p); if(n>(int)sizeof g_cap.L[0]-1) n=(int)sizeof g_cap.L[0]-1;
+        memcpy(g_cap.L[g_cap.n],p,(size_t)n); g_cap.L[g_cap.n][n]=0; g_cap.n++; p=e; }
     g_cap.len=secs; g_cap.t=secs; g_cap.who=who; g_cap.on=1; }
 static void faceLineEnd(Face*f){ if(f->sfx>=0) sfxStop(f->sfx); f->sfx=-1; if(f->uses&&f->voice>=0&&f->voice<g_fvN&&g_fv[f->voice].uses>0) g_fv[f->voice].uses--; f->uses=0; f->voice=-1;
     if(f->ownEnv) free(f->env);
@@ -114,7 +124,15 @@ static float faceEyeHeight(Pack*P){ if(P->faceEyeOK) return P->faceEyeH; P->face
     for(unsigned i=0;i<P->nNodes;i++){ M4 lc; m4_trs(lc,P->nodes[i].t,P->nodes[i].q,P->nodes[i].s); if(P->nodes[i].parent<0) memcpy(w[i],lc,64); else m4_mul(w[i],w[P->nodes[i].parent],lc); }
     const int a=P->fmEyeL,b=P->fmEyeR,h=P->pb[5]; if(a>=0&&b>=0) P->faceEyeH=(0.5f*(w[a][13]+w[b][13])-P->mny)*P->scale; else if(h>=0) P->faceEyeH=(w[h][13]-P->mny)*P->scale; free(w); return P->faceEyeH; }
 static Pack* faceBodyAt(int b,float*eye,float*yaw){ Pack*P; float x,z,feet,ya; if(b<0){ P=g_heroPk; x=g_rvx; z=g_rvz; feet=g_feet.y; ya=g_rvHead; } else if(b<g_NS&&b<1024){ const Slot*s=&g_slots[b]; P=&g_packs[s->pack]; x=s->x; z=s->z; feet=g_slotFeet[b]; ya=s->rotY; } else return NULL;
-    if(eye){ eye[0]=x; eye[1]=feet+(P?faceEyeHeight(P):1.6f); eye[2]=z; } if(yaw) *yaw=ya; return P; }
+    if(eye){ const Face*f=faceOf(b); eye[0]=x; eye[1]=feet+((f&&f->eyeYOK)?f->eyeY:(P?faceEyeHeight(P):1.6f)); eye[2]=z; } if(yaw) *yaw=ya; return P; }
+/* (step 20, 11-04) after a body's posed: is it sitting? Its eyes well below where they stand (under 85% of it) says so, and then its look, and the conversation's lens, go to where they
+ * really are and not to its standing head. It's latched, in steps of a twentieth of a unit, and let go only once it's nearly upright again: a standing body's sway never reaches the
+ * lens, so a standing conversation is what it always was, and which frame did the latching doesn't change what's latched */
+static void facePosed(Face*f,Pack*P,M4*w){ const int a=P->fmEyeL,b=P->fmEyeR,h=P->pb[5]; float y; if(a>=0&&b>=0) y=0.5f*(w[a][13]+w[b][13]); else if(h>=0) y=w[h][13]; else return;
+    y=(y-P->mny)*P->scale; const float rest=faceEyeHeight(P),q=floorf(y*20.f+0.5f)/20.f;
+    if(!f->eyeYOK){ if(y<0.85f*rest){ f->eyeYOK=1; f->eyeY=q; } }
+    else if(y>0.93f*rest) f->eyeYOK=0;
+    else if(fabsf(y-f->eyeY)>0.12f) f->eyeY=q; }
 static float faceRand(Face*f){ f->dice=f->dice*1664525u+1013904223u; return (float)(f->dice>>16&0x7fffu)/32767.f; }
 /* ---- once a tick, after the game's: a face has a clock of its own, and everything it does moves on it ---- */
 static void faceStep(void){ if(!g_faceN&&!g_fvN) return; const float dt=simStepS(); int installed=0;
@@ -183,7 +201,6 @@ static void faceLayer(Face*f,Pack*P,float Q[][4]){ if(f->pk!=P) faceBind(f,P); f
     { const int ch=(P->pb[3]>=0)?P->pb[3]:P->pb[2]; if(ch>=0){ qaxis(off,1,0,0,-0.014f*sinf(6.2832f*0.24f*t+me)); qmul(Q[ch],Q[ch],off); if(sway!=0.f){ qaxis(off,0,1,0,0.22f*sway); qmul(Q[ch],Q[ch],off); } } }
     { static const char*dbg=(const char*)1; if(dbg==(const char*)1) dbg=getenv("REVA_TALKDBG"); if(dbg&&g_tickTotal%30==0&&!g_noDraw){ printf("[face] tick %ld body %d %s: jaw bone %d shapes %d (jaw %d blink %d) shared %d open %.3f line %d t %.2f of %.2f env %d vis %d blink %.2f look %d aim %.2f hole %d\n",(long)g_tickTotal,f->body,P->label,P->fmJaw,P->nMorph,f->nJaw,f->nBlink,f->shared,f->open,f->lineOn,f->lineT,f->lineLen,f->nEnv,f->nVis,f->blink,f->look,f->aim,P->fmMouth>=0&&P->fmEyeL>=0&&P->fmEyeR>=0); fflush(stdout); } }
     if(f->shared&&P->nMorph) morphBlend(P,f->w,&f->wasAct); }
-#ifdef REVA_PACKET
 static float g_facePos[FACE_MAXV*3];
 /* one mesh of the body being drawn: its own positions if its shapes have moved them, and the hole in its mouth */
 static const float* faceMeshPos(Pack*P,unsigned mi,float*mouth){ Face*f=g_faceCur; mouth[6]=0.f; if(!f||f->pk!=P) return NULL;
@@ -195,11 +212,10 @@ static const float* faceMeshPos(Pack*P,unsigned mi,float*mouth){ Face*f=g_faceCu
     for(int m=0;m<P->nMorph;m++){ if(P->morphMesh[m]!=mi) continue; const float w=f->w[m]; if(fabsf(w)<=1e-3f) continue; const unsigned char*sd=P->pk+P->morphOff[m];
         for(unsigned s=0;s<P->morphSparse[m];s++){ unsigned vi; float dl[3]; memcpy(&vi,sd+s*16,4); memcpy(dl,sd+s*16+4,12); if(vi>=M->verts) continue; float*d=g_facePos+(size_t)vi*3; d[0]+=dl[0]*w; d[1]+=dl[1]*w; d[2]+=dl[2]*w; } }
     return g_facePos; }
-#endif
 /* the words, on the TV's grid and over any picture */
 static void faceHud(void){ if(!g_cap.on||!g_cap.n) return; const int pages=(g_cap.n+2)/3; float u=1.f-g_cap.t/(g_cap.len>0.f?g_cap.len:1.f); if(u<0.f) u=0.f; int pg=(int)(u*(float)pages); if(pg>=pages) pg=pages-1; const int first=pg*3,n=g_cap.n-first>3?3:g_cap.n-first;
-    const float row=22.f-(float)n; int wide=0; for(int l=0;l<n;l++){ const int w=(int)strlen(g_cap.L[first+l]); if(w>wide) wide=w; }
-    if(g_tvRead) g_tvGroup=99; else { UiDraw D; memset(&D,0,sizeof D); D.col=((float)TV_COLS-(float)wide)*0.5f; D.row=row; D.cols=(float)wide; D.frac=(float)n; uiPanelDraw(&D); }
+    const float row=22.f-(float)n; int wide=0; for(int l=0;l<n;l++){ const int w=tvLen(g_cap.L[first+l]); if(w>wide) wide=w; }
+    if(TV_FIT) g_tvGroup=99; else { UiDraw D; memset(&D,0,sizeof D); D.col=((float)TV_COLS-(float)wide)*0.5f; D.row=row; D.cols=(float)wide; D.frac=(float)n; uiPanelDraw(&D); }
     for(int l=0;l<n;l++) tvTextC(row+(float)l,1,g_cap.L[first+l],1.f,1.f,0.92f);
     g_tvGroup=0; }
 
@@ -214,7 +230,8 @@ static void faceHud(void){ if(!g_cap.on||!g_cap.n) return; const int pages=(g_ca
  *   ask <label> <words>                       lines of these in a row are a menu. The answer goes to that label, and to GameExport.talkEvent
  *   attach <seat> <prop> <bone> [x y z [yaw pitch roll [scale]]]    detach <seat>    a model on a bone, and all of them off again
  *   :label    goto <label>    event <name>    end    # a comment
- * ⛔ The lens comes from where the bodies are by the rules and how high their eyes are at rest, not from a drawn pose, so a seated body's shot sits too high until the game says otherwise. */
+ * The lens comes from where the bodies are by the rules, and from where their eyes were last posed (facePosed), so a seated body's shot frames its real head; a body not yet posed is taken at its rest height.
+ * On a split screen, E->talkView says which player's picture the lens goes in (step 20). */
 #define TALK_MAXL 512
 #define TALK_SEATS 8
 #define TALK_MAXLABEL 64
@@ -222,13 +239,21 @@ enum { TK_SAY,TK_SHOT,TK_SIDE,TK_LOOK,TK_SHAPE,TK_ANIM,TK_WAIT,TK_PRESS,TK_SKIP,
 enum { TS_AUTO,TS_CLOSE,TS_OVER,TS_TWO,TS_WIDE,TS_FREE };
 typedef struct { short kind,seat,other; float v,w; char a[32]; char s[96]; char t[168]; } TalkLine;
 static struct { int on,n,pc,saying,last,wait,press,skip,asking,nAuto; TalkLine L[TALK_MAXL]; struct { char nm[32]; int pc; } lab[TALK_MAXLABEL]; int nLab; int seat[TALK_SEATS],used[TALK_SEATS],look[TALK_SEATS];
-    int shot,autoShot,subj,other; float side,waitT; EngineUi ui; int hadLens; float saveE[3],saveA[3],saveFov; char name[56]; } g_talk;
+    int shot,autoShot,subj,other; float side,waitT; EngineUi ui; int hadLens; float saveE[3],saveA[3],saveFov; char name[56];
+    int view; float saveVE[3],saveVA[3]; } g_talk;   /* (step 20) which picture of a split screen the conversation's lens goes in; -1 is the whole screen's */
 static void apiTalkSeat(int seat,int body){ if(seat>=0&&seat<TALK_SEATS){ g_talk.seat[seat]=body; g_talk.used[seat]=1; } }
+static void apiTalkView(int view){ g_talk.view=view<0?-1:view>3?3:view; }
+/* the lens the conversation sets, and the one it hands back: the whole screen's, or one player's picture of a split screen (the first picture's lens is also the screen's) */
+static void talkLensPut(const float*e,const float*c,float fov){ g_tune.lensFov=fov;
+    if(g_talk.view>=0&&g_gameViews.n>1){ memcpy(g_gameViews.e[g_talk.view],e,12); memcpy(g_gameViews.a[g_talk.view],c,12); if(g_talk.view!=0) return; }
+    g_gameLens.on=1; memcpy(g_gameLens.e,e,12); memcpy(g_gameLens.a,c,12); }
+static void talkLensBack(void){ g_gameLens.on=g_talk.hadLens; memcpy(g_gameLens.e,g_talk.saveE,12); memcpy(g_gameLens.a,g_talk.saveA,12); g_tune.lensFov=g_talk.saveFov;
+    if(g_talk.view>=0&&g_gameViews.n>1){ memcpy(g_gameViews.e[g_talk.view],g_talk.saveVE,12); memcpy(g_gameViews.a[g_talk.view],g_talk.saveVA,12); } }
 static int apiTalking(void){ return g_talk.on; }
 static void talkLook(int k,int body){ if(k==-1) apiBodyLookOff(body); else if(k>=0&&k<TALK_SEATS&&g_talk.used[k]) apiBodyLookBody(body,g_talk.seat[k]); }
 static void apiTalkStop(void){ if(!g_talk.on) return; g_talk.on=0; g_talkOn=0;
     for(int s=0;s<TALK_SEATS;s++){ if(!g_talk.used[s]) continue; Face*f=faceOf(g_talk.seat[s]); if(!f) continue; faceLineEnd(f); f->look=0; for(int k=0;k<f->nS;k++){ f->s[k].want=0.f; f->s[k].rate=2.f; } }
-    g_gameLens.on=g_talk.hadLens; memcpy(g_gameLens.e,g_talk.saveE,12); memcpy(g_gameLens.a,g_talk.saveA,12); g_tune.lensFov=g_talk.saveFov; g_cap.on=0; }
+    talkLensBack(); g_cap.on=0; }
 static int talkParse(const char*name){ char p[128],b[512]; snprintf(p,sizeof p,"talk/%.100s.talk",name); FILE*f=fopen(p,"rb"); if(!f){ printf("[talk] no conversation called %s\n",p); fflush(stdout); return 0; } clubOpened(p);
     g_talk.n=0; g_talk.nLab=0; int ln=0;
     while(fgets(b,sizeof b,f)){ ln++; char*q=b; while(*q==' '||*q=='\t') q++; size_t e=strlen(q); while(e&&(q[e-1]=='\n'||q[e-1]=='\r'||q[e-1]==' ')) q[--e]=0; if(!*q||*q=='#') continue;
@@ -257,13 +282,14 @@ static int apiTalkStart(const char*name){ if(g_talk.on) apiTalkStop(); if(!name|
     g_talk.on=1; g_talkOn=1; g_talk.pc=0; g_talk.saying=-1; g_talk.last=-1; g_talk.wait=0; g_talk.press=0; g_talk.skip=1; g_talk.asking=0; g_talk.nAuto=0; g_talk.shot=TS_AUTO; g_talk.autoShot=TS_TWO; g_talk.subj=-1; g_talk.other=-1; g_talk.side=1.f; g_talk.waitT=0.f; memset(&g_talk.ui,0,sizeof g_talk.ui);
     for(int s=0;s<TALK_SEATS;s++) g_talk.look[s]=-2;
     g_talk.hadLens=g_gameLens.on; memcpy(g_talk.saveE,g_gameLens.e,12); memcpy(g_talk.saveA,g_gameLens.a,12); g_talk.saveFov=g_tune.lensFov;
+    if(g_talk.view>=0){ memcpy(g_talk.saveVE,g_gameViews.e[g_talk.view],12); memcpy(g_talk.saveVA,g_gameViews.a[g_talk.view],12); }
     /* every line it might say starts reading now, so there's nothing to wait for when it gets there */
     for(int i=0;i<g_talk.n;i++){ const TalkLine*L=&g_talk.L[i]; if(L->kind==TK_SAY&&strcmp(L->s,"-")) voiceAsk(L->s); }
     return 1; }
 static int talkAnyA(void){ for(int k=0;k<4;k++) if(g_pads[k].connected&&(g_pads[k].pressed&PAD_A)) return 1; return 0; }
 static int talkOtherSeat(int s){ if(g_talk.last>=0&&g_talk.last!=s) return g_talk.last; for(int k=0;k<TALK_SEATS;k++) if(k!=s&&g_talk.used[k]) return k; return -1; }
 /* the lens, each tick: it follows them, and only ever cuts when a line says so */
-static void talkLens(void){ if(g_talk.shot==TS_FREE){ g_gameLens.on=g_talk.hadLens; memcpy(g_gameLens.e,g_talk.saveE,12); memcpy(g_gameLens.a,g_talk.saveA,12); g_tune.lensFov=g_talk.saveFov; return; }
+static void talkLens(void){ if(g_talk.shot==TS_FREE){ talkLensBack(); return; }
     int a=g_talk.subj; if(a<0||a>=TALK_SEATS||!g_talk.used[a]){ for(a=0;a<TALK_SEATS&&!g_talk.used[a];a++){} if(a>=TALK_SEATS) return; }
     int b=g_talk.other; if(b<0||b>=TALK_SEATS||!g_talk.used[b]||b==a) b=talkOtherSeat(a);
     float A[3],B[3]; Pack*PA=faceBodyAt(g_talk.seat[a],A,NULL); if(!PA) return; const float h=faceEyeHeight(PA); int two=1; if(b<0||!faceBodyAt(g_talk.seat[b],B,NULL)){ two=0; float y=0.f; faceBodyAt(g_talk.seat[a],NULL,&y); B[0]=A[0]+sinf(y); B[1]=A[1]; B[2]=A[2]+cosf(y); }
@@ -271,12 +297,14 @@ static void talkLens(void){ if(g_talk.shot==TS_FREE){ g_gameLens.on=g_talk.hadLe
     /* one side of the line between them, whichever way round the shot is, so nobody seems to swap sides on a cut */
     float nx=-dz,nz=dx; if(a>b&&two){ nx=-nx; nz=-nz; } nx*=g_talk.side; nz*=g_talk.side;
     float e[3],c[3],fov=30.f; int shot=g_talk.shot==TS_AUTO?g_talk.autoShot:g_talk.shot; if(!two&&(shot==TS_OVER||shot==TS_TWO)) shot=TS_CLOSE;
+    /* (step 20) one of them's sitting: their eyes are far apart in height. An over-the-shoulder then has the other's body between the lens and the face, so it's a clean single; and a two-shot frames between their heights, from a little further back. Two standing people are framed as they always were */
+    const float dyAB=two?fabsf(A[1]-B[1]):0.f; const int sat=dyAB>0.15f*h; if(sat&&shot==TS_OVER) shot=TS_CLOSE;
     if(shot==TS_CLOSE){ const float D=0.685f*h; fov=28.f; e[0]=A[0]+dx*D*0.90f+nx*D*0.42f; e[1]=A[1]; e[2]=A[2]+dz*D*0.90f+nz*D*0.42f; c[0]=A[0]; c[1]=A[1]-0.03f*h; c[2]=A[2]; }
     else if(shot==TS_OVER){ fov=32.f; e[0]=B[0]+dx*0.62f*h+nx*0.24f*h; e[1]=B[1]+0.05f*h; e[2]=B[2]+dz*0.62f*h+nz*0.24f*h; c[0]=A[0]; c[1]=A[1]-0.05f*h; c[2]=A[2]; }
-    else { const float D=(d+0.5f*h)/0.7128f*(shot==TS_WIDE?2.2f:1.f); fov=shot==TS_WIDE?36.f:30.f; const float mx=0.5f*(A[0]+B[0]),mz=0.5f*(A[2]+B[2]); e[0]=mx+nx*D; e[1]=A[1]+(shot==TS_WIDE?0.25f*h:0.f); e[2]=mz+nz*D; c[0]=mx; c[1]=A[1]-(shot==TS_WIDE?0.35f*h:0.12f*h); c[2]=mz; }
+    else { const float my=sat?0.5f*(A[1]+B[1]):A[1]; const float D=(d+0.5f*h+(sat?dyAB:0.f))/0.7128f*(shot==TS_WIDE?2.2f:1.f); fov=shot==TS_WIDE?36.f:30.f; const float mx=0.5f*(A[0]+B[0]),mz=0.5f*(A[2]+B[2]); e[0]=mx+nx*D; e[1]=my+(shot==TS_WIDE?0.25f*h:0.f); e[2]=mz+nz*D; c[0]=mx; c[1]=my-(shot==TS_WIDE?0.35f*h:0.12f*h); c[2]=mz; }
     /* a wall between them and the lens: it comes in front of the wall */
     { float t=1.f; if(spRay(c,e,&t)&&t<1.f){ const float k=t*0.92f>0.15f?t*0.92f:0.15f; for(int i=0;i<3;i++) e[i]=c[i]+(e[i]-c[i])*k; } }
-    g_gameLens.on=1; memcpy(g_gameLens.e,e,12); memcpy(g_gameLens.a,c,12); g_tune.lensFov=fov;
+    talkLensPut(e,c,fov);
     { static const char*dbg=(const char*)1; if(dbg==(const char*)1) dbg=getenv("REVA_TALKDBG"); if(dbg&&g_tickTotal%30==0){ const Face*fa=faceOf(g_talk.seat[a]); printf("[talk] tick %ld shot %d on seat %d: A %.2f %.2f %.2f B %.2f %.2f %.2f h %.2f lens %.2f %.2f %.2f to %.2f %.2f %.2f fov %.0f; its head yaw %.2f pitch %.2f target %.2f %.2f\n",(long)g_tickTotal,shot,a,A[0],A[1],A[2],B[0],B[1],B[2],h,e[0],e[1],e[2],c[0],c[1],c[2],fov,fa?fa->S[0]:0.f,fa?fa->S[1]:0.f,fa?fa->yawT:0.f,fa?fa->pitchT:0.f); fflush(stdout); } } }
 /* once a tick, after the game's */
 static void talkStep(void){ if(!g_talk.on) return; const float dt=simStepS();

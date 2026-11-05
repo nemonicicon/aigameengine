@@ -43,11 +43,23 @@ static void dealRound(void) {
     S.roundLen = S.clock = 12.f + 2.f * (float)n;
 }
 
+/* the best score so far, kept in a save of the game's own (save/tag_auto.txt): read when the game starts, written when a round's beaten it. It's not in the state, so the receipt can't see it */
+static int g_best;
+static void keepBest(void) {
+    if (S.score <= g_best) return;
+    g_best = S.score;
+    E->saveBegin("auto", 1);
+    E->saveSetI("best", g_best);
+    E->saveSetI("round", S.round);
+    E->saveEnd();
+}
+
 static void start(int onSet) {
     (void)onSet;
     *E->heroX = 0.f;
     *E->heroZ = 0.5f * (YARD_Z0 + YARD_Z1);
     S.round = 1;
+    if (E->load("auto")) g_best = (int)E->loadGetI("best", 0);
     dealRound();
     E->banner("TAG THEM ALL", 3.f);
 }
@@ -77,7 +89,7 @@ static void tick(float dt) {
             S.score += 100;
             E->burst(b->x, 1.5f, b->z, 0.4f, 1.1f, 1.4f, 10, 1.6f);
             E->banner("TAG", 0.6f);
-            sfxPlay("pickup", 0.8f, NULL, 0);
+            E->sound("pickup", 0.8f, NULL, 0);
             continue;
         }
         if (S.nRings < MAX_RINGS) {
@@ -92,6 +104,7 @@ static void tick(float dt) {
         if (S.left <= 0) {
             S.round++;
             S.score += (int)S.clock * 10;
+            keepBest();
             dealRound();
             E->banner("NEXT ROUND", 2.f);
         } else if (S.clock <= 0.f) {
@@ -134,14 +147,18 @@ static void draw(const void *state) {
 static void hud(const void *state) {
     const State *s = state;
     char t[48];
-    snprintf(t, sizeof t, "SCORE %d", s->score);
+    snprintf(t, sizeof t, E->word("SCORE %d"), s->score);   /* E->word: this text in the player's language, if lang/<code>.txt has it. A fixed string needs nothing: the engine looks those up itself */
     E->tvText(0, 0, 1, t, 1.f, 1.f, 1.f);
-    snprintf(t, sizeof t, "ROUND %d", s->round);
+    snprintf(t, sizeof t, E->word("ROUND %d"), s->round);
     E->tvTextR(0, 1, t, 1.f, 1.f, 1.f);
     float f = s->roundLen > 0.f ? s->clock / s->roundLen : 0.f;
     E->tvBar(0, 1.25f, 13, f, f > 0.3f ? 0.35f : 1.f, f > 0.3f ? 0.95f : 0.35f, 0.3f);
-    snprintf(t, sizeof t, "LEFT %d", s->left);
+    snprintf(t, sizeof t, E->word("LEFT %d"), s->left);
     E->tvTextR(1.25f, 1, t, 0.55f, 0.95f, 1.f);
+    if (g_best > 0) {
+        snprintf(t, sizeof t, E->word("BEST %d"), g_best);
+        E->tvTextR(2.5f, 1, t, 0.8f, 0.8f, 0.8f);
+    }
     const char *m = E->bannerText();
     int cols;
     E->tvGrid(&cols, NULL);

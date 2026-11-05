@@ -26,8 +26,20 @@ static void start(int onSet) {
 }
 
 static void tick(float dt) {
-    (void)dt;
     S.x = *E->heroX; S.z = *E->heroZ;
+    /* a bench's question: ROAM_PATH=dx,dz asks the way to a place that far from her once a second, and says how it came out. REVA_TALKDBG=1 has the engine say how it looked:
+     * across cells whose part of the map is in, it's the map, and where one isn't in yet it's the slower search */
+    if (getenv("ROAM_PATH")) {
+        static float since;
+        since += dt;
+        if (since >= 1.f) {
+            since = 0.f;
+            float d[2] = {0.f, 0.f}, xyz[64 * 3];
+            sscanf(getenv("ROAM_PATH"), "%f,%f", &d[0], &d[1]);
+            int n = E->path(S.x, *E->heroFeet, S.z, S.x + d[0], 0.f, S.z + d[1], 0.f, xyz, 64);
+            printf("[roam] the way from %.0f,%.0f to %.0f,%.0f: %d points, ending at %.1f,%.1f\n", S.x, S.z, S.x + d[0], S.z + d[1], n, xyz[(n - 1) * 3], xyz[(n - 1) * 3 + 2]);
+        }
+    }
 }
 
 /* nobody's at the pad: back and forth along a line that keeps moving over, so it keeps finding cells it hasn't been near for a while. The boxes are solid, so when one stops her she edges along it until she's past: one way, then the other, and if that's a corner, back the way she came */

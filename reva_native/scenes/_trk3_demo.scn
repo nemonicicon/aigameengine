@@ -1,0 +1,6 @@
+scene 1 _trk3_demo.wav 6.000 1
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 6.000 
+env 0 
+stage cam=1.6,2.6,9.5,1.6,1.9,0,40 dur=6.000 hbrow=auto hclip=auto hgt=0 hlook=1 pbrow=auto pclip=auto pgap=1.15 plook=1 pside=0.12 pyaw=180 shot=ots snap=1
+vis 0 

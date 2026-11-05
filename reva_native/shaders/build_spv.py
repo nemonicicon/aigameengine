@@ -17,6 +17,7 @@ if os.name == "nt":
 ALSO = [("mesh.frag", "mesh_mouth_frag", "-DMOUTH_HOLE=1"), ("mesh_skin.vert", "mesh_skin_mouth_vert", "-DMOUTH_HOLE=1"),
         ("mesh.frag", "mesh_toon_frag", "-DTOON=1"), ("mesh.frag", "mesh_toon_mouth_frag", "-DTOON=1 -DMOUTH_HOLE=1"), ("mesh.frag", "mesh_toon_blend_frag", "-DTOON=1 -DTOON_BLEND=1"),
         ("mesh_skin.vert", "mesh_skin_ink_vert", "-DINK=1"), ("mesh_static.vert", "mesh_static_ink_vert", "-DINK=1"),
+        ("mesh_skin.vert", "mesh_skin_fur_vert", "-DFUR=1"), ("mesh_static.vert", "mesh_static_fur_vert", "-DFUR=1"), ("mesh.frag", "mesh_fur_frag", "-DFUR=1"), ("mesh.frag", "mesh_toon_fur_frag", "-DTOON=1 -DFUR=1"),
         ("mesh.frag", "mesh_refl_frag", "-DREFL=1"), ("mesh.frag", "mesh_toon_refl_frag", "-DTOON=1 -DREFL=1"), ("mesh.frag", "mesh_gloss_frag", "-DGLOSS=1"), ("mesh.frag", "mesh_toon_gloss_frag", "-DTOON=1 -DGLOSS=1")]
 out = ["/* gfx_spv.h -- the renderer's shaders as SPIR-V. Written by shaders/build_spv.py; edit the GLSL beside it, not this. */"]
 n = 0

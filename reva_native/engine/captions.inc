@@ -7,7 +7,11 @@
  * rows balanced against each other. What is shown is the line's PAGE for this moment -- compile_scene.py cuts a line
  * into pages of two rows and times each off the voice (`cap t0 t1 text`); a line without pages is wrapped whole. The
  * off-screen voice (slot 4: the narrator) is set in italic with no name; an on-screen speaker's name sits over the
- * box in the slot's colour. No font found, or REVA_OLDCAPS=1 (the control): the old captions. */
+ * box in the slot's colour. No font found, or REVA_OLDCAPS=1 (the control): the old captions.
+ * ⭐ (queue step 28, 11-05) THE TYPEFACE IS THE TV FONT NOW, grown (engine/tvgrown.inc): jacob's ruling is that nothing of anyone else's ships, and a font read off
+ * whatever machine a take was made on isn't the engine's. It's the same atlas and the same quads, with every letter the font has (accents, Greek, Cyrillic); the
+ * narrator's italic is the upright letter leaned over. REVA_CAPFONT=<a .ttf> sets captions in a font of the maker's own, and REVA_CAPFONT=system in the machine's,
+ * as they were: that's the control, and the way back for a take that wants it. */
 #define CAP_PX   64.f              /* the packed size */
 #define CAP_SIZE 36.f              /* drawn on the 1280-wide canvas: 5% of a 720 frame */
 #define CAP_AW 2048
@@ -15,8 +19,19 @@
 #define CAP_ROWS 4
 static const int CAP_EXTRA[8]={0x2013,0x2014,0x2018,0x2019,0x201C,0x201D,0x2026,0x2022};
 static stbtt_packedchar g_capA[2][95], g_capB[2][96], g_capC[2][8];
-static int g_capOK=0; static GLuint g_capTex=0, g_capProg=0, g_capVbo=0;
-static GLint g_capScr=-1, g_capCol=-1, g_capTx=-1, g_capOff=-1, g_capSolid=-1, g_capBox=-1;
+static int g_capOK=0; static unsigned g_capTex=0;
+/* the TV font as a typeface: a record a glyph, as stb_truetype's packer would have made. A font pixel is 2.5 on the 1280-wide canvas at the captions' size, so a letter is 20 across */
+#define CAPTV_CELL 36
+#define CAPTV_U (2.5f*CAP_PX/CAP_SIZE)
+static stbtt_packedchar g_capTvCh[96+TV_MORE]; static int g_capTv=0;
+static int capTvInit(void){ const int per=CAP_AW/CAPTV_CELL,n=96+TV_MORE; if((n+per-1)/per*CAPTV_CELL>CAP_AH) return 0;
+    unsigned char*px=(unsigned char*)malloc((size_t)CAP_AW*CAP_AH*4); if(!px) return 0;
+    for(size_t i=0;i<(size_t)CAP_AW*CAP_AH;i++){ px[i*4]=px[i*4+1]=px[i*4+2]=255; px[i*4+3]=0; }
+    for(int g=0;g<n;g++){ unsigned char a[TVG*TVG]; tvGrown(g,a); const int cx=(g%per)*CAPTV_CELL+2,cy=(g/per)*CAPTV_CELL+2;
+        for(int y=0;y<TVG;y++) for(int x=0;x<TVG;x++) px[((size_t)(cy+y)*CAP_AW+(size_t)(cx+x))*4+3]=a[y*TVG+x];
+        stbtt_packedchar*c=&g_capTvCh[g]; c->x0=(unsigned short)cx; c->y0=(unsigned short)cy; c->x1=(unsigned short)(cx+TVG); c->y1=(unsigned short)(cy+TVG);
+        c->xoff=0.f; c->yoff=-7.f*CAPTV_U; c->xoff2=8.f*CAPTV_U; c->yoff2=CAPTV_U; c->xadvance=8.f*CAPTV_U; }
+    g_capTex=gfxTextureNew(); gfxTexture(g_capTex,CAP_AW,CAP_AH,px); gfxTextureHud(g_capTex); free(px); return 1; }
 static unsigned char*capFile(const char*p){
     if(!p||!p[0]) return NULL;
     FILE*f=fopen(p,"rb"); if(!f) return NULL;
@@ -31,6 +46,7 @@ static int capCp(const char**s){   /* one UTF-8 codepoint */
     if((c&0xF0)==0xE0&&(p[1]&0xC0)==0x80&&(p[2]&0xC0)==0x80){ *s+=3; return ((c&0x0F)<<12)|((p[1]&0x3F)<<6)|(p[2]&0x3F); }
     *s+=1; return '?'; }
 static stbtt_packedchar*capGlyph(int f,int c){
+    if(g_capTv){ const int g=(c>=0&&c<65536)?tvGlyphOf((TvCh)c):-1; return &g_capTvCh[g<0?'?'-32:g]; }
     if(c>=32&&c<=126) return &g_capA[f][c-32];
     if(c>=160&&c<=255) return &g_capB[f][c-160];
     for(int k=0;k<8;k++) if(CAP_EXTRA[k]==c) return &g_capC[f][k];
@@ -38,6 +54,10 @@ static stbtt_packedchar*capGlyph(int f,int c){
 static void capInit(void){
     const char*e=getenv("REVA_OLDCAPS");
     if(e&&e[0]&&e[0]!='0'){ printf("[caps] REVA_OLDCAPS: the old segment-font captions\n"); fflush(stdout); return; }
+    { const char*nm=getenv("REVA_CAPFONT");   /* (step 28) nothing named: the TV font, grown. It's the one that ships */
+      if(!nm||!nm[0]){ if(capTvInit()){ g_capOK=1; g_capTv=1; printf("[caps] the TV font, grown to %.0f px: %d letters. REVA_CAPFONT=<a .ttf>, or =system, sets them in another\n",8.f*2.5f,96+TV_MORE); }
+                       else printf("[caps] no memory for the caption sheet -- the old segment-font captions\n");
+                       fflush(stdout); return; } }
     const char*cand[2][6]={{getenv("REVA_CAPFONT"),"C:/Windows/Fonts/seguisb.ttf","C:/Windows/Fonts/segoeui.ttf","C:/Windows/Fonts/arial.ttf",
                             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"},
                            {getenv("REVA_CAPFONTI"),"C:/Windows/Fonts/seguisbi.ttf","C:/Windows/Fonts/segoeuii.ttf","C:/Windows/Fonts/ariali.ttf",
@@ -60,36 +80,13 @@ static void capInit(void){
         if(!stbtt_PackFontRanges(&pc,ttf[f],0,r,3)) ok=0; }
     stbtt_PackEnd(&pc); free(ttf[0]); free(ttf[1]);
     if(!ok) printf("[caps] some glyphs did not fit the atlas -- they draw as '?'\n");
-    glGenTextures(1,&g_capTex); glBindTexture(GL_TEXTURE_2D,g_capTex);
-    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+    g_capTex = gfxTextureNew();
 #ifdef REVA_VK
-    { unsigned char*rg9=(unsigned char*)malloc((size_t)CAP_AW*CAP_AH*4); for(int i9=0;i9<CAP_AW*CAP_AH;i9++){ rg9[i9*4]=rg9[i9*4+1]=rg9[i9*4+2]=255; rg9[i9*4+3]=bmp[i9]; } glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,CAP_AW,CAP_AH,0,GL_RGBA,GL_UNSIGNED_BYTE,rg9); free(rg9); }
-#else
-    glTexImage2D(GL_TEXTURE_2D,0,GL_ALPHA,CAP_AW,CAP_AH,0,GL_ALPHA,GL_UNSIGNED_BYTE,bmp);
+    { unsigned char*rg9=(unsigned char*)malloc((size_t)CAP_AW*CAP_AH*4); for(int i9=0;i9<CAP_AW*CAP_AH;i9++){ rg9[i9*4]=rg9[i9*4+1]=rg9[i9*4+2]=255; rg9[i9*4+3]=bmp[i9]; } gfxTexture(g_capTex, CAP_AW, CAP_AH, rg9); free(rg9); }
 #endif
-    glPixelStorei(GL_UNPACK_ALIGNMENT,4);
-#ifdef REVA_PACKET
     gfxTextureHud(g_capTex);
-#endif
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     free(bmp);
-    const char*vs="attribute vec4 p; uniform vec2 scr; uniform vec2 off; varying vec2 uv; varying vec2 cp;\n"
-                  "void main(){ vec2 q=p.xy+off; cp=q; uv=p.zw; gl_Position=vec4(q.x/scr.x*2.0-1.0,1.0-q.y/scr.y*2.0,0.0,1.0); }\n";
     /* solid > 0: the box, a rounded rectangle of corner radius `solid` (an antialiased distance), else a glyph */
-    const char*fs="precision mediump float; varying vec2 uv; varying vec2 cp; uniform sampler2D tx; uniform vec4 col; uniform float solid; uniform vec4 box;\n"
-                  "void main(){ float a;\n"
-                  "  if(solid>0.5){ vec2 c=(box.xy+box.zw)*0.5, h=(box.zw-box.xy)*0.5;\n"
-                  "    vec2 q=abs(cp-c)-(h-vec2(solid)); float d=length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-solid; a=clamp(0.5-d,0.0,1.0); }\n"
-                  "  else a=texture2D(tx,uv).a;\n"
-                  "  gl_FragColor=vec4(col.rgb,col.a*a); }\n";
-    GLuint p=glCreateProgram(); glAttachShader(p,sh(GL_VERTEX_SHADER,vs)); glAttachShader(p,sh(GL_FRAGMENT_SHADER,fs));
-    glBindAttribLocation(p,0,"p"); glLinkProgram(p);
-    { GLint lk=0; glGetProgramiv(p,GL_LINK_STATUS,&lk); if(!lk){ printf("[caps] the caption program did not link -- the old captions\n"); fflush(stdout); return; } }
-    g_capProg=p; g_capScr=glGetUniformLocation(p,"scr"); g_capCol=glGetUniformLocation(p,"col"); g_capTx=glGetUniformLocation(p,"tx");
-    g_capOff=glGetUniformLocation(p,"off"); g_capSolid=glGetUniformLocation(p,"solid"); g_capBox=glGetUniformLocation(p,"box");
-    glGenBuffers(1,&g_capVbo);
     g_capOK=1;
     printf("[caps] %s%s%s packed at %.0f px (2x2 oversampled) into %dx%d, drawn at %.0f px%s\n",got[0],haveI?" + ":"",got[1],
            CAP_PX,CAP_AW,CAP_AH,CAP_SIZE,haveI?"":" (no italic face: the narrator in the upright one)"); fflush(stdout); }
@@ -100,7 +97,8 @@ static int capQuads(int f,const char*s,const char*e,float x,float y,float sz,flo
     while(s<e&&*s&&n+24<=cap){ int c=capCp(&s); stbtt_aligned_quad q;
         stbtt_GetPackedQuad(capGlyph(f,c),CAP_AW,CAP_AH,0,&px,&py,&q,0);
         float x0=x+q.x0*k, x1=x+q.x1*k, y0=y+q.y0*k, y1=y+q.y1*k;
-        float Q[24]={x0,y0,q.s0,q.t0, x1,y0,q.s1,q.t0, x1,y1,q.s1,q.t1, x0,y0,q.s0,q.t0, x1,y1,q.s1,q.t1, x0,y1,q.s0,q.t1};
+        const float lean=(g_capTv&&f==1)?0.20f:0.f, t0=(y-y0)*lean, t1=(y-y1)*lean;   /* the TV font has no italic of its own: the narrator's is the letter leaned over, about its baseline */
+        float Q[24]={x0+t0,y0,q.s0,q.t0, x1+t0,y0,q.s1,q.t0, x1+t1,y1,q.s1,q.t1, x0+t0,y0,q.s0,q.t0, x1+t1,y1,q.s1,q.t1, x0+t1,y1,q.s0,q.t1};
         memcpy(v+n,Q,sizeof Q); n+=24; }
     return n; }
 /* the page in rows no wider than maxW: one if it fits, else the two-row break that makes the longer row shortest (a
@@ -122,7 +120,6 @@ static int capWrap(int f,const char*t,float sz,float maxW,const char**ra,const c
         ra[n]=a; rb[n]=fit; n++;
         a=fit; while(a<end&&*a==' ') a++; }
     return n; }
-#ifdef REVA_PACKET
 /* one row of text for the renderer: its glyphs, as sprites, moved and in this colour */
 static void capVk(const float*q,int nv,float ox,float oy,float r,float g,float b,float a,float W,float H){ static float s[8*6*480]; const int n=nv/4; if(n<=0||n>6*480) return; for(int i=0;i<n;i++){ s[i*8]=q[i*4]+ox; s[i*8+1]=q[i*4+1]+oy; s[i*8+2]=q[i*4+2]; s[i*8+3]=q[i*4+3]; s[i*8+4]=r; s[i*8+5]=g; s[i*8+6]=b; s[i*8+7]=a; } gfxSprites(g_capTex,s,n,W,H); }
 /* the box behind them: a rounded rectangle, as a fan */
@@ -130,7 +127,6 @@ static void capBoxVk(float x0,float y0,float x1,float y1,float rd,float W,float 
     for(int c=0;c<4;c++) for(int k=0;k<=9;k++){ const float a=C[c][2]+1.5708f*(float)k/9.f,px=(C[c][0]>0.f?x1-rd:x0+rd)+cosf(a)*rd,py=(C[c][1]>0.f?y1-rd:y0+rd)+sinf(a)*rd; if(have&&n<40){ v[n*6]=cx; v[n*6+1]=cy; v[n*6+2]=pv[0]; v[n*6+3]=pv[1]; v[n*6+4]=px; v[n*6+5]=py; n++; } if(!have){ fst[0]=px; fst[1]=py; } pv[0]=px; pv[1]=py; have=1; }
     if(n<40){ v[n*6]=cx; v[n*6+1]=cy; v[n*6+2]=pv[0]; v[n*6+3]=pv[1]; v[n*6+4]=fst[0]; v[n*6+5]=fst[1]; n++; }
     gfxHud(v,n*3,W,H,0.02f,0.025f,0.04f,0.46f); }
-#endif
 static void capDraw(float HW,float HH){
     int li=scnActive(); if(li<0) return;
     ScnLine*L=&g_scnL[li]; if(L->silent) return;
@@ -149,61 +145,33 @@ static void capDraw(float HW,float HH){
     float top=base-(float)(nr-1)*lineH-sz*0.74f;      /* the first row's cap height */
     float padX=sz*0.60f, padY=sz*0.34f;
     float bx0=HW*0.5f-wmax*0.5f-padX, bx1=HW*0.5f+wmax*0.5f+padX, by0=top-padY, by1=base+sz*0.24f+padY;
-    glUseProgram(g_capProg); glUniform2f(g_capScr,HW,HH); glUniform1i(g_capTx,0);
-    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_capTex);
-    glBindBuffer(GL_ARRAY_BUFFER,g_capVbo);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,0,0);
-    for(int k=1;k<5;k++) glDisableVertexAttribArray(k);
-    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDisable(GL_DEPTH_TEST);
-    { float q[24]={bx0,by0,0,0, bx1,by0,0,0, bx1,by1,0,0, bx0,by0,0,0, bx1,by1,0,0, bx0,by1,0,0};
-      glBufferData(GL_ARRAY_BUFFER,sizeof q,q,GL_DYNAMIC_DRAW);
-      glUniform1f(g_capSolid,sz*0.30f); glUniform4f(g_capBox,bx0,by0,bx1,by1); glUniform2f(g_capOff,0.f,0.f);
-      glUniform4f(g_capCol,0.02f,0.025f,0.04f,0.46f); glDrawArrays(GL_TRIANGLES,0,6); }
-#ifdef REVA_PACKET
     capBoxVk(bx0,by0,bx1,by1,sz*0.30f,HW,HH);
-#endif
-    glUniform1f(g_capSolid,0.f);
     static float v[24*480];
     /* the name of an on-screen speaker, over the box's left edge, in the slot's colour */
     static const float SPK[SCN_MAXCAST][3]={{0.55f,0.95f,1.00f},{1.00f,0.78f,0.42f},{0.62f,0.94f,0.58f},{0.92f,0.72f,0.96f},{0.86f,0.86f,0.90f}};
     if(!f&&g_scnWho[sp][0]&&strcmp(g_scnWho[sp],"-")){
         char nm[24]; int k=0; for(const char*s=g_scnWho[sp];*s&&k<23;s++) nm[k++]=(*s=='_')?' ':*s; nm[k]=0;
         float nsz=sz*0.66f; int nv=capQuads(0,nm,nm+k,bx0+padX*0.30f,by0-7.f,nsz,v,24*480);   /* over the box, not on its edge */
-        glBufferData(GL_ARRAY_BUFFER,nv*4,v,GL_DYNAMIC_DRAW);
-        glUniform4f(g_capCol,0.f,0.f,0.f,0.85f);
-        for(int d=0;d<8;d++){ float a=d*0.785398f; glUniform2f(g_capOff,cosf(a)*1.4f,sinf(a)*1.4f); glDrawArrays(GL_TRIANGLES,0,nv/4);
-#ifdef REVA_PACKET
+        for(int d=0;d<8;d++){ float a=d*0.785398f;
             capVk(v,nv,cosf(a)*1.4f,sinf(a)*1.4f,0.f,0.f,0.f,0.85f,HW,HH);
-#endif
         }
-#ifdef REVA_PACKET
         capVk(v,nv,0.f,0.f,SPK[sp][0],SPK[sp][1],SPK[sp][2],1.f,HW,HH);
-#endif
-        glUniform2f(g_capOff,0.f,0.f); glUniform4f(g_capCol,SPK[sp][0],SPK[sp][1],SPK[sp][2],1.f); glDrawArrays(GL_TRIANGLES,0,nv/4); }
+           }
     /* the rows: a dark outline (twelve offsets), then the face */
     for(int r=0;r<nr;r++){ float w=capWidth(f,ra[r],rb[r],sz);
         int nv=capQuads(f,ra[r],rb[r],HW*0.5f-w*0.5f,base-(float)(nr-1-r)*lineH,sz,v,24*480);
-        glBufferData(GL_ARRAY_BUFFER,nv*4,v,GL_DYNAMIC_DRAW);
-        glUniform4f(g_capCol,0.01f,0.01f,0.02f,0.90f);
-        for(int d=0;d<12;d++){ float a=d*0.523599f; glUniform2f(g_capOff,cosf(a)*2.0f,sinf(a)*2.0f); glDrawArrays(GL_TRIANGLES,0,nv/4);
-#ifdef REVA_PACKET
+        for(int d=0;d<12;d++){ float a=d*0.523599f;
             capVk(v,nv,cosf(a)*2.0f,sinf(a)*2.0f,0.01f,0.01f,0.02f,0.90f,HW,HH);
-#endif
         }
-#ifdef REVA_PACKET
         capVk(v,nv,0.f,0.f,f?1.0f:0.98f,f?0.97f:0.98f,f?0.90f:0.96f,1.f,HW,HH);
-#endif
-        glUniform2f(g_capOff,0.f,0.f);
-        if(f) glUniform4f(g_capCol,1.0f,0.97f,0.90f,1.f); else glUniform4f(g_capCol,0.98f,0.98f,0.96f,1.f);
-        glDrawArrays(GL_TRIANGLES,0,nv/4); } }
+         } }
 
 /* P7: pose the partner from one clip and draw her. Deliberately the whole pipeline in
  * one place and nothing more: rest pose, clip tracks over it, FK, skin, draw. She has
  * no state tree and no grounding, so what the score authored is exactly what appears --
  * which is the only way a two-body contact point can be trusted. Returns 0 if there is
  * nothing to draw. `pal` is the caller's scratch palette. */
-static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
-                          GLint mModel,GLint mPal,GLint mBind,float*pal,int dq,GLint uDqS){
+static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,float*pal){
     /* ⛔ A BORROWED CLIP IS STILL A CLIP. clip is -1 whenever the staging resolved her
      * line out of the BANK rather than her own pack -- which is the normal case -- and
      * refusing to draw on that basis made the partner absent from every scene in the
@@ -489,13 +457,11 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,
             g_partIOD=sqrtf((el[0]-er[0])*(el[0]-er[0])+(el[1]-er[1])*(el[1]-er[1])+(el[2]-er[2])*(el[2]-er[2]));
             g_partFaceOK=1; } }
     { static int wasActP9[SCN_MAXCAST]; morphBlend(P,g_partMorphW,&wasActP9[(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1]); }   /* her face talks too */
-    mouthArm(P,g_partMorphW,g_labMouthP,g_labMouthS,g_labOpen);
     chainPublish((g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1,model);   /* her chains feel where she goes */
-#ifdef REVA_PACKET
     g_vkOwner=((unsigned)GFX_KIND_CAST<<28)|(((unsigned)g_castI&0xffffu)<<12);
-#endif
-    glUniformMatrix4fv(mModel,1,GL_FALSE,model);
-    { static const float wh9[3]={1.f,1.f,1.f}; BodyGL g9={mModel,mPal,mBind,uDqS,g_labUse,g_labTint,g_labOpen,g_castI,dq,g_partMorphW,0,0,0,wh9}; bodyMeshes(P,W,model,pal,&g9); }
+    if(g_eyeEver&&g_castI>=1&&g_castI<8) memcpy(g_vkEye,g_castEyeG[g_castI],16);   /* (step 23) her eyes glow, if a line said so */
+    { static const float wh9[3]={1.f,1.f,1.f}; BodyGL g9={g_castI,g_partMorphW,0,0,0,wh9}; bodyMeshes(P,W,model,pal,&g9); }
+    g_vkEye[3]=0.f;
     return 1; }
 static float clipStride(Pack*P,int clip){
     /* Returns how far the CONTACT foot travels backwards, in club units per clip frame.

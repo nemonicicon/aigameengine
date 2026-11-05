@@ -34,6 +34,14 @@ static void start(int onSet) {
         E->bodyShape(S.him, "smile", 1.f, 0.f);
         E->bodyLookBody(S.him, -1);
     }
+    /* two bench's questions. TALK_SIT: she's sitting down (sit.anim), and the conversation's lens finds her head where it really is. TALK_VIEWS: a split screen, with the conversation's lens in the second player's picture and the first left alone */
+    if (getenv("TALK_SIT") && S.her >= 0) E->bodyGraph(S.her, "sit.anim");
+    if (getenv("TALK_VIEWS")) {
+        E->views(2);
+        E->viewLens(0, 1.2f, 1.75f, 5.5f, 0.f, 1.25f, 0.f);
+        E->viewLens(1, -3.5f, 2.2f, 4.f, 0.f, 1.25f, 0.f);
+        E->talkView(1);
+    }
 }
 
 static void tick(float dt) {

@@ -11,6 +11,11 @@
  * regression, any A/B of two builds, and any "did my edit do that?" needs this on.
  * REVA_SCENEFPS already did it for the scene timeline alone; this generalises it. */
 static double g_fixedStepMs=-1.0, g_virtMs=0.0;
+/* (queue step 29) online play, for the parts of the engine that come before engine/net.inc: is this run a session; is pad 1's machine still in it; and what this
+ * machine has loaded, added up for the host to hold against its own */
+static int g_netOn=0, g_pad0On=1;   /* g_pad0On: pad 1 is always there on one machine, and in a session its machine can leave. A tape says so too */
+static void netSigAdd(const char*name,const void*bytes,size_t len);
+static void netSigFile(const char*path);
 /* ---- THE TICK (2026-09-30): the sim clock only ever moves by whole ticks ------------------
  * The N64 lesson, as the recomp projects retell it: the game runs at its own fixed tick and
  * the picture is whatever rate the glass can manage. Until now that was true only under
@@ -64,7 +69,7 @@ static float  g_boil=1.f;         /* ctl boil=: the animator's hand; 0 = a perfe
  * clipped. MEASURED on ROBOT NEKO ep 1 (2026-09-10): 25-41% of every frame was pure white.
  * `tone=<knee>` leaves everything below the knee exactly alone and rolls everything above it
  * off exponentially toward a WHITE POINT of 0.96, per channel -- toward 1.0 it still left 9.3%
- * of a sunlit frame at 252/255. 0 = off, which is byte-for-byte the old shader
+ * of a sunlit frame at 252/255. 0 = off, which is byte-for-byte the old
  * output -- so the film and every door keep their look until a scene or the ctl asks. */
 static float  g_tone=0.f, g_toneCtl=0.f;
 /* ⛔ MUST BE CALLED BEFORE ANYTHING READS THE MODE, not just lazily from now_ms().
@@ -89,19 +94,12 @@ static double now_ms(void){
  * colour the club never renders, any such pixel inside her mouth arrived through a
  * hole in her skull. Returns 1 if it overrode. */
 static float g_sun[4], g_sunC[3], g_sky[3];   /* the sun rig; defined once, used by the sky too */
-static int clearOverride(void){
-    static int on=-1; static float c[3];
+static int clearOverride(float*c){
+    static int on=-1; static float ov[3];
     if(on<0){ on=0; const char*e=getenv("REVA_CLEAR");
-        if(e&&sscanf(e,"%f,%f,%f",&c[0],&c[1],&c[2])==3) on=1; }
-    if(on){ glClearColor(c[0],c[1],c[2],1.f); return 1; }
-    /* A SUN MEANS A SKY. Black above the horizon is right for a club and wrong for a
-     * street -- and the sky ambient is already the colour the world is being lit by, so
-     * clearing to a lifted version of it costs nothing and makes the set sit in daylight
-     * instead of in space. Night is sun=off, which puts the black straight back. */
-    if(g_sun[3]>0.f){
-        glClearColor(g_sky[0]*1.55f+0.10f, g_sky[1]*1.55f+0.13f, g_sky[2]*1.55f+0.18f, 1.f);
-        return 1; }
-    return 0; }
+        if(e&&sscanf(e,"%f,%f,%f",&ov[0],&ov[1],&ov[2])==3) on=1; }
+    if(on) memcpy(c,ov,12);
+    return on; }
 /* one tick per RENDERED frame; a no-op unless REVA_FIXEDSTEP is set */
 static void sunInit(void){ g_sun[0]=0.f; g_sun[1]=1.f; g_sun[2]=0.f; g_sun[3]=0.f;
     g_sunC[0]=1.f; g_sunC[1]=0.97f; g_sunC[2]=0.90f;
@@ -157,7 +155,12 @@ static void todApply(float h){
         if(l9>1e-5f){ g_sun[0]/=l9; g_sun[1]/=l9; g_sun[2]/=l9; } } }
 /* how many ticks the wall clock owes this frame */
 static double g_ledFieldMs;
+/* ⭐ (queue step 25) A DISPLAY FASTER THAN THE TICK. The rules tick 60 times a second and a 100 or 144 Hz panel shows more pictures than that. With g_interpLive the loop
+ * no longer sleeps a refresh away to wait for a tick: a refresh that owes no tick is g_tickBetween, the rules don't run, and the renderer draws the picture between the
+ * last two ticks (gfxBetween). The rules still get exactly the ticks the wall clock owes, one whole tick at a time, so nothing they do changes. Never under a fixed step. */
+static int g_interpOn=0, g_interpLive=0, g_tickBetween=0; __attribute__((unused)) static int g_interpForce=0;
 static int clockOwed(void){
+    g_tickBetween=0;
     static double last=-1.0; double w=wall_ms(); if(last<0.0) last=w;
     double d=w-last; last=w; g_wallDt=d*0.001;
     if(g_fixedStepMs>0.0) return 1;
@@ -177,6 +180,7 @@ static int clockOwed(void){
     { int most=g_ledFieldMs>0.0?(int)ceil(g_ledFieldMs/g_tickMs-0.01):TICK_MAX; if(k>most){ k=most; g_tickAcc=0.0; return k; } }
     g_tickAcc-=k*g_tickMs; return k;
 #endif
+    if(k<1&&g_interpLive){ g_tickBetween=1; return 0; }   /* (step 25) no tick this refresh: the picture between the last two */
     if(k<1){ double rem=g_tickMs-g_tickAcc; struct timespec ts={0,(long)(rem*1e6)};
              /* ⛔ (11-02) A sliver short of a tick is not worth a sleep: on Windows a sleep can run many times long, and it broke a locked 100 fps down to 60.
               * vsync is pacing that frame already. The debt is carried below, and only a real gap sleeps. */
@@ -200,6 +204,7 @@ static void clockFrame(void){
             if(nc<0){ nc=0; const char*e=getenv("REVA_CADENCE"); while(e&&*e&&nc<32){ cad[nc++]=atoi(e); e=strchr(e,','); if(e) e++; } }
             if(nc>0){ k=cad[ci++%nc]; if(k<1) k=1; } }
         g_tickOwed=k; }
+    if(g_tickBetween){ g_tickOwed=0; return; }   /* (step 25) a refresh with no tick in it */
     g_tickOwed--; g_noDraw=(g_tickOwed>0); g_tickN=1;
     g_virtMs+=(g_fixedStepMs>0.0)?g_fixedStepMs:g_tickMs; g_tickTotal++; }
 static float simStepS(void){ return (float)(((g_fixedStepMs>0.0)?g_fixedStepMs:g_tickMs)*0.001); }   /* one tick, always */
@@ -224,8 +229,8 @@ static void tierApply(int t,int boot);
 static void tierInit(void){
     const char*e=getenv("REVA_TIER"); int t=3;
     { const char*am=getenv("REVA_AUTOMODE"); if(am&&atoi(am)==11) t=5; }   /* the lab and a scene are film's */
-#if defined(REVA_VK)&&!defined(REVA_SDL)
-    t=0;   /* the direct road is the Pi, and its picture is the budget's */
+#if (defined(REVA_VK)&&!defined(REVA_SDL))||defined(REVA_SOFT)
+    t=0;   /* the direct road is the Pi, and its picture is the budget's. So is the engine's own rasterizer's (step 27): few particles, short detail, a little foliage */
 #endif
     if(e&&e[0]){ if(e[0]>='0'&&e[0]<='9') t=atoi(e);
         else { t=-1; for(int i=0;i<TIER_N;i++) if(!strcmp(e,TIERS[i].name)) t=i;
@@ -234,7 +239,7 @@ static void tierInit(void){
     if(t>=TIER_N) t=TIER_N-1;
     tierApply(t,1); }
 /* ---- THE SIM HASH (2026-09-30): the cross-platform receipt --------------------------------
- * Pixels differ between llvmpipe, v3d and ANGLE by rasterizer; simulation state need not. Each
+ * Pixels differ between lavapipe, v3d and a PC's driver by rasterizer; simulation state need not. Each
  * frame mixes what the sim decided -- the hero's world matrices after FK, her position and
  * heading, every crowd slot's place and state -- into two FNV-1a hashes: EXACT (the float bits;
  * a regression receipt on one machine) and COARSE (each float rounded to 1e-3 first; what two
@@ -285,8 +290,6 @@ static float stepBoil(int who,int axis){
     unsigned h=(unsigned)g_stepIdx*2654435761u ^ ((unsigned)who*40503u+(unsigned)axis*9973u+0x9e37u);
     h^=h>>13; h*=0x5bd1e995u; h^=h>>15;
     return ((float)(h&0xffffu)/65535.f*2.f-1.f)*g_boil; }
-static GLuint sh(GLenum ty,const char*src){ GLuint s=glCreateShader(ty); glShaderSource(s,1,&src,NULL); glCompileShader(s);
-    GLint ok; glGetShaderiv(s,GL_COMPILE_STATUS,&ok); if(!ok){ char lg[512]; glGetShaderInfoLog(s,512,NULL,lg); fprintf(stderr,"%s\n",lg); die("shader"); } return s; }
 
 static int clipUpright(Pack*P,int clip);   /* S6e: defined below, used by the role audit */
 /* S7: a clip whose name says it happens on the FLOOR can never be a stand, however much

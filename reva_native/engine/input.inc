@@ -80,7 +80,7 @@ static void padStick(float*x,float*y){ float m=hypotf(*x,*y); if(m<PAD_DEAD){ *x
     float s=((m>1.f?1.f:m)-PAD_DEAD)/(1.f-PAD_DEAD)/m; *x*=s; *y*=s; }
 static void padsUpdate(void){
     for(int k=0;k<4;k++){ EnginePad*d=&g_pads[k]; unsigned was=d->held;
-        if(k==0){ d->connected=1; d->x=-g_lx; d->y=-g_ly; d->rx=g_rx; d->ry=-g_ry; d->rt=g_rt;
+        if(k==0){ d->connected=g_pad0On; d->x=-g_lx; d->y=-g_ly; d->rx=g_rx; d->ry=-g_ry; d->rt=g_rt;
             d->held=(g_btnA?PAD_A:0)|(g_btnB?PAD_B:0)|(g_btnX?PAD_X:0)|(g_btnY?PAD_Y:0)|(g_btnLB?PAD_LB:0)|(g_btnRB?PAD_RB:0)|(g_btnStart?PAD_START:0); }
         else { const PadRaw*r=&g_padRaw[k]; d->connected=r->connected; d->x=-r->lx; d->y=-r->ly; d->rx=r->rx; d->ry=-r->ry; d->rt=r->rt; d->held=r->held; }
         padStick(&d->x,&d->y); padStick(&d->rx,&d->ry);
@@ -140,6 +140,8 @@ static float g_mdx=0.f, g_mdy=0.f;       /* this frame's mouse delta, pixels (RT
  * REVA_FIXEDSTEP at any cadence, on any machine. v1 tapes still read.
  * ⭐ (11-03) v3 adds pads 1 to 3 to the end of each line, and a `# binds` line per action in the header. Older tapes read as those three pads not being plugged in. */
 static FILE*g_tapeRec=0,*g_tapeRep=0; static int g_tapeDone=0,g_tapeV2=0,g_tapeV3=0; static unsigned g_tapeSeedUsed=0;
+/* (step 29) in a session the tape is written after the pads of every machine are in (engine/net.inc), so what it holds is the session: four pads, as any tape */
+static int g_tapeLate=0; static void tapeRecord(void);
 static float tapeF(unsigned u){ float f; memcpy(&f,&u,4); return f; }
 static unsigned tapeU(float f){ unsigned u; memcpy(&u,&f,4); return u; }
 /* a replay's seed, from its header: the dice are rolled before the first poll, so main asks for this before it seeds them */
@@ -176,13 +178,17 @@ static void inputTape(double tsec){
             if(g_tapeV3){ const char*q9=ln+used9; for(int k=1;k<4;k++){ PadRaw*r=&g_padRaw[k]; unsigned f9[5],h9; int on9,n9=0;
                 if(sscanf(q9," %d %x %x %x %x %x %x%n",&on9,&f9[0],&f9[1],&f9[2],&f9[3],&f9[4],&h9,&n9)!=7) break;
                 r->connected=on9; r->lx=tapeF(f9[0]); r->ly=tapeF(f9[1]); r->rx=tapeF(f9[2]); r->ry=tapeF(f9[3]); r->rt=tapeF(f9[4]); r->held=h9; q9+=n9; }
-                { unsigned m9; g_tapeMusicIn=sscanf(q9," m %x",&m9)==1?tapeF(m9):-1.f; } } }
-        else { g_tapeDone=1; memset(g_padRaw,0,sizeof g_padRaw); printf("[tape] replay ended at frame %lu -- neutral from here\n",g_frameNo); fflush(stdout);
+                { unsigned m9; g_tapeMusicIn=sscanf(q9," m %x",&m9)==1?tapeF(m9):-1.f; }
+                g_pad0On=strstr(q9," u")==NULL; } }   /* (step 29) a session's tape: pad 1's machine had left */
+        else { g_tapeDone=1; g_pad0On=1; memset(g_padRaw,0,sizeof g_padRaw); printf("[tape] replay ended at frame %lu -- neutral from here\n",g_frameNo); fflush(stdout);
                g_lx=g_ly=g_rx=g_ry=g_rt=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=g_startEdge=0; g_mdx=g_mdy=0.f; } }
+    if(!g_tapeLate) tapeRecord(); }
+static void tapeRecord(void){
     if(g_tapeRec){ fprintf(g_tapeRec,"%ld %08x %08x %08x %08x %08x %d %d %d %d %d %d %d %d %d %08x %08x %d %d %d",
         g_tickTotal,tapeU(g_lx),tapeU(g_ly),tapeU(g_rx),tapeU(g_ry),tapeU(g_rt),g_btnA,g_btnB,g_btnX,g_btnY,g_btnLB,g_btnRB,g_btnStart,g_btnBack,g_startEdge,tapeU(g_mdx),tapeU(g_mdy),g_manual,g_kbActive,g_fpv);
         for(int k=1;k<4;k++){ const PadRaw*r=&g_padRaw[k]; fprintf(g_tapeRec," %d %08x %08x %08x %08x %08x %x",r->connected,tapeU(r->lx),tapeU(r->ly),tapeU(r->rx),tapeU(r->ry),tapeU(r->rt),r->held); }
-        { const float m9=musicClockRead(); if(m9>=0.f) fprintf(g_tapeRec," m %08x",tapeU(m9)); }   /* what the music clock will read this tick, for a replay to read the same */
+        { const float m9=musicClockRead(); if(m9>=0.f) fprintf(g_tapeRec," m %08x",tapeU(m9)); }
+        if(!g_pad0On) fputs(" u",g_tapeRec);   /* (step 29) pad 1 is unplugged: only ever in a session, once its machine has gone */   /* what the music clock will read this tick, for a replay to read the same */
         fputc('\n',g_tapeRec); } }
 __attribute__((unused)) static float g_mLook=0.f, g_mPitch=0.f;  /* integrated look, mapped onto the right stick */
 static void kbPoll(double tsec){

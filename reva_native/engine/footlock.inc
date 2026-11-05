@@ -69,11 +69,17 @@ static int   g_labClip=-1;                     /* P0: ctl clip=<name> -- play TH
  * in the dark is a POSE, and every clip in the club is a verb. */
 static float g_heroHold=-1.f;
 static int   g_labWphReset=0;                  /* P0: and start it from frame 0 on the next hero frame */
+/* (step 21) ...or from where its line says: `hclip=name>12.5s` (seconds in) or `name>0.33` (that far through), and plays on from there. With neither, a z_rm_ clip a LINE
+ * gave her starts at the set's `clipstart`. A trick's cut always starts at 0: it never sets these */
+static float g_heroCueF=-1.f,g_heroCueS=-1.f; static int g_heroStartOff=0;
 static int   g_labOnce=0;                      /* P1: play the override clip ONCE, then hand back to the state tree */
 static int   g_labRM=0;                        /* P3: the override clip is z_rm_* -- it OWNS the root's Y */
 static float g_rmY=-999.f;                     /* P3: the frozen ground offset while a clip owns Y */
 static float g_rmEndW[3]={0,0,0};              /* P4: the pelvis's world xz (+y) under an rm clip -- consumed at hand-back */
 static int   g_rmActive=0;                     /* P5: an rm clip owns the root THIS frame (the wall aims at the pelvis) */
+static double heroStartPh(float fps,unsigned frames){ double p=0.0;
+    if(g_heroCueS>=0.f) p=(double)g_heroCueS*fps; else if(g_heroCueF>=0.f) p=(double)g_heroCueF*frames; else if(g_heroStartOff&&g_labRM&&g_clipStartS>0.f) p=(double)g_clipStartS*fps;
+    g_heroCueS=g_heroCueF=-1.f; g_heroStartOff=0; if(frames>1&&p>(double)frames-1.0) p=(double)frames-1.0; return p; }
 /* ⭐ ep 10: THE TRICK SCHEDULER. Its state and trickClampEnd sit with the board channel (the samplers read
  * them); the firing lives here, after the lab's clip globals it writes. */
 static void trickSaveBase(int s){

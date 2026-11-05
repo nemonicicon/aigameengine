@@ -82,8 +82,9 @@ static void bridgeInput(void){ if(!g_brOn) return;
         if(k>0) g_padRaw[k].connected=1; } }
 /* the frame that was asked for */
 static void bridgeFrameDone(int W,int H){ if(!g_brOn||!g_brShot[0]||g_noDraw) return;
+    gfxShotSize(&W,&H);   /* (step 25) the glass's size */
     unsigned char*px=(unsigned char*)malloc((size_t)W*H*4); FILE*f=px?fopen(g_brShot,"wb"):NULL;
     if(!f){ brSay("{\"ok\":false,\"error\":\"can't write %s\"}",g_brShot); free(px); g_brShot[0]=0; return; }
-    glReadPixels(0,0,W,H,GL_RGBA,GL_UNSIGNED_BYTE,px);
+    if(!gfxRead(px,W,H)) memset(px,0,(size_t)W*(size_t)H*4);
     fprintf(f,"P6\n%d %d\n255\n",W,H); for(int y=H-1;y>=0;y--) for(int x=0;x<W;x++) fwrite(px+((size_t)y*W+x)*4,1,3,f);
     fclose(f); free(px); brSay("{\"ok\":true,\"path\":\"%s\",\"tick\":%ld}",g_brShot,g_tickTotal); g_brShot[0]=0; }

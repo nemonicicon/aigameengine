@@ -1,8 +1,3 @@
-/* ---------- KMS flip machinery ---------- */
-#ifndef REVA_SDL
-__attribute__((unused)) static struct gbm_bo *g_prevBo=NULL; __attribute__((unused)) static unsigned g_prevFb=0;
-__attribute__((unused)) static struct gbm_bo *g_prev2Bo=NULL; __attribute__((unused)) static unsigned g_prev2Fb=0;
-#endif   /* pipelined flips keep TWO retired bos alive */
 /* ⭐ THE FRAME LEDGER (11-02, engine plan Phase 0). The hard rule is that no frame ever drops, and a mean fps cannot see one. On the
  * KMS road each flip's own kernel timestamp goes in here, and a gap over 1.5 fields is a late frame; on the SDL road the swap's
  * return stands in for the flip, which is a proxy. [frames] prints with the stat line. */
@@ -14,9 +9,7 @@ static void ledgerMark(double t){
 static long g_visAcc=0,g_visN=0; static int g_visMax=0;   /* bodies in view: the proof's number */
 /* what the frame just drawn asked for, and what that cost the renderer */
 static void frameCostPrint(void){
-#ifdef REVA_PACKET
     { GfxStats s9; gfxStats(&s9); printf("[gfx] last frame: %d draws %ld indices, sun %d draws %ld indices\n",s9.draws,s9.indices,s9.sunDraws,s9.sunIndices); }
-#endif
 #ifdef REVA_VK
     { int c9,b9,p9,s9; gfxBackStats(&c9,&b9,&p9,&s9); printf("[gfx] the renderer made that %d calls and %d texture binds, with %d texture pages and %d stretched meshes\n",c9,b9,p9,s9); }
 #endif
@@ -29,9 +22,9 @@ static void ledgerPrint(void){
         g_ledN,g_ledLate,g_ledLate2,g_ledMax,g_ledWorkMax,g_ledTotLate,g_ledTotN);
     g_ledN=g_ledLate=g_ledLate2=0; g_ledMax=g_ledWorkMax=0.0; }
 /* ⭐ THE PASS CLOCK (11-02). REVA_PASSTIME=1 finishes the GPU at each mark and charges the time since the last mark to that name,
- * so a slot's number is its CPU plus its GPU. Every mark is a glFinish, which on a tiler also stores and reloads the tile buffer:
- * the numbers say which part costs what, not how fast the whole frame runs. REVA_PASSTIME=2 marks only where the framebuffer changes,
- * so no target is split. On the Pi each slot also gets the GPU's own books: bin is the vertex side, render the pixel side, and the
+ * so a slot's number is its CPU plus its GPU. A mark is the CPU's clock (the old road finished the GPU at each one; the renderer's own
+ * cost is gfxWaited): the numbers say which part costs what, not how fast the whole frame runs. REVA_PASSTIME=2 marks only the frame's
+ * big stations. On the Pi each slot also gets the GPU's own books: bin is the vertex side, render the pixel side, and the
  * two run in parallel. Off, a mark is one branch. */
 #define PASS_MAX 24
 static int g_passOn=-1,g_passN=0; static const char*g_passName[PASS_MAX]; static double g_passMs[PASS_MAX],g_passBin[PASS_MAX],g_passRen[PASS_MAX],g_passT=0.0,g_passB0=0.0,g_passR0=0.0;
@@ -39,17 +32,17 @@ static void passGpu(double*bin,double*ren){ *bin=*ren=0.0; FILE*f=fopen("/sys/de
     while(fgets(l,sizeof l,f)) if(sscanf(l,"%31s %llu %llu %llu",q,&ts,&j,&rt)==4){ if(!strcmp(q,"bin")) *bin=rt/1e6; else if(!strcmp(q,"render")) *ren=rt/1e6; }
     fclose(f); }
 static void passStart(void){ if(g_passOn<0){ const char*e=getenv("REVA_PASSTIME"); g_passOn=(e&&e[0]>='1')?e[0]-'0':0; }
-    if(g_passOn){ glFinish(); passGpu(&g_passB0,&g_passR0); g_passT=wall_ms(); } }
+    if(g_passOn){  passGpu(&g_passB0,&g_passR0); g_passT=wall_ms(); } }
 static void passMark(const char*name){ if(g_passOn<=0) return;
     if(g_passOn==2&&strcmp(name,"sim0")&&strcmp(name,"holly")&&strcmp(name,"blobmap")&&strcmp(name,"sun")&&strcmp(name,"game")&&strcmp(name,"post")&&strcmp(name,"hud")) return;
-    glFinish(); double t=wall_ms(),bb,rr; int i; passGpu(&bb,&rr);
+     double t=wall_ms(),bb,rr; int i; passGpu(&bb,&rr);
     for(i=0;i<g_passN;i++) if(!strcmp(g_passName[i],name)) break;
     if(i==g_passN&&g_passN<PASS_MAX) g_passName[g_passN++]=name;
     if(i<PASS_MAX){ g_passMs[i]+=t-g_passT; g_passBin[i]+=bb-g_passB0; g_passRen[i]+=rr-g_passR0; }
     g_passB0=bb; g_passR0=rr; g_passT=wall_ms(); }
 static void passPrint(long frames){ if(g_passOn<=0||frames<=0) return; printf("[pass]");
     for(int i=0;i<g_passN;i++){ printf(" %s %.2f (%.2f,%.2f)",g_passName[i],g_passMs[i]/frames,g_passBin[i]/frames,g_passRen[i]/frames); g_passMs[i]=g_passBin[i]=g_passRen[i]=0.0; }
-    printf(" (ms a frame: wall (bin,render), a finish at each %s)\n",g_passOn==2?"framebuffer":"mark"); }
+    printf(" (ms a frame: wall (bin,render), at each %s)\n",g_passOn==2?"station":"mark"); }
 /* The HUD's text. It lived inside main() as the engine's one GNU nested function, which clang can't compile and AddressSanitizer can't follow (11-02). */
 static float g_hudW=1280.f,g_hudH=720.f; static char g_fontBuf[60000];
 static void drawText(float x,float y,float sc,const char*txt,float r4,float g4,float b4,float a4){
@@ -62,24 +55,32 @@ static void drawText(float x,float y,float sc,const char*txt,float r4,float g4,f
     hudTris(tv2,nv/2,g_hudW,g_hudH,r4,g4,b4,a4); }
 #include "bridge.inc"    /* the bridge: a line of JSON each way, for an AI driving the running engine */
 #include "display.inc"   /* the screen: what setup learned, changing the mode, setup itself */
-#ifdef REVA_PACKET
+#include "net.inc"       /* online play: the players gather, every machine starts from the same nothing, and each tick's pads come in where a tape's would */
 #define PAUSE_N 6
 #define PAUSE_SETUP "SCREEN SETUP","TEXT SIZE","CONTROLS",
-#else
-#define PAUSE_N 3
-#define PAUSE_SETUP
-#endif
 static int g_pauseDark=0;
+#ifdef REVA_VK
+/* REVA_BTWDBG=<folder> (step 25): once a second, how many refreshes had a tick in them and how many lay between two, and how many of the mixed picture's draws found their
+ * pair; and from the tenth second, six refreshes in a row written there as pictures, named for whether each had a tick. It reads the picture the refresh BEFORE this one drew */
+static void btwDbg(int between,int W,int H){
+    static int on=-1; static const char*dir; if(on<0){ dir=getenv("REVA_BTWDBG"); on=(dir&&dir[0])?1:0; } if(!on) return;
+    if(!between&&g_noDraw) return;   /* a pass that only ticks shows nothing */
+    static double t0=0.0; static int nt=0,nb=0,shot=0,wasBetween=0,wasT=0,kind[8],frac[8],sw=0,sh=0; static unsigned char*keep[8]; static long seq=0; double w=wall_ms(); if(t0<=0.0) t0=w;
+    if(seq>1300&&shot<8){ if(!sw){ sw=W; sh=H; gfxShotSize(&sw,&sh); } keep[shot]=(unsigned char*)malloc((size_t)sw*sh*4);
+        if(keep[shot]&&gfxRead(keep[shot],sw,sh)){ kind[shot]=wasBetween; frac[shot]=wasT; shot++; }
+        if(shot==8) for(int k=0;k<8;k++){ char q[400]; snprintf(q,sizeof q,"%s/btw_%d_%s_%02d.ppm",dir,k,kind[k]?"between":"tick",frac[k]); FILE*f=fopen(q,"wb");
+            if(f){ fprintf(f,"P6\n%d %d\n255\n",sw,sh); for(int y=sh-1;y>=0;y--) for(int x=0;x<sw;x++) fwrite(keep[k]+((size_t)y*sw+x)*4,1,3,f); fclose(f); } free(keep[k]); } }
+    seq++; wasBetween=between; wasT=(int)(g_tickAcc/g_tickMs*100.0); if(between) nb++; else nt++;
+    if(w-t0>=1000.0){ int pr=0,dr=0; gfxBetweenSay(&pr,&dr); printf("[between] a second: %d refreshes with a tick, %d between; %d of %d draws paired\n",nt,nb,pr,dr); fflush(stdout); nt=nb=0; t0=w; } }
+#endif
 static void aspectInit(int composite){ const char*e=getenv("REVA_ASPECT");
     if(e&&e[0]) g_dispAspect=(float)atof(e); else if(composite) g_dispAspect=15.f/11.f*g_fit.stretch;
     if(g_dispAspect>0.f) printf("[aspect] the picture is %.3f wide, whatever the framebuffer's shape\n",g_dispAspect); }
 static int packNameCmp(const void*a,const void*b){ const unsigned char*x=a,*y=b;
     for(;;x++,y++){ int cx=toupper(*x),cy=toupper(*y); if(cx!=cy) return cx-cy; if(!cx) return 0; } }
-static int g_flipPending=0;
 #ifdef REVA_VK
 __attribute__((unused)) static void vkFlip(unsigned sec,unsigned usec){ ledgerMark(sec*1000.0+usec/1000.0); }
 #endif
-__attribute__((unused)) static void flipHandler(int fd,unsigned frame,unsigned sec,unsigned usec,void*data){ (void)fd;(void)frame;(void)data; ledgerMark(sec*1000.0+usec/1000.0); g_flipPending=0; }
 
 #ifdef REVA_HEADLESS
 static void g_win_headless_note(void){ printf("[headless] no display, no GPU, no vsync: the sim only\n"); fflush(stdout); }
@@ -89,8 +90,7 @@ int main(int argc,char**argv){
     g_argv=argv;   /* the start menu's MAIN MENU relaunches this exact invocation */
     int NS=atoi(argv[1]); const char*dir=argv[2];
     /* BENCH (2026-08-01 resolution sweep): argv[4]="WxH" forces a mode, argv[5]="bench"
-     * fixes the seed so every resolution runs the IDENTICAL show, and adds a glFinish
-     * before swap so we time real frame work rather than the vsync cap. */
+     * fixes the seed so every resolution runs the IDENTICAL show. */
     int g_benchW=0,g_benchH=0,g_bench=0;
     if(argc>4&&strchr(argv[4],'x')) sscanf(argv[4],"%dx%d",&g_benchW,&g_benchH);
     if(argc>5&&!strcmp(argv[5],"bench")) g_bench=1;
@@ -114,39 +114,36 @@ int main(int argc,char**argv){
     signal(SIGINT,onsig); signal(SIGTERM,onsig);
 
 #ifdef REVA_SDL
-    /* [win32] SDL2 window + GLES2 context. No mode enumeration -- the window IS the mode.
+    /* [win32] SDL2 window, the renderer's surface on it. No mode enumeration -- the window IS the mode.
      * argv[4]=WxH still forces a size, matching the bench path. */
     int W = g_benchW>0 ? g_benchW : 1280;
     int H = g_benchH>0 ? g_benchH : 720;
-    /* [win32] Force SDL to load ANGLE's libGLESv2 for the ES context instead of making a
-     * desktop WGL context -- without this GL_RENDERER comes back (null) and every buffer
-     * upload silently fails, which reads as "all meshes skipped". */
-    SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER,"1");
-    SDL_SetHint(SDL_HINT_VIDEO_WIN_D3DCOMPILER,"d3dcompiler_47.dll");
 #ifdef REVA_HEADLESS
     SDL_setenv("SDL_VIDEODRIVER","dummy",1); SDL_setenv("SDL_AUDIODRIVER","dummy",1); g_win_headless_note();
 #endif
+#ifdef REVA_SOFT
+    /* (step 27) the engine's own rasterizer needs no display to draw. REVA_NOWINDOW=1 is the whole engine with its picture in memory: a shot or a receipt with nothing on anyone's screen */
+    const int g_noWindow=getenv("REVA_NOWINDOW")&&getenv("REVA_NOWINDOW")[0]=='1';
+    if(g_noWindow){ SDL_setenv("SDL_VIDEODRIVER","dummy",1); SDL_setenv("SDL_AUDIODRIVER","dummy",1); }
+#endif
     if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER|SDL_INIT_AUDIO)!=0){ fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,3);   /* [win32] holly.c ships #version 300 es shaders; ES3 accepts the ES2 crowd shaders unchanged */
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,0);
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,8); SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,8); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
     /* [win32] Fullscreen at the panel's NATIVE resolution on a chosen display.
      * REVA_DISPLAY=<n> picks the monitor (SDL indexes in Windows enumeration order);
      * REVA_WINDOWED=1 falls back to a plain window for debugging. */
     int g_disp = 0; { const char* e=getenv("REVA_DISPLAY"); if(e) g_disp=atoi(e); }
     int g_windowed = 0; { const char* e=getenv("REVA_WINDOWED"); if(e&&e[0]=='1') g_windowed=1; }
     (void)g_windowed;
+#ifdef REVA_VK
+    displayPrefs(&g_windowed,&W,&H);   /* (step 25) save/graphics.txt: a window or the whole panel, and a window's size */
+#endif
     { const char* e=getenv("REVA_SKATE"); g_skate=(e&&e[0]=='1'); if(g_skate) printf("SKATE MODE\n"); }
     if(g_disp<0||g_disp>=SDL_GetNumVideoDisplays()) g_disp=0;
 #ifdef REVA_HEADLESS
     Uint32 g_wflags = SDL_WINDOW_HIDDEN;
-#elif defined(REVA_VK)
-    Uint32 g_wflags = SDL_WINDOW_VULKAN|SDL_WINDOW_SHOWN|(g_windowed?0:SDL_WINDOW_FULLSCREEN_DESKTOP);
+#elif defined(REVA_SOFT)
+    Uint32 g_wflags = g_noWindow?SDL_WINDOW_HIDDEN:(SDL_WINDOW_SHOWN|(g_windowed?0:SDL_WINDOW_FULLSCREEN_DESKTOP));   /* a plain window: no driver is asked for a surface */
 #else
-    Uint32 g_wflags = SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN|(g_windowed?0:SDL_WINDOW_FULLSCREEN_DESKTOP);
+    Uint32 g_wflags = SDL_WINDOW_VULKAN|SDL_WINDOW_SHOWN|(g_windowed?0:SDL_WINDOW_FULLSCREEN_DESKTOP);
 #endif
     SDL_Window* g_win = SDL_CreateWindow("reva",
                                           SDL_WINDOWPOS_CENTERED_DISPLAY(g_disp),
@@ -155,23 +152,21 @@ int main(int argc,char**argv){
     if(!g_win){ fprintf(stderr,"SDL_CreateWindow: %s\n",SDL_GetError()); return 1; }
 #ifdef REVA_VK
     gfxConfigBoot(); gfxInit(g_win,&W,&H);
-#elif !defined(REVA_HEADLESS)
-    SDL_GLContext g_glctx = SDL_GL_CreateContext(g_win);
-    if(!g_glctx){ fprintf(stderr,"SDL_GL_CreateContext: %s\n",SDL_GetError()); return 1; }
-    SDL_GL_SetSwapInterval(1);
 #endif
-    { int dz=0; SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE,&dz); printf("GL depth bits: %d\n",dz); }
-    /* the drawable is the truth, not what we asked for: glViewport and the projection
-     * aspect both read W/H below, and fullscreen gives us the panel's real size. */
-#ifndef REVA_VK
-    SDL_GL_GetDrawableSize(g_win,&W,&H);
-#endif
+    /* the drawable is the truth, not what we asked for: the projection's aspect reads W/H below, and fullscreen gives us the panel's real size. */
     { SDL_DisplayMode dm; if(!SDL_GetCurrentDisplayMode(g_disp,&dm))
         printf("display %d: %dx%d@%dHz -> drawable %dx%d\n",g_disp,dm.w,dm.h,dm.refresh_rate,W,H); }
     { SDL_DisplayMode dm9; const char*dv9=SDL_GetCurrentVideoDriver();
       if(!SDL_GetCurrentDisplayMode(g_disp,&dm9)&&dm9.refresh_rate>0) g_ledFieldMs=1000.0/dm9.refresh_rate;
-      if(g_ledFieldMs<g_tickMs) g_ledFieldMs=g_tickMs;   /* a display faster than the tick shows a new frame each tick, so that's when one is due */
-      aspectInit(dv9&&!strcmp(dv9,"KMSDRM")&&W==720&&(H==480||H==240||H==576||H==288)); }
+      /* (step 25) the pictures between ticks, on a display that's faster than them. REVA_INTERP=0 never, 1 everywhere it can; unsaid, the `interp` setting, and not in the anim lab, where a frame is an exposure */
+#ifdef REVA_VK
+      { const char*ei9=getenv("REVA_INTERP"); const int want9=ei9?atoi(ei9):g_gfxInterp;
+        g_interpOn=(want9>0&&dm9.refresh_rate>62&&!getenv("REVA_FIXEDSTEP")&&!getenv("REVA_REPLAY")&&!getenv("REVA_RECORD")); g_interpForce=(ei9&&atoi(ei9)>0);
+        if(g_interpOn) printf("[display] %d Hz: the pictures between the rules' ticks are worked out from the two packets, one tick behind%s\n",dm9.refresh_rate,g_interpForce?"":" (not in the anim lab)"); }
+#endif
+      if(g_ledFieldMs<g_tickMs&&!g_interpOn) g_ledFieldMs=g_tickMs;   /* a display faster than the tick shows a new frame each tick, so that's when one is due */
+      aspectInit(dv9&&!strcmp(dv9,"KMSDRM")&&W==720&&(H==480||H==240||H==576||H==288));
+      { const float sa9=gfxShownAspect(); if(sa9>0.f&&g_dispAspect<=0.f){ g_dispAspect=sa9; printf("[aspect] the picture's pixels aren't square: it's shown %.3f wide\n",sa9); } } }   /* (step 25) a tube's 240-line picture */
 #else
     /* KMS: the card WITH A CONNECTOR. On a Pi 4 (vc4-kms-v3d) /dev/dri holds two cards -- v3d
      * (render only, no connectors) and vc4 (the display) -- and which one is card0 depends on
@@ -236,82 +231,17 @@ int main(int argc,char**argv){
     drmModeEncoder*enc=drmModeGetEncoder(fd,conn->encoder_id);
     unsigned crtcId=enc?enc->crtc_id:res->crtcs[0];
     int W=mode.hdisplay,H=mode.vdisplay;
-#ifdef REVA_VK
     gfxConfigBoot(); gfxInitKms(fd,crtcId,conn->connector_id,&mode,W,H,vkFlip);
     g_vConn=conn; g_vFd=fd;
-#else
-
-    struct gbm_device*gbm=gbm_create_device(fd); if(!gbm) die("gbm dev");
-    struct gbm_surface*gsurf=gbm_surface_create(gbm,W,H,GBM_FORMAT_XRGB8888,GBM_BO_USE_SCANOUT|GBM_BO_USE_RENDERING);
-    if(!gsurf) die("gbm surface");
-    PFNEGLGETPLATFORMDISPLAYEXTPROC gpd=(PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
-    EGLDisplay dpy=gpd(EGL_PLATFORM_GBM_KHR,gbm,NULL); eglInitialize(dpy,NULL,NULL); eglBindAPI(EGL_OPENGL_ES_API);
-    /* jacob's eyes 07-22 (live on stream): "z fighting and layering... like malus in cv64" --
-     * root cause: no EGL_DEPTH_SIZE requested, eglChooseConfig prefers SMALLER depth -> 0-bit z.
-     * The offscreen bench had its own depth renderbuffer, so this only appeared on the glass. */
-    static const EGLint ca[]={EGL_RENDERABLE_TYPE,EGL_OPENGL_ES2_BIT,EGL_SURFACE_TYPE,EGL_WINDOW_BIT,
-        EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_DEPTH_SIZE,24,EGL_NONE};
-    EGLConfig cfgs[32]; EGLint nc=0; eglChooseConfig(dpy,ca,cfgs,32,&nc);
-    if(!nc){ static const EGLint ca16[]={EGL_RENDERABLE_TYPE,EGL_OPENGL_ES2_BIT,EGL_SURFACE_TYPE,EGL_WINDOW_BIT,
-        EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_DEPTH_SIZE,16,EGL_NONE};
-        eglChooseConfig(dpy,ca16,cfgs,32,&nc); }
-    if(!nc) die("no depth-capable config");
-    EGLConfig cfg=cfgs[0];   /* match visual to XRGB8888 */
-    for(int i=0;i<nc;i++){ EGLint id; eglGetConfigAttrib(dpy,cfgs[i],EGL_NATIVE_VISUAL_ID,&id);
-        if(id==GBM_FORMAT_XRGB8888){ cfg=cfgs[i]; break; } }
-    { EGLint dz=0; eglGetConfigAttrib(dpy,cfg,EGL_DEPTH_SIZE,&dz); printf("EGL depth bits: %d\n",dz); }
-    /* [pi] ES3 first: holly.c ships #version 300 es and a Pi 4's v3d speaks ES 3.1; the crowd's own
-     * ES2 shaders run unchanged on it (the Windows build has asked for 3 since 08-21). ES2 stays
-     * the floor for an older SoC, and the head then declines loudly instead of exit(1)ing. */
-    static const EGLint cx3[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};
-    static const EGLint cx2[]={EGL_CONTEXT_CLIENT_VERSION,2,EGL_NONE};
-    EGLContext ctx=eglCreateContext(dpy,cfg,EGL_NO_CONTEXT,cx3);
-    if(ctx==EGL_NO_CONTEXT){ printf("EGL: no ES3 context -- ES2\n"); ctx=eglCreateContext(dpy,cfg,EGL_NO_CONTEXT,cx2); }
-    if(ctx==EGL_NO_CONTEXT) die("ctx");
-    EGLSurface esurf=eglCreateWindowSurface(dpy,cfg,(EGLNativeWindowType)gsurf,NULL); if(esurf==EGL_NO_SURFACE) die("esurf");
-    if(!eglMakeCurrent(dpy,esurf,esurf,ctx)) die("current");
 #endif
-#endif
-    printf("GL_RENDERER: %s\n",glGetString(GL_RENDERER));
-    /* ⭐ MEASURE THE HARDWARE BEFORE BELIEVING A LIMIT (09-11, build-the-capability). MAXB sat
-     * at 64 against a reported 1023 for the whole project. What the context can do decides
-     * how shadow maps and the post pass get built, so it is printed at every boot. */
-    { const char*ex=(const char*)glGetString(GL_EXTENSIONS); GLint v[4]={0,0,0,0};
-      glGetIntegerv(GL_MAX_TEXTURE_SIZE,&v[0]); glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE,&v[1]);
-      glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS,&v[2]); glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_VECTORS,&v[3]);
-      static const char*want[]={"OES_depth_texture","OES_packed_depth_stencil","OES_texture_float","OES_texture_half_float",
-                                "OES_texture_half_float_linear","EXT_texture_filter_anisotropic","OES_standard_derivatives",
-                                "OES_element_index_uint","EXT_shader_texture_lod","OES_depth24","ANGLE_instanced_arrays",
-                                "EXT_color_buffer_half_float","OES_vertex_array_object","EXT_frag_depth",NULL};
-      printf("[gl] max tex %d rb %d vert-uniform-vec4 %d frag-uniform-vec4 %d\n",v[0],v[1],v[2],v[3]);
-      printf("[gl] extensions:"); for(int i=0;want[i];i++) printf(" %s=%s",want[i],(ex&&strstr(ex,want[i]))?"YES":"no"); printf("\n");
-      fflush(stdout); }
-    /* ⭐ ASK THE HARDWARE WHAT IT CAN ACTUALLY CARRY. MAXB has been a hardcoded 64
-     * since the first pack -- 256 vec4 of vertex uniform, already twice GLES2's
-     * guaranteed minimum, so it was never measured. It costs a Daz-class character most
-     * of its FACE RIG. Print the real ceiling so it is a fact, not an old guess. */
-    { GLint vu=0,vv=0; glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS,&vu);
-      glGetIntegerv(GL_MAX_VARYING_VECTORS,&vv);
-      printf("GL limits: MAX_VERTEX_UNIFORM_VECTORS=%d (=%d mat4) varying=%d | MAXB=%d\n",
-             vu, vu/4, vv, MAXB);
-      /* ⛔ SAY SO IF THE SHADER IS ASKING FOR MORE THAN THE HARDWARE HAS. A palette
-       * bigger than the uniform budget fails to LINK, and a link failure with no
-       * explanation is the worst kind of silence. */
-      if(vu>0 && vu/4 < MAXB+8)
-          printf("!! GL can only carry %d mat4 but the shader asks for pal[%d] -- "
-                 "lower MAXB and rebuild%c", vu/4, MAXB, 10);
-      fflush(stdout); }
-    glViewport(0,0,W,H); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL);   /* LEQUAL: the holo color pass re-draws at equal depth */
     g_vNow=vmOfSize(W,H); scrApply(W,H);
-#ifdef REVA_PACKET
     setupAtBoot(&W,&H,g_dispAspect>0.f&&g_vNow>=0);   /* a first boot asks about the screen, before anything is loaded */
-#endif
 
     /* WHAT ARE WE PLAYING, AND AS WHOM: mode select first, then the character select
      * (argv[3] names a pack outright; absent or "select", the screen decides). Windows
      * only; on the Pi the argv behavior is unchanged and REVA_MODE/REVA_SKATE pick modes. */
 #ifdef REVA_SDL
-    g_mode=modeSelect(g_win,W,H);
+    g_mode=modeSelect(W,H);
     saveLoad(); atexit(saveFlush);   /* the club remembers: see THE SAVE FILE above */
     saveSetI("last.mode",g_mode); saveSetI("last.variant",g_modeVariant); saveSetI("nights",saveGetI("nights",0)+1);
     /* ⭐ 10-12: door 11 is its own program from the first frame -- no packs, no crowd.
@@ -327,7 +257,8 @@ int main(int argc,char**argv){
      * mode that has a player. The world becoming a playable space starts here. */
     { const char*es=getenv("REVA_SET");
       /* ⭐ REVA VS ZOMBIES: the door itself plays on the street (rules' `street`; `none` is v0's yard) */
-      if(g_mode==MODE_GAME){ apiInit(); if(g_game->video) g_videoWant=vmOf(g_game->video); }
+      if(g_mode==MODE_GAME){ apiInit(); netBoot(); if(g_game->video) g_videoWant=vmOf(g_game->video); }   /* (step 29) a session's players gather here: the game's known, and nothing of it is loaded */
+      else if(getenv("REVA_NET")&&getenv("REVA_NET")[0]){ printf("[net] online play is a game's, and this door isn't one: REVA_NET is left alone\n"); fflush(stdout); }
       int game9=GAME_ON;
       if(game9){ g_game->boot(); actionsLoad();
         const char*st9=g_game->street();
@@ -345,7 +276,7 @@ int main(int argc,char**argv){
     if(WORLD_OFF) printf("[game] flat: no bodies\n");   /* a flat game has no body to choose */
     else if(argc>3&&strcmp(argv[3],"select")) snprintf(heroPick,sizeof heroPick,"%s",argv[3]);
 #ifdef REVA_SDL
-    else { const char*pk=charSelect(g_win,W,H); if(pk) snprintf(heroPick,sizeof heroPick,"%s",pk); }
+    else { const char*pk=charSelect(W,H); if(pk) snprintf(heroPick,sizeof heroPick,"%s",pk); }
 #endif
 
     /* packs */
@@ -396,6 +327,8 @@ int main(int argc,char**argv){
     { const char*sub=getenv("REVA_ANIMSUBJ");   /* the lab's test body: a mannequin reads better than a hologram */
       if(sub&&*sub){ FILE*sf=fopen(sub,"rb");
           if(!sf){ char alt[512]; snprintf(alt,sizeof alt,"packs/v1_%s.rpack",sub); sf=fopen(alt,"rb");
+                   /* (step 23) a lead who isn't one of the crowd lives in props/: a new file in packs/ changes who the crowd is, on every machine and in every receipt */
+                   if(!sf){ snprintf(alt,sizeof alt,"props/v1_%s.rpack",sub); sf=fopen(alt,"rb"); }
                    if(sf){ fclose(sf); snprintf(heroPick,sizeof heroPick,"%s",alt); } }
           else { fclose(sf); snprintf(heroPick,sizeof heroPick,"%s",sub); }
           printf("ANIM SUBJECT: %s\n",heroPick); } }
@@ -507,628 +440,14 @@ int main(int argc,char**argv){
     if(g_skate){ parkBuild(); hasPark=1; }   /* generated, not scanned */
 
     /* programs (opaque + cutout) */
-    const char*vs=
-      "attribute vec3 p; attribute vec3 n; attribute vec4 j; attribute vec4 w; attribute vec2 t;\n"
-      "uniform mat4 vp; uniform mat4 model; uniform mat4 bind; uniform mat4 pal["
-      MAXB_STR(MAXB) "];\n"
-      "uniform vec4 mouthP; uniform vec2 mouthS;\n"
-      "uniform mat4 uShVP;\n"   /* ⭐ the sun's view-projection, for the receiver test (09-11) */
-      "uniform float uInk; uniform vec2 uAsp;\n"
-      "uniform float uColOn; uniform vec3 uCapA[4]; uniform vec3 uCapB[4]; uniform float uCapR[4]; uniform vec3 uBodyC;\n"
-      "uniform mat4 uHeadM; uniform mat4 uHeadMI;\n"   /* ⭐ PER-VERTEX COLLISION (10-18), in RIG space */   /* ⭐ THE INK (10-18) */
-      "varying vec3 vn; varying vec2 vt; varying vec3 vwp; varying vec3 vFace; varying vec4 vShp;\n"
-      "uniform mat4 uHeadMIR; uniform float uWaistY;\n"
-      /* ⭐ THE DRAPE (10-18). Cloth HANGS over a leg: along the vertex's own horizontal way out of the body (from the
-       * hips' axis), it must lie past every part of each leg capsule at or ABOVE its own height -- nine spheres along
-       * each capsule; a sphere below the vertex counts by its slice at the vertex's height. A soft edge beside the
-       * leg (lateral 0.9R..1.6R). Both walls move by the SAME amount: the outer wall (its normal facing out) keeps
-       * its 4 mm. */
-      "vec3 drapeOut(vec3 V, float outer){\n"
-      "  vec3 h=V-uBodyC; h.y=0.0; float tv=length(h);\n"
-      "  if(tv<1e-4) return V;\n"
-      "  vec3 nn=h/tv; vec3 pr=vec3(-nn.z,0.0,nn.x);\n"
-      "  float wall=outer*0.004;\n"
-      "  float push=0.0;\n"
-      "  for(int i=0;i<4;i++){ float R=uCapR[i]; if(R>0.0){\n"
-      "    for(int k=0;k<9;k++){ vec3 s=mix(uCapA[i],uCapB[i],float(k)/8.0);\n"
-      "      vec3 d=s-vec3(uBodyC.x,V.y,uBodyC.z);\n"
-      "      float rad=dot(d,nn); float lat=abs(dot(d,pr)); float vrt=max(V.y-s.y,0.0);\n"
-      "      float q=sqrt(lat*lat+vrt*vrt);\n"
-      "      float ext=(q<R)?rad+sqrt(R*R-q*q):rad-1.2*(q-R);\n"
-      "      push=max(push,ext+0.012+wall-tv); } } }\n"
-      "  push*=1.0-smoothstep(uBodyC.y+0.35*(uWaistY-uBodyC.y),uWaistY-0.01,V.y);\n"
-      "  return V+nn*max(push,0.0); }\n"
-      /* ⭐ HAIR NEVER INWARD (10-18): out of the neck capsule, and never nearer the head's centre (in the head
-       * ellipsoid's normalised frame) than where it sits at rest -- RP is its rest position, uHeadMIR the rest frame */
-      "vec3 hairOut(vec3 V, vec3 RP){\n"
-      "  if(uCapR[0]>0.0){ vec3 e=uCapB[0]-uCapA[0]; float t=clamp(dot(V-uCapA[0],e)/max(dot(e,e),1e-10),0.0,1.0);\n"
-      "    vec3 c=uCapA[0]+e*t; vec3 d=V-c; float l=length(d); if(l<uCapR[0]&&l>1e-6) V=c+d*(uCapR[0]/l); }\n"
-      "  vec3 un=(uHeadMI*vec4(V,1.0)).xyz; vec3 ur=(uHeadMIR*vec4(RP,1.0)).xyz;\n"
-      "  float Ln=length(un), Lr=length(ur)*0.995;\n"
-      "  if(Ln<Lr&&Ln>1e-5) V=(uHeadM*vec4(un*(Lr/Ln),1.0)).xyz;\n"
-      "  return V; }\n"
-      "void main(){ vec4 bp=bind*vec4(p,1.0); vt=t;\n"
-      /* A MOUTH IS NOT ALWAYS LEVEL: rotate into the lip line's own frame first, by the
-       * angle the CORNER MARKS make (mouthP.w). Tilting the marks now tilts the
-       * opening with them -- the interior already followed, because it builds its
-       * frame from those same two marks. */
-      "  vec2 md=vec2(bp.x-mouthP.x, bp.y-mouthP.y);\n"
-      "  float ct=cos(mouthP.w), st=sin(mouthP.w);\n"
-      "  vec2 mr2=vec2(md.x*ct+md.y*st, -md.x*st+md.y*ct);\n"
-      "  vFace=vec3(mr2.y/max(1e-5,mouthS.x), mr2.x/max(1e-5,mouthS.x), (bp.z-mouthP.z)/max(1e-5,mouthS.y));\n"
-      "  mat4 skin=w.x*pal[int(j.x)]+w.y*pal[int(j.y)]+w.z*pal[int(j.z)]+w.w*pal[int(j.w)];\n"
-      "  vec4 rp=skin*bp;\n"
-      "  if(uColOn>0.5&&uColOn<1.5) rp.xyz=drapeOut(rp.xyz,(dot((bind*vec4(n,0.0)).xz,bp.xz)>0.0)?1.0:0.0);\n"
-      "  if(uColOn>1.5&&uColOn<2.5) rp.xyz=hairOut(rp.xyz,bp.xyz);\n"
-      "  vec4 wp=model*rp; vwp=wp.xyz; vn=normalize((model*skin*(bind*vec4(n,0.0))).xyz);\n"
-      "  vShp=uShVP*wp;\n"
-      "  gl_Position=vp*wp;\n"
-      /* ⭐ THE INK (10-18): on the toon pass's second draw, every vertex pushed out along its normal's direction ON
-       * SCREEN by uInk (a share of the viewport's height), front faces culled -- the back faces left showing round
-       * the silhouette are the line. In clip space, so its width holds at any distance. */
-      "  if(uInk>0.0){ vec2 dd=(vp*vec4(vn,0.0)).xy; float L=length(dd);\n"
-      "    float lin9=((uColOn>0.5&&uColOn<1.5&&dot((bind*vec4(n,0.0)).xz,bp.xz)<=0.0)||(uColOn>2.5&&dot(n.xz,bp.xz-uBodyC.xz)<=0.0))?0.0:1.0;\n"
-      "    if(L>1e-6) gl_Position.xy+=dd/L*uInk*2.0*uAsp*gl_Position.w*lin9; } }\n";
     /* jacob: DARKER, we are in space -- key light dimmer, ambient floor way down; the color now
      * comes from the CLUB: 3 nearest colored point lights (orbs / lamps / snake / reva) per dancer */
-    #define LITE \
-      "  vec3 li=vec3(0.0);\n" \
-      "  for(int i=0;i<6;i++){ vec3 D=lp[i]-vwp; float dd=dot(D,D);\n" \
-      "    li+=lc[i]*max(0.0,dot(N,D*inversesqrt(dd+0.001)))/(1.0+dd*max(0.055+lk[i],0.001)); }\n"
-    const char*fsO=
-      "#extension GL_OES_standard_derivatives : enable\n"   /* dFdx/dFdy for the normal map's tangent frame (09-11) */
-      "precision mediump float; varying vec3 vn; varying vec2 vt; varying vec3 vwp;\n"
-      "varying vec3 vFace;\n"
-      "uniform vec3 tint; uniform float useTex; uniform sampler2D smp;\n"
-      "uniform float uAlpha;\n"
-      "uniform float uEmis;\n"   /* ⭐ (ep 4) 1 = draw this mesh unlit at full tint: a held light glows */
-      "uniform float uOpen;\n"
-      "uniform vec3 lp[6]; uniform vec3 lc[6]; uniform float lk[6];\n"
-      "uniform vec4 uSun; uniform vec3 uSunC; uniform vec3 uSky;\n"
-      "uniform vec3 uEye; uniform vec4 uFog;\n"   /* ⭐ FOG (09-11): rgb + density; 0 = off */
-      "uniform sampler2D uShMap; uniform float uShOn; varying vec4 vShp;\n"   /* ⭐ THE SUN'S SHADOW MAP (09-11) */
-      "uniform sampler2D nmp; uniform float uNrm;\n"   /* ⭐ THE NORMAL MAP (09-11): unit 1, per mesh */
-      "uniform float uTone;\n"
-      "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
-      "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
-      "uniform float uRim; uniform vec4 uRefl; uniform vec4 uGloss; uniform float uKeyCam; uniform float uRoomG;\n"   /* ⭐ (10-23) the rim, a floor's reflection, the floor */
-      "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
-      "  vec3 N=normalize(vn);\n"
-      /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
-       * derivatives of position and UV (the cotangent-frame method; OES_standard_derivatives
-       * is present), so the pack carries no tangents and a flipped V is handled by the
-       * derivatives themselves. Only the SHADING normal changes: silhouettes and shadows keep
-       * the mesh. REVA_NONORMAL=1 forces uNrm 0 for the A/B. */
-      "  if(uNrm>0.5){ vec3 nt=texture2D(nmp,vt).xyz*2.0-1.0;\n"
-      "    vec3 dp1=dFdx(vwp), dp2=dFdy(vwp); vec2 du1=dFdx(vt), du2=dFdy(vt);\n"
-      "    vec3 dp2p=cross(dp2,N), dp1p=cross(N,dp1);\n"
-      "    vec3 T=dp2p*du1.x+dp1p*du2.x, B=dp2p*du1.y+dp1p*du2.y;\n"
-      "    float im=inversesqrt(max(dot(T,T),dot(B,B))+1e-12);\n"
-      "    N=normalize(T*im*nt.x+B*im*nt.y+N*max(nt.z,0.2)); }\n"
-      "  float l=0.3+0.7*max(0.0,dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
-      LITE
-      "  vec4 tx=texture2D(smp,vt); vec3 base=mix(tint,tx.rgb,useTex);\n"
-      /* THE MOUTH APERTURE -- ported from our own HOLLY (C:/holly, reva_native/holly.c):
-       * "Cut a hole. His lips are modelled shut -- one continuous sheet of skin -- so
-       * opening the jaw could only stretch it, and anything behind stayed hidden
-       * forever. Keyed on the REST position: the skin to remove is identified by
-       * where it STARTED, before the jaw carried it away."
-       * It lives in the FRAGMENT shader against vFace (the bind-space rest position)
-       * rather than in the mesh, so it needs NO VERTICES -- which is the only reason
-       * reva can open a mouth that has two of them. The ring of shadow outside the
-       * hole hides the stepped edge discard leaves behind.
-       * ⛔ IT IS SIZED BY THE MOUTH NOW, NOT BY THE FACE. Both axes used to be
-       * normalised by different things -- lateral by a half-width guessed as 0.42 x
-       * the interocular distance, VERTICAL by the whole face height -- so the hole
-       * came out as tall as a fifth of her face and, forced open on kaeli, read as a
-       * circle from her nose to her chin with the hair behind her skull showing
-       * through it. Both axes are now in units of the MEASURED mouth half-width
-       * (face_marks.py's corner marks), so the opening is a mouth-shaped ellipse on
-       * any head: 0.66 half-widths of travel at full open, centred just below the
-       * lip line. Only the depth gate still reads in face heights. */
-      "  if(uOpen>0.002&&vFace.z>-0.12&&abs(vFace.y)<1.6&&abs(vFace.x)<1.4){\n"
-      /* ⛔ THE HOLE OPENS *BETWEEN* HER LIPS, NOT THROUGH THEM. It used to reach the
-       * mouth CORNERS and half a mouth-width tall, so it discarded her modelled,
-       * textured lips along with the sealed seam -- and then lips had to be authored
-       * back, which is exactly the wrong way round (jacob: "the meshs ALREADY have
-       * lips ... use the meshs own lips"). The discard only has to take the thin seam
-       * where the lips MEET; her own lips then part by themselves, because the lower
-       * face is skinned to face_jaw and carries them down. Inset from the corners, and
-       * a fraction of the height. */
-      /* ⛔ BOTH AXES SCALE, OR IT IS A LETTERBOX. The lateral extent used to be a
-       * constant 0.78 half-widths while only the height grew with uOpen, so at a
-       * conversational 0.35 the hole was the full width of her mouth and a twentieth of
-       * a half-width tall -- a slit straight across her face. Speech sits in exactly that
-       * range. A mouth parts at the CENTRE first and the corners open last, so the width
-       * runs from just over half at a whisper to full at a shout.
-       * And the bias is deeper: only the LOWER jaw travels, so the opening must not climb
-       * into the upper lip. It sits below the seam and stays there. */
-      "    float aH=uOpen*0.22;\n"
-      "    float aW=0.78*mix(0.52,1.0,clamp(uOpen*1.25,0.0,1.0));\n"
-      "    float ax=vFace.y/max(1e-4,aW);\n"
-      "    float ay=(vFace.x+aH*0.92)/max(1e-4,aH*1.06);\n"
-      "    float rr=sqrt(ax*ax+ay*ay);\n"
-      "    if(rr<1.0) discard;\n"
-      /* ⛔ NO SHADOW RING. This multiplied the skin down to a TENTH of its brightness in
-       * a wide band outside the hole, to hide the stepped edge a discard leaves behind.
-       * With real lip geometry modelled around the opening that edge is covered, and the
-       * ring is just damage -- jacob: "the black around the lips/teeth is undesirable".
-       * A whisper of contact shadow is kept, over a much tighter band. */
-      "    base*=mix(0.72,1.0,smoothstep(1.0,1.18,rr));\n"
-      "  }\n"
-      /* uSun.w == 0 -> the club's own dark-room rig, byte for byte. Above zero it is
-       * a real directional over a sky ambient, which is the only thing that reads as
-       * daylight on a street. */
-      /* ⭐ THE SUN CASTS (09-11). The map holds the sun's depth packed in RGBA8 (no depth
-       * texture on this context); four taps half a texel apart, a slope-scaled bias, and
-       * outside the map's window everything is lit. Only the SUN term is shadowed -- sky
-       * ambient and the practicals are not, which is what a shadow is. */
-      "  float shv=1.0;\n"
-      "  if(uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
-      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
-      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
-      "      vec2 px=vec2(1.0/2048.0); shv=0.0;\n"
-      "      for(int i=0;i<4;i++){ vec2 o=vec2(i==1||i==3?0.5:-0.5, i>=2?0.5:-0.5)*px;\n"
-      "        vec4 e=texture2D(uShMap,sp.xy+o); float d=dot(e,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));\n"
-      "        shv+=(sp.z-bias<=d)?0.25:0.0; } } }\n"
-      /* ⭐ THE TOON'S SHADOW EDGE (10-18). Four taps half a texel apart step from texel to texel, and a hard cel
-       * cut turns every step into a STAIR across a face (Amelia's bob threw one down her cheek). For a toon body the
-       * test is BILINEAR: the four nearest texels' verdicts blended by where the point falls between them, so the
-       * cut follows a smooth contour. The realistic path keeps its filter. */
-      "  if(uCel>0.0&&uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
-      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
-      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
-      "      vec2 tc=sp.xy*2048.0-0.5; vec2 f=fract(tc); vec2 b0=(floor(tc)+0.5)/2048.0; float px=1.0/2048.0;\n"
-      "      vec4 kk=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);\n"
-      "      float s00=(sp.z-bias<=dot(texture2D(uShMap,b0),kk))?1.0:0.0;\n"
-      "      float s10=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,0.0)),kk))?1.0:0.0;\n"
-      "      float s01=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(0.0,px)),kk))?1.0:0.0;\n"
-      "      float s11=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,px)),kk))?1.0:0.0;\n"
-      "      shv=mix(mix(s00,s10,f.x),mix(s01,s11,f.x),f.y); } }\n"
-      "  vec3 lit = (uSun.w > 0.0)\n"
-      "     ? base*(uSky + uSunC*uSun.w*max(0.0,dot(N,uSun.xyz))*shv) + base*li\n"
-      "     : base*(l*0.42+0.13+li);\n"
-      /* ⭐ EMISSIVE (ep 4). Before the fog and the tone knee, so a glowing prop still sits in
-       * the same air as everything else and still rolls off under `tone=` instead of clipping. */
-      /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
-       * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
-       * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
-      /* \u2b50 (10-23) THE KEY FROM THE LENS: a toon BODY's cel cut taken on a light above and to the right of the camera (as a
-       * drawn show keys its characters), not on the set's one sun -- under the ship's fixed sun two faces in three were
-       * in the shadow tone, a hair's shadow carved across them in hard purple. The room's shadows still reach a body:
-       * as a dim (below), not a cut. uKeyCam 0 (REVA_TOONKEY=0) is the control. */
-      "  vec3 Lk=uSun.xyz; float shk=shv;\n"
-      "  if(uKeyCam>0.5&&uHemi<0.5&&uCel>0.0){ vec3 Vk=normalize(uEye-vwp); vec3 Rk=cross(vec3(0.0,1.0,0.0),Vk); float rl=length(Rk);\n"
-      "    Rk=(rl>1e-4)?Rk/rl:vec3(1.0,0.0,0.0); Lk=normalize(Vk*0.75+vec3(0.0,0.80,0.0)+Rk*0.30); shk=1.0; }\n"
-      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,Lk)*shk : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
-      "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
-      "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
-      /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
-       * realistic shade wants and a flat colour does not -- the white robe blew out and its SHADOW read pale
-       * lavender. A dimmer light (dusk, night, a lamp) still darkens; nothing brightens past the palette. */
-      "    float fl9=dot(full,vec3(0.299,0.587,0.114)); full*=min(1.0,1.0/max(fl9,1e-3));\n"
-      /* ⛔ ONE MULTIPLY CRUSHES A DARK COLOUR: Wanda's deep brown face went near-black on its shadow side. A
-       * drawn show keeps a dark skin's shadow a rich readable brown -- so the darker the base, the gentler the cut
-       * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
-      "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
-      "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
-      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25;\n"
-      /* \u2b50 (10-23) THE RIM: a cel band of the key light along a toon body's silhouette, full on its lit side and a third
-       * on its shadow side -- what separates a figure from a room drawn in the same flat colours. Bodies only (a room's
-       * surfaces are lit by uHemi); uRim 0 (REVA_TOONRIM=0) is the control. */
-      "    if(uRim>0.0&&uHemi<0.5){ vec3 V=normalize(uEye-vwp); float fr=1.0-max(dot(N,V),0.0);\n"
-      "      lit+=base*full*smoothstep(0.60,0.68,fr)*(0.35+0.65*lv)*uRim; }\n"
-      "    if(uKeyCam>0.5&&uHemi<0.5) lit*=mix(0.80,1.0,shv);\n"
-      /* \u2b50 (10-23) A ROOM LIT FROM ITS CEILING: its surfaces a little darker toward the floor (uRoomG; REVA_ROOMGRAD=0) */
-      "    if(uHemi>0.5&&uRoomG>0.0) lit*=mix(1.0-0.16*uRoomG,1.0+0.03*uRoomG,clamp(vwp.y/5.2,0.0,1.0)); }\n"
-      "  if(uEmis>0.0) lit=base*uEmis;\n"
-      /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
-       * takes off the sky's own horizon unless a scene names one. It is what a wide has to
-       * soften distance with, and what hides the edge of the world at night. */
-      "  if(uFog.w>0.0){ float fd=distance(vwp,uEye); lit=mix(uFog.rgb,lit,exp(-fd*uFog.w)); }\n"
-      "  if(uTone>0.0){ vec3 kn=vec3(uTone); vec3 ov=max(lit-kn,vec3(0.0));\n"
-      "    vec3 wp=vec3(0.96); lit=min(lit,kn)+(wp-kn)*(vec3(1.0)-exp(-ov/(wp-kn))); }\n"
-      /* \u2b50 (10-23) THE GLOSSY FLOOR: a reflection fades with its depth under the floor (uRefl: y, 1/fade); the floor's own
-       * pass writes its Fresnel term as alpha (uGloss: F0, the most) for glBlendFunc(ONE, SRC_ALPHA) -- see glossFloorPass */
-      "  float aOut=uAlpha;\n"
-      "  if(uRefl.w>0.5) lit*=exp(-max(uRefl.x-vwp.y,0.0)*uRefl.y);\n"
-      "  if(uGloss.w>0.5){ vec3 Vg=normalize(uEye-vwp); float ct=clamp(dot(N,Vg),0.0,1.0); aOut=min(uGloss.y,uGloss.x+(1.0-uGloss.x)*pow(1.0-ct,5.0)); }\n"
-      "  gl_FragColor=vec4(lit,aOut); }\n";
-    const char*fsC=
-      "#extension GL_OES_standard_derivatives : enable\n"   /* dFdx/dFdy for the normal map's tangent frame (09-11) */
-      "precision mediump float; varying vec3 vn; varying vec2 vt; varying vec3 vwp;\n"
-      "varying vec3 vFace;\n"
-      "uniform vec3 tint; uniform float useTex; uniform sampler2D smp;\n"
-      "uniform float uAlpha;\n"
-      "uniform float uEmis;\n"   /* ⭐ (ep 4) 1 = draw this mesh unlit at full tint: a held light glows */
-      "uniform float uOpen;\n"
-      "uniform vec3 lp[6]; uniform vec3 lc[6]; uniform float lk[6];\n"
-      "uniform vec4 uSun; uniform vec3 uSunC; uniform vec3 uSky;\n"
-      "uniform vec3 uEye; uniform vec4 uFog;\n"   /* ⭐ FOG (09-11): rgb + density; 0 = off */
-      "uniform sampler2D uShMap; uniform float uShOn; varying vec4 vShp;\n"   /* ⭐ THE SUN'S SHADOW MAP (09-11) */
-      "uniform sampler2D nmp; uniform float uNrm;\n"   /* ⭐ THE NORMAL MAP (09-11): unit 1, per mesh */
-      "uniform float uTone;\n"
-      "uniform float uCel; uniform vec4 uInkC;\n"   /* ⭐ THE TOON PASS (10-18) */
-      "uniform float uHemi;\n"   /* ⭐ the ship's sets (10-18): a room's light, toonSetLook */
-      "uniform float uRim; uniform vec4 uRefl; uniform vec4 uGloss; uniform float uKeyCam; uniform float uRoomG;\n"   /* ⭐ (10-23) the rim, a floor's reflection, the floor */
-      "void main(){ if(uInkC.w>0.0){ gl_FragColor=vec4(uInkC.rgb,1.0); return; }\n"
-      "  vec3 N=normalize(vn);\n"
-      /* ⭐ THE NORMAL MAP (09-11). The tangent frame is built from the screen-space
-       * derivatives of position and UV (the cotangent-frame method; OES_standard_derivatives
-       * is present), so the pack carries no tangents and a flipped V is handled by the
-       * derivatives themselves. Only the SHADING normal changes: silhouettes and shadows keep
-       * the mesh. REVA_NONORMAL=1 forces uNrm 0 for the A/B. */
-      "  if(uNrm>0.5){ vec3 nt=texture2D(nmp,vt).xyz*2.0-1.0;\n"
-      "    vec3 dp1=dFdx(vwp), dp2=dFdy(vwp); vec2 du1=dFdx(vt), du2=dFdy(vt);\n"
-      "    vec3 dp2p=cross(dp2,N), dp1p=cross(N,dp1);\n"
-      "    vec3 T=dp2p*du1.x+dp1p*du2.x, B=dp2p*du1.y+dp1p*du2.y;\n"
-      "    float im=inversesqrt(max(dot(T,T),dot(B,B))+1e-12);\n"
-      "    N=normalize(T*im*nt.x+B*im*nt.y+N*max(nt.z,0.2)); }\n"
-      "  float l=0.3+0.7*max(0.0,dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
-      "  vec4 tx=texture2D(smp,vt); if(useTex>0.5&&tx.a<0.4) discard;\n"
-      LITE
-      "  vec3 base=mix(tint,tx.rgb,useTex);\n"
-      /* THE MOUTH APERTURE -- ported from our own HOLLY (C:/holly, reva_native/holly.c):
-       * "Cut a hole. His lips are modelled shut -- one continuous sheet of skin -- so
-       * opening the jaw could only stretch it, and anything behind stayed hidden
-       * forever. Keyed on the REST position: the skin to remove is identified by
-       * where it STARTED, before the jaw carried it away."
-       * It lives in the FRAGMENT shader against vFace (the bind-space rest position)
-       * rather than in the mesh, so it needs NO VERTICES -- which is the only reason
-       * reva can open a mouth that has two of them. The ring of shadow outside the
-       * hole hides the stepped edge discard leaves behind.
-       * ⛔ IT IS SIZED BY THE MOUTH NOW, NOT BY THE FACE. Both axes used to be
-       * normalised by different things -- lateral by a half-width guessed as 0.42 x
-       * the interocular distance, VERTICAL by the whole face height -- so the hole
-       * came out as tall as a fifth of her face and, forced open on kaeli, read as a
-       * circle from her nose to her chin with the hair behind her skull showing
-       * through it. Both axes are now in units of the MEASURED mouth half-width
-       * (face_marks.py's corner marks), so the opening is a mouth-shaped ellipse on
-       * any head: 0.66 half-widths of travel at full open, centred just below the
-       * lip line. Only the depth gate still reads in face heights. */
-      "  if(uOpen>0.002&&vFace.z>-0.12&&abs(vFace.y)<1.6&&abs(vFace.x)<1.4){\n"
-      /* ⛔ THE HOLE OPENS *BETWEEN* HER LIPS, NOT THROUGH THEM. It used to reach the
-       * mouth CORNERS and half a mouth-width tall, so it discarded her modelled,
-       * textured lips along with the sealed seam -- and then lips had to be authored
-       * back, which is exactly the wrong way round (jacob: "the meshs ALREADY have
-       * lips ... use the meshs own lips"). The discard only has to take the thin seam
-       * where the lips MEET; her own lips then part by themselves, because the lower
-       * face is skinned to face_jaw and carries them down. Inset from the corners, and
-       * a fraction of the height. */
-      /* ⛔ BOTH AXES SCALE, OR IT IS A LETTERBOX. The lateral extent used to be a
-       * constant 0.78 half-widths while only the height grew with uOpen, so at a
-       * conversational 0.35 the hole was the full width of her mouth and a twentieth of
-       * a half-width tall -- a slit straight across her face. Speech sits in exactly that
-       * range. A mouth parts at the CENTRE first and the corners open last, so the width
-       * runs from just over half at a whisper to full at a shout.
-       * And the bias is deeper: only the LOWER jaw travels, so the opening must not climb
-       * into the upper lip. It sits below the seam and stays there. */
-      "    float aH=uOpen*0.22;\n"
-      "    float aW=0.78*mix(0.52,1.0,clamp(uOpen*1.25,0.0,1.0));\n"
-      "    float ax=vFace.y/max(1e-4,aW);\n"
-      "    float ay=(vFace.x+aH*0.92)/max(1e-4,aH*1.06);\n"
-      "    float rr=sqrt(ax*ax+ay*ay);\n"
-      "    if(rr<1.0) discard;\n"
-      /* ⛔ NO SHADOW RING. This multiplied the skin down to a TENTH of its brightness in
-       * a wide band outside the hole, to hide the stepped edge a discard leaves behind.
-       * With real lip geometry modelled around the opening that edge is covered, and the
-       * ring is just damage -- jacob: "the black around the lips/teeth is undesirable".
-       * A whisper of contact shadow is kept, over a much tighter band. */
-      "    base*=mix(0.72,1.0,smoothstep(1.0,1.18,rr));\n"
-      "  }\n"
-      /* uSun.w == 0 -> the club's own dark-room rig, byte for byte. Above zero it is
-       * a real directional over a sky ambient, which is the only thing that reads as
-       * daylight on a street. */
-      /* ⭐ THE SUN CASTS (09-11). The map holds the sun's depth packed in RGBA8 (no depth
-       * texture on this context); four taps half a texel apart, a slope-scaled bias, and
-       * outside the map's window everything is lit. Only the SUN term is shadowed -- sky
-       * ambient and the practicals are not, which is what a shadow is. */
-      "  float shv=1.0;\n"
-      "  if(uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
-      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
-      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
-      "      vec2 px=vec2(1.0/2048.0); shv=0.0;\n"
-      "      for(int i=0;i<4;i++){ vec2 o=vec2(i==1||i==3?0.5:-0.5, i>=2?0.5:-0.5)*px;\n"
-      "        vec4 e=texture2D(uShMap,sp.xy+o); float d=dot(e,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));\n"
-      "        shv+=(sp.z-bias<=d)?0.25:0.0; } } }\n"
-      /* ⭐ THE TOON'S SHADOW EDGE (10-18). Four taps half a texel apart step from texel to texel, and a hard cel
-       * cut turns every step into a STAIR across a face (Amelia's bob threw one down her cheek). For a toon body the
-       * test is BILINEAR: the four nearest texels' verdicts blended by where the point falls between them, so the
-       * cut follows a smooth contour. The realistic path keeps its filter. */
-      "  if(uCel>0.0&&uShOn>0.5&&uSun.w>0.0){ vec3 sp=vShp.xyz/vShp.w*0.5+0.5;\n"
-      "    if(sp.x>0.0&&sp.x<1.0&&sp.y>0.0&&sp.y<1.0&&sp.z<1.0){\n"
-      "      float nl=max(0.0,dot(N,uSun.xyz)); float bias=0.0012+0.0035*(1.0-nl);\n"
-      "      vec2 tc=sp.xy*2048.0-0.5; vec2 f=fract(tc); vec2 b0=(floor(tc)+0.5)/2048.0; float px=1.0/2048.0;\n"
-      "      vec4 kk=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);\n"
-      "      float s00=(sp.z-bias<=dot(texture2D(uShMap,b0),kk))?1.0:0.0;\n"
-      "      float s10=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,0.0)),kk))?1.0:0.0;\n"
-      "      float s01=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(0.0,px)),kk))?1.0:0.0;\n"
-      "      float s11=(sp.z-bias<=dot(texture2D(uShMap,b0+vec2(px,px)),kk))?1.0:0.0;\n"
-      "      shv=mix(mix(s00,s10,f.x),mix(s01,s11,f.x),f.y); } }\n"
-      "  vec3 lit = (uSun.w > 0.0)\n"
-      "     ? base*(uSky + uSunC*uSun.w*max(0.0,dot(N,uSun.xyz))*shv) + base*li\n"
-      "     : base*(l*0.42+0.13+li);\n"
-      /* ⭐ EMISSIVE (ep 4). Before the fog and the tone knee, so a glowing prop still sits in
-       * the same air as everything else and still rolls off under `tone=` instead of clipping. */
-      /* ⭐ THE CEL RAMP (10-18): the same key light and the same shadow map, cut into TWO tones -- lit, and a cool
-       * heavy shadow (the Mignola side of the look) -- over a pixel's smoothstep so the edge does not crawl. The
-       * head's normals come from its plain form (build_toon.py), so the cut is a designed shape, not a nose's patch. */
-      /* \u2b50 (10-23) THE KEY FROM THE LENS: a toon BODY's cel cut taken on a light above and to the right of the camera (as a
-       * drawn show keys its characters), not on the set's one sun -- under the ship's fixed sun two faces in three were
-       * in the shadow tone, a hair's shadow carved across them in hard purple. The room's shadows still reach a body:
-       * as a dim (below), not a cut. uKeyCam 0 (REVA_TOONKEY=0) is the control. */
-      "  vec3 Lk=uSun.xyz; float shk=shv;\n"
-      "  if(uKeyCam>0.5&&uHemi<0.5&&uCel>0.0){ vec3 Vk=normalize(uEye-vwp); vec3 Rk=cross(vec3(0.0,1.0,0.0),Vk); float rl=length(Rk);\n"
-      "    Rk=(rl>1e-4)?Rk/rl:vec3(1.0,0.0,0.0); Lk=normalize(Vk*0.75+vec3(0.0,0.80,0.0)+Rk*0.30); shk=1.0; }\n"
-      "  if(uCel>0.0){ float kd=(uHemi>0.5) ? (0.5+0.5*N.y)*shv : ((uSun.w>0.0) ? dot(N,Lk)*shk : dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
-      "    float lv=smoothstep(uCel-0.02,uCel+0.02,kd);\n"
-      "    vec3 full=(uSun.w>0.0) ? (uSky+uSunC*uSun.w*0.9) : vec3(0.80);\n"
-      /* ⛔ THE LIGHT'S BRIGHTNESS IS CAPPED AT 1 (its hue kept): sky + sun sum well past 1 on a street, which a
-       * realistic shade wants and a flat colour does not -- the white robe blew out and its SHADOW read pale
-       * lavender. A dimmer light (dusk, night, a lamp) still darkens; nothing brightens past the palette. */
-      "    float fl9=dot(full,vec3(0.299,0.587,0.114)); full*=min(1.0,1.0/max(fl9,1e-3));\n"
-      /* ⛔ ONE MULTIPLY CRUSHES A DARK COLOUR: Wanda's deep brown face went near-black on its shadow side. A
-       * drawn show keeps a dark skin's shadow a rich readable brown -- so the darker the base, the gentler the cut
-       * (luminance 0.40 and up: the full cool cut; 0.08 and down: a light one). Light colours unchanged. */
-      "    float bl9=dot(base,vec3(0.299,0.587,0.114));\n"
-      "    vec3 sm9=mix(vec3(0.74,0.70,0.84),vec3(0.50,0.47,0.66),smoothstep(0.08,0.40,bl9));\n"
-      "    lit=base*full*mix(sm9,vec3(1.0),lv)+base*li*0.25;\n"
-      /* \u2b50 (10-23) THE RIM: a cel band of the key light along a toon body's silhouette, full on its lit side and a third
-       * on its shadow side -- what separates a figure from a room drawn in the same flat colours. Bodies only (a room's
-       * surfaces are lit by uHemi); uRim 0 (REVA_TOONRIM=0) is the control. */
-      "    if(uRim>0.0&&uHemi<0.5){ vec3 V=normalize(uEye-vwp); float fr=1.0-max(dot(N,V),0.0);\n"
-      "      lit+=base*full*smoothstep(0.60,0.68,fr)*(0.35+0.65*lv)*uRim; }\n"
-      "    if(uKeyCam>0.5&&uHemi<0.5) lit*=mix(0.80,1.0,shv);\n"
-      /* \u2b50 (10-23) A ROOM LIT FROM ITS CEILING: its surfaces a little darker toward the floor (uRoomG; REVA_ROOMGRAD=0) */
-      "    if(uHemi>0.5&&uRoomG>0.0) lit*=mix(1.0-0.16*uRoomG,1.0+0.03*uRoomG,clamp(vwp.y/5.2,0.0,1.0)); }\n"
-      "  if(uEmis>0.0) lit=base*uEmis;\n"
-      /* ⭐ FOG BY DISTANCE (09-11). Exponential in eye distance, toward a colour the C side
-       * takes off the sky's own horizon unless a scene names one. It is what a wide has to
-       * soften distance with, and what hides the edge of the world at night. */
-      "  if(uFog.w>0.0){ float fd=distance(vwp,uEye); lit=mix(uFog.rgb,lit,exp(-fd*uFog.w)); }\n"
-      "  if(uTone>0.0){ vec3 kn=vec3(uTone); vec3 ov=max(lit-kn,vec3(0.0));\n"
-      "    vec3 wp=vec3(0.96); lit=min(lit,kn)+(wp-kn)*(vec3(1.0)-exp(-ov/(wp-kn))); }\n"
-      /* \u2b50 (10-23) THE GLOSSY FLOOR: a reflection fades with its depth under the floor (uRefl: y, 1/fade); the floor's own
-       * pass writes its Fresnel term as alpha (uGloss: F0, the most) for glBlendFunc(ONE, SRC_ALPHA) -- see glossFloorPass */
-      "  float aOut=uAlpha;\n"
-      "  if(uRefl.w>0.5) lit*=exp(-max(uRefl.x-vwp.y,0.0)*uRefl.y);\n"
-      "  if(uGloss.w>0.5){ vec3 Vg=normalize(uEye-vwp); float ct=clamp(dot(N,Vg),0.0,1.0); aOut=min(uGloss.y,uGloss.x+(1.0-uGloss.x)*pow(1.0-ct,5.0)); }\n"
-      "  gl_FragColor=vec4(lit,aOut); }\n";
-    typedef struct { GLuint prog; GLint uVP,uModel,uBind,uPal,uTint,uUse,uLp,uLc,uLk,uDqS,uMouthP,uMouthS,uOpen,uSun,uSunC,uSky,uAlpha,uTone,uEye,uFog,uShVP,uShMap,uShOn,uNmap,uNrm; } Prog;
-    Prog PR[2];
-    for(int pi=0;pi<2;pi++){ GLuint prog=glCreateProgram();
-        glAttachShader(prog,sh(GL_VERTEX_SHADER,vs)); glAttachShader(prog,sh(GL_FRAGMENT_SHADER,pi?fsC:fsO));
-        glBindAttribLocation(prog,0,"p"); glBindAttribLocation(prog,1,"n"); glBindAttribLocation(prog,2,"j"); glBindAttribLocation(prog,3,"w"); glBindAttribLocation(prog,4,"t");
-        glLinkProgram(prog); GLint ok; glGetProgramiv(prog,GL_LINK_STATUS,&ok); if(!ok) die("link");
-        PR[pi].prog=prog;
-        PR[pi].uVP=glGetUniformLocation(prog,"vp"); PR[pi].uModel=glGetUniformLocation(prog,"model");
-        PR[pi].uBind=glGetUniformLocation(prog,"bind"); PR[pi].uPal=glGetUniformLocation(prog,"pal");
-        PR[pi].uTint=glGetUniformLocation(prog,"tint"); PR[pi].uUse=glGetUniformLocation(prog,"useTex");
-        PR[pi].uLp=glGetUniformLocation(prog,"lp"); PR[pi].uLc=glGetUniformLocation(prog,"lc"); PR[pi].uLk=glGetUniformLocation(prog,"lk");
-        PR[pi].uSun=glGetUniformLocation(prog,"uSun");
-        PR[pi].uSunC=glGetUniformLocation(prog,"uSunC");
-        PR[pi].uSky=glGetUniformLocation(prog,"uSky");
-        PR[pi].uMouthP=glGetUniformLocation(prog,"mouthP");
-        PR[pi].uMouthS=glGetUniformLocation(prog,"mouthS");
-        PR[pi].uOpen=glGetUniformLocation(prog,"uOpen");
-        PR[pi].uEye=glGetUniformLocation(prog,"uEye"); PR[pi].uFog=glGetUniformLocation(prog,"uFog");
-        PR[pi].uShVP=glGetUniformLocation(prog,"uShVP"); PR[pi].uShMap=glGetUniformLocation(prog,"uShMap"); PR[pi].uShOn=glGetUniformLocation(prog,"uShOn");
-        PR[pi].uNmap=glGetUniformLocation(prog,"nmp"); PR[pi].uNrm=glGetUniformLocation(prog,"uNrm");
-        glUseProgram(prog); if(PR[pi].uNmap>=0) glUniform1i(PR[pi].uNmap,1);   /* the normal map lives on unit 1 (09-11) */
-        PR[pi].uDqS=-1;
-        PR[pi].uAlpha=glGetUniformLocation(prog,"uAlpha");
-        PR[pi].uTone=glGetUniformLocation(prog,"uTone");
-        glUseProgram(prog); glUniform1i(glGetUniformLocation(prog,"smp"),0);
-        glUniform1f(PR[pi].uAlpha,1.f); }
-    /* ---- H2: the DUAL-QUATERNION program (homecoming). Same fragment shaders, same
-     * attribute layout, but the palette is 2 vec4 per bone (real + dual quaternion)
-     * blended with hemisphere correction against the strongest influence -- the
-     * candy-wrapper cure. dqS folds a mesh-uniform bind scale. Hero and partner only
-     * this rung; the crowd stays on LBS until the soak. */
-    const char*vsDQ=
-      "attribute vec3 p; attribute vec3 n; attribute vec4 j; attribute vec4 w; attribute vec2 t;\n"
-      "uniform mat4 vp; uniform mat4 model; uniform mat4 bind; uniform vec4 dq[128];\n"
-      "uniform float dqS;\n"
-      "uniform vec4 mouthP; uniform vec2 mouthS;\n"
-      "uniform mat4 uShVP;\n"
-      "uniform float uInk; uniform vec2 uAsp;\n"
-      "uniform float uColOn; uniform vec3 uCapA[4]; uniform vec3 uCapB[4]; uniform float uCapR[4]; uniform vec3 uBodyC;\n"
-      "uniform mat4 uHeadM; uniform mat4 uHeadMI;\n"   /* ⭐ PER-VERTEX COLLISION (10-18), in RIG space */
-      "varying vec3 vn; varying vec2 vt; varying vec3 vwp; varying vec3 vFace; varying vec4 vShp;\n"
-      "uniform mat4 uHeadMIR; uniform float uWaistY;\n"
-      /* ⭐ THE DRAPE (10-18). Cloth HANGS over a leg: along the vertex's own horizontal way out of the body (from the
-       * hips' axis), it must lie past every part of each leg capsule at or ABOVE its own height -- nine spheres along
-       * each capsule; a sphere below the vertex counts by its slice at the vertex's height. A soft edge beside the
-       * leg (lateral 0.9R..1.6R). Both walls move by the SAME amount: the outer wall (its normal facing out) keeps
-       * its 4 mm. */
-      "vec3 drapeOut(vec3 V, float outer){\n"
-      "  vec3 h=V-uBodyC; h.y=0.0; float tv=length(h);\n"
-      "  if(tv<1e-4) return V;\n"
-      "  vec3 nn=h/tv; vec3 pr=vec3(-nn.z,0.0,nn.x);\n"
-      "  float wall=outer*0.004;\n"
-      "  float push=0.0;\n"
-      "  for(int i=0;i<4;i++){ float R=uCapR[i]; if(R>0.0){\n"
-      "    for(int k=0;k<9;k++){ vec3 s=mix(uCapA[i],uCapB[i],float(k)/8.0);\n"
-      "      vec3 d=s-vec3(uBodyC.x,V.y,uBodyC.z);\n"
-      "      float rad=dot(d,nn); float lat=abs(dot(d,pr)); float vrt=max(V.y-s.y,0.0);\n"
-      "      float q=sqrt(lat*lat+vrt*vrt);\n"
-      "      float ext=(q<R)?rad+sqrt(R*R-q*q):rad-1.2*(q-R);\n"
-      "      push=max(push,ext+0.012+wall-tv); } } }\n"
-      "  push*=1.0-smoothstep(uBodyC.y+0.35*(uWaistY-uBodyC.y),uWaistY-0.01,V.y);\n"
-      "  return V+nn*max(push,0.0); }\n"
-      /* ⭐ HAIR NEVER INWARD (10-18): out of the neck capsule, and never nearer the head's centre (in the head
-       * ellipsoid's normalised frame) than where it sits at rest -- RP is its rest position, uHeadMIR the rest frame */
-      "vec3 hairOut(vec3 V, vec3 RP){\n"
-      "  if(uCapR[0]>0.0){ vec3 e=uCapB[0]-uCapA[0]; float t=clamp(dot(V-uCapA[0],e)/max(dot(e,e),1e-10),0.0,1.0);\n"
-      "    vec3 c=uCapA[0]+e*t; vec3 d=V-c; float l=length(d); if(l<uCapR[0]&&l>1e-6) V=c+d*(uCapR[0]/l); }\n"
-      "  vec3 un=(uHeadMI*vec4(V,1.0)).xyz; vec3 ur=(uHeadMIR*vec4(RP,1.0)).xyz;\n"
-      "  float Ln=length(un), Lr=length(ur)*0.995;\n"
-      "  if(Ln<Lr&&Ln>1e-5) V=(uHeadM*vec4(un*(Lr/Ln),1.0)).xyz;\n"
-      "  return V; }\n"
-      "vec3 dqxf(vec4 r, vec4 d, vec3 v){\n"
-      "  vec3 o=v+2.0*cross(r.xyz,cross(r.xyz,v)+r.w*v);\n"
-      "  return o+2.0*(r.w*d.xyz-d.w*r.xyz+cross(r.xyz,d.xyz)); }\n"
-      "vec3 dqrot(vec4 r, vec3 v){ return v+2.0*cross(r.xyz,cross(r.xyz,v)+r.w*v); }\n"
-      "void main(){ vec4 bp=bind*vec4(p,1.0); vt=t;\n"
-      /* A MOUTH IS NOT ALWAYS LEVEL: rotate into the lip line's own frame first, by the
-       * angle the CORNER MARKS make (mouthP.w). Tilting the marks now tilts the
-       * opening with them -- the interior already followed, because it builds its
-       * frame from those same two marks. */
-      "  vec2 md=vec2(bp.x-mouthP.x, bp.y-mouthP.y);\n"
-      "  float ct=cos(mouthP.w), st=sin(mouthP.w);\n"
-      "  vec2 mr2=vec2(md.x*ct+md.y*st, -md.x*st+md.y*ct);\n"
-      "  vFace=vec3(mr2.y/max(1e-5,mouthS.x), mr2.x/max(1e-5,mouthS.x), (bp.z-mouthP.z)/max(1e-5,mouthS.y));\n"
-      "  bp.xyz*=dqS;\n"
-      "  vec4 r0=dq[2*int(j.x)], d0=dq[2*int(j.x)+1];\n"
-      "  vec4 r1=dq[2*int(j.y)], d1=dq[2*int(j.y)+1];\n"
-      "  vec4 r2=dq[2*int(j.z)], d2=dq[2*int(j.z)+1];\n"
-      "  vec4 r3=dq[2*int(j.w)], d3=dq[2*int(j.w)+1];\n"
-      "  float s1=sign(dot(r0,r1)+1e-9); float s2=sign(dot(r0,r2)+1e-9); float s3=sign(dot(r0,r3)+1e-9);\n"
-      "  vec4 br=w.x*r0+w.y*s1*r1+w.z*s2*r2+w.w*s3*r3;\n"
-      "  vec4 bd=w.x*d0+w.y*s1*d1+w.z*s2*d2+w.w*s3*d3;\n"
-      "  float il=1.0/max(length(br),1e-6); br*=il; bd*=il;\n"
-      "  vec3 sp=dqxf(br,bd,bp.xyz);\n"
-      "  if(uColOn>0.5&&uColOn<1.5) sp=drapeOut(sp,(dot((bind*vec4(n,0.0)).xz,bp.xz)>0.0)?1.0:0.0);\n"
-      "  if(uColOn>1.5&&uColOn<2.5) sp=hairOut(sp,bp.xyz);\n"
-      "  vec4 wp=model*vec4(sp,1.0); vwp=wp.xyz; vShp=uShVP*wp;\n"
-      "  vec3 bn=(bind*vec4(n,0.0)).xyz;\n"
-      "  vn=normalize((model*vec4(dqrot(br,bn),0.0)).xyz);\n"
-      "  gl_Position=vp*wp;\n"
-      /* ⭐ THE INK (10-18): on the toon pass's second draw, every vertex pushed out along its normal's direction ON
-       * SCREEN by uInk (a share of the viewport's height), front faces culled -- the back faces left showing round
-       * the silhouette are the line. In clip space, so its width holds at any distance. */
-      "  if(uInk>0.0){ vec2 dd=(vp*vec4(vn,0.0)).xy; float L=length(dd);\n"
-      "    float lin9=((uColOn>0.5&&uColOn<1.5&&dot((bind*vec4(n,0.0)).xz,bp.xz)<=0.0)||(uColOn>2.5&&dot(n.xz,bp.xz-uBodyC.xz)<=0.0))?0.0:1.0;\n"
-      "    if(L>1e-6) gl_Position.xy+=dd/L*uInk*2.0*uAsp*gl_Position.w*lin9; } }\n";
-    Prog PRD[2];
-    for(int pi=0;pi<2;pi++){ GLuint prog=glCreateProgram();
-        glAttachShader(prog,sh(GL_VERTEX_SHADER,vsDQ)); glAttachShader(prog,sh(GL_FRAGMENT_SHADER,pi?fsC:fsO));
-        glBindAttribLocation(prog,0,"p"); glBindAttribLocation(prog,1,"n"); glBindAttribLocation(prog,2,"j"); glBindAttribLocation(prog,3,"w"); glBindAttribLocation(prog,4,"t");
-        glLinkProgram(prog); GLint ok; glGetProgramiv(prog,GL_LINK_STATUS,&ok); if(!ok) die("dq link");
-        PRD[pi].prog=prog;
-        PRD[pi].uVP=glGetUniformLocation(prog,"vp"); PRD[pi].uModel=glGetUniformLocation(prog,"model");
-        PRD[pi].uBind=glGetUniformLocation(prog,"bind"); PRD[pi].uPal=glGetUniformLocation(prog,"dq");
-        PRD[pi].uTint=glGetUniformLocation(prog,"tint"); PRD[pi].uUse=glGetUniformLocation(prog,"useTex");
-        PRD[pi].uLp=glGetUniformLocation(prog,"lp"); PRD[pi].uLc=glGetUniformLocation(prog,"lc"); PRD[pi].uLk=glGetUniformLocation(prog,"lk");
-        PRD[pi].uSun=glGetUniformLocation(prog,"uSun");
-        PRD[pi].uSunC=glGetUniformLocation(prog,"uSunC");
-        PRD[pi].uSky=glGetUniformLocation(prog,"uSky");
-        PRD[pi].uMouthP=glGetUniformLocation(prog,"mouthP");
-        PRD[pi].uMouthS=glGetUniformLocation(prog,"mouthS");
-        PRD[pi].uOpen=glGetUniformLocation(prog,"uOpen");
-        PRD[pi].uEye=glGetUniformLocation(prog,"uEye"); PRD[pi].uFog=glGetUniformLocation(prog,"uFog");
-        PRD[pi].uShVP=glGetUniformLocation(prog,"uShVP"); PRD[pi].uShMap=glGetUniformLocation(prog,"uShMap"); PRD[pi].uShOn=glGetUniformLocation(prog,"uShOn");
-        PRD[pi].uNmap=glGetUniformLocation(prog,"nmp"); PRD[pi].uNrm=glGetUniformLocation(prog,"uNrm");
-        glUseProgram(prog); if(PRD[pi].uNmap>=0) glUniform1i(PRD[pi].uNmap,1);
-        PRD[pi].uDqS=glGetUniformLocation(prog,"dqS");
-        /* ⛔ PRD COMPILES THE SAME TWO FRAGMENT SHADERS AS PR, and an unset float uniform
-         * in GL is ZERO -- forget this line and every dual-quaternion body (hero and
-         * partner, which is everyone who matters) draws at alpha 0 and vanishes. */
-        PRD[pi].uAlpha=glGetUniformLocation(prog,"uAlpha");
-        PRD[pi].uTone=glGetUniformLocation(prog,"uTone");
-        glUseProgram(prog); glUniform1i(glGetUniformLocation(prog,"smp"),0);
-        glUniform1f(PRD[pi].uAlpha,1.f); }
-    glActiveTexture(GL_TEXTURE0);
-    /* HOLOGRAM program — reva only: fresnel glow, drifting scanlines, additive */
-    const char*vsH=
-      "attribute vec3 p; attribute vec3 n; attribute vec4 j; attribute vec4 w; attribute vec2 t;\n"
-      "uniform mat4 vp; uniform mat4 model; uniform mat4 bind; uniform mat4 pal["
-      MAXB_STR(MAXB) "];\n"
-      "varying vec3 vn; varying vec3 vwp; varying vec2 vt;\n"
-      "void main(){ vec4 bp=bind*vec4(p,1.0); vt=t;\n"
-      "  mat4 skin=w.x*pal[int(j.x)]+w.y*pal[int(j.y)]+w.z*pal[int(j.z)]+w.w*pal[int(j.w)];\n"
-      "  vec4 wp=model*skin*bp; vwp=wp.xyz; vn=normalize((model*skin*(bind*vec4(n,0.0))).xyz);\n"
-      "  gl_Position=vp*wp; }\n";
-    const char*fsH=
-      "precision mediump float; varying vec3 vn; varying vec3 vwp; varying vec2 vt;\n"
-      "uniform vec3 camPos; uniform float tsec; uniform sampler2D smp;\n"
-      /* jacob 07-22 ('half seeing through her'): she is a SOLID made of light, not a transparency --
-       * dense body + fresnel rim, standard alpha, and she WRITES depth so she self-occludes */
-      /* 50%% wet (jacob): translucent shimmer restored, scanlines deep, rim hot -- correctness
-       * comes from the depth PREPASS (see the two-pass draw), so alpha can breathe again */
-      /* jacob: HER REAL TEXTURES under the hologram -- basecolor modulates the body, purple cast +
-       * scanlines + fresnel rim keep her holographic, 50%% wet */
-      /* jacob round 4: "more texture, too transparent" -- body alpha up 0.60->0.82, her basecolor
-       * louder, scanlines shallower; the rim stays hot so she still reads as light */
-      "void main(){ vec3 V=normalize(camPos-vwp); vec3 N=normalize(vn);\n"
-      "  float fr=pow(1.0-abs(dot(N,V)),1.5);\n"
-      "  float l=0.30+0.70*max(0.0,dot(N,normalize(vec3(0.4,0.8,0.6))));\n"
-      /* jacob r5 ("messed up again"): 0.82-alpha + near-white body EXPOSED her atlas seams as
-       * shattered panels. Balance point: denser than v5, but the PURPLE CAST fuses the panels
-       * and the fresnel glow breathes again -- solid light, not broken porcelain */
-      "  float scan=0.86+0.14*sin(vwp.y*22.0-tsec*5.0);\n"
-      "  vec4 tx=texture2D(smp,vt);\n"
-      "  vec3 c=mix(vec3(0.48,0.17,0.90),vec3(1.0,0.60,1.0),fr);\n"
-      "  vec3 body=tx.rgb*vec3(0.88,0.72,1.14)*(0.44+0.80*l)*scan;\n"
-      "  gl_FragColor=vec4(body+c*fr*0.80,0.68+0.26*fr); }\n";
-    GLuint hProg=glCreateProgram(); glAttachShader(hProg,sh(GL_VERTEX_SHADER,vsH)); glAttachShader(hProg,sh(GL_FRAGMENT_SHADER,fsH));
-    glBindAttribLocation(hProg,0,"p"); glBindAttribLocation(hProg,1,"n"); glBindAttribLocation(hProg,2,"j"); glBindAttribLocation(hProg,3,"w"); glBindAttribLocation(hProg,4,"t");
-    glLinkProgram(hProg); { GLint ok2; glGetProgramiv(hProg,GL_LINK_STATUS,&ok2); if(!ok2) die("holo link"); }
-    glUseProgram(hProg); glUniform1i(glGetUniformLocation(hProg,"smp"),0);
-    GLint hVP=glGetUniformLocation(hProg,"vp"), hModel=glGetUniformLocation(hProg,"model"),
-          hBind=glGetUniformLocation(hProg,"bind"), hPal=glGetUniformLocation(hProg,"pal"),
-          hCam=glGetUniformLocation(hProg,"camPos"), hT=glGetUniformLocation(hProg,"tsec");
 
-    /* ---- ATMOSPHERE: starfield + club lasers + reva tracers + HUD (jacob: engage all five) ---- */
-    /* jacob: stars = MULTI-COLORED, COMING AT THE SCREEN (the page's motes) */
-    /* jacob: stars = BACKGROUND ONLY, whole sky, PHOSPHOR GLOW (soft, less solid color) */
-    const char*vsS="attribute vec3 p; attribute vec2 tw; uniform mat4 vp; uniform float tsec; varying vec3 vcol; varying float vtw;\n"
-      "void main(){ float hue=tw.x*3.0;\n"
-      "  vec3 c=0.55+0.45*cos(vec3(hue,hue+2.1,hue+4.2));\n"
-      "  vcol=mix(vec3(0.82,0.93,0.88),c,0.45);\n"        /* desaturated toward phosphor */
-      "  if(tw.y>4.0){ vcol=c*0.40; vtw=0.5+0.5*sin(tsec*0.05+tw.x*4.0);\n"   /* nebula: big, dim, colorful, slow-breathing */
-      "    gl_Position=vp*vec4(p,1.0); gl_PointSize=46.0+(tw.y-5.0)*22.0; return; }\n"
-      "  vtw=0.25+0.75*pow(abs(sin(tsec*tw.y*0.35+tw.x)),2.0);\n"
-      "  gl_Position=vp*vec4(p,1.0); gl_PointSize=4.0+tw.y*3.0; }\n";
-    const char*fsS="precision mediump float; varying vec3 vcol; varying float vtw;\n"
-      "void main(){ vec2 d=gl_PointCoord-0.5; float g=exp(-dot(d,d)*11.0);\n"
-      "  gl_FragColor=vec4(vcol*vtw*g,g*0.85); }\n";       /* gaussian phosphor dot */
-    GLuint sProg=glCreateProgram(); glAttachShader(sProg,sh(GL_VERTEX_SHADER,vsS)); glAttachShader(sProg,sh(GL_FRAGMENT_SHADER,fsS));
-    glBindAttribLocation(sProg,0,"p"); glBindAttribLocation(sProg,1,"tw"); glLinkProgram(sProg);
-    GLint sVP=glGetUniformLocation(sProg,"vp"), sT=glGetUniformLocation(sProg,"tsec");
-    /* DISCO FLOOR (jacob): translucent tile grid, beat-lit, colors per tile */
-    const char*vsF="attribute vec2 p; uniform mat4 vp; varying vec2 vxz;\n"
-      "void main(){ vxz=p; gl_Position=vp*vec4(p.x,0.004,p.y,1.0); }\n";
-    /* jacob: tiles flash INDEPENDENTLY to the music, new color each flash, flame-fractal patterns
-     * sweeping the floor (Electric Sheep energy) -- an iterated sin-warp field phases every tile */
-    const char*fsF="precision mediump float; varying vec2 vxz; uniform float beat;\n"
-      "uniform mat4 shvp; uniform sampler2D shmask;\n"   /* PROJECTED SHADOWS: silhouette mask from the key light */
-      "uniform vec3 flp[4]; uniform vec3 flc[4];\n"      /* colored light POOLS (orbs/snake) on the tiles */
-      "void main(){ vec2 tile=floor(vxz/2.0);\n"
-      "  float h=fract(sin(dot(tile,vec2(12.9898,78.233)))*43758.5453);\n"
-      "  vec2 q=tile*0.23; float t2=beat*0.11;\n"
-      "  for(int i=0;i<3;i++){ q=vec2(q.x*0.8-q.y*0.6,q.x*0.6+q.y*0.8)*1.25+sin(q.yx*0.9+t2); }\n"
-      "  float field=0.5+0.5*sin(q.x+q.y);\n"
-      "  float ph2=beat*0.125+h;\n"                     /* steady panels, pop only on change */
-      "  float flash=pow(1.0-fract(ph2),6.0);\n"
-      "  float fam=fract(h*3.7);\n"                     /* jacob: 60/30/10 -- green / purple / magenta */
-      "  vec3 base=fam<0.6?vec3(0.52,0.20,0.92):(fam<0.9?vec3(0.16,0.80,0.34):vec3(1.0,0.22,0.72));\n"   /* 60 purple / 30 green / 10 magenta */
-      "  float shade=0.55+0.65*fract(h*7.31+floor(ph2)*0.618);\n"
-      "  vec3 c=base*shade;\n"
-      /* jacob: LIT tiles are SOLID; DARKER now (we are in space) -- the color pools + flashes carry it */
-      "  float lum=0.13+0.11*field+0.80*flash;\n"
-      "  float aa=mix(0.30,0.96,clamp(flash*1.35,0.0,1.0));\n"
-      "  vec3 pool=vec3(0.0);\n"
-      "  for(int i=0;i<4;i++){ vec2 dv=vxz-flp[i].xz; float dd=dot(dv,dv);\n"
-      "    pool+=flc[i]*exp(-dd*0.012)*0.50; }\n"
-      "  vec4 sp=shvp*vec4(vxz.x,0.0,vxz.y,1.0);\n"
-      "  vec2 suv=sp.xy*0.5+0.5;\n"
-      "  vec2 bord=smoothstep(vec2(0.0),vec2(0.08),suv)*smoothstep(vec2(0.0),vec2(0.08),1.0-suv);\n"
-      "  float sh=texture2D(shmask,suv).r*bord.x*bord.y;\n"
-      "  vec3 fc=(c*lum+pool)*(1.0-0.60*sh);\n"
-      "  float pl=min(1.0,(pool.r+pool.g+pool.b)*0.6);\n"
-      "  gl_FragColor=vec4(fc,max(max(aa,sh*0.85),pl)); }\n";
-    GLuint fProg=glCreateProgram(); glAttachShader(fProg,sh(GL_VERTEX_SHADER,vsF)); glAttachShader(fProg,sh(GL_FRAGMENT_SHADER,fsF));
-    glBindAttribLocation(fProg,0,"p"); glLinkProgram(fProg);
-    GLint fVP=glGetUniformLocation(fProg,"vp"), fBeat=glGetUniformLocation(fProg,"beat");
-    GLint fShvp=glGetUniformLocation(fProg,"shvp"), fMask=glGetUniformLocation(fProg,"shmask");
-    GLint fFlp=glGetUniformLocation(fProg,"flp"), fFlc=glGetUniformLocation(fProg,"flc");
-    glUseProgram(fProg); glUniform1i(fMask,1);   /* the mask lives on texture unit 1 */
-    GLuint floorVbo; { float fq[12]={-FLOOR_X,FLOOR_ZN, FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,0.5f};
-        glGenBuffers(1,&floorVbo); glBindBuffer(GL_ARRAY_BUFFER,floorVbo); glBufferData(GL_ARRAY_BUFFER,sizeof fq,fq,GL_STATIC_DRAW); }
+    unsigned floorVbo; { float fq[12]={-FLOOR_X,FLOOR_ZN, FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,0.5f};
+        floorVbo = gfxBufferNew();  gfxBufferData(floorVbo, sizeof fq, fq, 0); }
     #define NSTAR 2400
     #define NNEB 56
-    GLuint starVbo; { static float sd[(NSTAR+NNEB)*5]; unsigned sr=4242;   /* jacob: a dancefloor IN SPACE -- full sphere of stars + nebulae, far shell, never clipping */
+    unsigned starVbo; { static float sd[(NSTAR+NNEB)*5]; unsigned sr=4242;   /* jacob: a dancefloor IN SPACE -- full sphere of stars + nebulae, far shell, never clipping */
         for(int i=0;i<NSTAR+NNEB;i++){ float dx3,dy3,dz3,ln3;
             do{ sr=sr*1103515245+12345; dx3=((sr>>8)%2000)/1000.f-1.f;
                 sr=sr*1103515245+12345; dy3=((sr>>8)%2000)/1000.f-1.f;
@@ -1140,57 +459,15 @@ int main(int argc,char**argv){
                 sr=sr*1103515245+12345; sd[i*5+4]=5.f+((sr>>8)%300)/100.f; continue; }   /* nebula: tw.y>4 flags BIG soft blob */
             sr=sr*1103515245+12345; sd[i*5+3]=((sr>>8)%628)/100.f;
             sr=sr*1103515245+12345; sd[i*5+4]=1.f+((sr>>8)%300)/100.f; }
-        glGenBuffers(1,&starVbo); glBindBuffer(GL_ARRAY_BUFFER,starVbo); glBufferData(GL_ARRAY_BUFFER,sizeof sd,sd,GL_STATIC_DRAW); }
+        starVbo = gfxBufferNew();  gfxBufferData(starVbo, sizeof sd, sd, 0); }
     /* lasers: unit quad 0..-30 in Y, widening; per-beam model matrix + color */
-    const char*vsL="attribute vec3 p; uniform mat4 vp; uniform mat4 model; varying float vy;\n"
-      "void main(){ vy=-p.y/30.0; gl_Position=vp*model*vec4(p,1.0); }\n";
-    const char*fsL="precision mediump float; varying float vy; uniform vec3 col; uniform float amp;\n"
-      "void main(){ gl_FragColor=vec4(col*amp*(1.0-vy*0.75),0.5*(1.0-vy)); }\n";
-    GLuint lProg=glCreateProgram(); glAttachShader(lProg,sh(GL_VERTEX_SHADER,vsL)); glAttachShader(lProg,sh(GL_FRAGMENT_SHADER,fsL));
-    glBindAttribLocation(lProg,0,"p"); glLinkProgram(lProg);
-    GLint lVP=glGetUniformLocation(lProg,"vp"), lModel=glGetUniformLocation(lProg,"model"),
-          lCol=glGetUniformLocation(lProg,"col"), lAmp=glGetUniformLocation(lProg,"amp");
-    GLuint laserVbo; { float lq[18]={ -0.05f,0,0, 0.05f,0,0, 0.16f,-30,0,  -0.05f,0,0, 0.16f,-30,0, -0.16f,-30,0 };
-        glGenBuffers(1,&laserVbo); glBindBuffer(GL_ARRAY_BUFFER,laserVbo); glBufferData(GL_ARRAY_BUFFER,sizeof lq,lq,GL_STATIC_DRAW); }
+    unsigned laserVbo; { float lq[18]={ -0.05f,0,0, 0.05f,0,0, 0.16f,-30,0,  -0.05f,0,0, 0.16f,-30,0, -0.16f,-30,0 };
+        laserVbo = gfxBufferNew();  gfxBufferData(laserVbo, sizeof lq, lq, 0); }
 
     /* ---- VENUE JUMBOS: Holly's head on jumbotrons (jacob: "ratchet dreadzone style") ---------
      * One textured quad per screen, all sampling the single off-screen head. Emissive: a screen
      * emits, it is not lit, so there is no normal and no light term -- which also means the
      * shadow pass can ignore them entirely. */
-    const char*vsJb="attribute vec3 p; attribute vec2 uv; uniform mat4 vp; uniform mat4 model;\n"
-      "varying vec2 vUv; void main(){ vUv=uv; gl_Position=vp*model*vec4(p,1.0); }\n";
-    /* The bezel is drawn in the shader rather than as geometry: a dark border and a faint scanline
-     * comb, so it reads as a screen hanging on a wall instead of a floating rectangle of face. */
-    const char*fsJb="precision mediump float; varying vec2 vUv; uniform sampler2D tex;\n"
-      "uniform float amp;\n"
-      "uniform float uProbe;\n"
-      "void main(){\n"
-      "  vec2 b=abs(vUv-0.5)*2.0;\n"
-      "  float inner=step(max(b.x,b.y),0.92);\n"
-      "  vec3 c=texture2D(tex,vUv).rgb*amp;\n"
-      "  c*=0.85+0.15*sin(vUv.y*160.0);\n"          /* scanline comb at the panel's own pitch */
-      "  vec3 bez=vec3(0.05,0.05,0.06);\n"
-      "  vec3 probe = mix(vec3(0.0,1.0,0.0), vec3(1.0,0.0,1.0), inner);\n"
-      "  gl_FragColor=vec4(uProbe>0.5 ? probe : mix(bez,c,inner),1.0);\n"
-      "}\n";
-    GLuint jbProg=glCreateProgram(); glAttachShader(jbProg,sh(GL_VERTEX_SHADER,vsJb)); glAttachShader(jbProg,sh(GL_FRAGMENT_SHADER,fsJb));
-    glBindAttribLocation(jbProg,0,"p"); glBindAttribLocation(jbProg,1,"uv"); glLinkProgram(jbProg);
-    /* ⭐ ep 9: every other program in this file dies on a failed link; the screens never looked */
-    { GLint ok9=0; glGetProgramiv(jbProg,GL_LINK_STATUS,&ok9);
-      if(!ok9){ char lg9[1024]; lg9[0]=0; glGetProgramInfoLog(jbProg,1024,NULL,lg9); fprintf(stderr,"[screen] jbProg %u LINK FAILED: %s\n",(unsigned)jbProg,lg9); }
-      else fprintf(stderr,"[screen] jbProg %u linked\n",(unsigned)jbProg); }
-    GLint jbProbe=glGetUniformLocation(jbProg,"uProbe");
-    GLint jbVP=glGetUniformLocation(jbProg,"vp"), jbModel=glGetUniformLocation(jbProg,"model"),
-          jbTex=glGetUniformLocation(jbProg,"tex"), jbAmp=glGetUniformLocation(jbProg,"amp");
-    GLuint jbVbo; { /* unit quad in XY, uv 0..1. NO v flip: the FBO already carries the GL
-                     * bottom-left origin, so v=0 belongs at the quad bottom. Flipping here was a
-                     * second correction on a convention that already agreed -- two flips, and he
-                     * hangs upside down. */
-        float jbq[30]={ -1,-1,0, 0,0,   1,-1,0, 1,0,   1, 1,0, 1,1,
-                       -1,-1,0, 0,0,   1, 1,0, 1,1,  -1, 1,0, 0,1 };
-        glGenBuffers(1,&jbVbo); glBindBuffer(GL_ARRAY_BUFFER,jbVbo);
-        glBufferData(GL_ARRAY_BUFFER,sizeof jbq,jbq,GL_STATIC_DRAW); }
-    g_jbProg=jbProg; g_jbVbo=jbVbo; g_jbVP=jbVP; g_jbModel=jbModel; g_jbTex=jbTex; g_jbAmp=jbAmp; g_jbProbe=jbProbe;   /* ep 9: scrDrawPlaced */
     /* x, y, z, yaw(rad), half-width, half-height. 4:3 to match the head's own target. */
     static const float JUMBOS[][6]={
         {-188.f, 26.f,  -45.f,  1.5708f, 30.f, 22.5f},   /* left wall, facing in */
@@ -1204,44 +481,16 @@ int main(int argc,char**argv){
     };
     const int NJUMBOS=(int)(sizeof JUMBOS/sizeof JUMBOS[0]);
     /* tracers: 4 ribbons x 48 points, streamed; pos+rgb per vertex */
-    const char*vsT="attribute vec3 p; attribute vec3 c; uniform mat4 vp; varying vec3 vc;\n"
-      "void main(){ vc=c; gl_Position=vp*vec4(p,1.0); }\n";
-    const char*fsT="precision mediump float; varying vec3 vc; void main(){ gl_FragColor=vec4(vc,0.95); }\n";
-    GLuint tProg=glCreateProgram(); glAttachShader(tProg,sh(GL_VERTEX_SHADER,vsT)); glAttachShader(tProg,sh(GL_FRAGMENT_SHADER,fsT));
-    glBindAttribLocation(tProg,0,"p"); glBindAttribLocation(tProg,1,"c"); glLinkProgram(tProg);
-    GLint tVP=glGetUniformLocation(tProg,"vp");
     #define TRN 48
     static float trail[4][TRN][3]; static int trailN[4]={0,0,0,0};
     int trBone[4]={-1,-1,-1,-1};
-    GLuint trailVbo; glGenBuffers(1,&trailVbo);
+    unsigned trailVbo; trailVbo = gfxBufferNew();
     /* round-4 FX buffers: blob shadows (one draw, all dancers), lava-lamp blobs, flame snake */
-    const char*vsSh="attribute vec3 p; attribute vec3 c; uniform mat4 vp; varying vec3 vu;\n"
-      "void main(){ vu=c; gl_Position=vp*vec4(p,1.0); }\n";
-    const char*fsSh="precision mediump float; varying vec3 vu;\n"
-      "void main(){ float a=vu.z*exp(-dot(vu.xy,vu.xy)*3.2); gl_FragColor=vec4(0.0,0.0,0.0,a); }\n";
-    GLuint shProg=glCreateProgram(); glAttachShader(shProg,sh(GL_VERTEX_SHADER,vsSh)); glAttachShader(shProg,sh(GL_FRAGMENT_SHADER,fsSh));
-    glBindAttribLocation(shProg,0,"p"); glBindAttribLocation(shProg,1,"c"); glLinkProgram(shProg);
-    GLint shVP=glGetUniformLocation(shProg,"vp");
-    GLuint shadowVbo,lampVbo,snakeVbo; glGenBuffers(1,&shadowVbo); glGenBuffers(1,&lampVbo); glGenBuffers(1,&snakeVbo);
-    /* REAL SHADOW (jacob: lets try shadows) -- reva's silhouette rendered from the key light into
-     * a 256^2 mask each frame (no depth: the floor is the only receiver and she's above it);
-     * the floor shader projects it. One frame of lag, ~1ms. */
+    unsigned shadowVbo,lampVbo,snakeVbo; shadowVbo = gfxBufferNew(); lampVbo = gfxBufferNew(); snakeVbo = gfxBufferNew();
+    /* REAL SHADOW (jacob: lets try shadows) -- reva's silhouette from the key light, a 256^2 mask the floor
+     * receives (gfxFloorShadow: the renderer draws the casters through g_shvp). One frame of lag. */
     #define SHMAP 256
-    GLuint shFbo, shTex;
-    { glGenTextures(1,&shTex); glBindTexture(GL_TEXTURE_2D,shTex);
-      glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,SHMAP,SHMAP,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-      glGenFramebuffers(1,&shFbo); glBindFramebuffer(GL_FRAMEBUFFER,shFbo);
-      glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,shTex,0);
-#ifdef REVA_VK
-      gfxTargetMake(shTex,SHMAP,SHMAP,0);
-#endif
-      if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE) die("shadow fbo");
-      glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
-      glBindFramebuffer(GL_FRAMEBUFFER,0); }
+    unsigned shTex=gfxTextureNew(); gfxTargetMake(shTex,SHMAP,SHMAP,0);
     /* THE BROADCAST FEED (jacob 08-01: "a camera feed up on every other display").
      * Ruby Rhod's show cuts to the talent, so half the screens carry a live close-up of
      * reva while she performs underneath them. Same economics as Holly: one small target,
@@ -1249,35 +498,12 @@ int main(int argc,char**argv){
      * crowd from a second camera would draw 115 dancers twice and gut the frame rate. */
     #define FEEDW 256
     #define FEEDH 192
-    GLuint feedFbo, feedTex, feedDepth;
-    { glGenTextures(1,&feedTex); glBindTexture(GL_TEXTURE_2D,feedTex);
-      glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,FEEDW,FEEDH,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-      glGenRenderbuffers(1,&feedDepth); glBindRenderbuffer(GL_RENDERBUFFER,feedDepth);
-      glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT16,FEEDW,FEEDH);
-      glGenFramebuffers(1,&feedFbo); glBindFramebuffer(GL_FRAMEBUFFER,feedFbo);
-      glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,feedTex,0);
-      glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,feedDepth);
-      if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE) die("feed fbo");
-#ifdef REVA_VK
-      gfxTargetMake(feedTex,FEEDW,FEEDH,0);
-#endif
-      glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-      glBindFramebuffer(GL_FRAMEBUFFER,0); }
+    unsigned feedTex=gfxTextureNew(); gfxTargetMake(feedTex,FEEDW,FEEDH,0);
     /* Holly's head into its own small target. 160x120 is his native crush -- the jaw is a vertex
      * stretch on a mesh with sealed lips, and it only reads as a mouth at that resolution. One
      * draw feeds every screen in the venue, so more jumbotrons cost nothing. */
     { const char*hm=getenv("HOLLY_MODEL");
       if(!holly_fbo_init(160,120,hm?hm:"holly.hlm")) fprintf(stderr,"[holly] init failed\n"); }
-    const char*fsW="precision mediump float; void main(){ gl_FragColor=vec4(1.0); }\n";
-    GLuint cProg=glCreateProgram(); glAttachShader(cProg,sh(GL_VERTEX_SHADER,vsH)); glAttachShader(cProg,sh(GL_FRAGMENT_SHADER,fsW));
-    glBindAttribLocation(cProg,0,"p"); glBindAttribLocation(cProg,1,"n"); glBindAttribLocation(cProg,2,"j"); glBindAttribLocation(cProg,3,"w"); glBindAttribLocation(cProg,4,"t");
-    glLinkProgram(cProg); { GLint ok3; glGetProgramiv(cProg,GL_LINK_STATUS,&ok3); if(!ok3) die("cast link"); }
-    GLint cVP=glGetUniformLocation(cProg,"vp"), cModel=glGetUniformLocation(cProg,"model"),
-          cBind=glGetUniformLocation(cProg,"bind"), cPal=glGetUniformLocation(cProg,"pal");
     static M4 g_shvp;   /* light view-proj used for BOTH the mask pass and the floor sampling */
     /* MORE SHADOWS (jacob): everyone inside the mask window casts -- reva + the showcased npc +
      * neighbors within 6u. Up to 8 mesh entries stashed per frame (each remembers its pack+model). */
@@ -1357,17 +583,8 @@ int main(int argc,char**argv){
         printf("tracer bones: %d %d %d %d   canon %d/%d   rig=%s\n",
                trBone[0],trBone[1],trBone[2],trBone[3],revaP.pbOK,NCANON,
                g_procRig?"PROCEDURAL":"BAKED (plays its own clips)"); }
-    /* HUD: stb_easy_font quads -> triangles, ortho overlay */
-    const char*vsU="attribute vec2 p; uniform vec2 scr; void main(){ gl_Position=vec4(p.x/scr.x*2.0-1.0,1.0-p.y/scr.y*2.0,0.0,1.0); }\n";
-    const char*fsU="precision mediump float; uniform vec4 col; void main(){ gl_FragColor=col; }\n";
-    GLuint uProg=glCreateProgram(); glAttachShader(uProg,sh(GL_VERTEX_SHADER,vsU)); glAttachShader(uProg,sh(GL_FRAGMENT_SHADER,fsU));
-    glBindAttribLocation(uProg,0,"p"); glLinkProgram(uProg);
-    GLint uScr=glGetUniformLocation(uProg,"scr"), uCol=glGetUniformLocation(uProg,"col");
-    GLuint hudVbo; glGenBuffers(1,&hudVbo);
-    g_hudProg=uProg; g_hudVbo=hudVbo; g_hudScr=uScr; g_hudCol=uCol;
     postInit(W,H);   /* ⭐ the post pass's targets and programs (09-11) */
     sfxInit();       /* ⭐ the audio mixer (09-11) */
-    sunMapInit(vs);  /* ⭐ the sun's shadow map (09-11): the mesh vertex shader over a depth-pack fragment */
 
     /* slots on a 26x12-ish floor */
     Slot*slots=calloc((size_t)NS,sizeof(Slot)); unsigned seed=777;   /* ⛔ ZEROED (09-30): pgT/pgD/blk were never set at spawn and pgT is read in the roam tree -- heap garbage, and with it the receipt, varied with the heap's history */
@@ -1479,31 +696,44 @@ int main(int argc,char**argv){
     float (*T2)[3]=calloc(maxNodes,12); float (*Q2)[4]=calloc(maxNodes,16); float (*S2)[3]=calloc(maxNodes,12);
     M4 *world=calloc(maxNodes,sizeof(M4));
     static float pal[MAXB*16];
-    int curProg=-1; GLint uModel=0,uBind=0,uPal=0,uTint=0,uUse=0;
-    #define USEPROG(i) do{ if(curProg!=(i)){ curProg=(i); glUseProgram(PR[i].prog); \
-        uModel=PR[i].uModel; uBind=PR[i].uBind; uPal=PR[i].uPal; uTint=PR[i].uTint; uUse=PR[i].uUse; g_curNrmLoc=PR[i].uNrm; } }while(0)
 
+    netStart(NS);   /* (step 29) a session: everything's loaded, and every machine's clock starts from nothing together */
     double t0=now_ms(), lastStat=wall_ms(); long frames=0; __attribute__((unused)) int first=1; long tickAcc9=0;
 #ifndef REVA_SDL
-    drmEventContext evctx; memset(&evctx,0,sizeof evctx);
-    evctx.version=2; evctx.page_flip_handler=flipHandler;
 #endif
     int *order=calloc((size_t)NS,sizeof(int)); float *depth=calloc((size_t)NS,sizeof(float));
 
+    langBoot();   /* (step 26) the language asked for, or the one chosen last time */
     double lastT=now_ms();
     double workAcc=0; long workN=0;   /* bench: sim+GPU work per frame, flip wait EXCLUDED */
     while(g_run){
         bridgePoll();
+        netPoll();   /* (step 29) a session: this machine waits here until it has every pad for the next tick */
         gameLibPoll();
+#ifdef REVA_VK
+        g_interpLive=g_interpOn&&(g_interpForce||g_mode!=MODE_ANIM);
+        /* a window's vsync can't be trusted to pace this (measured 11-05: 600 refreshes a second in a window on a 100 Hz panel), so the loop keeps the display's own beat itself: a refresh is begun no sooner than one field after the last */
+        if(g_interpLive){ static double next9=0.0; const double per9=g_ledFieldMs>0.5?g_ledFieldMs:10.0; double w9=wall_ms(); if(next9<=0.0||w9-next9>per9*4.0) next9=w9;
+            while(next9-w9>1.2){ SDL_Delay(1); w9=wall_ms(); } next9+=per9; }
+#endif
         clockFrame();
-#ifdef REVA_PACKET
+        /* (step 25) THE FAIR VIEW. A game played against other people says the shape its picture is played in (E->tune->fairAspect), and on a screen wider than that the world is
+         * drawn in a view of that shape in the middle, through the same lens, with black either side: a wider monitor shows no more of the level. The HUD keeps the whole screen.
+         * REVA_FAIR=<w/h> says it for a game that doesn't, to look at */
+        { static float env9=-1.f; if(env9<0.f){ const char*e9=getenv("REVA_FAIR"); env9=(e9&&e9[0])?(float)atof(e9):0.f; }
+          const float want9=GAME_ON?(env9>0.f?env9:g_tune.fairAspect):0.f;
+          g_fairNow=(want9>0.2f&&g_dispAspect<=0.f&&(float)W/(float)H>want9*1.01f)?want9:0.f; }
+#ifdef REVA_VK
+        gfxBetweenSet(g_interpLive,(float)(g_tickAcc/g_tickMs));
+        btwDbg(g_tickBetween,W,H);
+        if(g_tickBetween){ gfxBetween(); ledgerMark(wall_ms()); SDL_PumpEvents(); continue; }   /* (step 25) no tick this refresh: the picture between the last two, and the rules don't run */
+#endif
         videoPoll(&W,&H);
         { static int ok9=0; if(!ok9&&g_tickTotal>1800){ ok9=1; scrBootOk(); } }   /* this run lasted: it wasn't a power cycle asking for setup */
 #ifdef REVA_VK
         if(!g_noDraw) gfxPagesBuild();
 #endif
         if(!g_noDraw) gfxFrameBegin();
-#endif
         simHashBegin();
         stStep(g_rvx,g_rvz,g_tickTotal);
         bodyPackStep();
@@ -1519,29 +749,7 @@ int main(int argc,char**argv){
         if(g_tod>=0.f){   /* Z6: the day runs, and the light is recomputed every frame */
             if(g_todRate!=0.f) g_tod+=g_todRate*animStepS(simStepS());
             todApply(g_tod); }
-        /* ⛔ AND IT HAS TO REACH EVERY PROGRAM. A uniform is per-program state, the sun
-         * was only ever uploaded to the one AP points at (index 1), and USEPROG picks
-         * index 0 for any mesh whose material flags lack bit 2 -- that program evaluated
-         * `uSun.w > 0.0` as FALSE and drew the body with the club's dark-room constants.
-         * On a black stage that is invisible; on a sunlit street it is the four black
-         * skaters standing down the road from a fully lit one. */
-        postDecide(g_mode,MODE_ANIM);   /* ⭐ decided here, so the knee goes to ONE place: the post pass when on, the mesh shaders when off */
-        { GLint wasP=0; glGetIntegerv(GL_CURRENT_PROGRAM,&wasP);
-          for(int pi9=0;pi9<2;pi9++){
-              Prog*Q9[2]={&PR[pi9],&PRD[pi9]};
-              for(int k9=0;k9<2;k9++){ Prog*R9=Q9[k9];
-                  if(!R9->prog) continue;
-                  glUseProgram(R9->prog);
-                  if(R9->uSun >=0) glUniform4fv(R9->uSun ,1,g_sun);
-                  if(R9->uSunC>=0) glUniform3fv(R9->uSunC,1,g_sunC);
-                  if(R9->uSky >=0) glUniform3fv(R9->uSky ,1,g_sky);
-                  if(R9->uTone>=0) glUniform1f(R9->uTone,g_postOn?0.f:g_tone);
-                  if(R9->uFog >=0) glUniform4fv(R9->uFog ,1,g_fog);
-                  if(R9->uShVP>=0) glUniformMatrix4fv(R9->uShVP,1,GL_FALSE,g_sunVP);   /* ⭐ the sun's map (09-11) */
-                  if(R9->uShMap>=0) glUniform1i(R9->uShMap,3);
-                  if(R9->uShOn>=0) glUniform1f(R9->uShOn,(float)g_shadowOn); } }
-          if(wasP) glUseProgram((GLuint)wasP);
-          curProg=-1; }
+        postDecide(g_mode,MODE_ANIM);   /* ⭐ decided here, once a frame, so the knee goes to one place */
         static double frameT0; if(g_tickFirst) frameT0=wall_ms(); passStart();
         double tsec=(now_ms()-t0)/1000.0;
         double dt=(now_ms()-lastT)/1000.0; lastT=now_ms(); if(dt>0.25)dt=0.25;
@@ -1573,13 +781,16 @@ int main(int argc,char**argv){
         { static int lock=-1; if(lock<0){ const char*e=getenv("REVA_CAMLOCK"); lock=(e&&e[0]!='0'); }
           if(lock){ eye[0]=g_rvx+4.5f; eye[1]=3.2f; eye[2]=g_rvz+6.5f;
                     ctr[0]=g_rvx;      ctr[1]=1.5f; ctr[2]=g_rvz; } }
+        lensNow(eye,ctr);   /* (step 25) this frame's lens and look; the set's timeline may have the lens */
         M4 proj,view,vp;
         g_aspect=VIEW_ASPECT(W,H);   /* ⭐ (ep 4) the medium's lateral guarantee needs the frame's SHAPE, and W/H are locals in here */
-        if(g_fpvNow){ float fv9=fishFov(68.0f,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
+        if(g_lensNow.camOn&&g_lensNow.fov>0.f){ float fv9=fishFov(g_lensNow.fov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* the timeline's lens */
+        else if(g_fpvNow){ float fv9=fishFov(68.0f,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
         else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* a street runs to the horizon */
         else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(140.0f,g_setFar)); }   /* a scene is two bodies on a black stage */
         else          { m4_persp(proj,(GAME_ON&&g_tune.lensFov>0.f)?g_tune.lensFov:42.0f,VIEW_ASPECT(W,H),0.8f,fmaxf(520.0f,g_setFar)); }   /* jacob: "eliminate the view distance" */
         m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
+        if(g_lensNow.roll!=0.f){ const float a9=g_lensNow.roll*0.0174532925f, c9=cosf(a9), s9=sinf(a9); M4 r9,t9; memset(r9,0,64); r9[0]=c9; r9[1]=s9; r9[4]=-s9; r9[5]=c9; r9[10]=1.f; r9[15]=1.f; m4_mul(t9,r9,view); memcpy(view,t9,64); }   /* (step 25) the lens rolled about its own line */
         /* the lens's own position, for anything later in the frame that has to face it
          * (ep 8: a billboarded screen). Stamped here because this is where it is decided. */
         g_camEye[0]=eye[0]; g_camEye[1]=eye[1]; g_camEye[2]=eye[2];
@@ -1589,24 +800,16 @@ int main(int argc,char**argv){
          * most of a frame lies beyond it), for next frame's pass */
         { float dx=ctr[0]-eye[0], dz=ctr[2]-eye[2], dl=sqrtf(dx*dx+dz*dz); if(dl<1e-3f) dl=1.f;
           g_sunFocus[0]=ctr[0]+dx/dl*g_shadowExt*0.35f; g_sunFocus[1]=0.f; g_sunFocus[2]=ctr[2]+dz/dl*g_shadowExt*0.35f; }
-        for(int pi=0;pi<2;pi++){ glUseProgram(PR[pi].prog); glUniformMatrix4fv(PR[pi].uVP,1,GL_FALSE,vp); }
         /* ⭐ FOG needs the eye and, unless a scene named one, the SKY'S OWN HORIZON as its colour,
          * so the far end of a street dissolves into the sky it stands under instead of a grey. */
-        /* ⭐ (10-23) THE EYE, EVERY FRAME: the toon rim and a glossy floor face the lens, as only the fog did -- uploaded
-         * with the fog alone, a rim would read the eye of the last foggy frame, or the origin */
+        /* ⭐ (10-23) the toon key and the room gradient, read once (REVA_TOONKEY, REVA_ROOMGRAD): toonTell hands them to the renderer */
         { if(g_fog[3]>0.f&&g_fogAuto){ float hz[3]; skyHorizonC(hz); g_fog[0]=hz[0]; g_fog[1]=hz[1]; g_fog[2]=hz[2]; }
-            for(int pi=0;pi<2;pi++){ Prog*Q9[2]={&PR[pi],&PRD[pi]};
-                for(int k9=0;k9<2;k9++){ Prog*R9=Q9[k9]; if(!R9->prog) continue; glUseProgram(R9->prog);
-                    if(R9->uEye>=0) glUniform3fv(R9->uEye,1,eye);
-                    { static int kinit=0; if(!kinit){ kinit=1; const char*e9=getenv("REVA_TOONKEY"); if(e9&&*e9) g_toonKeyCam=atoi(e9)!=0;
+          { static int kinit=0; if(!kinit){ kinit=1; const char*e9=getenv("REVA_TOONKEY"); if(e9&&*e9) g_toonKeyCam=atoi(e9)!=0;
                           e9=getenv("REVA_ROOMGRAD"); if(e9&&*e9) g_roomGrad=(float)atof(e9);
-                          printf("[toon] key %s, room gradient %.2f\n",g_toonKeyCam?"from the lens":"the set's sun (REVA_TOONKEY=0)",g_roomGrad); fflush(stdout); }
-                      GLint lk9=glGetUniformLocation(R9->prog,"uKeyCam"); if(lk9>=0) glUniform1f(lk9,(float)g_toonKeyCam);
-                      GLint lg9=glGetUniformLocation(R9->prog,"uRoomG"); if(lg9>=0) glUniform1f(lg9,g_roomGrad); }
-                    if(g_fog[3]>0.f&&R9->uFog>=0) glUniform4fv(R9->uFog,1,g_fog); } }
-            curProg=-1; }
-        curProg=-1;
+                          printf("[toon] key %s, room gradient %.2f\n",g_toonKeyCam?"from the lens":"the set's sun (REVA_TOONKEY=0)",g_roomGrad); fflush(stdout); } } }
 
+
+        netPreInput();
         jsPoll(tsec);   /* F310: any input takes reva manual */
         kbPoll(tsec);   /* WASD + mouse ride the same axes as the pad */
         { /* mouse look grabs the cursor only once a key or the mouse has actually been
@@ -1625,6 +828,7 @@ int main(int argc,char**argv){
               g_btnA=((aF%aper)<3)?1:0; } }   /* WRITE both edges: padless jsPoll never clears, the latch ate the pulses */
         inputTape(tsec);   /* ⭐ THE TAPE: record what the polls decided, or replace it with a recorded session */
         bridgeInput();
+        netInput();   /* (step 29) a session: this machine's pads go out, and every machine's for this tick come in, where the tape's would */
         padsUpdate();
         double btF0=beatPLL(tsec);   /* one beat clock for floor + dancers this frame */
         g_btF=(float)btF0;
@@ -1680,16 +884,14 @@ int main(int argc,char**argv){
                     execv(g_argv[0],g_argv);
 #endif
                     printf("relaunch failed -- resuming\n"); g_pause=0; }
-#ifdef REVA_PACKET
                 else if(g_pauseSel==2){ g_pause=0; setupRun(&W,&H,0); }
                 else if(g_pauseSel==3){ g_pause=0; setupRun(&W,&H,2); }
                 else if(g_pauseSel==4){ g_ctlOn=1; g_ctlSel=0; g_ctlWait=0; }
-#endif
                 else g_run=0; }
             paP=g_btnA; pbP=g_btnB;
             g_lx=g_ly=g_rx=g_ry=g_rt=0.f; g_btnA=g_btnB=g_btnX=g_btnY=0; }
-        /* SHADOW MASK PASS (runs FIRST in the frame, before the main target binds: V3D is a TILER and a mid-frame FBO switch flushes the whole tile buffer (cost jacob saw as 60->30); pose = last frame's stash):
-         * key light from high overhead, ortho window centered on reva, her silhouette in white */
+        /* THE FLOOR'S SHADOW: a key light from high overhead, an ortho window centred on reva, her silhouette on the floor. The lens
+         * is worked out here, first in the frame, and the renderer draws last frame's casters through it (gfxFloorShadow, g_shvp) */
         { float L[3]={0.30f,-1.0f,0.18f}; float ll=sqrtf(L[0]*L[0]+L[1]*L[1]+L[2]*L[2]);
           L[0]/=ll; L[1]/=ll; L[2]/=ll;
           float R2[3]={L[2],0,-L[0]}; float rl=sqrtf(R2[0]*R2[0]+R2[2]*R2[2]); R2[0]/=rl; R2[2]/=rl;
@@ -1702,7 +904,6 @@ int main(int argc,char**argv){
           memcpy(g_shvp,svp,64);
           /* the head, off-screen, before the venue's own passes; it restores fbo+viewport */
           { static double ht=0; ht+=1.0/60.0;
-            static int hdumped=0, hframes=0;
             /* ⭐ AND HE FINALLY GETS A MOUTH (ep 8). `g_holly_open` has been written
              * exactly nowhere since he was built -- a head with a working jaw, rendering
              * on screens, frozen at 0.45 for the life of the project. The scene has been
@@ -1718,29 +919,9 @@ int main(int argc,char**argv){
                   g_holly_open=0.06f+0.80f*a8; }
               else g_holly_open=0.06f; }
             passMark("sim0"); { static int nh9=-1; if(nh9<0) nh9=getenv("REVA_NOHOLLY")?1:0; if(!nh9&&!g_noDraw) holly_fbo_render(g_holly_open,g_holly_wide,g_holly_seal,ht); } passMark("holly");
-            if(!hdumped && ++hframes>90){ hdumped=1; holly_fbo_dump("/tmp/holly-fbo.ppm"); } }
-          glBindFramebuffer(GL_FRAMEBUFFER,shFbo); glViewport(0,0,SHMAP,SHMAP);
-          glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND);
-          glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
-          if(nCast>0){ glUseProgram(cProg);
-              glUniformMatrix4fv(cVP,1,GL_FALSE,g_shvp);
-              for(int ci=0;ci<nCast;ci++){ Pack*Pc=castP[ci]; PMesh*M=&Pc->meshes[castMi[ci]];
-                  glUniformMatrix4fv(cModel,1,GL_FALSE,castModelA[ci]);
-                  glUniformMatrix4fv(cPal,M->boneCount,GL_FALSE,castPal[ci]);
-                  glUniformMatrix4fv(cBind,1,GL_FALSE,(float*)(Pc->pk+M->offBind));
-                  GLuint*b=&Pc->vbo[castMi[ci]*6];
-                  glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-                  if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
-                  else glDisableVertexAttribArray(1);
-                  glBindBuffer(GL_ARRAY_BUFFER,b[2]); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
-                  glBindBuffer(GL_ARRAY_BUFFER,b[3]); glEnableVertexAttribArray(3); glVertexAttribPointer(3,4,GL_UNSIGNED_BYTE,GL_TRUE,0,0);
-                  if(M->flags&2){ glBindBuffer(GL_ARRAY_BUFFER,b[5]); glEnableVertexAttribArray(4); glVertexAttribPointer(4,2,GL_FLOAT,GL_FALSE,0,0); }
-                  else glDisableVertexAttribArray(4);
-                  if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
-                  else glDrawArrays(GL_TRIANGLES,0,M->verts); } }
-          glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);   /* back to THE SCREEN, which may be the post FBO */
-          glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); curProg=-1; }
-        passMark("blobmap"); sunPass(W,H); curProg=-1; passMark("sun");   /* ⭐ THE SUN'S SHADOW MAP (09-11): props + last frame's stashed bodies */
+            }
+}
+        passMark("blobmap"); sunPass();passMark("sun");   /* ⭐ THE SUN'S SHADOW MAP (09-11): props + last frame's stashed bodies */
         nCast=0;   /* the shadow-caster stash refills as the frame draws */
         /* ORBS + THE LIGHT LIST: plasma balls mill about the floor in slow 3D lissajous wanders;
          * list = orbs + snake head + reva's own glow + the nearest lava lamp */
@@ -1885,37 +1066,19 @@ int main(int argc,char**argv){
             if(s->z>FLOOR_ZF)s->z=FLOOR_ZF;
             s->rotY=s->h;
         }
-        passMark("steer"); postBegin(W,H);   /* ⭐ the 3D frame goes to the post FBO when the pass is on (09-11) */
-        if(clearOverride()){}                                        /* REVA_CLEAR wins */
-        else if(g_mode==MODE_ANIM) glClearColor(0.055f,0.058f,0.070f,1);   /* THE LAB: a neutral grey studio,
-             * because animation cannot be judged against a strobing neon floor */
-        else glClearColor(0.006f,0.003f,0.014f,1);
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);   /* jacob: darker, we are IN SPACE */
+        passMark("steer");
         /* ⛔ THE CROWD WAS HOLES (11-02). drawSet paints the sky with depth OFF over the whole frame, and the crowd draws BEFORE
          * drawSet: every body's colour was wiped and its depth kept, so the ground behind it then failed the depth test and the
          * sky's own ground band showed through, in the shape of a person. No tint, texture, sun or shadow could touch it, and on
          * every door that has ever played on a set the crowd was flat dark cut-outs. In a door the sky now goes down first and
          * drawSet stands down for the frame. The lab shows no crowd and keeps its order. REVA_SKYLATE=1 is the control. */
         { static int late9=-1; if(late9<0){ const char*e9=getenv("REVA_SKYLATE"); late9=(e9&&e9[0]=='1'); }
-          if(!late9&&g_mode!=MODE_ANIM&&(g_setNI||g_nPipe||g_setSpace)){ memcpy(g_watVP,vp,64); skyDraw(); g_skyEarly=1; curProg=-1; } }
+          if(!late9&&g_mode!=MODE_ANIM&&(g_setNI||g_nPipe||g_setSpace)){ memcpy(g_watVP,vp,64); } }
         passMark("sky");
         /* STARFIELD (behind everything, twinkling on its own phases) */
-        glUseProgram(sProg); glUniformMatrix4fv(sVP,1,GL_FALSE,vp); glUniform1f(sT,(float)tsec);
-        glDepthMask(GL_FALSE); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE);
-        glBindBuffer(GL_ARRAY_BUFFER,starVbo);
-        glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,20,0);
-        glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,20,(void*)12);
-        for(int k2=2;k2<5;k2++) glDisableVertexAttribArray(k2);
-        /* no starfield in the lab -- and none over a SET: the street has its own sky */
-        if(g_mode!=MODE_ANIM&&!g_setNI) glDrawArrays(GL_POINTS,0,NSTAR+NNEB);
-#ifdef REVA_PACKET
         if(g_mode!=MODE_ANIM&&!g_setNI&&!g_noDraw&&!WORLD_OFF) gfxSkyPoints(starVbo,NULL,NSTAR+NNEB,1);
-#endif
         /* the disco floor, under everyone's feet -- STANDARD blend (jacob: lit tiles must be
          * SOLID; the old additive func could never hide a star no matter the alpha) */
-        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        glUseProgram(fProg); glUniformMatrix4fv(fVP,1,GL_FALSE,vp); glUniform1f(fBeat,(float)btF0);
-        glUniformMatrix4fv(fShvp,1,GL_FALSE,g_shvp);
         { float fp4[12],fc4[12];   /* the floor pools under the 4 strongest lights near reva */
           int pk4[4]={-1,-1,-1,-1}; float pv4[4]={0,0,0,0};
           for(int li2=0;li2<nLite;li2++){ float dx5=liteP[li2][0]-g_rvx, dz5=liteP[li2][2]-g_rvz;
@@ -1924,22 +1087,11 @@ int main(int argc,char**argv){
           for(int k4=0;k4<4;k4++){ int li2=pk4[k4];
               if(li2<0){ fp4[k4*3]=0; fp4[k4*3+1]=0; fp4[k4*3+2]=999; fc4[k4*3]=fc4[k4*3+1]=fc4[k4*3+2]=0; }
               else { memcpy(fp4+k4*3,liteP[li2],12); memcpy(fc4+k4*3,liteC[li2],12); } }
-          glUniform3fv(fFlp,4,fp4); glUniform3fv(fFlc,4,fc4);
-#ifdef REVA_PACKET
           if(!g_skate&&g_mode!=MODE_ANIM&&!g_setNI&&!g_noDraw) venueFloor(vp,g_camEye,(float)btF0,fp4,fc4);
 #ifdef REVA_VK
           if(!g_skate&&g_mode!=MODE_ANIM&&!g_setNI&&!g_noDraw&&!WORLD_OFF){ const float r9[4]={-FLOOR_X,FLOOR_X,FLOOR_ZN,0.5f}; gfxFloorShadow(shTex,g_shvp,r9); }
 #endif
-#endif
         }
-        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,shTex); glActiveTexture(GL_TEXTURE0);
-        glBindBuffer(GL_ARRAY_BUFFER,floorVbo);
-        glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
-        for(int k2=1;k2<5;k2++) glDisableVertexAttribArray(k2);
-        /* skate mode and the lab: no dancefloor -- and none under a SET. The club floor sits
-         * at y=0, the street's ground at y=-0.02, so with both drawn the pink tiles win the
-         * depth test and a game door on the street stood on a magenta dance floor. */
-        if(!g_skate&&g_mode!=MODE_ANIM&&!g_setNI) glDrawArrays(GL_TRIANGLES,0,6);
         /* BLOB SHADOWS (jacob asked for shadows: one streamed draw, every dancer grounded;
          * real shadow-maps = a second full-scene pass, parked -- see the reva-caster idea) */
         { static float shv[(1024+1)*36]; int nq=0;
@@ -1951,9 +1103,6 @@ int main(int argc,char**argv){
           for(int si=0;(g_mode!=MODE_ANIM&&!g_setNI)&&si<NS;si++){ Slot*sl2=&slots[si];
               Pack*P2=&packs[sl2->pack]; float r2=fminf(3.0f,fmaxf(0.9f,P2->avoidR*0.55f));
               if(nq>=1024) break;
-#ifndef REVA_PACKET   /* the renderer has no contact mask yet, so the near ones keep a blob */
-              if(hypotf(sl2->x-g_rvx,sl2->z-g_rvz)<6.0f||si==CAMD.tgt) continue;   /* they cast REAL shadows */
-#endif
               float shfa=0.42f/(1.f+g_slotAlt[si]*0.45f);   /* sky layer: shadow softens with altitude */
               float cx4=sl2->x, cz4=sl2->z; float*v=shv+nq*36; nq++;
               float qq[6][2]={{-1,-1},{1,-1},{1,1},{-1,-1},{1,1},{-1,1}};
@@ -1964,17 +1113,11 @@ int main(int argc,char**argv){
               float qq[6][2]={{-1,-1},{1,-1},{1,1},{-1,-1},{1,1},{-1,1}};
               for(int k3=0;k3<6;k3++){ v[k3*6]=g_rvx+qq[k3][0]*r2; v[k3*6+1]=0.015f+g_feet.y; v[k3*6+2]=g_rvz+qq[k3][1]*r2;
                   v[k3*6+3]=qq[k3][0]; v[k3*6+4]=qq[k3][1]; v[k3*6+5]=fa; } }
-          glUseProgram(shProg); glUniformMatrix4fv(shVP,1,GL_FALSE,vp);
-          glBindBuffer(GL_ARRAY_BUFFER,shadowVbo); glBufferData(GL_ARRAY_BUFFER,nq*36*4,shv,GL_DYNAMIC_DRAW);
-          glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-          glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-          for(int k2=2;k2<5;k2++) glDisableVertexAttribArray(k2);
-#ifdef REVA_PACKET
+           gfxBufferData(shadowVbo, nq*36*4, shv, 1);
           if(!g_noDraw) venueBlobs(shv,nq);
-#endif
-          glDrawArrays(GL_TRIANGLES,0,nq*6); }
+           }
         /* LAVA LAMPS (jacob: cool light sources): warm blobs rising in glass columns at the floor
-         * edges -- streamed points through the star program's big-soft-nebula branch.
+         * edges -- streamed points through the sky points' big-soft-nebula branch.
          * A SCENE TAKES THE SET DOWN. The club's dressing -- lamps, orbs, the flame
          * snake, the arcs -- floats at head height and crosses both faces; against a
          * conversation it reads as debris. Two lit bodies in black is the stage this
@@ -1985,7 +1128,6 @@ int main(int argc,char**argv){
          * which a scene already switches off because a conversation wants a dark stage.
          * A street wants it for the same reason. */
         if(g_scnT<0.f&&!g_setNI&&!g_setSpace){
-        glBlendFunc(GL_SRC_ALPHA,GL_ONE);
         { static float lv[(48+NORB*2)*5]; int np=0;
           for(int li=0;li<8&&np<48;li++){
               float lx=(li<4)?(-FLOOR_X*0.94f+li*(FLOOR_X*2*0.94f/3.f)):(FLOOR_X*0.94f-(li-4)*(FLOOR_X*2*0.94f/3.f));
@@ -1996,20 +1138,14 @@ int main(int argc,char**argv){
                   v[2]=lz+cosf((float)tsec*0.6f+b3*1.7f+li)*0.5f;
                   v[3]=0.15f+0.9f*((li*5+b3)%7)/7.f;   /* warm hue walk */
                   v[4]=5.2f+((b3*13+li)%10)*0.14f; } }
-          /* the ORBS themselves: soft halo + bright core riding the same sprite program */
+          /* the ORBS themselves: soft halo + bright core, the same sky points */
           for(int i2=0;i2<NORB;i2++){ float*v=lv+np*5; np++;
               memcpy(v,orbP[i2],12); v[3]=(float)tsec*0.25f+i2*0.61f; v[4]=5.6f;
               v=lv+np*5; np++;
               memcpy(v,orbP[i2],12); v[3]=(float)tsec*0.25f+i2*0.61f; v[4]=3.0f; }
-          glUseProgram(sProg); glUniformMatrix4fv(sVP,1,GL_FALSE,vp); glUniform1f(sT,(float)tsec);
-          glBindBuffer(GL_ARRAY_BUFFER,lampVbo); glBufferData(GL_ARRAY_BUFFER,np*20,lv,GL_DYNAMIC_DRAW);
-          glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,20,0);
-          glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,20,(void*)12);
-          for(int k2=2;k2<5;k2++) glDisableVertexAttribArray(k2);
-#ifdef REVA_PACKET
+           gfxBufferData(lampVbo, np*20, lv, 1);
           if(!g_noDraw&&!WORLD_OFF) gfxSkyPoints(0,lv,np,1);
-#endif
-          glDrawArrays(GL_POINTS,0,np); }
+           }
         /* THE FLAME SNAKE (jacob: 'a flame fractal snake... ribboning around our dance floor'):
          * a thin fire ribbon weaving a lissajous through the crowd, head white-hot, tail ember */
         {
@@ -2030,15 +1166,8 @@ int main(int argc,char**argv){
               v[0]=x4+sxx*w4; v[1]=y4; v[2]=z4+szz*w4; v[3]=r4; v[4]=gg4; v[5]=b4;
               v[6]=x4-sxx*w4; v[7]=y4; v[8]=z4-szz*w4; v[9]=r4; v[10]=gg4; v[11]=b4;
               px0=x4; py0=y4; pz0=z4; }
-          glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
-          glBindBuffer(GL_ARRAY_BUFFER,snakeVbo); glBufferData(GL_ARRAY_BUFFER,sizeof sv,sv,GL_DYNAMIC_DRAW);
-          glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-          glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-          for(int k2=2;k2<5;k2++) glDisableVertexAttribArray(k2);
-#ifdef REVA_PACKET
+           gfxBufferData(snakeVbo, sizeof sv, sv, 1);
           if(!g_noDraw) venueStrip(sv,SNK*2,0.95f);
-#endif
-          glDrawArrays(GL_TRIANGLE_STRIP,0,SNK*2);
           /* ELECTRIC ARCS: jittered crackle around each orb, new randoms every frame */
           { static float av[NORB*8*2*6]; int nv3=0;
             for(int i2=0;i2<NORB;i2++) for(int a3=0;a3<8;a3++){
@@ -2048,15 +1177,11 @@ int main(int argc,char**argv){
                 v=av+nv3*6;
                 v[0]=orbP[i2][0]+(frnd()-0.5f)*1.6f; v[1]=orbP[i2][1]+(frnd()-0.5f)*1.6f; v[2]=orbP[i2][2]+(frnd()-0.5f)*1.6f;
                 v[3]=orbC[i2][0]*0.5f; v[4]=orbC[i2][1]*0.5f; v[5]=orbC[i2][2]*0.7f; nv3++; }
-            glBufferData(GL_ARRAY_BUFFER,nv3*24,av,GL_DYNAMIC_DRAW);
-            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-            glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-#ifdef REVA_PACKET
+            gfxBufferData(snakeVbo, nv3*24, av, 1);
             if(!g_noDraw) gfxLines3D(av,nv3);
-#endif
-            glDrawArrays(GL_LINES,0,nv3); } }
+             } }
         }
-        glDisable(GL_BLEND); glDepthMask(GL_TRUE); curProg=-1;
+
         /* FPS LEVERS (07-22, tuned LIVE on the CRT): frustum-cull each slot (sphere vs vp planes),
          * then draw front-to-back so early-Z eats the occluded crowd. Culled slots skip anim too. */
         int nVis=0;
@@ -2111,9 +1236,7 @@ int main(int argc,char**argv){
         passMark("venue");
         poseTick(); int poseR9=poseRate(),poseN9=poseNear();
         for(int oi=0;oi<nVis;oi++){ int si=order[oi]; Slot*sl=&slots[si]; Pack*P=&packs[sl->pack];
-#ifdef REVA_PACKET
             g_vkOwner=((unsigned)GFX_KIND_CROWD<<28)|(((unsigned)si&0xffffu)<<12);
-#endif
             bodyRest(P,T,Q,S);
             /* THE SPOTLIGHT PINS ITS MODEL (jacob: stuck-loop root cause was the featured npc
              * walking away mid-showcase): wander target snaps home, speed damps -> they dance
@@ -2308,9 +1431,11 @@ int main(int argc,char**argv){
               for(unsigned i9=0;i9<nn9;i9++){ memcpy(xQ[si][i9],Q[i9],16); memcpy(xT[si][i9],T[i9],12); }
               xInit[si]=1; } }
             g_faceCur=(g_faceN&&si<1024&&g_faceOf[si])?&g_faces[g_faceOf[si]-1]:NULL; if(g_faceCur) faceLayer(g_faceCur,P,Q);
+            if(g_eyeEver){ if(si<1024) memcpy(g_vkEye,g_slotEye[si],16); else g_vkEye[3]=0.f; }   /* (step 23) this body's eyes glow, if a game said so */
             if(!pr9||!pr9->world) bodyFK(P,T,Q,S,world);
             if(pr9&&!pr9->world&&!poseKeep(pr9,P,world)) pr9=NULL;
             M4*world9=pr9?pr9->world:world; if(pr9) g_poseStood++;
+            if(g_faceCur) facePosed(g_faceCur,P,world9);   /* (step 20) where its eyes are now, for a seated body's look and shot */
             /* STATUE RESCUE (rooster/zoo-class: no clips AND unmapped rig): the whole body
              * grooves -- beat bob + yaw sway. The rig is there for future clips; v0 dances anyway. */
             int statue=(P->nClips==0&&P->pbOK<10);
@@ -2393,10 +1518,6 @@ int main(int argc,char**argv){
             if(g_slotHide[si]) continue;   /* squid-convicted: invisible until relaunch */
             for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
                 if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
-            meshAlphaState(M);
-                USEPROG((P->meshMatFlags[mi]&4)?1:0);
-                glUniformMatrix4fv(uModel,1,GL_FALSE,model);
-                glUniform3fv(uTint,1,tint);
                 if(labLight){
                     float kx=g_rvx,kz=g_rvz;
                     float llp[NLIGHT*3]={kx+2.6f,3.4f,kz+2.2f,  kx-3.0f,2.2f,kz+1.4f,  kx-0.6f,2.8f,kz-3.2f,
@@ -2404,9 +1525,8 @@ int main(int argc,char**argv){
                     float llc[NLIGHT*3]={2.6f,2.6f,2.6f,        1.15f,1.15f,1.25f,      1.5f,1.5f,1.45f,
                                         0,0,0, 0,0,0, 0,0,0};
                     lightsStamp(llp,llc,3);
-                    glUniform3fv(PR[curProg].uLp,NLIGHT,llp); glUniform3fv(PR[curProg].uLc,NLIGHT,llc); }
-                else { glUniform3fv(PR[curProg].uLp,NLIGHT,lpv); glUniform3fv(PR[curProg].uLc,NLIGHT,lcv); }
-                glUniform1fv(PR[curProg].uLk,NLIGHT,g_stampK);   /* ⭐ ep 12: a held light's reach */
+                      }
+                else {   }
                 const float*palU=pal; int palS9=0;
                 if(pr9&&pr9->pal[mi]){ palU=pr9->pal[mi]; palS9=1; }
                 else { bodyPalette(P,mi,world9,pal);
@@ -2424,46 +1544,25 @@ int main(int argc,char**argv){
                     memcpy(castPal[nCast],palU,M->boneCount*64); castP[nCast]=P; castMi[nCast]=(int)mi;
                     memcpy(castModelA[nCast],model,64); nCast++; }
                 if(g_shadowOn) sunStash(P,(int)mi,palU,(int)M->boneCount,model,1);   /* ⭐ the crowd casts under a sun (09-11), capped */
-                glUniformMatrix4fv(uPal,M->boneCount,GL_FALSE,palU);
-                glUniformMatrix4fv(uBind,1,GL_FALSE,(float*)(P->pk+M->offBind));
-                GLuint*b=&P->vbo[mi*6];
+                unsigned*b=&P->vbo[mi*6];
                 int tex=P->meshTex[mi];
-                if(tex>=0&&(M->flags&2)){ glBindTexture(GL_TEXTURE_2D,P->tex[tex]);
+                if(tex>=0&&(M->flags&2)){
                     /* ⭐ a texture wins over a tint outright, so the cab's "sickly green" never showed on a textured body. Part of the way, it does:
-                     * the shader mixes tint and texture by this (under 0.5 it stops alpha-testing, so dead_tint stays below that). */
-                    glUniform1f(uUse,GAME_ON?g_game->bodyUse(si):1.0f); nrmBind(P,mi); }
-                else { glUniform1f(uUse,0.0f); if(g_curNrmLoc>=0) glUniform1f(g_curNrmLoc,0.f); }
-                bodyStreams(M,b);
-#ifdef REVA_PACKET
+                     * the renderer mixes tint and texture by useTex (under 0.5 it stops alpha-testing, so dead_tint stays below that). */
+                      }
+                else {  }
                 g_vkPalShared=palS9?g_poseStamp:0u;
-#else
-                (void)palS9;
-#endif
-                bodyDrawMesh(P,mi,model,world9,palU,b,tint,GAME_ON?g_game->bodyUse(si):1.0f,0,0,-1);
-#ifdef REVA_PACKET
+                bodyDrawMesh(P,mi,model,palU,b,tint,GAME_ON?g_game->bodyUse(si):1.0f,0,0);
                 g_vkPalShared=0u;
-#endif
             }
         }
         /* VENUE JUMBOS — the head, on the walls. Opaque and depth-tested: they are objects in
          * the room. Drawn before the lasers so the beams glow over them. */
         if(holly_fbo_texture()&&g_mode!=MODE_ANIM){   /* the lab is a clean plate: no screens */
-          glUseProgram(jbProg); glUniformMatrix4fv(jbVP,1,GL_FALSE,vp);
-          glDisable(GL_BLEND); glDepthMask(GL_TRUE); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-          glActiveTexture(GL_TEXTURE0);   /* texture chosen PER SCREEN in the loop below */
-          glUniform1i(jbTex,0);
-          { static int pb9=-1; if(pb9<0){ const char*e=getenv("REVA_SCRPROBE"); pb9=(e&&e[0]!='0'); }
-            glUniform1f(jbProbe,pb9?1.f:0.f); }
-          { double bp2=beatPhase(); glUniform1f(jbAmp,0.9f+0.25f*(float)(1.0-(bp2-floor(bp2)))); }
-          glBindBuffer(GL_ARRAY_BUFFER,jbVbo);
-          glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,20,(void*)0);
-          glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,20,(void*)12);
-          for(int k2=2;k2<5;k2++) glDisableVertexAttribArray(k2);
           for(int si=0;si<NJUMBOS;si++){
               const float*S2=JUMBOS[si];
               /* jacob 08-01: the house face on one screen, the live feed of the star on
                * the next. Alternating puts both on every wall. */
-              glBindTexture(GL_TEXTURE_2D,(si&1)?feedTex:holly_fbo_texture());
               float cy=cosf(S2[3]), sy2=sinf(S2[3]);
               M4 mm2; memset(mm2,0,64);
               /* column-major: T * Ry * S, with the quad's own half-extents as the scale */
@@ -2471,12 +1570,11 @@ int main(int argc,char**argv){
               mm2[5]= S2[5];
               mm2[8]= sy2;      mm2[10]= cy;
               mm2[12]=S2[0]; mm2[13]=S2[1]; mm2[14]=S2[2]; mm2[15]=1;
-              glUniformMatrix4fv(jbModel,1,GL_FALSE,mm2);
 #ifdef REVA_VK
               if(!g_noDraw){ double bp9=beatPhase(); gfxScreen((si&1)?feedTex:holly_fbo_texture(),mm2,0.9f+0.25f*(float)(1.0-(bp9-floor(bp9)))); }
 #endif
-              glDrawArrays(GL_TRIANGLES,0,6); }
-          glDisableVertexAttribArray(1); }
+               }
+           }
 
         passMark("crowd");
         /* ⭐ PLACED SCREENS -- and these DO draw in MODE_ANIM, which is the whole point:
@@ -2488,16 +1586,11 @@ int main(int argc,char**argv){
          * set paints its sky first in drawSet with no depth test, which wiped this quad every frame
          * while its depth kept the room out -- Holly's blank screen. With a set, the world pass draws
          * them after the world. */
-        if(!g_setNI&&!g_setSpace) scrDrawPlaced(vp);
+        if(!g_setNI&&!g_setSpace) scrDrawPlaced();
 
         /* CLUB LASERS — 7-beam fan from above the back of the stage, hue-cycling, beat-pulsed */
         if(g_mode!=MODE_ANIM&&!g_setNI&&!g_setSpace){ double bp=beatPhase(); float pulse=0.8f+0.4f*powf(1.0f-(float)(bp-floor(bp)),2.0f);
           float sw=0.55f+0.25f*sinf((float)tsec*0.21f);
-          glUseProgram(lProg); glUniformMatrix4fv(lVP,1,GL_FALSE,vp);
-          glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE); glDepthMask(GL_FALSE);
-          glBindBuffer(GL_ARRAY_BUFFER,laserVbo);
-          glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-          for(int k2=1;k2<5;k2++) glDisableVertexAttribArray(k2);
           for(int li=0;li<14;li++){ float ph=(li%7)/7.f; int rig=li/7;   /* TWO rigs -- it's a rave (jacob) */
               float rz2=sinf((float)tsec*(0.55f+g_bpm/400.f)+ph*6.283f+rig*1.7f)*sw*(rig?-1.f:1.f);
               float rx2=0.95f+sinf((float)tsec*0.37f+ph*4.2f+rig*2.6f)*0.28f;
@@ -2507,16 +1600,10 @@ int main(int argc,char**argv){
               mm[8]=sz2*sx2; mm[9]=-cz2*sx2; mm[10]=cx2; mm[15]=1;
               mm[12]=rig?10.5f:-10.5f; mm[13]=9.0f; mm[14]=-14.0f;
               float r3,g3,b3; hsv((float)tsec*0.07f+ph*0.45f+rig*0.5f,&r3,&g3,&b3);
-              glUniformMatrix4fv(lModel,1,GL_FALSE,mm);
-              glUniform3f(lCol,r3,g3,b3); glUniform1f(lAmp,pulse);
-#ifdef REVA_PACKET
               if(!g_noDraw) venueLaser(mm,r3,g3,b3,pulse);
-#endif
-              glDrawArrays(GL_TRIANGLES,0,6); }
-#ifdef REVA_PACKET
+               }
           if(!g_noDraw) venueLasersEnd();
-#endif
-          glDisable(GL_BLEND); glDepthMask(GL_TRUE); curProg=-1; }
+}
         /* REVA — the hologram, drawn over her town */
         if(hasReva&&g_heroWear>=0){ revaP=g_packs[g_heroWear]; g_heroWorn=g_heroWear; g_heroWear=-1; g_heroPk=&revaP; revaGround=-revaP.mny*revaP.scale+0.02f; { Face*hf9=faceOf(-1); if(hf9) hf9->pk=NULL; } }   /* E->heroWear */
         if(hasReva){ Pack*P=&revaP;
@@ -2681,7 +1768,7 @@ int main(int argc,char**argv){
                                  g_rvx=g_rmEndW[0]; g_rvz=g_rmEndW[1]; }   /* P4: the travel is KEPT -- no teleport home */
                     g_labClip=-1; printf("[lab] clip once: done, state tree resumes\n"); fflush(stdout); }
                 else { want=g_labClip; hdP=NULL; hdC=-1; rate=1.0f; skHold=-1.f;
-                       if(g_labWphReset){ rvWph=0.0; g_labWphReset=0; } } }
+                       if(g_labWphReset){ rvWph=heroStartPh(P->clips[g_labClip].fps,P->clips[g_labClip].frames); g_labWphReset=0; } } }
             /* P5: the authored move found in the MOVES pack -- played on THIS body
              * through the canonical donor transfer. kaeli inherits every score. */
             else if(g_mode==MODE_ANIM&&g_labDnC>=0&&(g_labDnP?g_labDnP:g_movesPk)&&
@@ -2691,7 +1778,7 @@ int main(int argc,char**argv){
                     if(g_labRM){ g_rvx=g_rmEndW[0]; g_rvz=g_rmEndW[1]; }
                     g_labDnC=-1; printf("[lab] clip once: done, state tree resumes (donor)"); printf("%c",10); fflush(stdout); }
                 else { hdP=dnp9; hdC=g_labDnC; want=-1; rate=1.0f; skHold=-1.f;
-                       if(g_labWphReset){ rvWph=0.0; g_labWphReset=0; } } }
+                       if(g_labWphReset){ rvWph=heroStartPh(dnp9->clips[g_labDnC].fps,dnp9->clips[g_labDnC].frames); g_labWphReset=0; } } }
             /* ⭐ A GAIT UNDER THE STAGE MOVE. Same hook the hero already uses to borrow
              * a run she does not own: point hdP/hdC at the bank's walk and let gaitRate()
              * pick the stride for the speed the mark is actually carrying her at. */
@@ -2943,7 +2030,7 @@ int main(int argc,char**argv){
                 bodyFK(P,T,Q,S,world);
                 wmsApply(P,T,Q,world,&hw,(float)g_chDt,g_wms); }
             /* a face is picture, not rules, and her pose is in the receipt: so it goes on after the receipt's had the pose without it */
-            { Face*hf9=(g_faceN&&GAME_ON)?faceOf(-1):NULL; if(hf9){ bodyFK(P,T,Q,S,world); g_shDumpTag="pose"; simHashMix((const float*)world,P->nNodes*16); faceLayer(hf9,P,Q); } g_faceHeroHashed=hf9!=NULL; }
+            { Face*hf9=(g_faceN&&GAME_ON)?faceOf(-1):NULL; if(hf9){ bodyFK(P,T,Q,S,world); g_shDumpTag="pose"; simHashMix((const float*)world,P->nNodes*16); faceLayer(hf9,P,Q); facePosed(hf9,P,world); } g_faceHeroHashed=hf9!=NULL; }
             bodyFK(P,T,Q,S,world);
             stretchTick(P,world);  /* ⭐ drapes held between two limbs (09-29) */
             chainSim(P,world,0);   /* H1: the hero's tails/hair swing after the pose is solved */
@@ -3618,41 +2705,26 @@ int main(int argc,char**argv){
             if(!g_skate&&g_heroMk&&(g_loco[0].pon||g_loco[0].phold)) locoLeanModel(model,0,g_castFloorY[0]);
             /* ⭐ ep 11: ON A HALF-PIPE the ride places her -- contact, the surface's up, the air's turn -- over all of the above */
             if(!g_skate&&g_mode==MODE_ANIM){ pipeModel(0,model,P,sc); rollModel(0,model); }   /* (10-22) and the roll */
-            /* HER REAL TEXTURE. The hologram program is a deliberate look for the venue --
+            /* HER REAL TEXTURE. The hologram (GFX_HOLO) is a deliberate look for the venue --
              * fresnel, scanlines, additive -- but it throws her texture away: her atlas has skin
              * tones, grey panels and purple fabric, and none of it survives an additive purple
              * wash. In skate mode she is a person on a board, not an apparition, so she is drawn
-             * with the ordinary CUTOUT program (cutout, not opaque, so alpha-keyed hair and
-             * straps still key correctly). REVA_HOLO=1 puts the hologram back. */
+             * solid. REVA_HOLO=1 puts the hologram back. */
             static int holoMode=-1;
             if(holoMode<0){ const char*e=getenv("REVA_HOLO"); holoMode=(e&&e[0]=='1')?1:0; }
             /* ⭐ M0 (11-01): in the zombie cab she is REVA VS ZOMBIES' Reva -- an android with a body on a street, not the
              * venue's apparition -- so the cab draws her solid, as skate mode does. REVA_HOLO=1 still puts the hologram back. */
             int skSolid = (g_mode==MODE_ANIM) ? 1 : ((g_skate||GAME_ON) && !holoMode);   /* the lab is never a hologram */   /* the lab shows a SOLID body: a translucent hologram hides the very pops being hunted */
-            GLint mModel=hModel, mPal=hPal, mBind=hBind, mVP=hVP;
-            GLint mDqS=-1; int labDq=0;
-            { if(g_dqs<0){ const char*e=getenv("REVA_LBS"); g_dqs=(e&&e[0]=='1')?0:1; }
-              /* ctl dqs=0 forces LBS for the lab. DQS cures the LBS candy-wrapper, but
-               * on a body with soft auto-generated weights it does the opposite thing
-               * wrong: reva2's deltoid inflates into a ball when her arms hang (jacob:
-               * "revas shoulders are not right"). Her weights came from an automatic
-               * bind, and until they are re-solved LBS is the honest look for her. */
-              labDq=g_dqs&&g_labDqsOn&&skSolid&&P->dqsOK&&(!g_labPartner||g_labPartner->dqsOK); }
-            if(skSolid){ Prog*AP=labDq?&PRD[1]:&PR[1]; glUseProgram(AP->prog); curProg=-1;
-                { static int said=-1; if(said!=labDq){ said=labDq;
-                    printf("[h2] lab skinning: %s (hero dqsOK=%d partner dqsOK=%d)\n",
-                           labDq?"DQS":"LBS",P->dqsOK,g_labPartner?g_labPartner->dqsOK:-1); fflush(stdout); } }
+            if(skSolid){
                 /* NOT a flat tint: a single-colour body merges its own limbs into one
                  * silhouette and a crumpled pose reads as a fine one. The lab keeps the
                  * pack's texture and lets the neutral rig shade it, so an arm can be told
                  * from a leg. */
-                         mModel=AP->uModel; mPal=AP->uPal; mBind=AP->uBind; mVP=AP->uVP; mDqS=AP->uDqS;
-                         glUniform1f(AP->uUse,1.f); glUniform3f(AP->uTint,1.f,1.f,1.f);
-                         /* SHE NEEDS HER OWN LIGHT. The venue shader is deliberately dark and
-                          * gets its colour from the three nearest club lights, which are aimed
-                          * at the dancefloor -- on the skate program she was lit by nothing but
-                          * the 0.13 ambient floor, so her texture showed up almost black. A key
-                          * over her shoulder, a cool fill opposite, and a low warm bounce. */
+                         /* SHE NEEDS HER OWN LIGHT. The venue's light is deliberately dark and
+                          * comes from the three nearest club lights, which are aimed at the
+                          * dancefloor -- a solid body there was lit by nothing but the 0.13
+                          * ambient floor, so her texture showed up almost black. A key over her
+                          * shoulder, a cool fill opposite, and a low warm bounce. */
                          /* A SCENE GETS LIT FOR THE SCENE. The rig above is aimed at
                           * one body standing on a runway; a two-hander needs the pair
                           * lit as a pair, and it needs a RIM -- once the club's dressing
@@ -3693,38 +2765,24 @@ int main(int argc,char**argv){
                                           mx,                        my -2.40f,    mz , 0,-99,0, 0,-99,0, 0,-99,0 };
                            float lc3[NLIGHT*3]={ 2.55f,2.28f,2.02f,   1.60f,1.90f,2.65f,   0.50f,0.38f,0.32f , 0,0,0, 0,0,0, 0,0,0 };
                            lightsStamp(lp3,lc3,3);   /* ⭐ (ep 4) the held light is the fourth lamp on the pair */
-                           glUniform3fv(AP->uLp,NLIGHT,lp3); glUniform3fv(AP->uLc,NLIGHT,lc3); glUniform1fv(AP->uLk,NLIGHT,g_stampK);
                          } else { float kx=sinf(SK.head), kz=cosf(SK.head);
                            float lp3[NLIGHT*3]={ SK.x-kx*2.2f+kz*1.8f, SK.y+3.4f, SK.z-kz*2.2f-kx*1.8f,
                                           SK.x+kx*3.0f-kz*2.2f, SK.y+2.6f, SK.z+kz*3.0f+kx*2.2f,
                                           SK.x,                 SK.y+0.4f, SK.z , 0,-99,0, 0,-99,0, 0,-99,0 };
                            float lc3[NLIGHT*3]={ 2.30f,2.15f,2.55f,   0.85f,0.95f,1.45f,   0.55f,0.42f,0.70f , 0,0,0, 0,0,0, 0,0,0 };
                            lightsStamp(lp3,lc3,3);
-                           glUniform3fv(AP->uLp,NLIGHT,lp3); glUniform3fv(AP->uLc,NLIGHT,lc3); glUniform1fv(AP->uLk,NLIGHT,g_stampK); }
-                         glUniform4fv(AP->uSun,1,g_sun);
-                         glUniform3fv(AP->uSunC,1,g_sunC);
-                         glUniform3fv(AP->uSky,1,g_sky);
-                         g_labUse=AP->uUse; g_labTint=AP->uTint; g_labAlpha=AP->uAlpha; g_curNrmLoc=AP->uNrm;
-                         g_labMouthP=AP->uMouthP; g_labMouthS=AP->uMouthS; g_labOpen=AP->uOpen; }
-            else { glUseProgram(hProg); curProg=-1; g_curNrmLoc=-1; }   /* the hologram reads no normal map */
-            glUniformMatrix4fv(hVP,1,GL_FALSE,vp);
-            glUniformMatrix4fv(mModel,1,GL_FALSE,model);
-            glUniform3f(hCam,eye[0],eye[1],eye[2]);
-            glUniform1f(hT,(float)tsec);
+                              }
+                         }
             /* TWO-PASS HOLOGRAM (jacob: "textures/mesh is not right"): single-pass alpha+depth-write
              * z-blocked her own far surfaces -> hollow patches showing the background through her.
              * Pass 1 lays her depth silently; pass 2 colors ONLY the nearest surface, any alpha. */
-            /* TWO TARGETS. vcPass 1 = the broadcast feed (small FBO, tight camera on
+            /* TWO TARGETS. vcPass 1 = the broadcast feed (a small target, tight camera on
              * her); vcPass 0 = the real frame. ONLY the mesh draw repeats: her locomotion
              * state machine, the tracer ribbons and the lightning sit outside this loop and
              * must tick exactly once per frame. */
             for(int vcPass=1;vcPass>=0;vcPass--){
-            float savedClear[4]; glGetFloatv(GL_COLOR_CLEAR_VALUE,savedClear);
+
             if(vcPass){
-                glBindFramebuffer(GL_FRAMEBUFFER,feedFbo); glViewport(0,0,FEEDW,FEEDH);
-                glClearColor(0.03f,0.0f,0.05f,1.f);
-                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-                glClearColor(savedClear[0],savedClear[1],savedClear[2],savedClear[3]);
                 { /* the broadcast camera: chest height, close, drifting three-quarter orbit */
                   float fx7=model[12], fy7=model[13], fz7=model[14];
                   float ang7=(float)tsec*0.22f;
@@ -3736,91 +2794,33 @@ int main(int argc,char**argv){
 #ifdef REVA_VK
                   if(!g_noDraw){ float e9[3]={ex7,ey7,ez7}; gfxFeed(feedTex,fvp,e9); }
 #endif
-                  memcpy(curVP,fvp,64); glUniformMatrix4fv(mVP,1,GL_FALSE,fvp); }
+                  memcpy(curVP,fvp,64);  }
             } else {
-                glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);   /* the screen, or the post FBO */
-                memcpy(curVP,vp,64); memcpy(g_watVP,vp,64); glUniformMatrix4fv(mVP,1,GL_FALSE,vp);
-                /* THE SET goes down before the actors do -- same program, same lights,
-                 * and the depth buffer sorts the rest. Inside this loop because the
-                 * render target is only bound here, and on the real pass only: the
-                 * broadcast FBO is a tight orbit of the hero and wants no scenery. */
-                /* THE SET'S OWN LAMPS, bound once for the props AND the actors that
-                 * follow -- same program, so one bind carries both. A set with no light
-                 * lines binds zeros and is lit by the sun alone. */
+                memcpy(curVP,vp,64); memcpy(g_watVP,vp,64);
+                /* THE SET goes down before the actors do -- same lights, and the depth
+                 * buffer sorts the rest. On the real pass only: the broadcast feed is a
+                 * tight orbit of the hero and wants no scenery. A set with no light lines
+                 * is lit by the sun alone. */
                 /* ⭐ A SET DRAWS IN EVERY MODE, not only the lab. These four gates carried
                  * `g_mode==MODE_ANIM&&`, so no game door had ever rendered the street the
                  * film is shot on: REVA_SET could load its colliders and the player would
                  * bump into houses that were not drawn. A loaded set IS the world now. */
-                /* ⛔ THE STREET WAS MAGENTA IN EVERY DOOR (09-11). In a door the hero is a
-                 * HOLOGRAM, so the current program here was hProg and its uniform slots
-                 * (mModel=hModel) -- the whole town, the actors and the held props went
-                 * through the hologram shader: a translucent purple street under a lit sky.
-                 * The lab never saw it because the lab is always solid (PR[1]). The world
-                 * draws on the SOLID program whatever the hero is wearing, and hands the
-                 * hologram back with its own VP/model re-bound. Found by the first-person
-                 * lens, which made the whole frame world. */
-                /* ⛔ M0 (11-01): AND NEVER ON HER DUAL-QUATERNION PROGRAM. A solid hero skinned by dual quaternions leaves
-                 * PRD[1] current, and PRD's palette slot is `dq` -- vec4 pairs. drawProp's identity palette is a mat4 upload
-                 * onto that vec4 array: GL_INVALID_OPERATION, nothing written, so every prop, every set actor and every held
-                 * prop was skinned by HER bone 0. A still root hid it for two months; r2moves running in the zombie cab (bone 0
-                 * = her hips) carried the whole street on her stride -- the lawns rose through the road and over her, 3 frames
-                 * in 7. REVA_LBS=1 (her on LBS) was the control: clean. The world goes down on PR[1] whenever she is on PRD. */
-                int dqWorld=skSolid&&labDq&&(g_setNI||g_nPipe||g_setSpace||g_setNA||g_scnN>0||heldAny());
-                int setSwap=((g_setNI||g_setNA||g_scnN>0||g_objLive)&&!skSolid)||dqWorld;
-                float wLp[NLIGHT*3], wLc[NLIGHT*3]; int wLit=0;   /* the lamps the world was lit with -- she reads them after */
-                GLint sModel=mModel,sPal=mPal,sBind=mBind,sUse=g_labUse,sTint=g_labTint;
-                if(setSwap){ Prog*SP=&PR[1]; glUseProgram(SP->prog); curProg=-1;
-                    glUniformMatrix4fv(SP->uVP,1,GL_FALSE,curVP);
-                    sModel=SP->uModel; sPal=SP->uPal; sBind=SP->uBind; sUse=SP->uUse; sTint=SP->uTint;
-                    g_labAlpha=SP->uAlpha; g_curNrmLoc=SP->uNrm;
-                    glUniform1f(sUse,1.f); glUniform3f(sTint,1.f,1.f,1.f); glUniform1f(SP->uDqS,0.f); }
-                if(g_setNI||g_nPipe){
-                    GLint pcur=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pcur);
-                    /* ⛔ AND THIS UPLOADED THREE OF THE SIX. NLIGHT has been 6 since Z6 and the
-                     * count here was still the literal 3, so a set's fourth, fifth and sixth
-                     * lamps reached the shader as whatever was in those slots last. */
-                    if(pcur){ GLint ulp=glGetUniformLocation(pcur,"lp");
-                              GLint ulc=glGetUniformLocation(pcur,"lc");
-                              float slp9[NLIGHT*3], slc9[NLIGHT*3];
-                              memcpy(slp9,g_setLp,sizeof slp9); memcpy(slc9,g_setLc,sizeof slc9);
-                              /* ⭐ `lamps=` SCALES THE SET'S OWN PRACTICALS (ep 5), and it has to
-                               * happen HERE -- this is the single upload that carries g_setLc to the
-                               * shader, and everything drawn after it (the props, the actors, the held
-                               * props and the hero body) reads these same slots. Before lightsStamp,
-                               * so a HELD light in the top slot keeps the power its script named. */
-                              if(g_lampScale!=1.f)
-                                  for(int k9=0;k9<g_setNL*3&&k9<NLIGHT*3;k9++) slc9[k9]*=g_lampScale;
-                              lightsStamp(slp9,slc9,g_setNL);   /* ⭐ (ep 4) above the set's own lamps */
-                              for(int k9=0;k9<g_setNL&&k9<NLIGHT;k9++) g_stampK[k9]=g_setLk[k9];   /* ⭐ ep 12: and their reach */
-                              if(ulp>=0) glUniform3fv(ulp,NLIGHT,slp9);
-                              if(ulc>=0) glUniform3fv(ulc,NLIGHT,slc9);
-                              { GLint ulk=glGetUniformLocation(pcur,"lk"); if(ulk>=0) glUniform1fv(ulk,NLIGHT,g_stampK); }
-                              memcpy(wLp,slp9,sizeof wLp); memcpy(wLc,slc9,sizeof wLc); wLit=1; } }
                 passMark("heroPose");
                 if(g_setNI||g_nPipe||g_setSpace)   /* ⭐ 10-22: a set that is only space still paints its sky */
-                    drawSet(sModel,sPal,sBind,sUse,sTint);
-                else objDraw(sModel,sPal,sBind,sUse,sTint);
+                    drawSet();
+                else objDraw();
                 passMark("set");
                 if(g_setNA){
-                    actorsDraw(sModel,sPal,sBind,pal,sUse,sTint);
+                    actorsDraw(pal);
                     leadsCollect(); }
                 passMark("actors");
                 /* ⭐ A HELD PROP OUTSIDE A SCENE (ep 4). This was gated on a loaded .scn, so
                  * the lab could not put anything in a hand and look at it -- which is where a
                  * held LIGHT has to be judged before it is cast. */
                 if(g_scnN>0||heldAny())
-                    drawHeld(sModel,sPal,sBind,sUse,sTint);
+                    drawHeld();
                 /* ⭐ ep 9: THE PLACED SCREENS, AFTER THE WORLD -- drawSet's sky would wipe them otherwise */
-                if(g_setNI) scrDrawPlaced(vp);
-                if(setSwap){
-                    if(skSolid){ Prog*AP9=labDq?&PRD[1]:&PR[1]; glUseProgram(AP9->prog); curProg=-1;   /* back to HER program */
-                        g_curNrmLoc=AP9->uNrm; g_labAlpha=AP9->uAlpha;
-                        glUniformMatrix4fv(AP9->uVP,1,GL_FALSE,curVP); glUniformMatrix4fv(mModel,1,GL_FALSE,model);
-                        /* ...lit by the world's lamps, as she was when the world drew on her program */
-                        if(wLit){ if(AP9->uLp>=0) glUniform3fv(AP9->uLp,NLIGHT,wLp); if(AP9->uLc>=0) glUniform3fv(AP9->uLc,NLIGHT,wLc);
-                                  if(AP9->uLk>=0) glUniform1fv(AP9->uLk,NLIGHT,g_stampK); } }
-                    else { glUseProgram(hProg); curProg=-1; g_curNrmLoc=-1;
-                        glUniformMatrix4fv(hVP,1,GL_FALSE,curVP); glUniformMatrix4fv(mModel,1,GL_FALSE,model); } }
+                if(g_setNI) scrDrawPlaced();
             }
             if(g_mode==MODE_ANIM){ ragdollTick(P,world,model,0); jiggleTick(P,world,model,0); ctSolve(P,world,model,0); }   /* ⭐ limp / soft mass / THE CONTACT PASS, before her skin */
             else if(g_rdGameOn) rdBody(-1,P,world,model);   /* limp, if a game said so */
@@ -3835,28 +2835,21 @@ int main(int argc,char**argv){
              * vanished from the main view whenever a second body was on stage, and
              * every pair move since the high five was judged on the multi-cam wall,
              * which rebinds per panel and hid the bug. */
-            glUniformMatrix4fv(mModel,1,GL_FALSE,model);
             chainPublish(0,model);   /* her chains feel where she goes */
-#ifdef REVA_PACKET
             g_vkOwner=(unsigned)GFX_KIND_HERO<<28;
-#endif
-            mouthArm(P,g_heroMorphW,g_labMouthP,g_labMouthS,g_labOpen);
             /* the hologram needs two passes (depth, then colour); a solid character needs one */
             for(int hp2=((g_fpvNow||g_camHoldSlot==0)?2:(skSolid?1:0));hp2<2;hp2++){   /* first person, or her own camera: her body is not drawn */
-                if(skSolid){ glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE); glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
-                else if(hp2==0){ glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE); glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
-                else { glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); }
-#ifdef REVA_PACKET
+                if(skSolid){    }
+                else if(hp2==0){    }
+                else {     }
                 g_vkBodySkip=(!skSolid&&hp2==0); g_vkBodyFlags=skSolid?0:GFX_HOLO;   /* the renderer does a hologram's two passes itself */
-#endif
                 /* mesh 1 is his skateboard, skinned to his rig: once he has bailed it is lying on the ground, so it must not ride along with him. The lab reads the body, not a silhouette: real texture, white tint, neutral light. */
                 { static const float labTint9[3]={0.80f,0.80f,0.82f}; int lab9=(g_mode==MODE_ANIM);
-                  BodyGL g9={mModel,mPal,mBind,mDqS,g_labUse,g_labTint,g_labOpen,0,labDq,g_heroMorphW,1,vcPass,(g_skate&&SK.onFoot&&!g_procRig)?1u:0u,lab9?labTint9:NULL};
+                  BodyGL g9={0,g_heroMorphW,1,vcPass,(g_skate&&SK.onFoot&&!g_procRig)?1u:0u,lab9?labTint9:NULL};
                   g_faceCur=(g_faceN&&GAME_ON)?faceOf(-1):NULL;
-                  bodyMeshes(P,world,model,pal,&g9); g_faceCur=NULL; if(g_attN&&GAME_ON&&hp2==1) attDraw(-1,P,world,model); } }
-#ifdef REVA_PACKET
+                  if(g_eyeEver) memcpy(g_vkEye,g_heroEye,16);
+                  bodyMeshes(P,world,model,pal,&g9); g_faceCur=NULL; g_vkEye[3]=0.f; if(g_attN&&GAME_ON&&hp2==1) attDraw(-1,P,world,model); } }
             g_vkBodySkip=0; g_vkBodyFlags=0;
-#endif
             /* ⭐ THE PICKER NEEDS THE HERO EXACTLY AS DRAWN -- her world matrices and her
              * model matrix, this frame, in this pose. Stashed here because this is the one
              * place that has both. */
@@ -3941,11 +2934,11 @@ int main(int argc,char**argv){
                 int sv8=g_castI;
                 for(g_castI=1;g_castI<SCN_MAXCAST;g_castI++)
                     if(g_labPartner&&(g_labPClip>=0||g_labPDnP))
-                        labDrawPartner(g_labPartner,g_labPClip,g_labPPhase,model,mModel,mPal,mBind,pal,labDq,mDqS);
+                        labDrawPartner(g_labPartner,g_labPClip,g_labPPhase,model,pal);
                 g_castI=sv8;
                 /* ⭐ ep 10: THE BOARDS, in the frame their riders were just posed in (every rider has published) */
-                if(g_scnN>0||heldAny()){ drawBoards(mModel,mPal,mBind,g_labUse,g_labTint);
-                    glUniformMatrix4fv(mModel,1,GL_FALSE,model); } }
+                if(g_scnN>0||heldAny()){ drawBoards();
+                     } }
             if(g_mode==MODE_ANIM&&g_labGrid>1&&skSolid){
                 /* ================= THE MULTI-CAM WALL =================================
                  * Not copies of the body scattered through the world -- that clutters the
@@ -3961,15 +2954,12 @@ int main(int argc,char**argv){
                  * With a partner, the close-ups centre between the two of them. */
                 if(g_faceDbg<0){ const char*e9=getenv("REVA_FACEDBG"); g_faceDbg=(e9&&e9[0]!='0'); }
                 int gn=g_labGrid; if(gn>16) gn=16;
-#ifdef REVA_PACKET
                 g_wallV.n=gn;
-#endif
                 int nClose=(gn==13&&!g_labFace)?4:0, nWall=gn-nClose;
                 int cols, rows, pw, ph;
                 if(nClose){ cols=3; rows=3; pw=(W*3/4)/3; ph=H/3; }
                 else { cols=1; while(cols*cols<gn) cols++;
                        rows=(gn+cols-1)/cols; pw=W/cols; ph=H/rows; }
-                glEnable(GL_SCISSOR_TEST);
                 for(int gi=0;gi<gn;gi++){
                     int pw2=pw, ph2=ph, vx, vy;
                     if(g_labFace){
@@ -3982,9 +2972,6 @@ int main(int argc,char**argv){
                         vx=cx*pw; vy=H-(cy+1)*ph; }
                     else { int k=gi-nWall; pw2=W-3*pw; ph2=H/4;
                         vx=3*pw; vy=H-(k+1)*ph2; }
-                    glViewport(vx,vy,pw2,ph2); glScissor(vx,vy,pw2,ph2);
-                    if(!clearOverride()) glClearColor(0.055f,0.058f,0.070f,1.f);
-                    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                     /* P5: a root-motion clip displaces the MESH away from the body's
                      * origin -- the wall was orbiting empty air while kaeli crawled out
                      * of frame (jacob caught it on the grid). Aim at the actual pelvis. */
@@ -4055,51 +3042,21 @@ int main(int argc,char**argv){
                         m4_lookat(vw,ex,g_rmActive?(by+0.6f):1.95f,ez, bx,by,bz);
                     }
                     m4_mul(pvp,pj,vw);
-#ifdef REVA_PACKET
                     memcpy(g_wallV.vp[gi],pvp,64); g_wallV.eye[gi][0]=-(vw[0]*vw[12]+vw[1]*vw[13]+vw[2]*vw[14]); g_wallV.eye[gi][1]=-(vw[4]*vw[12]+vw[5]*vw[13]+vw[6]*vw[14]); g_wallV.eye[gi][2]=-(vw[8]*vw[12]+vw[9]*vw[13]+vw[10]*vw[14]); g_wallV.x[gi]=vx; g_wallV.y[gi]=H-vy-ph2; g_wallV.w[gi]=pw2; g_wallV.h[gi]=ph2;
-#endif
-                    glUniformMatrix4fv(mVP,1,GL_FALSE,pvp);
-                    glUniformMatrix4fv(mModel,1,GL_FALSE,model);
                     for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi];
-                        mouthMeshArm(P,mi,g_heroMorphW,g_labOpen);
                         if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
-            meshAlphaState(M);
                         /* P7: the panels used to inherit whatever palette the main pass
                          * left bound. That held only while the hero was the last thing
                          * drawn -- the partner binds her own, so the hero's is rebuilt
                          * here for every panel. */
-                        { bodyPalette(P,mi,world,pal);
-                          skinPal(mPal,mDqS,labDq,pal,(int)M->boneCount,mi<8?P->meshDqS[mi]:1.f); }
-                        glUniformMatrix4fv(mBind,1,GL_FALSE,(float*)(P->pk+M->offBind));
-                        GLuint*b=&P->vbo[mi*6];
-                        bodyStreams(M,b);
-                        { int tex=P->meshTex[mi]; if(tex>=0) glBindTexture(GL_TEXTURE_2D,P->tex[tex]); nrmBind(P,mi); }
-                        /* ⭐ AN AUTHORED MESH CARRIES ITS OWN COLOUR. The body paths
-                         * already drop to the tint path for an untextured mesh -- which is
-                         * how kaeli's appended pyjamas draw at all -- but the tint was
-                         * whatever was last set, so a garment came out white. The colour
-                         * lives in the mesh NAME as `#rrggbb`, so a garment carries it
-                         * without the pack format needing a material it does not have. */
-                        glUniform1f(g_labUse,(P->meshTex[mi]>=0)?1.f:0.f);
-                        if(P->meshTex[mi]<0){ const char*mn9=packStr(P,M->name);
-                            const char*h9=strchr(mn9,'#');
-                            float c9[3]={0.42f,0.47f,0.62f};
-                            if(h9&&strlen(h9)>=7){ unsigned v9=(unsigned)strtoul(h9+1,NULL,16);
-                                c9[0]=((v9>>16)&255)/255.f; c9[1]=((v9>>8)&255)/255.f; c9[2]=(v9&255)/255.f; }
-                            glUniform3f(g_labTint,c9[0],c9[1],c9[2]); }
-                        glUniform3f(g_labTint,0.80f,0.80f,0.82f);
-                        bodyDrawGL(P,mi,world,b,0,-1); }
+                        bodyPalette(P,mi,world,pal);
+                         }
                     /* the partner appears on every angle of the wall too -- an interaction
                      * judged from one side is the single-camera habit the wall replaced */
                     if(g_labPartner&&g_labPClip>=0){
-                        glUniform1f(g_labUse,1.f); glUniform3f(g_labTint,0.80f,0.80f,0.82f);
-#ifdef REVA_PACKET
                         g_vkBodySkip=1;   /* the packet has her from the main pass: every panel shows it */
-#endif
-                        labDrawPartner(g_labPartner,g_labPClip,g_labPPhase,model,mModel,mPal,mBind,pal,labDq,mDqS);
-#ifdef REVA_PACKET
+                        labDrawPartner(g_labPartner,g_labPClip,g_labPPhase,model,pal);
                         g_vkBodySkip=0;
-#endif
                         }
                     /* THE FACE MARKS, per panel. They MUST be drawn in here: the wall
                      * re-renders the body with its own camera for every pane, so a
@@ -4114,22 +3071,13 @@ int main(int argc,char**argv){
                         float s9=P->mouthBind[3]*P->scale*0.55f;
                         if(!(s9>1e-6f)) s9=0.010f;
                         int ng=faceGizmo(P,world,model,gz,64,s9);
-                        if(ng>1){ glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,pvp);
-                            glDisable(GL_DEPTH_TEST);      /* marks read THROUGH the face */
-                            glBindBuffer(GL_ARRAY_BUFFER,trailVbo);
-                            glBufferData(GL_ARRAY_BUFFER,ng*24,gz,GL_DYNAMIC_DRAW);
-                            glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-                            glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-                            for(int k3=2;k3<5;k3++) glDisableVertexAttribArray(k3);
-                            glDrawArrays(GL_LINES,0,ng);
-#ifdef REVA_PACKET
+                        if(ng>1){
+                            gfxBufferData(trailVbo, ng*24, gz, 1);
                             if(gi==0&&!g_noDraw) gfxLines3DOver(gz,ng);
-#endif
-                            glEnable(GL_DEPTH_TEST);
-                            glUseProgram(skSolid?PR[1].prog:hProg); } } }
+                             } } }
                 /* ⭐ THE LEAD. From the dog's collar to the walker's hand -- the partner's
                  * head is published every frame, and a hand is a forearm below it and a
-                 * little forward. Drawn on the same GL_LINES batch the face marks use. */
+                 * little forward. Drawn on the same line batch the face marks use. */
                 if(g_leadN>0){
                     static float lv[LEAD_MAX*12];
                     for(int li=0;li<g_leadN;li++){ float*v=lv+li*12;
@@ -4137,36 +3085,19 @@ int main(int argc,char**argv){
                         v[3]=0.62f; v[4]=0.47f; v[5]=0.31f;
                         v[6]=g_leadB[li][0]; v[7]=g_leadB[li][1]; v[8]=g_leadB[li][2];
                         v[9]=0.62f; v[10]=0.47f; v[11]=0.31f; }
-                    glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
-                    glBindBuffer(GL_ARRAY_BUFFER,trailVbo);
-                    glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(g_leadN*12*sizeof(float)),lv,GL_DYNAMIC_DRAW);
-                    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-                    glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-                    for(int k3=2;k3<5;k3++) glDisableVertexAttribArray(k3);
-                    glLineWidth(3.0f);
-                    glDrawArrays(GL_LINES,0,g_leadN*2);
-                    glLineWidth(1.0f);
-#ifdef REVA_PACKET
+                    gfxBufferData(trailVbo, (long)(g_leadN*12*sizeof(float)), lv, 1);
                     if(!g_noDraw){ static float q9[LEAD_MAX*6*9]; int n9=0;   /* a lead is three pixels wide at any distance, so a thin strip facing the lens */
                         for(int li=0;li<g_leadN;li++){ const float*a9=g_leadA[li],*b9=g_leadB[li]; float d9[3]={b9[0]-a9[0],b9[1]-a9[1],b9[2]-a9[2]}, e9[3]={g_camEye[0]-a9[0],g_camEye[1]-a9[1],g_camEye[2]-a9[2]}; float s9[3]={d9[1]*e9[2]-d9[2]*e9[1],d9[2]*e9[0]-d9[0]*e9[2],d9[0]*e9[1]-d9[1]*e9[0]}; float sl9=sqrtf(s9[0]*s9[0]+s9[1]*s9[1]+s9[2]*s9[2]); if(sl9<1e-6f) continue; float w9=sqrtf(e9[0]*e9[0]+e9[1]*e9[1]+e9[2]*e9[2])*0.0016f/sl9;
                             const float P9[6][4]={{0,-1,0,0},{1,-1,0,0},{1,1,0,0},{0,-1,0,0},{1,1,0,0},{0,1,0,0}}; for(int k9=0;k9<6;k9++){ float*o9=q9+n9*9; const float t9=P9[k9][0],c9=P9[k9][1]*w9; for(int r9=0;r9<3;r9++) o9[r9]=a9[r9]+d9[r9]*t9+s9[r9]*c9; o9[3]=0.62f; o9[4]=0.47f; o9[5]=0.31f; o9[6]=1.f; o9[7]=0.f; o9[8]=0.f; n9++; } }
                         if(n9) gfxFxTris(q9,n9,GFX_FX_ALPHA,0); }
-#endif
-                    glUseProgram(skSolid?PR[1].prog:hProg); }
-                glDisable(GL_SCISSOR_TEST);
-                MAINVIEW(W,H);
-                glUniformMatrix4fv(mVP,1,GL_FALSE,curVP); }
-            /* THE PARK and THE BOARD are real objects, so they are drawn with the OPAQUE
-             * textured program -- her hologram program has no tint or texture path and would
-             * render the park as translucent purple. The board takes her ground point and
-             * heading plus her bank so it leans into the carve, but not her pitch or scale. */
+                     }
+                 }
+            /* THE PARK and THE BOARD are real objects, drawn solid whatever she is. The board
+             * takes her ground point and heading plus her bank so it leans into the carve, but
+             * not her pitch or scale. */
             if(g_skate&&(hasPark||hasBoard)){
-                glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE); glDisable(GL_BLEND); glDepthMask(GL_TRUE);
-                glUseProgram(PR[0].prog);
-                glUniformMatrix4fv(PR[0].uVP,1,GL_FALSE,curVP);
-                glUniform1f(PR[0].uUse,1.f); glUniform3f(PR[0].uTint,1.f,1.f,1.f);
-                if(hasPark){ parkDraw(PR[0].uModel,PR[0].uPal,PR[0].uBind);
-                             railDraw(PR[0].uModel,PR[0].uPal,PR[0].uBind,PR[0].uUse,PR[0].uTint); }
+                if(hasPark){ parkDraw();
+                             railDraw(); }
                 { static int rep=0; if(!rep++) printf("skate geom: her xz=(%.3f,%.3f) y=%.3f   board xz=(%.3f,%.3f) y=%.3f\n",
                     model[12],model[14],model[13],SK.x,SK.z,SK.y); }
                 /* A character who arrived with her own skateboard rides THAT one -- it is
@@ -4205,24 +3136,19 @@ int main(int argc,char**argv){
                     M4 r1,r2,r3,bmodel;
                     m4_mul(r1,rz,ry); m4_mul(r2,tup,r1); m4_mul(r3,r2,tdn);
                     m4_mul(bmodel,basis,r3);
-                    drawProp(&boardP,bmodel,PR[0].uModel,PR[0].uPal,PR[0].uBind); }
-                if(skSolid){ glUseProgram(PR[1].prog); glUniform1f(PR[1].uUse,1.f);
-                             glUniform3f(PR[1].uTint,1.f,1.f,1.f); }
-                else glUseProgram(hProg);
-                curProg=-1;
-                glUniformMatrix4fv(mVP,1,GL_FALSE,curVP);
-                glUniformMatrix4fv(mModel,1,GL_FALSE,model);   /* restore: her matrix is used below */
+                    drawProp(&boardP,bmodel); }
+
             }
             /* ⭐ (10-23) THE GLOSSY FLOOR, after every body that reflects in it (the real frame only) */
-            if(!vcPass&&g_gloss.on){ GLint pg9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pg9);
-                glossFloorPass(PR[1].prog,PR[1].uVP,PR[1].uModel,PR[1].uPal,PR[1].uBind,PR[1].uUse,PR[1].uTint,curVP);
-                glUseProgram((GLuint)pg9); curProg=-1; }
+            if(!vcPass&&g_gloss.on){
+                glossFloorPass();
+}
             }   /* end vcPass: feed target, then the frame */
-            glDisable(GL_BLEND); glDepthMask(GL_TRUE);
             passMark("hero");
             /* ⭐ ep 12: THE SMOKE -- after every opaque thing in the real frame (the set, the actors, the cast, the
-             * boards, the park), into the same target (the post FBO when the post pass is on), far to near */
-            if(g_mode==MODE_ANIM){ starDraw(vp); beamDraw(vp); smokeTick(); smokeDraw(vp); }
+             * boards, the park), into the frame, far to near */
+            if(g_mode==MODE_ANIM){ starDraw(); beamDraw(); smokeTick(); smokeDraw();
+                ptStepAll((float)g_animDtS); ptDrawAll(view); dcStepAll((float)g_animDtS); dcDrawAll(); }   /* (step 24) a set's emitters, on the exposure clock: a held exposure holds them */
             if(trBone[1]>=0){ float hx6=world[trBone[1]][12],hy6=world[trBone[1]][13],hz6=world[trBone[1]][14];
                 g_boltFrom[0]=model[0]*hx6+model[4]*hy6+model[8]*hz6+model[12];
                 g_boltFrom[1]=model[1]*hx6+model[5]*hy6+model[9]*hz6+model[13];
@@ -4238,9 +3164,7 @@ int main(int argc,char**argv){
                 trail[k2][TRN-1][0]=wx2; trail[k2][TRN-1][1]=wy2; trail[k2][TRN-1][2]=wz2; }
             /* draw ribbons: hue-cycling, fading to the tail -- the VENUE's look (her tracers and glowsticks), so never in the lab
              * and never in the zombie cab (M0, 11-01: a woman on a street at dusk does not leave rainbow trails) */
-            if(g_mode!=MODE_ANIM&&!GAME_ON){ static float tvb[TRN*6]; glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
-              glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE); glDepthMask(GL_FALSE);
-              glBindBuffer(GL_ARRAY_BUFFER,trailVbo);
+            if(g_mode!=MODE_ANIM&&!GAME_ON){ static float tvb[TRN*6];
               for(int k2=0;k2<4;k2++){ if(trBone[k2]<0||trailN[k2]<2) continue;
                   int n0=TRN-trailN[k2];
                   for(int i2=n0;i2<TRN;i2++){ float f2=(float)(i2-n0)/(float)(trailN[k2]-1);
@@ -4249,14 +3173,9 @@ int main(int argc,char**argv){
                       int o2=(i2-n0)*6;
                       tvb[o2]=trail[k2][i2][0]; tvb[o2+1]=trail[k2][i2][1]; tvb[o2+2]=trail[k2][i2][2];
                       tvb[o2+3]=r3*br; tvb[o2+4]=g3*br; tvb[o2+5]=b3*br; }
-#ifdef REVA_PACKET
                   if(!g_noDraw) venueLineStrip(tvb,trailN[k2]);
-#endif
-                  glBufferData(GL_ARRAY_BUFFER,trailN[k2]*24,tvb,GL_DYNAMIC_DRAW);
-                  glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-                  glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-                  for(int k3=2;k3<5;k3++) glDisableVertexAttribArray(k3);
-                  glDrawArrays(GL_LINE_STRIP,0,trailN[k2]); }
+                  gfxBufferData(trailVbo, trailN[k2]*24, tvb, 1);
+                   }
               /* GLOWSTICKS (jacob: IN her hands, not through her wrists -- and GLOWING):
                * rod rides the HAND BONE'S OWN AXIS (world col 1 = along the hand), triple-line core */
               for(int k2=0;k2<2;k2++){ if(trBone[k2]<0||trailN[k2]<1) continue;
@@ -4274,13 +3193,9 @@ int main(int argc,char**argv){
                       sv[nv2][3]=r3*bb; sv[nv2][4]=g3*bb; sv[nv2][5]=b3*bb; nv2++;
                       sv[nv2][0]=hp[0]+off+wx3*0.30f; sv[nv2][1]=hp[1]+wy3*0.30f; sv[nv2][2]=hp[2]+off+wz3*0.30f;
                       sv[nv2][3]=r3*bb; sv[nv2][4]=g3*bb; sv[nv2][5]=b3*bb; nv2++; }
-#ifdef REVA_PACKET
                   if(!g_noDraw) gfxLines3D(&sv[0][0],nv2);
-#endif
-                  glBufferData(GL_ARRAY_BUFFER,nv2*24,sv,GL_DYNAMIC_DRAW);
-                  glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-                  glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-                  glDrawArrays(GL_LINES,0,nv2); }
+                  gfxBufferData(trailVbo, nv2*24, sv, 1);
+                   }
               /* SITH LIGHTNING (jacob: purple and magenta, of course): jagged forked bolt,
                * re-rolled every frame = crackle; thin lock-beam while RT holds a target */
               if(g_boltT>0||g_lockTgt>=0){ static float bl[256*6]; int nb=0;
@@ -4308,14 +3223,9 @@ int main(int argc,char**argv){
                   else if(((int)(tsec*6.f))&1){   /* lock beam: dashed magenta thread */
                       bl[0]=fx; bl[1]=fy; bl[2]=fz; bl[3]=0.7f; bl[4]=0.12f; bl[5]=0.7f;
                       bl[6]=tx7; bl[7]=ty7; bl[8]=tz7; bl[9]=0.9f; bl[10]=0.15f; bl[11]=0.9f; nb=2; }
-#ifdef REVA_PACKET
                   if(nb>1&&!g_noDraw) gfxLines3D(bl,nb);
-#endif
-                  if(nb>1){ glBufferData(GL_ARRAY_BUFFER,nb*24,bl,GL_DYNAMIC_DRAW);
-                      glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-                      glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-                      glDrawArrays(GL_LINES,0,nb); } }
-              glDisable(GL_BLEND); glDepthMask(GL_TRUE); curProg=-1; }
+                  }
+}
         }
 
         passMark("ribbons");
@@ -4326,9 +3236,7 @@ int main(int argc,char**argv){
          * the squid sentinel and the eviction bolt already use. */
         if(MODE_PLAYS&&(hasReva||WORLD_OFF)&&!g_pause){ float dtf=(float)dt; if(dtf>0.1f)dtf=0.1f;
             g_gameT+=dtf;   /* the game clock: stops with the start menu, unlike tsec */
-#ifdef REVA_PACKET
-            if(GAME_ON){ fxStep(dtf); if(!g_noDraw&&!WORLD_OFF) fxDrawAll(view); }   /* a game's particles and decals */
-#endif
+            if(GAME_ON){ fxStep(dtf); ptStepAll(dtf); dcStepAll(dtf); if(!g_noDraw&&!WORLD_OFF){ fxDrawAll(view); ptDrawAll(view); dcDrawAll(); } }   /* a game's particles and decals, and (step 24) its emitters and its set's */
             if(GM.msgT>0.f) GM.msgT-=dtf;
             if(GM.ifr>0.f) GM.ifr-=dtf;
             GM.l1[0]=GM.l2[0]=GM.l3[0]=0;
@@ -4442,6 +3350,10 @@ int main(int argc,char**argv){
                                   Pack*pk12=(o12==0)?g_heroPk:g_cast[o12].pk;
                                   if(pk12){ wardWear(pk12,of); snprintf(wore12[o12],24,"%s",of);
                                       printf("[scene] line %d: slot %d dressed in '%s'\n",held8,o12,of); fflush(stdout); } } }
+                            /* (step 23) eyes that glow, on the cut: heyes= peyes= p2eyes= p3eyes= */
+                            { static char had12[4][28];
+                              for(int o12=0;o12<4;o12++){ const char*ey=S8->eyes[o12]; if(!ey[0]||!strcmp(ey,had12[o12])) continue;
+                                  eyesSay(o12?g_castEyeG[o12]:g_heroEye,ey); snprintf(had12[o12],28,"%s",ey); printf("[scene] line %d: slot %d eyes %s\n",held8,o12,ey); fflush(stdout); } }
                             /* ⭐ 10-22: THE ROLL on the cut -- a new spec starts it, the same one carried on keeps it running */
                             for(int o12=0;o12<4&&o12<SCN_MAXCAST;o12++){ const char*rs=S8->roll[o12]; CastRoll*CR=&g_castRoll[o12];
                               if(!rs[0]){ if(CR->on){ CR->on=0; CR->spec[0]=0; printf("[roll] line %d: slot %d stands again\n",held8,o12); fflush(stdout); } continue; }
@@ -4461,6 +3373,12 @@ int main(int argc,char**argv){
                             /* ⭐ THE EXPOSURE RATE CHANGES ON THE CUT, like the lens and the clips. */
                             if(S8->feed>=0.f&&S8->feed!=g_tape){ g_tape=S8->feed; if(g_tape>0.f&&g_post<=0) g_post=1;
                                 printf("[feed] line %d: %s\n",held8,(g_tape>1.5f)?"HER PHONE, TURNED SIDEWAYS":((g_tape>0.f)?"HER PHONE, PORTRAIT":"out of the phone")); fflush(stdout); }
+                            /* (step 25) the lens's roll, its focus and shutter, and film's sepia and grain: sticky, and they land on the cut */
+                            if(S8->camRoll>-9000.f&&S8->camRoll!=g_camRoll){ g_camRoll=S8->camRoll; printf("[lens] line %d: rolled %.1f\n",held8,g_camRoll); fflush(stdout); }
+                            if(S8->focusSaid[0]){ lensFocusSay(S8->focusSaid); }
+                            if(S8->shut>-9000.f) g_lensShutter=S8->shut;
+                            if(S8->sepia>-9000.f) g_filmSepia=S8->sepia;
+                            if(S8->grain>-9000.f) g_filmGrain=S8->grain;
                             if(S8->fish>=0.f&&S8->fish!=g_fish){ g_fish=S8->fish; if(g_fish>0.f&&g_post<=0) g_post=1;
                                 printf("[fish] line %d: %.2f\n",held8,g_fish); fflush(stdout); }
                             if(S8->step>=0.f&&S8->step!=g_stepFps){ g_stepFps=S8->step;
@@ -4491,15 +3409,18 @@ int main(int argc,char**argv){
                              * that names a clip still wins. Borrowed off the bank through
                              * the canonical transfer, so it works on any canon rig. */
                             const char*hcl=S8->hclip; const char*pcl=S8->pclip;
+                            char hcb[40];   /* (step 28, found by the memory checker on an unbroken scene) the clip's name without its `@` or `>`: hcl points at it from here on, so it lives as long as hcl does. It was inside the block below, and what's said about the clip after that block read a buffer that was gone */
                             if(!strcmp(hcl,"auto")) hcl=(S8->spk==0)?"x_convo1":"x_convo2";
                             if(!strcmp(pcl,"auto")) pcl=(S8->spk==0)?"x_convo2":"x_convo1";
                             if(g_heroPk&&hcl[0]){
                                 /* ⭐ `name@0.6` on the hero as well -- see the partner path. */
-                                char hcb[40]; g_heroHold=-1.f;
+                                g_heroHold=-1.f; float hCueF=-1.f,hCueS=-1.f; const int wr0=g_labWphReset;
                                 { int k7=0; const char*a7=hcl;
-                                  while(*a7&&*a7!='@'&&k7<39) hcb[k7++]=*a7++;
+                                  while(*a7&&*a7!='@'&&*a7!='>'&&k7<39) hcb[k7++]=*a7++;
                                   hcb[k7]=0;
-                                  if(*a7=='@') g_heroHold=(float)atof(a7+1); }
+                                  if(*a7=='@') g_heroHold=(float)atof(a7+1);
+                                  else if(*a7=='>'){ const char*v7=a7+1; const size_t L7=strlen(v7);   /* (step 21) `name>12.5s`, `name>0.33`: start there and play on, as the partner's `>` does */
+                                      if(L7&&v7[L7-1]=='s') hCueS=(float)atof(v7); else { hCueF=(float)atof(v7); if(hCueF<0.f) hCueF=0.f; if(hCueF>1.f) hCueF=1.f; } } }
                                 hcl=hcb;
                                 int f8=-1; for(unsigned c8=0;c8<g_heroPk->nClips;c8++)
                                     if(!strcmp(packStr(g_heroPk,g_heroPk->clips[c8].name),hcl)){ f8=(int)c8; break; }
@@ -4510,7 +3431,9 @@ int main(int argc,char**argv){
                                         g_labDnP=bp; g_labDnC=bc; g_labClip=-1; g_labWphReset=1;
                                         g_labRM=(strncmp(hcl,"z_rm_",5)==0); g_rmY=-999.f; }
                                     else printf("[stage] hclip '%s' NOT FOUND\n",hcl); }
-                                else { g_labDnP=NULL; } }
+                                else { g_labDnP=NULL; }
+                                if(hCueF>=0.f||hCueS>=0.f){ g_heroCueF=hCueF; g_heroCueS=hCueS; g_labWphReset=1; }   /* a cue starts it there even when it's the clip already playing */
+                                else if(g_labWphReset&&!wr0) g_heroStartOff=1; }                                    /* a line's new clip: the set's `clipstart` applies */
                             /* ⭐ SLOT 2'S CLIP, resolved exactly as slot 1's is -- her own
                              * pack first, then the bank through the canonical transfer --
                              * by lending her g_castI for the length of the lookup. */
@@ -4718,16 +3641,18 @@ int main(int argc,char**argv){
                                  * smoking loop ran on its own clock under the dialogue and put the cigarette in her
                                  * mouth in the middle of her line; the director has to be able to say where the drag
                                  * falls. (`@` still HOLDS a pose; `>` plays from one.) */
-                                char pcb[40]; float pHold=-1.f, pCue=-1.f;
+                                char pcb[40]; float pHold=-1.f, pCue=-1.f, pCueS=-1.f;
                                 { int k8=0; const char*a8=pcl;
                                   while(*a8&&*a8!='@'&&*a8!='>'&&k8<39) pcb[k8++]=*a8++;
                                   pcb[k8]=0;
                                   if(*a8=='@') pHold=(float)atof(a8+1);
-                                  else if(*a8=='>'){ pCue=(float)atof(a8+1); if(pCue<0.f) pCue=0.f; if(pCue>1.f) pCue=1.f; } }
+                                  else if(*a8=='>'){ const char*v8=a8+1; const size_t L8=strlen(v8);   /* (step 21) `>12.5s` is seconds in; a bare number is still how far through */
+                                      if(L8&&v8[L8-1]=='s') pCueS=(float)atof(v8); else { pCue=(float)atof(v8); if(pCue<0.f) pCue=0.f; if(pCue>1.f) pCue=1.f; } } }
                                 const char*pcn=pcb;
                                 int f8=-1; for(unsigned c8=0;c8<g_labPartner->nClips;c8++)
                                     if(!strcmp(packStr(g_labPartner,g_labPartner->clips[c8].name),pcn)){ f8=(int)c8; break; }
-                                if(f8>=0){ if(f8!=g_labPClip){ g_labPClip=f8; g_labPPhase=0.0; }
+                                if(f8>=0){ if(f8!=g_labPClip){ g_labPClip=f8; g_labPPhase=(g_clipStartS>0.f&&!strncmp(pcn,"z_rm_",5))?(double)g_clipStartS*(double)g_labPartner->clips[f8].fps:0.0; }
+                                           if(pCueS>=0.f){ const PClip*c8=&g_labPartner->clips[f8]; g_labPPhase=(double)pCueS*(double)c8->fps; if(c8->frames>1&&g_labPPhase>(double)c8->frames-1.0) g_labPPhase=(double)c8->frames-1.0; }
                                            g_labPHold=pHold;
                                            if(pHold>=0.f)
                                                g_labPPhase=(double)pHold*(double)g_labPartner->clips[f8].frames;
@@ -4737,9 +3662,12 @@ int main(int argc,char**argv){
                                            g_labPDnP=NULL; g_labPDnC=-1; }
                                 else { int bc=-1; Pack*bp=bankFind(pcn,&bc);
                                     if(bp&&g_labPartner->cbOK&&g_labPartner->pbOK>=10){
+                                        const int chg9=(g_labPDnP!=bp||g_labPDnC!=bc);
                                         g_labPDnP=bp; g_labPDnC=bc; g_labPHold=pHold;
                                         if(pHold>=0.f) g_labPPhase=(double)pHold*(double)bp->clips[bc].frames;
-                                        else if(pCue>=0.f) g_labPPhase=(double)pCue*(double)bp->clips[bc].frames; }
+                                        else if(pCue>=0.f) g_labPPhase=(double)pCue*(double)bp->clips[bc].frames;
+                                        else if(pCueS>=0.f) g_labPPhase=(double)pCueS*(double)bp->clips[bc].fps;
+                                        else if(chg9&&g_clipStartS>0.f&&!strncmp(pcn,"z_rm_",5)) g_labPPhase=(double)g_clipStartS*(double)bp->clips[bc].fps; }
                                     else { g_missClip++; static int said9=0;
                                         if(!said9++) printf("\n========================================================================\n"
                                                "  \u26d4 MISSING CLIP: the script asks the PARTNER for '%s' and her\n"
@@ -5079,7 +4007,7 @@ int main(int argc,char**argv){
                                 printf("[lab] partner OFF\n"); }
                             else { char pp[512]; FILE*pf=fopen(nm3,"rb");
                                 if(pf){ fclose(pf); snprintf(pp,sizeof pp,"%s",nm3); }
-                                else snprintf(pp,sizeof pp,"packs/v1_%s.rpack",nm3);
+                                else { snprintf(pp,sizeof pp,"packs/v1_%s.rpack",nm3); FILE*t9=fopen(pp,"rb"); if(t9) fclose(t9); else snprintf(pp,sizeof pp,"props/v1_%s.rpack",nm3); }   /* a lead outside the crowd: props/ */
                                 FILE*pf2=fopen(pp,"rb");
                                 if(!pf2) printf("[lab] partner '%s' NOT FOUND\n",nm3);
                                 else { fclose(pf2); g_labPartnerPk=loadPack(pp); g_labPartner=&g_labPartnerPk;
@@ -5161,7 +4089,6 @@ int main(int argc,char**argv){
                             if(v>=0.f&&v<=20.f) g_chGrav=v; }
                         if((q=strstr(buf,"pyaw="))) g_labPYaw=(float)atof(q+5);
                         if((q=strstr(buf,"aimy="))) g_labAimY=(float)atof(q+5);   /* close-up aim height (faces vs hands) */
-                        if((q=strstr(buf,"dqs="))) g_labDqsOn=atoi(q+4)?1:0;
                         if((q=strstr(buf,"wms="))) g_wms=(float)atof(q+4);
                         if((q=strstr(buf,"face="))){ g_labFace=atoi(q+5); if(g_labFace>10) g_labFace=10;
                             if(g_labFace) g_labGrid=g_labFace; }      /* 0 = LBS (soft-bound shoulders balloon under DQS) */
@@ -5192,6 +4119,10 @@ int main(int argc,char**argv){
                         /* ⭐ gaze=yaw,pitch (radians; off) forces the hero's eyes for the bench (09-11) */
                         if((q=strstr(buf,"gaze="))){ if(!strncmp(q+5,"off",3)){ g_gazeForce[0]=-9.f; } else { float gy=0,gp=0; if(sscanf(q+5,"%f,%f",&gy,&gp)>=1){ g_gazeForce[0]=gy; g_gazeForce[1]=gp; } }
                             printf("[eyes] gaze force %s\n",g_gazeForce[0]>-8.f?"on":"off"); }
+                        /* (step 23) eyes= peyes= p2eyes= p3eyes=  r,g,b[,amount] or off: that body's eyes glow. `eyes=` is inside the others: the word has to start there */
+                        { static const char*const EK9[4]={"eyes=","peyes=","p2eyes=","p3eyes="};
+                          for(int s9=0;s9<4;s9++){ char*r9=strstr(buf,EK9[s9]); while(r9&&r9>buf&&r9[-1]!=' ') r9=strstr(r9+1,EK9[s9]);
+                              if(r9) eyesSay(s9?g_castEyeG[s9]:g_heroEye,r9+strlen(EK9[s9])); } }
                         if((q=strstr(buf,"look="))) g_lookOn=atoi(q+5)?1:0;
                         if((q=strstr(buf,"fpv="))){ g_fpv=atoi(q+4)?1:0; printf("[fpv] %s (ctl)\n",g_fpv?"FIRST PERSON":"third person"); }
                         /* \u2b50 fish=<0..0.6>: the lens on the front of the camera. 0.18 is a wide, 0.35 is a
@@ -5239,6 +4170,19 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"knee="))){ g_postKnee=(float)atof(q+5); printf("[post] default knee %.2f\n",g_postKnee); }
                         if((q=strstr(buf,"fxaa="))){ g_fxaa=atoi(q+5)?1:0; printf("[post] fxaa %d\n",g_fxaa); }
                         if((q=strstr(buf,"grade="))){ g_grade=(float)atof(q+6); printf("[post] grade %.2f\n",g_grade); }
+                        /* (step 25) the lens and film's look: engine/post.inc */
+                        if((q=strstr(buf,"camroll="))){ g_camRoll=(float)atof(q+8); printf("[lens] rolled %.1f\n",g_camRoll); }
+                        if((q=strstr(buf,"words="))){ g_tvWords=atoi(q+6)?1:0; }   /* (step 26) a page of every script the TV font has */
+                        if((q=strstr(buf,"lang="))){ char c9[16]=""; sscanf(q+5,"%15[A-Za-z0-9_-]",c9); langSet(strcmp(c9,"off")?c9:"",0); }
+                        if((q=strstr(buf,"trackt="))){ g_stkScrub=!strncmp(q+7,"off",3)?-1.f:!strncmp(q+7,"play",4)?-2.f:(float)atof(q+7); g_stkPlay0=now_ms()*0.001; g_stkLast=-1;
+                            if(g_stkScrub>=0.f) printf("[track] held at %.2f s by hand\n",g_stkScrub); else printf(g_stkScrub<-1.5f?"[track] playing round on the lab's clock\n":"[track] back on the scene's clock\n"); }
+                        if((q=strstr(buf,"focus="))){ lensFocusSay(q+6); printf("[lens] focus %s%.2f, soft %.2f\n",g_lensFocus<0.f?"on the aim ":"",g_lensFocus<0.f?0.f:g_lensFocus,g_lensDof); }
+                        if((q=strstr(buf,"shutter="))){ g_lensShutter=(float)atof(q+8); printf("[lens] shutter %.2f\n",g_lensShutter); }
+                        if((q=strstr(buf,"sepia="))){ g_filmSepia=(float)atof(q+6); printf("[film] sepia %.2f\n",g_filmSepia); }
+                        if((q=strstr(buf,"grain="))){ g_filmGrain=(float)atof(q+6); printf("[film] grain %.2f\n",g_filmGrain); }
+                        if((q=strstr(buf,"flash="))){ g_filmFlash=(float)atof(q+6); printf("[film] flash %.2f\n",g_filmFlash); }
+                        if((q=strstr(buf,"burn="))){ g_filmBurn=(float)atof(q+5); printf("[film] burn %.2f\n",g_filmBurn); }
+                        if((q=strstr(buf,"weave="))){ g_filmWeave[0]=g_filmWeave[1]=0.f; sscanf(q+6,"%f,%f",&g_filmWeave[0],&g_filmWeave[1]); printf("[film] weave %.4f,%.4f\n",g_filmWeave[0],g_filmWeave[1]); }
                         if((q=strstr(buf,"vig="))){ g_vig=(float)atof(q+4); printf("[post] vignette %.2f\n",g_vig); }
                         if((q=strstr(buf,"fog="))){ float d=0,r=0,g=0,b=0; int n=sscanf(q+4,"%f,%f,%f,%f",&d,&r,&g,&b);
                             if(!strncmp(q+4,"off",3)){ d=0; n=1; }
@@ -5383,10 +4327,11 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"cam="))){
                             if(!strncmp(q+4,"off",3)){ g_camOn=0; printf("[cam] off\n"); }
                             else { float f=-1.f;
-                                int n7=sscanf(q+4,"%f,%f,%f,%f,%f,%f,%f",
+                                float rl7=0.f;
+                                int n7=sscanf(q+4,"%f,%f,%f,%f,%f,%f,%f,%f",
                                               &g_camPos[0],&g_camPos[1],&g_camPos[2],
-                                              &g_camAim[0],&g_camAim[1],&g_camAim[2],&f);
-                                if(n7>=6){ g_camOn=1; g_camFov=(n7>=7)?f:-1.f;
+                                              &g_camAim[0],&g_camAim[1],&g_camAim[2],&f,&rl7);
+                                if(n7>=6){ g_camOn=1; g_camFov=(n7>=7)?f:-1.f; g_camRoll=(n7>=8)?rl7:0.f;   /* (step 25) an eighth number rolls it; a lens placed without one is level */
                                     printf("[cam] eye %.1f,%.1f,%.1f -> aim %.1f,%.1f,%.1f fov %.0f\n",
                                            g_camPos[0],g_camPos[1],g_camPos[2],
                                            g_camAim[0],g_camAim[1],g_camAim[2],g_camFov); }
@@ -5551,24 +4496,18 @@ int main(int argc,char**argv){
             default: break; }
         }
 
-        /* S5a WEAPON PASS: every gun, bat and floor pickup in one program switch, drawn
-         * with the opaque textured program (the hologram program has no texture path). */
+        /* S5a WEAPON PASS: every gun, bat and floor pickup, drawn solid. */
         if(g_wdrawN){
-            glUseProgram(PR[0].prog); glUniformMatrix4fv(PR[0].uVP,1,GL_FALSE,vp);
-            glUniform1f(PR[0].uUse,0.f);   /* no textures survived the UE export: tint them */
-            glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDisable(GL_BLEND);
             for(int i9=0;i9<g_wdrawN;i9++){
                 int d9=g_wdraw[i9].def; if(d9<0||!g_wpnPackOK[d9]) continue;
-                glUniform3f(PR[0].uTint,WPNDEF[d9].tint[0],WPNDEF[d9].tint[1],WPNDEF[d9].tint[2]);
                 float yw9=g_wdraw[i9].yaw-1.5708f;   /* the rack runs along +X; the club faces +Z */
                 float ca9=cosf(yw9), sa9=sinf(yw9);
                 M4 wm; memset(wm,0,64);
                 wm[0]=ca9; wm[2]=-sa9; wm[5]=1.f; wm[8]=sa9; wm[10]=ca9; wm[15]=1.f;
                 wm[12]=g_wdraw[i9].x; wm[13]=g_wdraw[i9].y; wm[14]=g_wdraw[i9].z;
-                drawProp(&g_wpnPack[d9],wm,PR[0].uModel,PR[0].uPal,PR[0].uBind); }
-            g_wdrawN=0; curProg=-1; }
-        /* GAME OVERLAY FLUSH: the mode's neon geometry, one additive line batch. Rides
-         * the tracer program -- same vertex layout (pos + color, 24B stride). */
+                drawProp(&g_wpnPack[d9],wm); }
+            g_wdrawN=0;}
+        /* GAME OVERLAY FLUSH: the mode's neon geometry, one additive line batch. */
         { static long gmDbg=0; if(getenv("REVA_GMDBG")&&(gmDbg++%120)==0)
             printf("[gm] mode=%d n=%d v0=(%.1f,%.1f,%.1f rgb %.1f,%.1f,%.1f)\n",
                    g_mode,gmN,gmV[0],gmV[1],gmV[2],gmV[3],gmV[4],gmV[5]); }
@@ -5578,22 +4517,12 @@ int main(int argc,char**argv){
                                   * the batch rather than skipping the flush -- the flush
                                   * is what resets it. */
         if(gmN&&!(g_mode==MODE_ANIM&&g_labGrid>1)){   /* the multi-cam wall owns the screen */
-            glUseProgram(tProg); glUniformMatrix4fv(tVP,1,GL_FALSE,vp);
-            glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE); glDepthMask(GL_FALSE);
-            glEnable(GL_DEPTH_TEST);
-            static GLuint gmVbo=0; if(!gmVbo) glGenBuffers(1,&gmVbo);
-            glBindBuffer(GL_ARRAY_BUFFER,gmVbo);
-            glBufferData(GL_ARRAY_BUFFER,gmN*24,gmV,GL_DYNAMIC_DRAW);
-#ifdef REVA_PACKET
+            static unsigned gmVbo=0; if(!gmVbo) gmVbo = gfxBufferNew();
+            gfxBufferData(gmVbo, gmN*24, gmV, 1);
             if(!g_noDraw) gfxLines3D(gmV,gmN);
-#endif
-            glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,24,0);
-            glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,24,(void*)12);
-            for(int k9=2;k9<5;k9++) glDisableVertexAttribArray(k9);
-            glDrawArrays(GL_LINES,0,gmN);
-            glDisable(GL_BLEND); glDepthMask(GL_TRUE); curProg=-1;
+
             gmN=0; }
-        passMark("game"); postEnd(W,H,g_tone); passMark("post");   /* ⭐ resolve the 3D frame to the screen: bloom, FXAA, the knee (09-11). The HUD lands sharp on top. */
+        passMark("game");
         /* HUD — the terminal readout returns (green/pink CRT text, top-right) */
         int labClean=((g_mode==MODE_ANIM||GAME_ON)&&!getenv("REVA_ANIMHUD"));   /* REVA_ANIMHUD=1 puts the readouts back. The zombie game is not a venue: no clock, no temperature, no chord */
         /* ⭐ THE HUD CANVAS (2026-09-30). Every readout was laid out in pixels for a 1280-wide window and ran off a
@@ -5602,7 +4531,7 @@ int main(int argc,char**argv){
         const float HW=1280.f, HH=(g_dispAspect>0.f)?1280.f/g_dispAspect:1280.f*(float)H/(float)W;
         g_hudW=HW; g_hudH=HH;
         if(g_tvW!=W||g_tvH!=H) tvInit(W,H,g_dispAspect>0.f);
-        { glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        {
           /* SUBTITLES: the speaker's line across the bottom, in her own colour, with a
            * drop shadow so it survives a bright frame. Centred by the font's own metric
            * (stb_easy_font is ~6px per character at scale 1). */
@@ -5611,22 +4540,13 @@ int main(int argc,char**argv){
               if(li9>=0&&!g_scnL[li9].silent){ const char*tx=g_scnL[li9].text;   /* ⭐ ep 10: an ACTION line has no subtitle */
                   /* A SCRIM. The words landed on whoever was standing at the bottom of
                    * the frame -- kaeli's midriff ate a whole line in the two-shot. Four
-                   * stacked bands fake the gradient a single flat uCol cannot. */
+                   * stacked bands fake the gradient a single flat colour cannot. */
                   { static float bd[12]; float y0=HH-146.f, st=36.5f;
-                    glUseProgram(uProg); glUniform2f(uScr,HW,HH);
-                    glBindBuffer(GL_ARRAY_BUFFER,hudVbo);
                     for(int b6=0;b6<4;b6++){
                         float ya=y0+b6*st, yb=ya+st+1.f;
                         bd[0]=0;bd[1]=ya; bd[2]=HW;bd[3]=ya; bd[4]=HW;bd[5]=yb;
                         bd[6]=0;bd[7]=ya; bd[8]=HW;bd[9]=yb; bd[10]=0;bd[11]=yb;
-                        glUniform4f(uCol,0.f,0.f,0.f,0.10f+0.17f*(float)b6);
-                        glBufferData(GL_ARRAY_BUFFER,sizeof bd,bd,GL_DYNAMIC_DRAW);
-                        glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);
-                        for(int k6=1;k6<5;k6++) glDisableVertexAttribArray(k6);
-                        glDrawArrays(GL_TRIANGLES,0,6);
-#ifdef REVA_PACKET
                         gfxHud(bd,6,HW,HH,0.f,0.f,0.f,0.10f+0.17f*(float)b6);
-#endif
                         } }
                   float sc9=2.4f; float w9=6.0f*sc9*(float)strlen(tx);
                   float lim9=HW-110.f;
@@ -5767,8 +4687,10 @@ int main(int argc,char**argv){
               else { drawText(60,362,2.4f,sp->label,1.0f,0.92f,1.0f,0.98f);   /* raised clear of the musinfo block */
               if(sp->artist[0]){ char a2[96]; snprintf(a2,sizeof a2,"by %s",sp->artist);
                   drawText(60,386,1.6f,a2,0.5f,0.95f,0.85f,0.95f); } } }
+          if(g_tvWords&&g_mode==MODE_ANIM) tvWordsPage();   /* (step 26) the lab's `words=1`: a page of every script */
+          netHud();
           tvFlush();   /* at a bigger reading size, the frame's text goes down now that it's all known */
-          glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST); curProg=-1; }
+}
         passMark("hud");
         { float sv9[4]={g_rvx,g_rvz,g_rvHead,g_rvAlt}; g_shDumpTag="hero"; simHashMix(sv9,4);
           if(g_spOn){ float f9[2]={g_feet.y,g_feet.vy}; g_shDumpTag="feet"; simHashMix(f9,2); }
@@ -5777,6 +4699,7 @@ int main(int argc,char**argv){
           for(int i9=0;i9<NS;i9++){ float sl9[6]={slots[i9].x,slots[i9].z,slots[i9].rotY,(float)slots[i9].state,(float)slots[i9].clip,(float)slots[i9].phase}; char t9[24]; snprintf(t9,sizeof t9,"slot%d",i9); g_shDumpTag=t9; simHashMix(sl9,6); }
           if(GAME_ON&&g_game->state&&g_game->stateSize){ g_shDumpTag="game"; simHashBytes(g_game->state,g_game->stateSize); }   /* what a game says is its state is part of the receipt */
           g_shDumpTag="";
+          netTickDone();   /* (step 29) the tick's hash is whole: held against the other machines' */
           if(g_shDumpF&&g_tickTotal>=g_shDumpTick){ fclose(g_shDumpF); g_shDumpF=NULL; }
           if(g_shEvery>0&&(g_frameNo%(unsigned long)g_shEvery)==0) simHashPrint("every");
 #ifdef REVA_ALLOCCOUNT
@@ -5788,24 +4711,28 @@ int main(int argc,char**argv){
             if(ex9>0&&g_tickTotal>=ex9){ simHashPrint("end"); fflush(stdout); g_run=0; } } }
         tickAcc9+=g_tickN;
         if(g_noDraw) continue;   /* a pass that only ticks: no finish, no shot, no swap or flip. Window events and the stat line wait for the pass that draws */
-#ifdef REVA_PACKET
         { GfxView v9; memset(&v9,0,sizeof v9); memcpy(v9.vp,vp,64); memcpy(v9.sunVP,g_sunVP,64); memcpy(v9.eye,g_camEye,12); memcpy(v9.sunDir,g_sun,12); v9.sunI=g_sun[3];
           memcpy(v9.sunCol,g_sunC,12); memcpy(v9.sky,g_sky,12); memcpy(v9.fog,g_fog,12); v9.fogD=g_fog[3]; skyHorizonC(v9.clear); v9.knee=g_tone>0.f?g_tone:g_postKnee; v9.shadowOn=g_shadowOn; v9.tsec=(float)tsec; v9.exposure=g_exposure; if(g_tod>=0.f) v9.dayExposure=1.f/(0.4f+0.6f*(g_sun[3]<1.f?g_sun[3]:1.f));   /* the day's: a night's weak sun is opened up by a fixed curve, never by measuring the picture */
           if(!g_setNI&&!g_setSpace){ if(g_mode==MODE_ANIM){ v9.clear[0]=0.055f; v9.clear[1]=0.058f; v9.clear[2]=0.070f; } else { v9.clear[0]=0.006f; v9.clear[1]=0.003f; v9.clear[2]=0.014f; } }   /* a dark room, or the lab's grey: no sky to match */
           if(WORLD_OFF) memcpy(v9.clear,g_flatClear,12);
-          if(g_gameViews.n>1){ int n9=g_gameViews.n,cols9=n9>2?2:1,w9=W/cols9,h9=H/2; v9.nViews=n9;
+          clearOverride(v9.clear);   /* REVA_CLEAR=r,g,b: the impossible backdrop, for one test */
+          const int FW9=g_fairNow>0.f?(((int)((float)H*g_fairNow+0.5f))&~1):W, FX9=(W-FW9)/2;   /* (step 25) the fair view's place in the picture: all of it, when there's no rule */
+          if(g_fairNow>0.f){ v9.bars=1; if(g_gameViews.n<=1){ v9.nViews=1; memcpy(v9.views[0].vp,vp,64); memcpy(v9.views[0].eye,g_camEye,12); v9.views[0].x=FX9; v9.views[0].y=0; v9.views[0].w=FW9; v9.views[0].h=H; } }
+          if(g_gameViews.n>1){ int n9=g_gameViews.n,cols9=n9>2?2:1,w9=FW9/cols9,h9=H/2; v9.nViews=n9;
               for(int i9=0;i9<n9;i9++){ M4 pj9,vw9,vp9; const float*e9=g_gameViews.e[i9],*a9=g_gameViews.a[i9];
-                  m4_persp(pj9,g_tune.lensFov>0.f?g_tune.lensFov:42.f,VIEW_ASPECT(W,H)*((float)w9/(float)W)/((float)h9/(float)H),0.8f,fmaxf(520.f,g_setFar));
+                  m4_persp(pj9,g_tune.lensFov>0.f?g_tune.lensFov:42.f,VIEW_ASPECT(W,H)*((float)w9/(float)FW9)/((float)h9/(float)H),0.8f,fmaxf(520.f,g_setFar));
                   m4_lookat(vw9,e9[0],e9[1],e9[2],a9[0],a9[1],a9[2]); m4_mul(vp9,pj9,vw9);
-                  memcpy(v9.views[i9].vp,vp9,64); memcpy(v9.views[i9].eye,e9,12); v9.views[i9].x=(i9%cols9)*w9; v9.views[i9].y=(i9/cols9)*h9; v9.views[i9].w=w9; v9.views[i9].h=h9; } }
+                  memcpy(v9.views[i9].vp,vp9,64); memcpy(v9.views[i9].eye,e9,12); v9.views[i9].x=FX9+(i9%cols9)*w9; v9.views[i9].y=(i9/cols9)*h9; v9.views[i9].w=w9; v9.views[i9].h=h9; } }
           /* the lab's wall: a lens to a panel, and the bodies alone in each */
           if(g_wallV.n>1){ v9.nViews=g_wallV.n; v9.wall=1; for(int i9=0;i9<g_wallV.n;i9++){ memcpy(v9.views[i9].vp,g_wallV.vp[i9],64); memcpy(v9.views[i9].eye,g_wallV.eye[i9],12); v9.views[i9].x=g_wallV.x[i9]; v9.views[i9].y=g_wallV.y[i9]; v9.views[i9].w=g_wallV.w[i9]; v9.views[i9].h=g_wallV.h[i9]; } g_wallV.n=0; v9.clear[0]=0.055f; v9.clear[1]=0.058f; v9.clear[2]=0.070f; }
           /* the dance floor's coloured movers, which the old road lit the crowd with */
           if(!GAME_ON&&!WORLD_OFF&&g_mode!=MODE_ANIM&&!g_setNI) for(int k9=0;k9<nLite;k9++) frameLightAdd(liteP[k9][0],liteP[k9][1],liteP[k9][2],liteC[k9][0],liteC[k9][1],liteC[k9][2],0.055f,0.f,0.f,0.f,0.f);
           v9.skyDome=(g_mode!=MODE_ANIM&&(g_setNI||g_nPipe)&&!g_setSpace&&!WORLD_OFF);
           { static float sp9[72]; v9.space=NULL; if(g_setSpace&&!WORLD_OFF){ spaceFill(sp9,H); v9.space=sp9; } }
+          v9.focus=g_lensNow.focus; v9.dof=g_lensNow.focus>0.f?g_lensNow.dof:0.f; v9.shutter=g_lensNow.shutter; v9.sepia=g_lensNow.sepia; v9.flash=g_lensNow.flash; v9.burn=g_lensNow.burn; v9.grain=g_lensNow.grain; v9.weave[0]=g_lensNow.weave[0]; v9.weave[1]=g_lensNow.weave[1];
+          if(g_lensNow.exposure>0.f) v9.exposure=g_lensNow.exposure;   /* (step 25) the timeline's, for this frame */
           v9.filmBloom=g_bloom; v9.filmPostOn=g_postOn; v9.filmTone=g_tone; v9.fish=(g_fishTh>0.f)?g_fish:0.f; v9.fishTh=(g_fishTh>0.f)?g_fishTh:0.8f; v9.feed=g_tape; v9.feedT=g_tapeT; if(g_gloss.on){ v9.gloss[0]=g_gloss.y; v9.gloss[1]=1.f/g_gloss.fade; v9.gloss[2]=g_gloss.f0; v9.gloss[3]=g_gloss.fmax; }
-          { static int rd9=0; static float gr9=0.f,vg9=0.f; if(!rd9){ rd9=1; const char*e9=getenv("REVA_GRADE"); if(e9&&e9[0]) gr9=(float)atof(e9); e9=getenv("REVA_VIG"); if(e9&&e9[0]) vg9=(float)atof(e9); } v9.filmGrade=g_grade>0.f?g_grade:gr9; v9.filmVig=g_vig>0.f?g_vig:vg9; }
+          { static int rd9=0; static float gr9=0.f,vg9=0.f; if(!rd9){ rd9=1; const char*e9=getenv("REVA_GRADE"); if(e9&&e9[0]) gr9=(float)atof(e9); e9=getenv("REVA_VIG"); if(e9&&e9[0]) vg9=(float)atof(e9); } v9.filmGrade=g_grade>0.f?g_grade:gr9; v9.filmVig=g_vig>0.f?g_vig:vg9; if(g_lensNow.grade>=0.f) v9.filmGrade=g_lensNow.grade; }
           /* lights beyond the sun: the set's, its spots, and what the game asked for this frame */
           { static GfxLight L9[GFX_MAX_LIGHTS]; int n9=0;
             { float lp9[NLIGHT*3],lc9[NLIGHT*3]; memcpy(lp9,g_setLp,sizeof lp9); memcpy(lc9,g_setLc,sizeof lc9); for(int k9=g_setNL*3;k9<NLIGHT*3;k9++) lc9[k9]=0.f;
@@ -5813,15 +4740,18 @@ int main(int argc,char**argv){
               lightsStamp(lp9,lc9,g_setNL); for(int k9=0;k9<g_setNL&&k9<NLIGHT;k9++) g_stampK[k9]=g_setLk[k9];   /* and a light in someone's hand, in the top slots */
               for(int k9=0;k9<NLIGHT&&n9<GFX_MAX_LIGHTS;k9++){ if(lc9[k9*3]+lc9[k9*3+1]+lc9[k9*3+2]<=0.f) continue; GfxLight*L=&L9[n9++]; memset(L,0,sizeof *L); memcpy(L->pos,&lp9[k9*3],12); memcpy(L->col,&lc9[k9*3],12); L->falloff=0.055f+g_stampK[k9]; } }
             for(int k9=0;k9<g_setNSpot&&n9<GFX_MAX_LIGHTS;k9++) L9[n9++]=g_setSpot[k9];
+            if(g_gfxBeamLights>0&&g_beamLight>0.f&&g_mode==MODE_ANIM) for(int k9=0;k9<g_nBeam&&n9<GFX_MAX_LIGHTS;k9++){   /* (step 24) a beam is a light too */
+                const float len9=g_beamL[k9], wide9=fmaxf(g_beamR[k9][0],g_beamR[k9][1]), pw9=g_beamK[k9]*g_beamLight; if(len9<=1e-3f||pw9<=0.f) continue;
+                float deg9=atan2f(wide9,len9)*57.29578f*1.2f; if(deg9<5.f) deg9=5.f; if(deg9>70.f) deg9=70.f;
+                GfxLight*B9=&L9[n9++]; lightFill(B9,g_beamA[k9][0],g_beamA[k9][1],g_beamA[k9][2],g_beamC[k9][0]*pw9,g_beamC[k9][1]*pw9,g_beamC[k9][2]*pw9,0.055f,g_beamU[k9][0],g_beamU[k9][1],g_beamU[k9][2],deg9);
+                B9->shadow=(g_gfxBeamLights>1); }
             for(int k9=0;k9<g_frameNL&&n9<GFX_MAX_LIGHTS;k9++) L9[n9++]=g_frameLight[k9];
-            g_frameNL=0; v9.lights=L9; v9.nLights=n9; memcpy(v9.ground,g_ground,12); v9.haze=g_haze; }
+            g_frameNL=0; v9.lights=L9; v9.nLights=n9; memcpy(v9.ground,g_ground,12); v9.haze=g_lensNow.haze>=0.f?g_lensNow.haze:g_haze; }
           /* the lens jumped: more in one tick than anything travels. The first frame carries nothing over. */
           { static int first9=1; static float le9[3]; static unsigned cuts9=0; float dx9=g_camEye[0]-le9[0],dy9=g_camEye[1]-le9[1],dz9=g_camEye[2]-le9[2];
             if(!first9&&dx9*dx9+dy9*dy9+dz9*dz9>36.f) cuts9++;
             memcpy(le9,g_camEye,12); v9.cuts=cuts9; v9.reset=first9; first9=0; v9.tick=g_tickTotal; }
-          gfxFrameEnd(&v9); }
-#endif
-        if(g_bench) glFinish();   /* make the GPU actually finish so the number means something */
+          gfxFrameEnd(&v9); }   /* make the GPU actually finish so the number means something */
         bridgeFrameDone(W,H);
 #ifdef REVA_VK
         frameT0+=gfxWaited();   /* on the direct road the wait for the last flip happens in gfxFrameEnd: work is the CPU's own */
@@ -5845,16 +4775,16 @@ int main(int argc,char**argv){
                        const char*e2=getenv("REVA_SHOTEVERY"); every=e2?atoi(e2):1;
                        if(burst<1) burst=1;
                        if(every<1) every=1; }
+          int SW9=W,SH9=H; gfxShotSize(&SW9,&SH9);   /* (step 25) a shot is the glass's size, which is the picture's unless a presenter's between them */
           if(g_shotNow[0]){   /* LIVE SHOT: write it, keep running */
-              unsigned char*px=(unsigned char*)malloc((size_t)W*H*4);
-              while(glGetError()!=GL_NO_ERROR){}
-              glReadPixels(0,0,W,H,GL_RGBA,GL_UNSIGNED_BYTE,px);
+              unsigned char*px=(unsigned char*)malloc((size_t)SW9*SH9*4);
+              if(!gfxRead(px,SW9,SH9)) memset(px,0,(size_t)SW9*(size_t)SH9*4);
               FILE*sf=fopen(g_shotNow,"wb");
-              if(sf){ fprintf(sf,"P6\n%d %d\n255\n",W,H);
-                  unsigned char*rw=(unsigned char*)malloc((size_t)W*3);
-                  for(int y=H-1;y>=0;y--){ for(int x=0;x<W;x++){ rw[x*3]=px[((size_t)y*W+x)*4];
-                      rw[x*3+1]=px[((size_t)y*W+x)*4+1]; rw[x*3+2]=px[((size_t)y*W+x)*4+2]; }
-                      fwrite(rw,1,(size_t)W*3,sf); }
+              if(sf){ fprintf(sf,"P6\n%d %d\n255\n",SW9,SH9);
+                  unsigned char*rw=(unsigned char*)malloc((size_t)SW9*3);
+                  for(int y=SH9-1;y>=0;y--){ for(int x=0;x<SW9;x++){ rw[x*3]=px[((size_t)y*SW9+x)*4];
+                      rw[x*3+1]=px[((size_t)y*SW9+x)*4+1]; rw[x*3+2]=px[((size_t)y*SW9+x)*4+2]; }
+                      fwrite(rw,1,(size_t)SW9*3,sf); }
                   free(rw); fclose(sf);
                   printf("[lab] shot -> %s\n",g_shotNow); fflush(stdout); }
               else printf("[lab] shot FAILED to open %s (a native exe needs a Windows path)\n",g_shotNow);
@@ -5866,21 +4796,18 @@ int main(int argc,char**argv){
           ++fno;
           if(((capArm&&shotPath) || (shotN>=0 && fno>=shotN && ((fno-shotN)%every)==0)) && taken<burst){
               if(!capArm) frameCostPrint();
-              unsigned char*px=(unsigned char*)malloc((size_t)W*H*4);
-              /* GLES guarantees only GL_RGBA here; GL_RGB raises INVALID_OPERATION on ANGLE and writes nothing (an all-zero PPM). */
-              while(glGetError()!=GL_NO_ERROR){}
-              glReadPixels(0,0,W,H,GL_RGBA,GL_UNSIGNED_BYTE,px);
-              { GLenum ge=glGetError(); if(ge!=GL_NO_ERROR) printf("shot: glReadPixels failed 0x%x\n",ge); }
+              unsigned char*px=(unsigned char*)malloc((size_t)SW9*SH9*4);
+              if(!gfxRead(px,SW9,SH9)) memset(px,0,(size_t)SW9*(size_t)SH9*4);
               char pth[512];
               if(burst>1) snprintf(pth,sizeof pth,"%.*s_%05d.ppm",(int)(strrchr(shotPath,46)?(size_t)(strrchr(shotPath,46)-shotPath):strlen(shotPath)),shotPath,taken);
               else snprintf(pth,sizeof pth,"%s",shotPath);
               FILE*sf=fopen(pth,"wb");
-              if(sf){ fprintf(sf,"P6\n%d %d\n255\n",W,H);
-                      { unsigned char*rw=(unsigned char*)malloc((size_t)W*3); for(int y=H-1;y>=0;y--){ for(int x=0;x<W;x++){ rw[x*3]=px[((size_t)y*W+x)*4]; rw[x*3+1]=px[((size_t)y*W+x)*4+1]; rw[x*3+2]=px[((size_t)y*W+x)*4+2]; } fwrite(rw,1,(size_t)W*3,sf); } free(rw); }   /* GL origin is bottom-left */
-                      fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,W,H,fno); simHashPrint("shot"); }
+              if(sf){ fprintf(sf,"P6\n%d %d\n255\n",SW9,SH9);
+                      { unsigned char*rw=(unsigned char*)malloc((size_t)SW9*3); for(int y=SH9-1;y>=0;y--){ for(int x=0;x<SW9;x++){ rw[x*3]=px[((size_t)y*SW9+x)*4]; rw[x*3+1]=px[((size_t)y*SW9+x)*4+1]; rw[x*3+2]=px[((size_t)y*SW9+x)*4+2]; } fwrite(rw,1,(size_t)SW9*3,sf); } free(rw); }   /* GL origin is bottom-left */
+                      fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,SW9,SH9,fno); simHashPrint("shot"); }
               free(px); fflush(stdout); g_capBegun=1; if(++taken>=burst) exit(0); } }
         clipAuditFrame();   /* ⭐ ep 10: every body drawn this frame, tested together */
-        SDL_GL_SwapWindow(g_win); ledgerMark(wall_ms());
+        ledgerMark(wall_ms());
         { SDL_Event ev; while(SDL_PollEvent(&ev)){
             if(ev.type==SDL_QUIT) g_run=0;
             /* ESC is the start menu now (jacob's keyboard pass): QUIT lives inside it, and
@@ -5908,25 +4835,6 @@ int main(int argc,char**argv){
         (void)first;
 #else
         clipAuditFrame();   /* ⭐ ep 10 */
-#ifndef REVA_VK
-        eglSwapBuffers(dpy,esurf);
-        struct gbm_bo*bo=gbm_surface_lock_front_buffer(gsurf);
-        unsigned fb; unsigned handle=gbm_bo_get_handle(bo).u32, pitch=gbm_bo_get_stride(bo);
-        drmModeAddFB(fd,W,H,24,32,pitch,handle,&fb);
-        if(first){ if(drmModeSetCrtc(fd,crtcId,fb,0,0,&conn->connector_id,1,&mode)) die("setcrtc"); first=0; }
-        else {
-            /* PIPELINED (jacob's 30<->60 flicker: 480i quantizes every frame to 16.6 or 33.3ms --
-             * the old wait-AFTER-flip serialized render+scanout, so frames hovering at the field
-             * boundary fell to 30. Waiting for the PREVIOUS flip here instead lets the whole
-             * sim+submit of this frame hide inside last frame's scanout wait.) */
-            while(g_flipPending&&g_run){ fd_set fds; FD_ZERO(&fds); FD_SET(fd,&fds);
-                struct timeval tv={1,0}; if(select(fd+1,&fds,NULL,NULL,&tv)>0) drmHandleEvent(fd,&evctx); else break; }
-            if(g_prev2Bo){ drmModeRmFB(fd,g_prev2Fb); gbm_surface_release_buffer(gsurf,g_prev2Bo); g_prev2Bo=NULL; }
-            g_flipPending=1;
-            if(drmModePageFlip(fd,crtcId,fb,DRM_MODE_PAGE_FLIP_EVENT,NULL)) g_flipPending=0; }
-        g_prev2Bo=g_prevBo; g_prev2Fb=g_prevFb;
-        g_prevBo=bo; g_prevFb=fb;
-#endif
 #endif
         frames++;
         if(wall_ms()-lastStat>5000){ if(g_dieN||g_hideN) printf("[ledger] die=%ld hide=%ld inflight=%ld%s\n",g_dieN,g_hideN,g_dieN-g_hideN,(g_dieN-g_hideN>3)?"  ZOMBIE ALARM":"");

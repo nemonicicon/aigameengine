@@ -1,0 +1,32 @@
+# data/tube.txt -- the numbers of the flat-panel look (the `tube` setting; shaders/tube.frag; queue step 25).
+# A line is `name value`. Leave a line out and the engine's own number stands, which is the one written here.
+#
+# ⛔ NOTHING HERE HAS BEEN MEASURED OFF A TUBE YET. The signal's numbers are the NTSC standard's; the beam's, the mask's and the fields' are a typical
+# 20-inch consumer set's, from what such sets are known to be. When a set is measured (the webcam on the tube, the Pi's turn), its numbers go here,
+# and they check this model: they are never tuned to one set (design for all TVs).
+#
+# luma     how fine brightness is along a line, in samples across the picture. NTSC carries brightness to 4.2 MHz, about 80 lines of detail per MHz
+#          of picture height, 336, so 448 across a 4:3 picture
+luma 448
+# chroma   how fine colour is. NTSC's wider colour signal (I) reaches 1.3 MHz: 104 per picture height, 139 across. A set's own filters are often narrower
+chroma 139
+# beam     the spot's width, as the sigma of its profile in 480ths of the picture's height. A spot about 1.1 line pitches wide at half brightness is 0.47:
+#          at 480 lines the lines overlap into a solid picture, at 240 the same spot leaves dark between them
+beam 0.47
+# bloom    how much wider the spot is at full brightness than at none: a bright line is fatter
+bloom 0.25
+# mask     0 none, 1 slots (most consumer sets), 2 unbroken stripes (an aperture grille)
+mask 1
+# pitch    the mask's pitch in the PANEL's pixels, 3 at least (one each for red, green and blue). 0: the engine picks, 3 up to a 1440-line panel and 4 past it
+pitch 0
+# depth    how dark the mask is between its stripes, 0 no mask to 1 black
+depth 0.30
+# field    at 480 lines: the share of light the lines of the field NOT being drawn this frame are shown at. A tube's phosphor is dark again in a couple of
+#          milliseconds and the eye joins the fields; a panel holds its picture, so this stands in for that. 1 is no interlace at all, 0 is hard flicker
+field 0.55
+# gamma    the tube's curve from signal to light. A panel's is about 2.2
+gamma 2.4
+# curve    how far the glass bulges, 0 flat
+curve 0.025
+# gain     brightness made up for what the lines and the mask take away. 0: worked out from the numbers above
+gain 0

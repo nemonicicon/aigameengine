@@ -1,0 +1,11 @@
+# _mat_demo -- made by scenes/material_demo.py: what a surface is made of
+climb
+sun 42 150 1.25 1.0 0.96 0.90
+sky 0.42 0.50 0.64
+ground 0.30 0.28 0.26
+prop mat_floor  0 0 0 0 1
+prop mat_balls  0 0 0 0 1
+prop mat_panel  5.4 0 -1.2 -30 1
+light -4.5 2.6 3.0 1.0 0.55 0.25 6
+light  4.0 1.4 3.5 0.3 0.5 1.0 6
+reflect 0 1.4 2.5

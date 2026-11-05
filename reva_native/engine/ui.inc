@@ -5,17 +5,18 @@ static int apiUiMove(int player,int*sel,int n){ static int hold[4]; if(player<0|
     if(!dir) hold[player]=0;
     else { int h=hold[player]++; if(h==0||(h>18&&h%6==0)) *sel=(*sel+dir+n)%n; }
     return (p->pressed&PAD_A)?*sel:-1; }
+#define UI_TXT (TV_COLS*3+8)   /* a line of a menu, in bytes: a letter past ASCII is up to three (step 26) */
 static void apiUiList(float row,const char*const*items,int n,int sel){
-    for(int i=0;i<n;i++){ char t[TV_COLS+1]; snprintf(t,sizeof t,i==sel?"> %.30s <":"%.30s",items[i]);
+    for(int i=0;i<n;i++){ char t[UI_TXT]; snprintf(t,sizeof t,i==sel?"> %.90s <":"%.90s",langWord(items[i]));
         if(i==sel) tvTextC(row+(float)i*2.f,1,t,1.f,0.92f,0.4f); else tvTextC(row+(float)i*2.f,1,t,0.7f,0.75f,0.8f); } }
 /* ---- A FULLER MENU (queue step 10). A game says what's on it, in order, in tick, every tick: uiBegin, then uiButton, uiToggle, uiSlider, uiChoice, uiText and the rest, then uiEnd. Each answers there and then what the player just did, and the values are the game's own, so there's nothing to keep in step. Where the menu is, its EngineUi, is the game's too, so it's in the receipt and a replay does the same.
  * It's made for a pad on a tube: the stick moves between rows and changes a value, A picks, B goes back, LB and RB change tabs, and there's no pointer. What it draws is kept from the tick and drawn with the HUD, so hud has nothing to do for it, and tick's the only place a menu's asked about. A long one scrolls so that the row in use can be seen. It's all on the TV's grid, one string a row wherever it can be, so it fits itself to the player's reading size like everything else (engine/tvtext.inc). */
 #define UI_MAXROW 128     /* in one menu: past that, a row isn't there and it says so once */
 #define UI_MAXDRAW 320    /* in one frame */
-typedef struct { char s[TV_COLS+2],v[TV_COLS+2]; float col,row,cols,frac,r,g,b; int kind,wide,mark,view; } UiDraw;   /* kind: 0 a row of text, 1 a bar, 2 the panel behind a menu */
+typedef struct { char s[UI_TXT],v[UI_TXT]; float col,row,cols,frac,r,g,b; int kind,wide,mark,view; } UiDraw;   /* kind: 0 a row of text, 1 a bar, 2 the panel behind a menu */
 static UiDraw g_uiDraw[UI_MAXDRAW]; static int g_uiND=0;
 enum { UIR_TEXT, UIR_BAR, UIR_KEYS };
-typedef struct { char t[TV_COLS+2],v[TV_COLS+2]; float vy,frac; int kind,focus,off; } UiRow;
+typedef struct { char t[UI_TXT],v[UI_TXT]; float vy,frac; int kind,focus,off; } UiRow;
 static struct { EngineUi*u; int player; float col,row,cols,rows,vy,pinned; int nr,nf,on,dx,dy,d0,view; unsigned pressed; unsigned long long off; UiRow r[UI_MAXROW]; } g_ui;
 static float g_uiColF[3]={1.f,0.92f,0.4f},g_uiColN[3]={0.7f,0.75f,0.8f},g_uiColO[3]={0.34f,0.37f,0.42f};
 static char g_uiSnd[3][24];
@@ -88,16 +89,17 @@ static UiDraw* uiPut(const char*s,float col,float row,const float*c){ if(g_uiND>
 static int apiUiTabs(const char*const*names,int n){ EngineUi*u=g_ui.u; if(!u||!names||n<1) return 0;
     if(!u->editing&&(g_ui.pressed&(PAD_LB|PAD_RB))){ u->tab=(u->tab+((g_ui.pressed&PAD_RB)?1:-1)+n)%n; u->sel=0; u->top=0.f; g_ui.nf=0; uiSound(0); g_ui.pressed&=~(unsigned)(PAD_LB|PAD_RB); }
     if(u->tab<0||u->tab>=n) u->tab=0;
-    if(!u->editing){ char t[TV_COLS+2]; int at=0; for(int k=0;k<n&&at<TV_COLS;k++){ const int w=snprintf(t+at,sizeof t-(size_t)at,k==u->tab?"[%.12s]  ":"%.12s  ",names[k]); if(w<0) break; at+=w; if(at>TV_COLS) at=TV_COLS; }
+    if(!u->editing){ char t[UI_TXT]; int at=0; for(int k=0;k<n&&at<UI_TXT-40;k++){ const int w=snprintf(t+at,sizeof t-(size_t)at,k==u->tab?"[%.36s]  ":"%.36s  ",langWord(names[k])); if(w<0) break; at+=w; }
         uiPut(t,g_ui.col+2.f,g_ui.row,g_uiColF); }
     g_ui.pinned=2.f; return u->tab; }
 static int apiUiBack(void){ if(g_ui.u&&!g_ui.u->editing&&(g_ui.pressed&PAD_B)){ g_ui.pressed&=~(unsigned)PAD_B; uiSound(2); return 1; } return 0; }
 /* a label, a group of spaces and a value, to this width. One string, because a group of spaces is where a line breaks if it really won't fit */
-static void uiLine(char*o,const char*l,const char*v,int wide){ int n=0; for(const char*p=l;*p&&n<TV_COLS;p++) o[n++]=*p;
-    if(*v){ int gap=wide-n-(int)strlen(v); if(gap<2) gap=2; for(int i=0;i<gap&&n<TV_COLS;i++) o[n++]=' '; for(const char*p=v;*p&&n<TV_COLS;p++) o[n++]=*p; }
+static void uiLine(char*o,const char*l,const char*v,int wide){ int n=0; l=langWord(l); v=langWord(v);   /* (step 26) in the language chosen, and its gap counted in letters, not bytes */
+    for(const char*p=l;*p&&n<UI_TXT-2;p++) o[n++]=*p;
+    if(*v){ int gap=wide-tvLen(l)-tvLen(v); if(gap<2) gap=2; for(int i=0;i<gap&&n<UI_TXT-2;i++) o[n++]=' '; for(const char*p=v;*p&&n<UI_TXT-2;p++) o[n++]=*p; }
     o[n]=0; }
 /* the keyboard: one string a row, so it fits at any reading size, with the key in use in brackets */
-static void uiKeysDraw(const EngineUi*u,const UiRow*F,float x,float y,int wide){ char t[TV_COLS+2]; { UiDraw*D=uiPut(F->t,x,y,g_uiColF); snprintf(D->v,sizeof D->v,"%s",F->v); D->wide=wide; }
+static void uiKeysDraw(const EngineUi*u,const UiRow*F,float x,float y,int wide){ char t[UI_TXT]; { UiDraw*D=uiPut(F->t,x,y,g_uiColF); snprintf(D->v,sizeof D->v,"%s",F->v); D->wide=wide; }
     for(int ky=0;ky<4;ky++){ int n=0; for(int kx=0;kx<10;kx++){ const int on=u->ky==ky&&u->kx==kx; if(on) t[n++]='['; t[n++]=g_uiKeys[ky][kx]; if(on) t[n++]=']'; } t[n]=0; uiPut(t,x,y+2.f+(float)ky*2.f,u->ky==ky?g_uiColF:g_uiColN); }
     const int w=u->ky==4?(u->kx<4?0:u->kx<7?1:2):-1; snprintf(t,sizeof t,"%s %s %s",w==0?"[SPACE]":"SPACE",w==1?"[RUB]":"RUB",w==2?"[DONE]":"DONE"); uiPut(t,x,y+10.f,w>=0?g_uiColF:g_uiColN); }
 /* a dark back for the whole menu, so it reads over any picture. It goes in ahead of what the menu's already put */
@@ -126,9 +128,9 @@ static void apiUiEnd(void){ EngineUi*u=g_ui.u; if(!u) return; g_ui.u=NULL; u->n=
 /* with the HUD: what the tick's menus said. A row's put together here, because here's where the grid it's on is known, and the rules never see it. At a bigger reading size the layout moves rows about, so a menu's a group and tvFlush puts its panel round them */
 static void uiFlush(void){ int group=0; g_tvGroup=0;
     for(int i=0;i<g_uiND;i++){ const UiDraw*D=&g_uiDraw[i]; g_tvView=D->view;
-        if(D->kind==2){ if(g_tvRead||D->view>=0) g_tvGroup=++group; else { g_tvGroup=0; uiPanelDraw(D); } continue; }
+        if(D->kind==2){ if(TV_FIT||D->view>=0) g_tvGroup=++group; else { g_tvGroup=0; uiPanelDraw(D); } continue; }
         if(D->kind==1){ tvBar(D->col,D->row,D->cols,D->frac,D->r,D->g,D->b); continue; }
-        int c0,r0,c9,r9; tvViewRect(D->view,&c0,&r0,&c9,&r9); char t[TV_COLS+2],f[TV_COLS+4]; uiLine(t,D->s,D->v,D->wide*c9/TV_COLS);
+        int c0,r0,c9,r9; tvViewRect(D->view,&c0,&r0,&c9,&r9); char t[UI_TXT],f[UI_TXT+4]; uiLine(t,D->s,D->v,D->wide*c9/TV_COLS);
         if(D->mark){ f[0]='>'; f[1]=' '; memcpy(f+2,t,strlen(t)+1); tvText(D->col,D->row,1,f,D->r,D->g,D->b); } else tvText(D->col,D->row,1,t,D->r,D->g,D->b); }
     g_tvGroup=0; g_tvView=-1; }
 /* the CONTROLS screen: every action the game named, and what it's on. A picks one, and the next button pressed is its button, for everyone. It's written to save/controls.txt straight away, one line an action */

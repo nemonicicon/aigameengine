@@ -15,7 +15,7 @@ CWD = os.path.join(ROOT, "games", "tower")
 def build(out):
     if os.name == "nt":
         env = dict(os.environ, PATH=r"C:\msys64\mingw64\bin;" + os.environ["PATH"])
-        cmd = [r"C:\msys64\mingw64\bin\gcc.exe", "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DKHRONOS_STATIC", "-DREVA_NODOORS", "-o", out, "crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "crowd_win_rc.o", "anim_bench/physcheck.c", "gl_null.c", "gfx_packet.c", "-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lm"]
+        cmd = [r"C:\msys64\mingw64\bin\gcc.exe", "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DREVA_NODOORS", "-o", out, "crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", "crowd_win_rc.o", "anim_bench/physcheck.c", "gfx_packet.c", "-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lm"]
     else:
         env = dict(os.environ, GAME="anim_bench/physcheck.c", EXTRA="-DREVA_NODOORS", OUTDIR=os.path.dirname(out))
         cmd = ["sh", "build_pi.sh", "headless"]

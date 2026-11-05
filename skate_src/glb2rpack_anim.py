@@ -18,7 +18,14 @@ Two things about the target format drove the design:
     what a finger would do anyway if you only had a hand.
 
 Usage:
-    glb2rpack_anim.py <in.glb> <out.rpack> [--fps 30] [--scale S] [--maxbones 64]
+    glb2rpack_anim.py <in.glb> <out.rpack> [--fps 30] [--scale S] [--maxbones 64] [--height METRES] [--nomatcolour]
+
+  --height METRES  the body stands this tall at rest, measured through its own skin, and the pack is marked true size (a node named
+                   TrueScale), so the engine takes its units as metres. For anything that isn't a person: every other body is stood up to a
+                   person's height at load, and a dog that tall is a horse.
+  A part's shapes (glTF morph targets: a blink, a jaw, whatever the file names them) are kept, each as a morph on that part's mesh by its name.
+  A part with no colour texture keeps its material's flat colour: its mesh is named <mesh>_<material>#rrggbb, which is where the engine reads an
+  untextured mesh's colour. --nomatcolour leaves the names as they were (an older pack's authored data may be keyed by them).
 """
 import sys, os, json, struct, base64, argparse, math
 import rpackchunks
@@ -208,6 +215,8 @@ def main():
     ap.add_argument('--scale', type=float, default=1.0)
     ap.add_argument('--maxbones', type=int, default=MAXB)
     ap.add_argument('--norigid', action='store_true', help='skip rigid meshes on animated nodes (the pre-09-30 behaviour)')
+    ap.add_argument('--height', type=float, default=0.0, help='metres the body stands at rest; marks the pack true size')
+    ap.add_argument('--nomatcolour', action='store_true', help="don't put a flat material's colour in its mesh's name")
     ap.add_argument('--autoslice', action='store_true',
                     help='find the moves inside long reels automatically instead of being told where they are')
     ap.add_argument('--keepnames', action='store_true',
@@ -223,6 +232,9 @@ def main():
 
     js, bin_ = read_glb(a.src)
     nodes = js.get('nodes', [])
+    if a.height > 0 and not any(nd.get('name') == 'TrueScale' for nd in nodes):
+        nodes.append({'name': 'TrueScale'})   # the engine's marker: this pack's units are metres
+        js['nodes'] = nodes
     nN = len(nodes)
 
     # ---- parents ----
@@ -280,11 +292,45 @@ def main():
             if skinIdx is None:
                 continue
             prims.append({'mi': mi, 'pi': pi, 'prim': prim, 'att': att,
-                          'node': node, 'skin': skinIdx,
+                          'node': node, 'skin': skinIdx, 'tnames': (m.get('extras') or {}).get('targetNames') or [],
                           'name': m.get('name', 'mesh%d' % mi),
                           'verts': js['accessors'][att['POSITION']]['count']})
     if not prims:
         raise SystemExit('no skinned primitive found')
+    if a.height > 0:
+        import numpy as _np
+        def _trs0(nd):
+            if 'matrix' in nd:
+                return _np.array(nd['matrix'], dtype=float).reshape(4, 4).T
+            t = nd.get('translation', [0, 0, 0]); x, y, z, w = nd.get('rotation', [0, 0, 0, 1]); sc = nd.get('scale', [1, 1, 1])
+            R = _np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                           [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                           [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+            M = _np.eye(4); M[:3, :3] = R * _np.array(sc)[None, :]; M[:3, 3] = t
+            return M
+        _W = [None] * nN
+        def _world(i):
+            if _W[i] is None:
+                _W[i] = _trs0(nodes[i]) if parent[i] < 0 else _world(parent[i]) @ _trs0(nodes[i])
+            return _W[i]
+        lo, hi = 1e30, -1e30
+        for q in prims:
+            sk = js['skins'][q['skin']]
+            if sk.get('inverseBindMatrices') is None:
+                continue
+            ib = _np.array(accessor(js, bin_, sk['inverseBindMatrices']), dtype=float).reshape(-1, 4, 4).transpose(0, 2, 1)
+            J = _np.stack([_world(j) @ ib[k] for k, j in enumerate(sk['joints'])])
+            ps = _np.array(accessor(js, bin_, q['att']['POSITION']), dtype=float).reshape(-1, 3)
+            ji = _np.array(accessor(js, bin_, q['att']['JOINTS_0'])).astype(int).reshape(-1, 4)
+            jw = _np.array(accessor(js, bin_, q['att']['WEIGHTS_0']), dtype=float).reshape(-1, 4)
+            p4 = _np.concatenate([ps, _np.ones((len(ps), 1))], axis=1)
+            y = _np.zeros(len(ps))
+            for k in range(4):
+                y += jw[:, k] * _np.einsum('ij,ij->i', J[ji[:, k]][:, 1, :], p4)
+            lo = min(lo, float(y.min())); hi = max(hi, float(y.max()))
+        if hi - lo > 1e-9:
+            print('  --height %.3f m: it stands %.4f of its own units at rest, so everything is scaled by %.5f, and the pack is marked true size' % (a.height, hi - lo, a.height / (hi - lo) * a.scale))
+            a.scale *= a.height / (hi - lo)
     # ⭐ RIGID MESHES ON AN ANIMATED NODE (2026-09-30, ROBOT NEKO ep 15). The shipped characters carry
     # their skateboard as a mesh on its own node -- no JOINTS_0, animated per trick by that node's
     # translation/rotation channels. Skipped as "not skinned", both riders rode thin air for a whole
@@ -468,10 +514,29 @@ def main():
                         images.append(nimg)
                     nSlot = images.index(nimg)
 
-        built.append({'name': q['name'], 'node': q['node'], 'nv': nv, 'idx': idx,
+        # ⭐ THE FILE'S SHAPES (11-04, queue step 23). A glTF part can carry morph targets -- a blink, a jaw, a smile -- and this baker read past them: a face made
+        # in Blender with shape keys reached the engine with none. Each target becomes a morph on this mesh, by the name the file gives it, as sparse deltas.
+        shapes = []
+        for ti, tg in enumerate(prim.get('targets') or []):
+            if 'POSITION' not in tg:
+                continue
+            dl = accessor(js, bin_, tg['POSITION'])
+            tn = q.get('tnames') or []
+            rows = [(v, dl[v * 3] * a.scale, dl[v * 3 + 1] * a.scale, dl[v * 3 + 2] * a.scale) for v in range(min(nv, len(dl) // 3))
+                    if abs(dl[v * 3]) + abs(dl[v * 3 + 1]) + abs(dl[v * 3 + 2]) > 1e-7]
+            if rows:
+                shapes.append((tn[ti] if ti < len(tn) else 'target%d' % ti, rows))
+        name = q['name']
+        if texSlot < 0 and not a.nomatcolour and '#' not in name and matIdx is not None and matIdx < len(js.get('materials', [])):
+            mat = js['materials'][matIdx]
+            fac = mat.get('pbrMetallicRoughness', {}).get('baseColorFactor')
+            if fac:   # the file's colour is linear light; a name's is the colour as it's seen
+                hx = '%02x%02x%02x' % tuple(max(0, min(255, int(round((max(0.0, c) ** (1.0 / 2.2)) * 255)))) for c in fac[:3])
+                name = '%s_%s#%s' % (name, ''.join(ch if ch.isalnum() else '_' for ch in mat.get('name', 'mat%d' % matIdx)), hx)
+        built.append({'name': name, 'node': q['node'], 'nv': nv, 'idx': idx,
                       'pos': pos, 'nrm': nrm, 'uv': uv, 'jb': jb, 'wb': wb,
                       'boneMap': boneMap, 'ibm': ibmOut, 'tex': texSlot, 'ntex': nSlot, 'blend': blend,
-                      'joints': len(joints), 'kept': len(kept)})
+                      'joints': len(joints), 'kept': len(kept), 'shapes': shapes})
 
     # ---- animations, resampled to a fixed frame rate ----
     clips = []
@@ -818,6 +883,12 @@ def main():
     clipTableOff = [place(b''.join(struct.pack('<III', nd, typ, o) for (nd, typ, o) in e))
                     for e in clipTrackOff]
 
+    # the shapes: a table of (mesh, name, how many vertices move, where), then each one's (vertex, delta) rows. Header slot 14 points at it; 0 is none
+    morphRows = []
+    for bi, b in enumerate(built):
+        for nm, rows in b.get('shapes', []):
+            morphRows.append((bi, sid(nm), len(rows), place(b''.join(struct.pack('<I3f', *r) for r in rows))))
+    offMorphs = place(struct.pack('<I', len(morphRows)) + b''.join(struct.pack('<4I', *r) for r in morphRows)) if morphRows else 0
     tbl = struct.pack('<I', len(strs))
     so = 0
     for t in strs:
@@ -835,7 +906,7 @@ def main():
     out += b'RPK1'
     out += struct.pack('<15I', 2, nN, nM, nM, len(clips), nTex,
                        offNodes, offMeshes, offMats, offClips, offTexTable,
-                       offStr, offSize, total, 0)
+                       offStr, offSize, total, offMorphs)
     for i, nd in enumerate(nodes):
         t, q, sc = node_trs(nd)
         if a.scale != 1.0:
@@ -878,6 +949,9 @@ def main():
     for b in built:
         print('     mesh %-26s verts %6d  tris %6d  bones %2d/%-2d  tex %d'
               % (b['name'], b['nv'], len(b['idx']) // 3, b['kept'], b['joints'], b['tex']))
+    for b in built:
+        for nm, rows in b.get('shapes', []):
+            print('     shape %-25s on %-22s %5d vertices move' % (nm, b['name'][:22], len(rows)))
     for (nm, fps, frames, tracks) in clips:
         print('     clip %-26s %3d frames @ %gfps (%.2fs)  %d tracks'
               % (nm, frames, fps, frames / fps, len(tracks)))

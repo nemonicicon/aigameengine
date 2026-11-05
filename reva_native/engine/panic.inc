@@ -55,42 +55,13 @@ static void bhvStep(float dtf){
             g_slotHide[i]=1; g_slotBan[i]=1; g_hideN++;
             { static int pd9=-2; if(pd9==-2){ const char*e=getenv("REVA_POSEDUMP"); pd9=e?atoi(e):-9999; }
               if(pd9==i||pd9==-5) printf("[bhvev] gameT=%.2f si=%d DOWN expired -> hidden\n",g_gameT,i); } } } }
-/* the sun pass's targets and program: the mesh vertex shader (so skinned casters pose exactly
- * as they draw) over a depth-packing fragment shader that alpha-tests cut-outs */
-static void sunMapInit(const char*vs){
-    const char*fsD=
-      "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n"
-      "varying vec2 vt; uniform sampler2D smp; uniform float useTex;\n"
-      "void main(){ if(useTex>0.5&&texture2D(smp,vt).a<0.5) discard;\n"
-      "  float d=gl_FragCoord.z; vec4 e=vec4(1.0,255.0,65025.0,16581375.0)*d; e=fract(e);\n"
-      "  e-=e.yzww*vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0); gl_FragColor=e; }\n";
-    glGenTextures(1,&g_sunTex); glBindTexture(GL_TEXTURE_2D,g_sunTex);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,SUNMAP,SUNMAP,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glGenRenderbuffers(1,&g_sunDs); glBindRenderbuffer(GL_RENDERBUFFER,g_sunDs);
-    glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24_OES,SUNMAP,SUNMAP);
-    glGenFramebuffers(1,&g_sunFbo); glBindFramebuffer(GL_FRAMEBUFFER,g_sunFbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,g_sunTex,0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,g_sunDs);
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){ printf("[shadow] sun FBO incomplete -- shadows DISABLED\n"); g_sunFbo=0; glBindFramebuffer(GL_FRAMEBUFFER,0); return; }
-    glClearColor(1,1,1,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
-    GLuint p=glCreateProgram(); glAttachShader(p,sh(GL_VERTEX_SHADER,vs)); glAttachShader(p,sh(GL_FRAGMENT_SHADER,fsD));
-    glBindAttribLocation(p,0,"p"); glBindAttribLocation(p,1,"n"); glBindAttribLocation(p,2,"j"); glBindAttribLocation(p,3,"w"); glBindAttribLocation(p,4,"t");
-    glLinkProgram(p); { GLint ok; glGetProgramiv(p,GL_LINK_STATUS,&ok); if(!ok) die("sun link"); }
-    g_sunProg=p; g_su_vp=glGetUniformLocation(p,"vp"); g_su_model=glGetUniformLocation(p,"model");
-    g_su_bind=glGetUniformLocation(p,"bind"); g_su_pal=glGetUniformLocation(p,"pal"); g_su_use=glGetUniformLocation(p,"useTex");
-    glUseProgram(p); glUniform1i(glGetUniformLocation(p,"smp"),0);
-    { const char*e=getenv("REVA_SHADOW"); if(e&&e[0]) g_shadow=atoi(e)?1:0; }
-    printf("[shadow] sun map %dx%d ready (shadow=%d ext %.0f)\n",SUNMAP,SUNMAP,g_shadow,g_shadowExt); fflush(stdout); }
 /* the pass itself: at the top of the frame, before the main target binds */
-static void sunPass(int W,int H){
+static void sunPass(void){
     int want=(g_shadow>=0)?g_shadow:(g_sun[3]>0.f);
-    g_shadowOn=(want&&g_sunFbo)?1:0;
+    g_shadowOn=want?1:0;
     { static int said=-1; if(said!=g_shadowOn){ said=g_shadowOn;
         if(g_shadowOn) printf("[shadow] sun pass ON: %dx%d, window +-%.0f round the lens aim\n",SUNMAP,SUNMAP,g_shadowExt);
-        else printf("[shadow] off (%s)\n",g_sunFbo?"no sun up, or shadow=0":"no FBO");
+        else printf("[shadow] off (no sun up, or shadow=0)\n");
         fflush(stdout); } }
     if(!g_shadowOn){ g_nSunCast=g_nSunCrowd=0; return; }
     float L[3]={g_sun[0],g_sun[1],g_sun[2]}; float ll=sqrtf(L[0]*L[0]+L[1]*L[1]+L[2]*L[2]);
@@ -114,38 +85,14 @@ static void sunPass(int W,int H){
     view[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); view[13]=-(uy[0]*ex+uy[1]*ey+uy[2]*ez); view[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); view[15]=1;
     M4 ortho; memset(ortho,0,64); { float zn=1.f, zf=260.f; ortho[0]=1.f/E; ortho[5]=1.f/E; ortho[10]=-2.f/(zf-zn); ortho[14]=-(zf+zn)/(zf-zn); ortho[15]=1.f; }
     m4_mul(g_sunVP,ortho,view);
-    glBindFramebuffer(GL_FRAMEBUFFER,g_sunFbo); glViewport(0,0,SUNMAP,SUNMAP);
-    glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
-    glClearColor(1,1,1,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glUseProgram(g_sunProg); glUniformMatrix4fv(g_su_vp,1,GL_FALSE,g_sunVP);
-    g_curNrmLoc=-1;   /* the sun pass has no normal to perturb */
-    glActiveTexture(GL_TEXTURE0);
-    g_shadowPass=1; if(g_setNI||g_nPipe) drawSet(g_su_model,g_su_pal,g_su_bind,g_su_use,-1); else objDraw(g_su_model,g_su_pal,g_su_bind,g_su_use,-1); g_shadowPass=0;
-    glDisable(GL_BLEND); glDepthMask(GL_TRUE);   /* meshAlphaState may have left a blend on */
+    g_shadowPass=1; if(g_setNI||g_nPipe) drawSet(); else objDraw(); g_shadowPass=0;
     for(int ci=0;ci<g_nSunCast;ci++){ SunCast*S=&g_sunCast[ci]; Pack*Pc=S->P; PMesh*M=&Pc->meshes[S->mi];
-        glUniformMatrix4fv(g_su_model,1,GL_FALSE,S->model);
-        glUniformMatrix4fv(g_su_pal,(GLsizei)M->boneCount,GL_FALSE,S->pal);
-        { static const float I9s[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-          glUniformMatrix4fv(g_su_bind,1,GL_FALSE,S->world?I9s:(float*)(Pc->pk+M->offBind)); }
-        { int tx9=Pc->meshTex[S->mi]; if(tx9>=0){ glBindTexture(GL_TEXTURE_2D,Pc->tex[tx9]); glUniform1f(g_su_use,1.f); } else glUniform1f(g_su_use,0.f); }
-        GLuint bw9[6]; GLuint*b=&Pc->vbo[S->mi*6];
+        unsigned bw9[6]; unsigned*b=&Pc->vbo[S->mi*6];
         if(S->vb0){ memcpy(bw9,b,sizeof bw9); bw9[0]=S->vb0; if(S->vb1) bw9[1]=S->vb1; b=bw9; }
-        glBindBuffer(GL_ARRAY_BUFFER,b[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-        if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0); }
-        else glDisableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER,b[2]); glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_UNSIGNED_BYTE,GL_FALSE,0,0);
-        glBindBuffer(GL_ARRAY_BUFFER,b[3]); glEnableVertexAttribArray(3); glVertexAttribPointer(3,4,GL_UNSIGNED_BYTE,GL_TRUE,0,0);
-        if(M->flags&2){ glBindBuffer(GL_ARRAY_BUFFER,b[5]); glEnableVertexAttribArray(4); glVertexAttribPointer(4,2,GL_FLOAT,GL_FALSE,0,0); }
-        else glDisableVertexAttribArray(4);
-#ifdef REVA_PACKET
         { static const float wh9[3]={1.f,1.f,1.f}; g_vkOwner=S->owner; vkMesh(Pc,(unsigned)S->mi,S->model,S->world?NULL:(float*)(Pc->pk+M->offBind),S->pal,M->boneCount,wh9,1.f,GFX_SHADOW,b); }
-#endif
-        if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0); }
-        else glDrawArrays(GL_TRIANGLES,0,M->verts); }
+    }
     { static int said2=0; if(!said2&&g_nSunCast>0){ said2=1; printf("[shadow] first pass: %d stashed casters (%d crowd), %d props in the set\n",g_nSunCast,g_nSunCrowd,g_setNI); fflush(stdout); } }
-    g_nSunCast=g_nSunCrowd=0;
-    glBindFramebuffer(GL_FRAMEBUFFER,g_mainFB); MAINVIEW(W,H);
-    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,g_sunTex); glActiveTexture(GL_TEXTURE0); }
+    g_nSunCast=g_nSunCrowd=0; }
 
 static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float*ctr){
     bpmPoll();   /* moved above the debug return -- REVA_CAM runs were freezing bpm/SoC on the HUD */

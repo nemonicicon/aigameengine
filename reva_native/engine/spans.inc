@@ -14,7 +14,7 @@
 #define SP_MAXLIVE 384
 #define SP_JUMP 2.f        /* in one tick, that's 120 units a second: nothing walks that fast */
 typedef struct { float y0,y1; int next,walk; } SpSpan;
-typedef struct { int W,H; float x0,z0; int*col; SpSpan*sp; int n,cap,freeSp,soft; } SpGrid;   /* soft: it can be knocked aside: something loose, asleep */
+typedef struct { int W,H; float x0,z0; int*col; SpSpan*sp; int n,cap,freeSp,soft,mapped; } SpGrid;   /* soft: it can be knocked aside: something loose, asleep. mapped: a streamed cell whose part of the path map is in, so a search needn't ask about it again */
 static SpGrid g_sp;                                     /* the set's own props */
 static SpGrid* g_spLive[SP_MAXLIVE]; static int g_spNLive=0;   /* the streamed cells near the hero */
 static int g_spBuilt=0;   /* goes up each time a set's columns are made */
@@ -75,9 +75,12 @@ static void spTri(SpGrid*G,const float*a,const float*b,const float*c){
             spAdd(G,cz*G->W+cx,lo,hi,walk); } } }
 /* the columns' extent is known: make them. 0 if it's too many */
 static int spGridAlloc(SpGrid*G,float bx0,float bx1,float bz0,float bz1){
+    /* (step 28) its extent has to be a size before it's turned into a count: a prop a file put at minus infinity made this ask for a grid of no size at all, and then write to it */
+    if(!(bx1-bx0>=0.f&&bx1-bx0<1e6f&&bz1-bz0>=0.f&&bz1-bz0<1e6f)||!(bx0-bx0==0.f)||!(bz0-bz0==0.f)){ G->W=G->H=0; return 0; }
     G->x0=bx0-1.f; G->z0=bz0-1.f; G->W=(int)((bx1-bx0+2.f)/SP_CELL)+1; G->H=(int)((bz1-bz0+2.f)/SP_CELL)+1;
-    if((double)G->W*(double)G->H>(double)SP_MAXCOLS){ G->W=G->H=0; return 0; }
+    if(G->W<1||G->H<1||(double)G->W*(double)G->H>(double)SP_MAXCOLS){ G->W=G->H=0; return 0; }
     G->col=(int*)malloc((size_t)G->W*(size_t)G->H*sizeof(int)); G->cap=1<<12; G->sp=(SpSpan*)malloc((size_t)G->cap*sizeof(SpSpan)); G->freeSp=-1; G->n=0;
+    if(!G->col||!G->sp){ free(G->col); free(G->sp); G->col=NULL; G->sp=NULL; G->W=G->H=0; return 0; }
     for(size_t k=0;k<(size_t)G->W*(size_t)G->H;k++) G->col[k]=-1;
     return 1; }
 /* a mesh's triangles through a matrix: pass 0 widens the extent, pass 1 goes into the grid */

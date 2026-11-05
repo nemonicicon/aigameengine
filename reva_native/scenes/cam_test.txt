@@ -29,10 +29,10 @@
 #   [lens] line 7 camtrack slot 0 dist 5.20 height =2.60 (absolute) azim 90 fov 56 aimh 1.60 (cut)
 #   [lens] line 8 campan slot 0 aimh 1.40 eye 20.00,3.20,18.00 (cut)   [lens] line 8 camshake off
 # REVA_LENSDBG=1 (via --env) prints the lens and the tracked body's height and vertical speed every 30 frames.
-# RUN from the repo root, PY=/c/Users/jacob/AppData/Local/Python/pythoncore-3.14-64/python.exe (action lines only:
+# RUN from the repo root, PY="${CLUB_PYTHON:-python}" (action lines only:
 # nothing to voice):
 #   $PY reva_native/scenes/compile_scene.py reva_native/scenes/cam_test.txt
-#   $PY .claude/skills/run-reva/driver.py scene D:/reva902/robot_neko/ep11/cam_test_t8.mp4 --name cam_test --set southbank --seconds 35 --fps 8 --new --raw --subject r2moves --partner anima_outfit --pclip z_rm_sk_ride --clip z_rm_sk_ride
+#   $PY .claude/skills/run-reva/driver.py scene out/cam_test_t8.mp4 --name cam_test --set southbank --seconds 35 --fps 8 --new --raw --subject r2moves --partner anima_outfit --pclip z_rm_sk_ride --clip z_rm_sk_ride
 # (judge SMOOTHNESS at --fps 24, not 8: an 8 fps take cannot show a lens gliding between stepped bodies)
 # grammar: a lens test fixture, not a scene
 cast 0=reva 1=kaeli

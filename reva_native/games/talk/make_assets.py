@@ -101,7 +101,17 @@ def build_body(dst):
         ibm += [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -at[0], -at[1], -at[2], 1]
     mesh = {"name": "talk_body", "node": len(nodes) - 1, "pos": m.pos, "nrm": m.nrm, "uv": m.uv, "idx": m.idx, "joints": m.joints,
             "weights": [[1, 0, 0, 0]] * len(m.joints), "boneMap": bone_map, "ibm": ibm, "tex": 0}
-    clips = [B.clip("idle", 60, B.idle), B.clip("w_walk", 30, B.gait(0.45, 0.9, 0.35, 0.25, 0.03, 0.012)), B.clip("w_run", 20, B.gait(0.8, 1.5, 0.6, 1.1, 0.14, 0.03))]
+    def sit(u):
+        """sitting: thighs out in front, shins down, the hips a thigh lower. For the seated conversation shot (TALK_SIT=1, sit.anim)"""
+        s = math.sin(2 * math.pi * u)
+        qx = lambda a: B.q_axis(1, 0, 0, a)
+        r = B.arms(0.02 * s, -0.02 * s, 0.9)
+        for side in ("Left", "Right"):
+            r["mixamorig:%sUpLeg" % side] = qx(-1.45)
+            r["mixamorig:%sLeg" % side] = qx(1.45)
+        r["mixamorig:Spine"] = qx(0.03 + 0.012 * s)
+        return r, -0.42 + 0.003 * s
+    clips = [B.clip("idle", 60, B.idle), B.clip("w_walk", 30, B.gait(0.45, 0.9, 0.35, 0.25, 0.03, 0.012)), B.clip("w_run", 20, B.gait(0.8, 1.5, 0.6, 1.1, 0.14, 0.03)), B.clip("x_sit", 60, sit)]
     write_pack(dst, nodes, [mesh], clips, [texture()], verbose=False)
     # a lid comes down over the eye: the bottom of it, to the bottom of the eye
     add_morph(dst, 0, "blink", [(v, 0, -0.044, 0) for r in lids for v in r if m.pos[v * 3 + 1] < 1.748])

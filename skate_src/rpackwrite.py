@@ -13,7 +13,7 @@ Layout (crowd_kms.c loadPack, mirrored by skate_src/author/rpack.py):
   mesh   '<15I'        name node verts idxCount boneCount flags offPos offNorm offUV offJoints
                        offWeights offIdx offBoneMap offIBM offBind
                        flags: 1 normals, 2 uvs, 4 drawable, 8 alpha-blend pass
-  mat    36 B          mesh u32 @0, flags u32 @16 (1 nearest, 2 flip-v), tex i32 @24, normalTex+1 i32 @28
+  mat    36 B          mesh u32 @0, flags u32 @16 (1 nearest, 2 flip-v, 4 cut out by its alpha), tex i32 @24, normalTex+1 i32 @28
   clip   '<IfIII'      name fps frames nTracks offTracks;  track '<III' node type(0 rot 1 trans 2 scale) off
   tex    16 B          off u32 @8, len u32 @12 -- an image file (PNG) stb_image decodes at load
 
@@ -319,7 +319,7 @@ def write_pack(dst, nodes, meshes, clips, textures, verbose=True, fresh=False):
     for mi, m in enumerate(meshes):
         mat = bytearray(36)
         struct.pack_into('<I', mat, 0, mi)
-        struct.pack_into('<I', mat, 16, (1 if m.get('nearest') else 0) | (2 if m.get('flipv') else 0))
+        struct.pack_into('<I', mat, 16, (1 if m.get('nearest') else 0) | (2 if m.get('flipv') else 0) | (4 if m.get('cutout') else 0))   # 4: its texture's alpha cuts it out (leaves, a far-off picture of a prop)
         struct.pack_into('<i', mat, 24, m.get('tex', -1) if m.get('tex') is not None else -1)
         struct.pack_into('<i', mat, 28, (m.get('ntex', -1) if m.get('ntex') is not None else -1) + 1)
         out += mat

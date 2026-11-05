@@ -281,24 +281,21 @@ static int apiObjectOnRay(const float*a,const float*b,float*tOut){ float best=2.
     if(who&&tOut) *tOut=best;
     return who; }
 /* what isn't here, from its stand-in. Only in the picture: not in the sun's pass, and never solid */
-static void stFarDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){ if(!g_st.on||!g_st.farStem[0]||g_shadowPass) return;
+static void stFarDraw(void){ if(!g_st.on||!g_st.farStem[0]||g_shadowPass) return;
     if(g_st.farPk==-2) stFarReady();
     if(g_st.farPk<0) return;
     static const M4 ident={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; Pack*Q=&g_setPk[g_st.farPk]; const float far2=g_st.farDist*g_st.farDist; float pl[6][4]; const int cullOn=g_cullOn&&g_gameViews.n<=1;
     if(cullOn){ const float*m=g_watVP;
         for(int k=0;k<3;k++) for(int c=0;c<4;c++){ pl[k*2][c]=m[c*4+3]+m[c*4+k]; pl[k*2+1][c]=m[c*4+3]-m[c*4+k]; }
         for(int k=0;k<6;k++){ float l=sqrtf(pl[k][0]*pl[k][0]+pl[k][1]*pl[k][1]+pl[k][2]*pl[k][2]); if(l>1e-6f) for(int c=0;c<4;c++) pl[k][c]/=l; } }
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-#ifdef REVA_PACKET
     g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; g_vkOwner=(unsigned)GFX_KIND_FAR<<28;
-#endif
     for(int i=0;i<g_st.n;i++){ StCell*C=&g_st.c[i]; if(C->farMesh<0||SDL_AtomicGet(&C->state)==ST_HERE) continue; const float dx=C->fx-g_rvx,dz=C->fz-g_rvz; if(dx*dx+dz*dz>far2) continue;
         if(cullOn){ int out=0; for(int k=0;k<6&&!out;k++) if(pl[k][0]*C->fx+pl[k][1]*C->y+pl[k][2]*C->fz+pl[k][3]<-C->fr) out=1;
             if(out) continue; }
-        g_propOnly=C->farMesh; drawProp(Q,ident,uModel,uPal,uBind); }
+        g_propOnly=C->farMesh; drawProp(Q,ident); }
     g_propOnly=-1; }
 /* in both passes. The same tests a set's prop gets */
-static void objDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){ if(!g_objLive) return;
+static void objDraw(void){ if(!g_objLive) return;
     float pl[6][4]; const int cullOn=g_cullOn&&!g_shadowPass&&g_gameViews.n<=1;
     if(cullOn){ const float*m=g_watVP;
         for(int k=0;k<3;k++) for(int c=0;c<4;c++){ pl[k*2][c]=m[c*4+3]+m[c*4+k]; pl[k*2+1][c]=m[c*4+3]-m[c*4+k]; }
@@ -310,17 +307,12 @@ static void objDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
             float hh=Q->effH*0.5f,rr=sqrtf(Q->propR*Q->propR+hh*hh)*sc*1.25f+1.0f,cx=O->m[12]+O->m[0]*Q->propCx+O->m[8]*Q->propCz,cy=O->m[13]+hh*sc,cz=O->m[14]+O->m[2]*Q->propCx+O->m[10]*Q->propCz; int out=0;
             for(int k=0;k<6&&!out;k++) if(pl[k][0]*cx+pl[k][1]*cy+pl[k][2]*cz+pl[k][3]<-rr) out=1;
             if(out) continue; }
-        if(O->tinted){ glUniform1f(uUse,0.f); glUniform3f(uTint,O->tint[0],O->tint[1],O->tint[2]); }
-        else         { glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); }
-#ifdef REVA_PACKET
+        if(O->tinted){   }
+        else         {   }
         if(O->tinted){ g_vkUse=0.f; memcpy(g_vkTint,O->tint,12); } else { g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }
         g_vkOwner=((unsigned)GFX_KIND_OBJECT<<28)|(((unsigned)i&0xffffu)<<12);   /* its slot is its id for as long as it lives, whatever comes and goes around it */
-#endif
-        drawProp(Q,O->m,uModel,uPal,uBind); }
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-#ifdef REVA_PACKET
+        drawProp(Q,O->m); }
     g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f;
-#endif
 }
 /* what the receipt sees. Once any has been made, the count goes in too, so taking the last one out still shows */
 static void objHash(void){ if(!g_objEver) return; { float n9=(float)g_objLive; g_shDumpTag="objects"; simHashMix(&n9,1); }
@@ -361,9 +353,7 @@ static void bodyPackInstall(StBody*B){ if(!B->bytes){ objSay("a body's pack coul
     g_packMem=NULL; B->bytes=NULL; SDL_AtomicSet(&B->state,ST_HERE); }
 /* once a tick: one in, and one that's finished with out */
 static void bodyPackStep(void){ int in=0,out=0;
-#ifdef REVA_PACKET
     { static const char*m=(const char*)1; if(m==(const char*)1) m=getenv("REVA_MEMSAY"); if(m&&g_tickTotal%atoi(m)==0) gfxMemSay(); }
-#endif
     for(int k=0;k<g_stNBody;k++){ StBody*B=&g_stBody[k]; const int s=SDL_AtomicGet(&B->state);
         if(s==ST_AWAY&&B->want) bodyPackRead(B,k);
         else if(s==ST_READ&&!in){ in=1; bodyPackInstall(B); }

@@ -7,4 +7,5 @@ layout(location = 1) in vec4 aC;
 layout(location = 2) in vec2 aU;
 layout(location = 0) out vec4 vC;
 layout(location = 1) out vec2 vU;
-void main() { vC = aC; vU = aU; gl_Position = V.vp * vec4(aP, 1.0); }
+layout(location = 2) out vec3 vW;   // where it is, for a particle that fades out against the scene behind it (step 24)
+void main() { vC = aC; vU = aU; vW = aP; gl_Position = V.vp * vec4(aP, 1.0); }

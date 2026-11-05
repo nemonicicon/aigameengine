@@ -17,15 +17,11 @@ static void sprInit(int W,int H,int composite){ g_sprW=W; g_sprH=H; g_sprSx=W/SP
     if(!composite){ int s=g_sprSx<g_sprSy?g_sprSx:g_sprSy; g_sprSx=g_sprSy=s; }
     g_sprX0=(W-SPR_W*g_sprSx)/2; g_sprY0=(H-SPR_H*g_sprSy)/2; }
 static void sprFlush(void){ if(!g_sprN) return;
-#ifdef REVA_PACKET
     if(!g_noDraw) gfxSprites(g_sprTex,g_sprV,g_sprN,(float)g_sprW,(float)g_sprH);
-#endif
     g_sprN=0; }
 /* an image on the GPU by itself */
-static unsigned sprTexture(const unsigned char*px,int w,int h){ GLuint t; glGenTextures(1,&t); glBindTexture(GL_TEXTURE_2D,t); glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,px);
-#ifdef REVA_PACKET
+static unsigned sprTexture(const unsigned char*px,int w,int h){ unsigned t; t = gfxTextureNew();  gfxTexture(t, w, h, px);
     gfxTextureNear(t);
-#endif
     return t; }
 static void sprUpload(int i){ g_sprImg[i].tex=sprTexture(g_sprImg[i].px,g_sprImg[i].w,g_sprImg[i].h); stbi_image_free(g_sprImg[i].px); g_sprImg[i].px=NULL; }
 /* ---- A SHEET (engine plan, Phase 2: atlases). A change of texture breaks a batch of sprites, so a game's small images go on one sheet, packed at the first draw once boot() has loaded them. A game can still make its

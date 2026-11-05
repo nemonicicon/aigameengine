@@ -1,0 +1,12 @@
+# _trk3_demo -- made by scenes/trk3_demo.py: the timeline's third format on one small set
+sun 50 140 1.0
+sky 0.30 0.34 0.42
+mover trk3_card grid=2x2
+mover trk3_card grid=2x2
+mover trk3_card grid=2x2
+track sets/_trk3_demo.trk
+# a curtain pinned along the bottom of the third card, in that card's own space: it goes where the card goes
+curtain 0 0 0 1.6 1.5 0 0.75 0.12 0.12 mover=2
+# the same clip twice: the second starts half way through it
+actor v1_reva902 z_rm_sk_push      3.4 0 -1.0 0 1.0
+actor v1_reva902 z_rm_sk_push>0.5  5.0 0 -1.0 0 1.0

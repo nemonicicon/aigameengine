@@ -65,8 +65,8 @@ because the number is correct — it is the *application* that is unfinished.
 rest-delta transfer every frame for 400 slots, where Blender/UE could bake retargeted
 clips per pack offline and delete both the transfer and the "24 uncovered packs"
 problem), and a hand-rolled state machine every commercial engine ships. Both are
-deliberate: the engine runs 400 skinned bodies at ~100fps in one C file, on ANGLE here
-and bare KMS on a Pi, which is not a thing Unreal does. UE is already used correctly —
+deliberate: the engine runs 400 skinned bodies at ~100fps in one C file, on a PC's window
+and straight onto a Pi's display card, which is not a thing Unreal does. UE is already used correctly —
 as the asset source through the artery, not as the runtime.
 
 ## Standing (2026-08-26)

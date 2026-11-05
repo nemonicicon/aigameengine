@@ -295,8 +295,7 @@ static int donorOK(Pack*dp,int clip,Pack*tp){
 /* STATIC PROP DRAW (jacob 08-21, the skate work). A prop is a pack with no rig: one
  * joint at the origin, so the palette is a single identity and the vertices land exactly
  * where the baker put them. Props are baked at FINAL WORLD SIZE and therefore ignore the
- * per-pack height normalisation that sizes a dancer -- the caller owns the model matrix.
- * Assumes the skinned program is already current; restores nothing. */
+ * per-pack height normalisation that sizes a dancer -- the caller owns the model matrix. */
 /* S7 THE BORROWED STAND. Most of the roster ships no idle clip at all: the whole
  * AssetsvilleTown cast has dance loops and nothing else, and reva has no stand either.
  * Asked to stand they fell through to "hold the walk cycle 27% of the way in" -- a
@@ -353,67 +352,10 @@ static int dnStandPick(Pack*P,Pack**dp,int*dc){
         if(donorOK(g_dnIdlesP[i],g_dnIdles[i],P)){ *dp=g_dnIdlesP[i]; *dc=g_dnIdles[i]; return 2; }
     return 0; }
 static void sunStash(Pack*P,int mi,const float*pal,int nb,const float*model,int crowd);   /* the sun's caster stash (09-11), defined below */
-/* ⭐ THE NORMAL MAP, BOUND (09-11). Unit 1, next to the base colour on unit 0, and the
- * current program's uNrm says whether this mesh has one. g_curNrmLoc is set wherever a mesh
- * program is bound for drawing (-1 on the hologram and the sun pass). REVA_NONORMAL=1 for
- * the A/B. Every draw path that binds a base colour calls this right after. */
-static GLint g_curNrmLoc=-1; static int g_noNormal=-1;
-static void nrmBind(Pack*P,unsigned mi){
-    if(g_noNormal<0){ const char*e=getenv("REVA_NONORMAL"); g_noNormal=(e&&e[0]!='0')?1:0; }
-    int nt=(P->meshNTex&&!g_noNormal)?P->meshNTex[mi]:-1;
-    if(nt>=0&&P->tex[nt]){ glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,P->tex[nt]); glActiveTexture(GL_TEXTURE0);
-        if(g_curNrmLoc>=0) glUniform1f(g_curNrmLoc,1.f);
-        { static int said=0; if(said<3){ said++; printf("[normal] bound %s mesh %u slot %d on unit 1, uNrm loc %d%s\n",P->label,mi,nt,g_curNrmLoc,g_curNrmLoc<0?" -- NO LOCATION: the program was bound without setting g_curNrmLoc":""); fflush(stdout); } } }
-    else if(g_curNrmLoc>=0) glUniform1f(g_curNrmLoc,0.f); }
-/* ⭐ ep 12: A HELD PRIMITIVE IN MORE THAN ONE COLOUR. drawProp handed every mesh of a pack the ONE tint
- * its caller set, so an authored primitive was one colour -- and a cigarette is three (paper, filter,
- * ember). The garments' convention is reused, not a new one: a mesh named `...#rrggbb` takes that colour,
- * one without a colour takes the caller's, and `#rrggbb*` marks the part that GLOWS. Only a caller that
- * fills g_propMC (drawHeldOne, on the tint path) gets any of this: every other draw is untouched. */
-static struct { GLint uTint, uEmis; float base[3]; float emisAll, emisGlow; } g_propMC={-1,-1,{1.f,1.f,1.f},0.f,1.f};
-static void propMeshColour(Pack*P,unsigned mi){
-    float c[3]={g_propMC.base[0],g_propMC.base[1],g_propMC.base[2]}; int glow=0;
-    const char*mn=packStr(P,P->meshes[mi].name); const char*h=mn?strchr(mn,'#'):NULL;
-    if(h&&strlen(h)>=7){ char hx[7]; memcpy(hx,h+1,6); hx[6]=0; unsigned v=(unsigned)strtoul(hx,NULL,16);
-        c[0]=((v>>16)&255)/255.f; c[1]=((v>>8)&255)/255.f; c[2]=(v&255)/255.f; glow=(h[7]=='*'); }
-    glUniform3f(g_propMC.uTint,c[0],c[1],c[2]);
-    if(g_propMC.uEmis>=0) glUniform1f(g_propMC.uEmis,glow?g_propMC.emisGlow:g_propMC.emisAll); }
 static int g_propOnly=-1;   /* one mesh of a pack, not all of them: a far stand-in */
-static void drawProp(Pack*P,const float*model,GLint uModel,GLint uPal,GLint uBind){
-    static const M4 ident={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    /* ⛔ ONE identity is only enough for a ONE-BONE prop. A weapon is weighted entirely
-     * to bone 0; a character is not, and every vertex on a bone this never wrote reads an
-     * unset uniform and collapses to the origin -- the mesh comes back as a star of
-     * triangles radiating from a point. The bind pose IS the identity palette (the pack's
-     * inverse binds are the inverse of the rest world matrices), it just has to be
-     * identity for all of them. */
-    static float idN[MAXB*16]; static int idInit=0;
-    if(!idInit){ idInit=1; for(int b=0;b<MAXB;b++) memcpy(idN+b*16,ident,64); }
-    glUniformMatrix4fv(uModel,1,GL_FALSE,model);
+static void drawProp(Pack*P,const float*model){
     for(unsigned mi=g_propOnly>=0?(unsigned)g_propOnly:0u,me=g_propOnly>=0?mi+1u:P->nMeshes;mi<me;mi++){ PMesh*M=&P->meshes[mi];
         if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
-            meshAlphaState(M);
-        glUniformMatrix4fv(uPal,(GLsizei)(M->boneCount?M->boneCount:1),GL_FALSE,idN);
-        glUniformMatrix4fv(uBind,1,GL_FALSE,(float*)(P->pk+M->offBind));
-        GLuint*b=&P->vbo[mi*6];
-        bodyStreams(M,b);
-        { int tx=P->meshTex[mi]; if(tx>=0) glBindTexture(GL_TEXTURE_2D,P->tex[tx]); nrmBind(P,mi); }
-        if(g_propMC.uTint>=0) propMeshColour(P,mi);   /* ⭐ ep 12: per-mesh colour and glow, for a held primitive */
-        GLint shA9=-1;   /* ⭐ (10-22) a SHEER prop: blended, not depth-writing, at its marker's opacity */
-        if(P->sheer>0.f&&P->sheer<1.f){ GLint pr9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pr9); shA9=glGetUniformLocation((GLuint)pr9,"uAlpha");
-            glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); if(shA9>=0) glUniform1f(shA9,P->sheer); }
-        { int toon9=P->glow?0:toonOn(P,P->toon); toonCelSet(toon9); colSet(P,NULL,mi);
-          int look9=(toon9&&P->toon==2)||P->glow; if(look9) toonSetLook(toon9&&P->toon==2,P->glow);
-        if(M->idxCount) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]);
-#ifdef REVA_PACKET
-        g_vkMirror=1|2|((P->mirOnly||P->sheer>0.f)?4:0)|(P->mirOnly?8:0); vkMesh(P,mi,model,(float*)(P->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,g_shadowPass?GFX_SHADOW:0,NULL); g_vkMirror=0;
-#endif
-        if(!P->mirOnly){   /* ⭐ (10-22) a MirrorOnly prop shows only in reflections: a mirror's backing, seen in another */
-        if(M->idxCount) glDrawElements(GL_TRIANGLES,M->idxCount,GL_UNSIGNED_INT,0);
-        else glDrawArrays(GL_TRIANGLES,0,M->verts);
-          toonInkDraw(toon9,packStr(P,M->name),M->idxCount,M->verts); }
-          mirInst(uModel,toon9,packStr(P,M->name),M->idxCount,M->verts,1|((P->mirOnly||P->sheer>0.f)?2:0));
-          if(look9) toonSetLook(0,0); }
-        if(P->sheer>0.f&&P->sheer<1.f){ if(shA9>=0) glUniform1f(shA9,1.f); glDisable(GL_BLEND); glDepthMask(GL_TRUE); } }
+        g_vkMirror=1|2|((P->mirOnly||P->sheer>0.f)?4:0)|(P->mirOnly?8:0); vkMesh(P,mi,model,(float*)(P->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,g_shadowPass?GFX_SHADOW:0,NULL); g_vkMirror=0; }
 }
 

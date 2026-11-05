@@ -1,7 +1,6 @@
 /* ---- PARTICLES AND DECALS (11-03, engine plan Phase 6) ---------------------------------------------------------------------------------------------------------------------
  * Two fixed pools: when one's full the oldest makes way, so a big explosion can't cost more than the budget, and nothing is ever allocated in a frame. They're soft quads through the renderer's cheap effect path: a pixel of one costs next to nothing, so it's the count that's budgeted, and the count is small enough for the Pi.
  * They roll their own dice, so a burst can't change what the game's dice say next, and they're not in the sim. They do go in the packet, stepped by the tick, so a replay draws the same ones at any frame rate. */
-#ifdef REVA_PACKET
 #define FXP_MAX 512
 #define FXD_MAX 64
 typedef struct { float p[3],v[3],c[3],t,life,size,grav; } FxPart;
@@ -51,7 +50,3 @@ static void fxDrawAll(const float*view){
     const float rt[3]={view[0],view[4],view[8]},up[3]={view[1],view[5],view[9]};
     o=fxParticles(o,rt,up);
     int n=(int)((o-v)/9); if(n>0) gfxFxTris(v,n,GFX_FX_SOFT,0); }
-#else
-static void apiParticles(float x,float y,float z,int n,float speed,float life,float size,float r,float g,float b,float grav){ (void)x;(void)y;(void)z;(void)n;(void)speed;(void)life;(void)size;(void)r;(void)g;(void)b;(void)grav; }
-static void apiDecal(float x,float y,float z,float radius,float r,float g,float b,float a,float seconds){ (void)x;(void)y;(void)z;(void)radius;(void)r;(void)g;(void)b;(void)a;(void)seconds; }
-#endif

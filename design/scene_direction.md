@@ -547,6 +547,9 @@ after it. `camorbit=` with `camat=` circles a world point instead of a body (eng
 The scene moves (Wanda tugs Viktor from the freezatorium to the workshop and back to the warm corridor). Every line
 after it plays there until another `home=`.
 
+### `heyes= / peyes= / p2eyes= / p3eyes=` — eyes that glow (11-04, queue step 23)
+`r,g,b[,amount]`, or `off`. Sticky. That body's eyes glow the colour from this line on, at any graphics setting; past 1 the amount is brighter than the colour, for the bloom. It needs eyes the engine can find: meshes of their own (Anima's are found by their shape) or a built person's. REVA 902's are paint on her head, so hers wait for her rebuild. On a lab line the keys are `eyes=` for the hero and `peyes=`, `p2eyes=`, `p3eyes=`.
+
 ### `houtfit= / poutfit= / p2outfit= / p3outfit=` — dressed on the cut; `hroll=` — carried round a drum
 Section 43. (A set ACTOR's outfit is its line's `outfit=` -- design/the_set.md.)
 
@@ -685,3 +688,7 @@ round a crowded cabin -- is `snap=1` on its line instead: the cut places it.
 ### ⛔ A solo scene still gets a partner
 `driver.py scene`'s default partner is kmoves: a scene with one person in it passes `--partner off`, or a stranger
 stands in the cabin.
+
+### The lens's roll, its focus and shutter, and film's sepia and grain (11-05, queue step 25)
+
+Five more sticky keys, landing on the cut like `fish=` and `feed=`: `camroll=DEG` tilts the frame; `focus=<distance>|aim|off[,soft]` focuses the lens that far away (or on whatever it's aimed at) and lets the rest go soft; `shutter=0..1` smears a fast move; `sepia=0..1` and `grain=0..1` are film's own look. A flash and a burn are the timeline's (`design/the_set.md`, TRK4): they're moments, and a line is too long to hold one. ⛔ `roll=` was already a body carried round an axis (`hroll=`, `proll=`): the lens's is `camroll=`.

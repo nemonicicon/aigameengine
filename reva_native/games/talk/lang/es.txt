@@ -1,0 +1,12 @@
+# lang/es.txt -- TALK en español: a conversation in another language. A line of talk/hello.talk is looked up whole, exactly as the file has it, like any other text;
+# so are the choices of a question. The voice is still the file's own: a line with no sound (`-`) moves the mouth on the words it's given here.
+# E->language("es") from the game, or REVA_LANG=es for one run.
+name Español
+"Where were you last night?" = "¿Dónde estuviste anoche?"
+"Out." = "Fuera."
+"Out where?" = "¿Fuera dónde?"
+"Somewhere you have never been, and you would not like it." = "En un sitio donde nunca has estado, y no te gustaría."
+"Ask her again" = "Pregúntale otra vez"
+"Let it go" = "Déjalo estar"
+"Fine. I went to see the tower." = "Está bien. Fui a ver la torre."
+"Have it your way." = "Como tú quieras."

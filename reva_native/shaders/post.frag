@@ -6,7 +6,7 @@ layout(set = 0, binding = 1) uniform sampler2D uBloom;
 layout(set = 0, binding = 2) uniform sampler3D uLut;
 layout(set = 0, binding = 3) uniform sampler2D uAO;   // r occlusion, g contact shadow
 layout(set = 0, binding = 4) uniform sampler2D uVol;  // what the air adds
-layout(push_constant) uniform PC { vec4 a; vec4 b; vec4 c; vec4 d; } pc;  // a: exposure, bloom, the LUT's size (0 none), tonemap on. b: x the knee, y occlusion or contact on, z haze on, w the colours are already as they'll be shown. c: film's grade, its vignette, the picture's width over its height. d: the fisheye, the half-angle its corners cover, a phone's frame (1 upright, 2 wide), its clock
+layout(push_constant) uniform PC { vec4 a; vec4 b; vec4 c; vec4 d; vec4 e; vec4 f; } pc;   // e, f (step 25), film's look for the frame: e sepia, a flash, a burn, grain. f: the gate's weave x and y, the clock  // a: exposure, bloom, the LUT's size (0 none), tonemap on. b: x the knee, y occlusion or contact on, z haze on, w the colours are already as they'll be shown. c: film's grade, its vignette, the picture's width over its height. d: the fisheye, the half-angle its corners cover, a phone's frame (1 upright, 2 wide), its clock
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 o;
@@ -30,6 +30,7 @@ vec2 warp(vec2 t, float aa) {
     q.x /= aa; return q * 0.5 + 0.5;
 }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float soft2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 // seven-segment digits, for the phone's timer
 float seg(vec2 p, vec2 a, vec2 b, float w) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return step(length(pa - ba * h), w); }
 float digit(vec2 p, int d) {
@@ -54,6 +55,7 @@ void main() {
         vec2 fw = warp(fu, fasp);
         su = vec2(0.5 + (fw.x - 0.5) * wf, 1.0 - fw.y);
     }
+    su += pc.f.xy;   // the gate's weave: the whole frame off its place
     vec4 sc = texture(uScene, su); vec3 c = sc.rgb;
     if (pc.b.y > 0.5) { vec2 k = texture(uAO, su).rg; c *= k.r * k.g; }
     if (pc.b.z > 0.5) c += texture(uVol, su).rgb;
@@ -69,6 +71,18 @@ void main() {
     if (pc.c.x > 0.0) { float l0 = luma(c); vec3 s = clamp(c, 0.0, 1.0); s = s * s * (3.0 - 2.0 * s); c = mix(c, s, 0.16 * pc.c.x); c += vec3(-0.012, -0.002, 0.020) * pc.c.x * (1.0 - smoothstep(0.0, 0.45, l0)); c *= mix(vec3(1.0), vec3(1.03, 1.005, 0.965), pc.c.x * smoothstep(0.45, 1.0, l0)); float l1 = luma(c); c = mix(vec3(l1), c, 1.0 + 0.07 * pc.c.x); }   // film's gentle S
     if (pc.c.y > 0.0) { vec2 dv = (fu - 0.5) * vec2(fasp, 1.0) / sqrt(fasp * fasp + 1.0) * 2.0; c *= 1.0 - pc.c.y * 0.32 * smoothstep(0.55, 1.25, length(dv)); }   // and the corners falling away
     if (pc.a.z > 0.0) c = texture(uLut, c * (pc.a.z - 1.0) / pc.a.z + 0.5 / pc.a.z).rgb;
+    // (step 25) film's own look, on the picture as it'll be shown. Sepia: its brightness, in a brown. Grain: new every frame, stronger in the middle tones.
+    // A burn: hot orange to white, eating in from the frame's edge along a ragged front. A flash: white over all of it.
+    if (pc.e.x > 0.0) { float l = luma(c); c = mix(c, vec3(l) * vec3(1.10, 0.86, 0.60) + vec3(0.035, 0.015, 0.0) * (1.0 - l), clamp(pc.e.x, 0.0, 1.0)); }
+    if (pc.e.w > 0.0) { float l = luma(c), g = hash2(fu * vec2(1183.0, 911.0) + vec2(pc.f.z * 61.0, pc.f.z * 47.0)) - 0.5; c += g * 0.16 * pc.e.w * (0.35 + 0.65 * (1.0 - abs(2.0 * l - 1.0))); }
+    if (pc.e.z > 0.0) {
+        vec2 q = fu * vec2(fasp, 1.0) * 3.2; float T = floor(pc.f.z * 12.0);
+        float n = soft2(q + T) * 0.5 + soft2(q * 2.7 + T * 1.3) * 0.3 + soft2(q * 7.1 - T) * 0.2;
+        float edge = 1.0 - 2.0 * min(min(fu.x, 1.0 - fu.x), min(fu.y, 1.0 - fu.y));   // 0 in the middle, 1 at the frame's edge
+        float m = smoothstep(1.05 - 1.3 * pc.e.z, 1.25 - 1.3 * pc.e.z, edge + (n - 0.5) * 0.45);
+        c = mix(c, mix(vec3(1.0, 0.42, 0.08), vec3(1.0, 0.97, 0.88), smoothstep(0.35, 1.0, m)), m);
+    }
+    if (pc.e.y > 0.0) c = mix(c, vec3(1.0), clamp(pc.e.y, 0.0, 1.0));
     // a phone's frame goes on last, because a camera's own frame isn't part of the scene's exposure: its lens falling off, sensor noise, the red dot and the running timer, top left of its screen
     if (pc.d.z > 0.5) {
         float r = length((fu - 0.5) * vec2(1.10, 1.0)), T = pc.d.w;

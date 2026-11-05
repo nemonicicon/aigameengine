@@ -60,8 +60,10 @@ static void phPoint(const PHead*H,float u,float th,float*o){ float hw,f,b; phRow
     o[0]=x; o[1]=H->chinY+u*H->hh; o[2]=H->zAxis+z; }
 static void phNormal(const PHead*H,float u,float th,float*n){ float a[3],b[3],c[3],d[3]; const float du=0.006f,dt=0.03f; phPoint(H,u-du,th,a); phPoint(H,u+du,th,b); phPoint(H,u,th-dt,c); phPoint(H,u,th+dt,d); const float ax=b[0]-a[0],ay=b[1]-a[1],az=b[2]-a[2],bx=d[0]-c[0],by=d[1]-c[1],bz=d[2]-c[2]; n[0]=by*az-bz*ay; n[1]=bz*ax-bx*az; n[2]=bx*ay-by*ax; float p[3]; phPoint(H,u,th,p); if(n[0]*p[0]+n[2]*(p[2]-H->zAxis)+n[1]*(p[1]-H->chinY-0.5f*H->hh)<0.f){ n[0]=-n[0]; n[1]=-n[1]; n[2]=-n[2]; } }
 /* ---- the texture: the face on the left, front on, and flat colours on the right ---- */
+/* (step 23) its alpha says what kind of surface each pixel is, because the whole person is one mesh: 230 skin, 204 hair, 179 an eye, 153 cloth, 255 nothing in particular.
+ * A mesh whose name has person_body in it is read that way (engine/load.inc, MAT_KIND). Nothing's see-through: every one of them is well over the half that cuts a hole */
 static void pbPaint(unsigned char*px,const EngineBodySpec*S,const PHead*H,const unsigned char col[9][3]){ (void)S; const int W=128,HT=64;
-    for(int y=0;y<HT;y++) for(int x=0;x<W;x++){ unsigned char*o=px+(size_t)(y*W+x)*4; float c[3]; const unsigned char*sk=col[PC_SKIN]; c[0]=sk[0]; c[1]=sk[1]; c[2]=sk[2];
+    for(int y=0;y<HT;y++) for(int x=0;x<W;x++){ unsigned char*o=px+(size_t)(y*W+x)*4; float c[3]; const unsigned char*sk=col[PC_SKIN]; c[0]=sk[0]; c[1]=sk[1]; c[2]=sk[2]; unsigned char ka=230;
         if(x<64){ const float X=((float)x+0.5f)/32.f-1.f,U=((float)y+0.5f)/64.f*0.86f,ax=fabsf(X); const float mw=0.34f;
             /* a blush on the cheeks */
             { const float bl=0.10f*pbG(ax-0.52f,0.2f)*pbG(U-0.32f,0.06f); c[0]+=(205.f-c[0])*bl; c[1]+=(80.f-c[1])*bl; c[2]+=(80.f-c[2])*bl; }
@@ -73,8 +75,9 @@ static void pbPaint(unsigned char*px,const EngineBodySpec*S,const PHead*H,const 
             /* the brows, in the hair's colour */
             { const float m=fabsf(ax-0.47f)/0.27f; const float yb=0.605f+0.016f*(1.f-m*m); if(m<1.f&&fabsf(U-yb)<0.012f*(1.f-0.45f*m)){ const unsigned char*h=col[PC_HAIR]; c[0]=h[0]*0.8f; c[1]=h[1]*0.8f; c[2]=h[2]*0.8f; } } }
         else { const int cx=(x-64)/16,cy=y/16,cell=cy*4+cx; const unsigned char*f=cell<9?col[cell]:col[PC_SKIN]; c[0]=f[0]; c[1]=f[1]; c[2]=f[2];
+            ka=(unsigned char)(cell==PC_HAIR?204:(cell==PC_TOP||cell==PC_BOTTOM)?153:(cell==PC_EYE||cell==PC_WHITE)?179:(cell==PC_SKIN||cell>=9)?230:255);
             if(cell==PC_EYE){ const float ex=((float)(x-64-cx*16)-7.5f)/7.5f,ey=((float)(y-cy*16)-7.5f)/7.5f,r=sqrtf(ex*ex+ey*ey); const unsigned char*wh=col[PC_WHITE]; if(r>0.62f){ c[0]=wh[0]; c[1]=wh[1]; c[2]=wh[2]; } else if(r<0.26f){ c[0]=c[1]=c[2]=12.f; } else { const float k=0.65f+0.5f*r; c[0]*=k; c[1]*=k; c[2]*=k; } } }
-        o[0]=(unsigned char)pbClamp(c[0],0.f,255.f); o[1]=(unsigned char)pbClamp(c[1],0.f,255.f); o[2]=(unsigned char)pbClamp(c[2],0.f,255.f); o[3]=255; } }
+        o[0]=(unsigned char)pbClamp(c[0],0.f,255.f); o[1]=(unsigned char)pbClamp(c[1],0.f,255.f); o[2]=(unsigned char)pbClamp(c[2],0.f,255.f); o[3]=ka; } }
 /* a PNG with nothing compressed: it's small, and stb_image reads it like any other */
 static unsigned pbCrc(unsigned c,const unsigned char*b,size_t n){ c=~c; for(size_t i=0;i<n;i++){ c^=b[i]; for(int k=0;k<8;k++) c=(c>>1)^(0xEDB88320u&(0u-(c&1u))); } return ~c; }
 static void pbBE(unsigned char*o,unsigned v){ o[0]=(unsigned char)(v>>24); o[1]=(unsigned char)(v>>16); o[2]=(unsigned char)(v>>8); o[3]=(unsigned char)v; }

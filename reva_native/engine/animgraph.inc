@@ -35,18 +35,19 @@ static void agLoad(int g){ AgGraph*G=&g_agG[g]; FILE*f=fopen(G->path,"r"); G->di
     free(G->ref); G->ref=NULL; G->refN=0; G->heroP=NULL;
     G->nS=G->nW=G->nE=0; char ln[160];
     while(fgets(ln,sizeof ln,f)){ if(ln[0]=='#') continue;
+        if(!txtNumsOk(ln,1e6)){ printf("[anim] %s: a line with a number in it that isn't one, left out: %.60s\n",G->path,ln); fflush(stdout); continue; }   /* (step 28) a rate of 1e308 hung the loop that wraps a clip */
         char a[32],c[32],d[32];
         if(!strncmp(ln,"state ",6)&&G->nS<AG_MAXS){ AgState*S=&G->s[G->nS]; memset(S,0,sizeof *S);
             int n=sscanf(ln,"state %23s %31s %31s %31s",S->name,S->clip,c,d); if(n<3) continue;
             S->once=!strcmp(c,"once"); S->rate=1.f;
-            if(n==4){ if(!strcmp(d,"gait")) S->gait=1; else S->rate=(float)atof(d); }
+            if(n==4){ if(!strcmp(d,"gait")) S->gait=1; else { S->rate=(float)atof(d); if(!(S->rate>-64.f&&S->rate<64.f)) S->rate=1.f; } }   /* (step 28) a rate is a speed, held to one */
             S->c=-1; G->nS++; continue; }
         if(!strncmp(ln,"event ",6)&&G->nE<AG_MAXE){ AgEvent*E9=&G->e[G->nE];
-            if(sscanf(ln,"event %31s %f %23s",a,&E9->u,E9->name)==3){ E9->st=agStateOf(G,a); if(E9->st<0) printf("[anim] %s: an event on a state that isn't there: %s\n",G->path,a); else G->nE++; }
+            if(sscanf(ln,"event %31s %f %23s",a,&E9->u,E9->name)==3){ if(!(E9->u>=0.f)) E9->u=0.f; else if(E9->u>1.f) E9->u=1.f; E9->st=agStateOf(G,a); if(E9->st<0) printf("[anim] %s: an event on a state that isn't there: %s\n",G->path,a); else G->nE++; }
             continue; } }
     /* the states are all known now: the transitions can name them in any order */
     rewind(f);
-    while(fgets(ln,sizeof ln,f)){ char a[32],b[32],c[40]; if(strncmp(ln,"when ",5)||G->nW>=AG_MAXW) continue;
+    while(fgets(ln,sizeof ln,f)){ char a[32],b[32],c[40]; if(strncmp(ln,"when ",5)||G->nW>=AG_MAXW||!txtNumsOk(ln,1e6)) continue;
         if(sscanf(ln,"when %31s %31s %39s",a,b,c)!=3) continue;
         AgWhen*W=&G->w[G->nW]; W->from=strcmp(a,"any")?agStateOf(G,a):-1; W->to=agStateOf(G,b);
         if((W->from<0&&strcmp(a,"any"))||W->to<0){ printf("[anim] %s: a transition names a state that isn't there: %s %s\n",G->path,a,b); continue; }
@@ -84,7 +85,7 @@ static int agTransit(AgGraph*G,AgRun*R,float*prev){
 static void agAdvance(AgGraph*G,AgRun*R,const PClip*c,float r,float dt,int fresh,float prev,int who){ const AgState*S=&G->s[R->cur]; float len=c->frames>1?(float)c->frames/c->fps:1.f, wrapped=0.f;
     if(!fresh) R->u+=dt*r/len;
     if(S->once){ if(R->u>=1.f){ R->u=1.f; R->done=1; } }
-    else while(R->u>=1.f){ R->u-=1.f; wrapped=1.f; }
+    else if(R->u>=1.f){ R->u-=floorf(R->u); wrapped=1.f; if(!(R->u>=0.f&&R->u<1.f)) R->u=0.f; }   /* (step 28) once round or a hundred times, in one go: the same answer as taking 1 off until it's under 1, and it can't run for ever */
     for(int i=0;i<G->nE;i++){ const AgEvent*E9=&G->e[i]; if(E9->st!=R->cur) continue;
         if(wrapped>0.f?(E9->u>prev||E9->u<=R->u):(E9->u>prev&&E9->u<=R->u)){ if(g_game&&g_game->clipEvent) g_game->clipEvent(who,E9->name); } } }
 /* one tick for the hero: which clip, and how far through it */

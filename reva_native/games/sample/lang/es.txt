@@ -1,0 +1,9 @@
+# lang/es.txt -- TAG en español: what a language's file looks like. The left side is the game's own text, exactly as the game has it; the right is what's shown.
+# A line this file hasn't got stays as the game wrote it. E->language("es") from the game, or REVA_LANG=es for one run.
+name Español
+"SCORE %d" = "PUNTOS %d"
+"ROUND %d" = "RONDA %d"
+"LEFT %d" = "QUEDAN %d"
+"BEST %d" = "RÉCORD %d"
+"PRESS A TO PLAY" = "PULSA A PARA JUGAR"
+"B TO PLAY AGAIN" = "B PARA REPETIR"

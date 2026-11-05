@@ -9,7 +9,7 @@
  * Scale: reva is 3.45 units tall, so 1 unit is about half a metre. */
 #define PARK_EXT  26.0f      /* the park is 52x52 units -- about 26m across */
 #define PARK_STEP 0.40f
-static GLuint parkVbo[3]={0,0,0}; static int parkVerts=0; static GLuint parkTex=0;
+static unsigned parkVbo[3]={0,0,0}; static int parkVerts=0; static unsigned parkTex=0;
 
 static float parkH(float x,float z){
     float y=0.f;
@@ -66,7 +66,7 @@ static void parkN(float x,float z,float*n){
 typedef struct { float a[3],b[3]; float r; const char*name; } Rail;
 static Rail g_rail[6];
 static int  g_nRail=0;
-static GLuint railVbo[2]={0,0}; static int railVerts=0;
+static unsigned railVbo[2]={0,0}; static int railVerts=0;
 
 static void railAdd(float ax,float ay,float az,float bx,float by,float bz,float r,const char*nm){
     if(g_nRail>=(int)(sizeof g_rail/sizeof g_rail[0])) return;
@@ -118,9 +118,9 @@ static void railBuild(void){
                 v++; }
         }
     }
-    glGenBuffers(2,railVbo);
-    glBindBuffer(GL_ARRAY_BUFFER,railVbo[0]); glBufferData(GL_ARRAY_BUFFER,(size_t)railVerts*12,P,GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER,railVbo[1]); glBufferData(GL_ARRAY_BUFFER,(size_t)railVerts*12,N,GL_STATIC_DRAW);
+    gfxBuffersNew(2,railVbo);
+     gfxBufferData(railVbo[0], (size_t)railVerts*12, P, 0);
+     gfxBufferData(railVbo[1], (size_t)railVerts*12, N, 0);
     free(P); free(N);
     printf("rails: %d, %d tris\n",g_nRail,railVerts/3);
 }
@@ -160,19 +160,15 @@ static void parkBuild(void){
             parkN(xx,zz,N+v*3);
             T[v*2]=xx*0.55f; T[v*2+1]=zz*0.55f;   /* tight tile: the scan reads as grit, not as its atlas */
             v++; } }
-    glGenBuffers(3,parkVbo);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[0]); glBufferData(GL_ARRAY_BUFFER,(size_t)parkVerts*12,P,GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[1]); glBufferData(GL_ARRAY_BUFFER,(size_t)parkVerts*12,N,GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[2]); glBufferData(GL_ARRAY_BUFFER,(size_t)parkVerts*8,T,GL_STATIC_DRAW);
+    gfxBuffersNew(3,parkVbo);
+     gfxBufferData(parkVbo[0], (size_t)parkVerts*12, P, 0);
+     gfxBufferData(parkVbo[1], (size_t)parkVerts*12, N, 0);
+     gfxBufferData(parkVbo[2], (size_t)parkVerts*8, T, 0);
     free(P); free(N); free(T);
     railBuild();
     { int tw,th,comp; unsigned char*img=stbi_load("props/park_diffuse.jpg",&tw,&th,&comp,4);
-      if(img){ glGenTextures(1,&parkTex); glBindTexture(GL_TEXTURE_2D,parkTex);
-               glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,tw,th,0,GL_RGBA,GL_UNSIGNED_BYTE,img);
-               glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-               glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-               glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-               glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+      if(img){ parkTex = gfxTextureNew();
+               gfxTexture(parkTex, tw, th, img);
                stbi_image_free(img);
                printf("park: %d tris, scan texture %dx%d\n",parkVerts/3,tw,th); }
       else printf("park: %d tris, NO texture (props/park_diffuse.jpg missing)\n",parkVerts/3); }
@@ -180,42 +176,17 @@ static void parkBuild(void){
 
 /* The park has no rig at all, so joints/weights come in as CONSTANT vertex attributes
  * (bone 0, full weight) rather than as buffers nobody would ever vary. */
-static void parkDraw(GLint uModel,GLint uPal,GLint uBind){
+static void parkDraw(void){
     static const M4 ident={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     if(!parkVerts) return;
-    glUniformMatrix4fv(uModel,1,GL_FALSE,ident);
-    glUniformMatrix4fv(uPal,1,GL_FALSE,ident);
-    glUniformMatrix4fv(uBind,1,GL_FALSE,ident);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0);
-    glBindBuffer(GL_ARRAY_BUFFER,parkVbo[2]); glEnableVertexAttribArray(4); glVertexAttribPointer(4,2,GL_FLOAT,GL_FALSE,0,0);
-    glDisableVertexAttribArray(2); glVertexAttrib4f(2,0.f,0.f,0.f,0.f);
-    glDisableVertexAttribArray(3); glVertexAttrib4f(3,1.f,0.f,0.f,0.f);
-    if(parkTex) glBindTexture(GL_TEXTURE_2D,parkTex);
-    glDrawArrays(GL_TRIANGLES,0,parkVerts);
-#ifdef REVA_PACKET
     if(!g_noDraw){ GfxMesh m9; memset(&m9,0,sizeof m9); m9.id=((unsigned)GFX_KIND_PROP<<28)|(0xf300u<<12); m9.vb[0]=parkVbo[0]; m9.vb[1]=parkVbo[1]; m9.vb[5]=parkVbo[2]; m9.nVerts=(unsigned)parkVerts; m9.model=ident; m9.tex=parkTex; m9.tint[0]=m9.tint[1]=m9.tint[2]=1.f; m9.useTex=parkTex?1.f:0.f; gfxMesh(&m9); }
-#endif
 }
 
 /* Rails are painted metal, not concrete: no texture, flat tint. */
-static void railDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
+static void railDraw(void){
     static const M4 ident={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     if(!railVerts) return;
-    glUniformMatrix4fv(uModel,1,GL_FALSE,ident);
-    glUniformMatrix4fv(uPal,1,GL_FALSE,ident);
-    glUniformMatrix4fv(uBind,1,GL_FALSE,ident);
-    glUniform1f(uUse,0.f); glUniform3f(uTint,0.72f,0.74f,0.80f);
-    glBindBuffer(GL_ARRAY_BUFFER,railVbo[0]); glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-    glBindBuffer(GL_ARRAY_BUFFER,railVbo[1]); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0);
-    glDisableVertexAttribArray(2); glVertexAttrib4f(2,0.f,0.f,0.f,0.f);
-    glDisableVertexAttribArray(3); glVertexAttrib4f(3,1.f,0.f,0.f,0.f);
-    glDisableVertexAttribArray(4);
-    glDrawArrays(GL_TRIANGLES,0,railVerts);
-#ifdef REVA_PACKET
     if(!g_noDraw){ GfxMesh m9; memset(&m9,0,sizeof m9); m9.id=((unsigned)GFX_KIND_PROP<<28)|(0xf301u<<12); m9.vb[0]=railVbo[0]; m9.vb[1]=railVbo[1]; m9.nVerts=(unsigned)railVerts; m9.model=ident; m9.tint[0]=0.72f; m9.tint[1]=0.74f; m9.tint[2]=0.80f; gfxMesh(&m9); }
-#endif
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
 }
 
 /* ================= A SMALL ANIMATION SYSTEM =========================================

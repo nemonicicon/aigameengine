@@ -231,10 +231,10 @@ static int scnLoad(const char*name){
                     L->pipe[k10][0]=L->pipeAir[k10][0]=0; }   /* ⭐ ep 11 */
                 L->trkN=L->trkHas=L->panN=L->panHas=L->hldN=L->hldHas=0;
                 L->movHas=L->orbN=L->orbHas=L->orbAbs=L->trkAbs=L->shkHas=0; L->secs=-1.f; L->set[0]=0; L->atHas=0;
-                L->home[0]=0; for(int o12=0;o12<4;o12++){ L->outfit[o12][0]=0; L->roll[o12][0]=0; }   /* ⭐ ep 11 */
+                L->home[0]=0; for(int o12=0;o12<4;o12++){ L->outfit[o12][0]=0; L->roll[o12][0]=0; L->eyes[o12][0]=0; }   /* ⭐ ep 11 */
                 L->silent=(L->text[0]==0);
                 L->hlook=L->plook=1; L->shot=SHOT_OTS;
-                L->hbrow=L->pbrow=-9.f; L->hgt=0.f; L->step=-1.f; L->tod=-1.f; L->tone=-1.f; L->feed=-1.f; L->fish=-1.f; L->snap=0;
+                L->hbrow=L->pbrow=-9.f; L->hgt=0.f; L->step=-1.f; L->tod=-1.f; L->tone=-1.f; L->feed=-1.f; L->fish=-1.f; L->snap=0; L->camRoll=L->shut=L->sepia=L->grain=-9999.f; L->focusSaid[0]=0;
                 L->reverse=0; L->jawgain=-1.f; L->to=-1;
                 L->hover[0]=L->pover[0]=L->p2over[0]=0;
                 L->htrick[0]=L->ptrick[0]=L->p2trick[0]=L->p3trick[0]=0;   /* ⭐ ep 10 */
@@ -336,6 +336,11 @@ static int scnLoad(const char*name){
                   if((q=strstr(ln,LK10[s10]))) L->loop[s10]=atoi(q+strlen(LK10[s10])); } }
             if((q=strstr(ln," feed="))){ L->feed=(float)atoi(q+6); if(L->feed<0.f)L->feed=0.f; if(L->feed>2.f)L->feed=2.f; }
             if((q=strstr(ln," fish="))){ L->fish=(float)atof(q+6); if(L->fish<0.f)L->fish=0.f; if(L->fish>1.f)L->fish=1.f; }
+            if((q=strstr(ln," camroll="))) L->camRoll=(float)atof(q+9);   /* (step 25) the lens and film's look, per line */
+            if((q=strstr(ln," focus="))){ int k9=0; q+=7; while(q[k9]&&q[k9]!=' '&&q[k9]!='\t'&&q[k9]!='\n'&&q[k9]!='\r'&&k9<23){ L->focusSaid[k9]=q[k9]; k9++; } L->focusSaid[k9]=0; }
+            if((q=strstr(ln," shutter="))) L->shut=(float)atof(q+9);
+            if((q=strstr(ln," sepia="))) L->sepia=(float)atof(q+7);
+            if((q=strstr(ln," grain="))) L->grain=(float)atof(q+7);
             if((q=strstr(ln," camhold="))){ q+=9;
                 if(!strncmp(q,"off",3)) L->hldHas=2;
                 else { float h12[5]={0.f,1.f,-1.f,1.4f,0.f}; int dummy12=0;
@@ -371,6 +376,10 @@ static int scnLoad(const char*name){
               for(int o12=0;o12<4;o12++) if((q=strstr(ln,OK12[o12]))){ int k12=0; q+=strlen(OK12[o12]);
                   while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<23) L->outfit[o12][k12++]=*q++;
                   L->outfit[o12][k12]=0; } }
+            { static const char*const EK12[4]={" heyes="," peyes="," p2eyes="," p3eyes="};   /* (step 23) eyes that glow */
+              for(int o12=0;o12<4;o12++) if((q=strstr(ln,EK12[o12]))){ int k12=0; q+=strlen(EK12[o12]);
+                  while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<27) L->eyes[o12][k12++]=*q++;
+                  L->eyes[o12][k12]=0; } }
             { static const char*const RK12[4]={" hroll="," proll="," p2roll="," p3roll="};
               for(int o12=0;o12<4;o12++) if((q=strstr(ln,RK12[o12]))){ int k12=0; q+=strlen(RK12[o12]);
                   while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k12<95) L->roll[o12][k12++]=*q++;

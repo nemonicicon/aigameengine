@@ -113,6 +113,7 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
                   * span); camshake=amp[,hz] (shkHas 1 said). A height written `=h` is ABSOLUTE world y (trkAbs for
                   * camtrack, orbAbs for camorbit), not a height above the body. */
                  float mov[7], orb[7], secs, shk[2]; int movHas, orbN, orbHas, orbAbs, trkAbs, shkHas;
+                 float camRoll, shut, sepia, grain; char focusSaid[24];   /* (step 25) camroll= shutter= sepia= grain= (under -9000: not said) and focus= as it was written */
                  int silent;            /* ⭐ ep 10: an ACTION line -- nothing said, so no subtitle and no mouth */
                  float hbrow,pbrow;     /* -1..1; -9 = leave it to the reactive brow */
                  float hgt;             /* camera height off the eyeline: -low +high */
@@ -130,6 +131,7 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
                  char set[48];          /* ⭐ 10-22: this line plays on ANOTHER set (a cutaway); NOT sticky -- home after */
                  char home[48];         /* ⭐ 10-22: the scene's HOME set from this line on (sticky in the compiler) */
                  char outfit[4][24];    /* ⭐ 10-22: houtfit/poutfit/p2outfit/p3outfit -- dressed on the cut (sticky) */
+                 char eyes[4][28];      /* (step 23) heyes/peyes/p2eyes/p3eyes: r,g,b[,amount] or off -- that body's eyes glow from this line on (sticky) */
                  char roll[4][96];      /* ⭐ 10-22: hroll/proll/p2roll/p3roll -- the body's placement turned round an axis */
                  float at[3]; int atHas;   /* ⭐ 10-22: camat=x,y,z: camorbit circles this WORLD point, not a body */
                  /* ⭐ THE REACTION SHOT. Which body the LENS treats as the subject, when
@@ -569,6 +571,7 @@ static int heldFind(const char*stem){
     int idx=-1;
     float ext9=0.f, loY9=0.f, hiY9=0.f, lo9[3]={0,0,0}, hi9[3]={0,0,0}, deckY9=-1e9f;
     if(f){ fclose(f); g_setPk[g_setNP]=loadPack(pp); idx=g_setNP++;
+           g_setLod[idx][0]=g_setLod[idx][1]=g_setLod[idx][2]=-1;   /* (11-05) this place doesn't come through setPack either: its row says "no lighter copies", and not whatever was there (engine/stream.inc has what that cost) */
            /* ⭐ HOW BIG IS IT -- off EVERY mesh's own vertices (a prop is one node at identity, so
             * its buffer IS its rest shape). This is what makes a held size a WORLD size. */
            { Pack*HP=&g_setPk[idx]; float lo[3]={1e9f,1e9f,1e9f}, hi[3]={-1e9f,-1e9f,-1e9f};
@@ -1719,8 +1722,7 @@ static void locoLeanModel(float*model,int slot,float floorY){
 /* ONE DRAW, called once per held slot per body. ⛔ Copying this loop body for the second
  * slot is the same mistake as a second parser: every later fix would have to be made twice
  * and one of them would be missed. */
-static void drawHeldOne(int i,const char*spec,int which,
-                        GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint,GLint uEmis9){
+static void drawHeldOne(int i,const char*spec,int which){
         const char*w9=which?" prop2":"";
         /* ⭐ A REFUSAL IS SAID OUT LOUD (ROBOT NEKO ep 2). Every skip below was silent, so a script
          * put a coffee in two women's hands and a torch in one, the take came back with nothing
@@ -1753,7 +1755,7 @@ static void drawHeldOne(int i,const char*spec,int which,
         HeldSpec HS9; heldParse(spec,&HS9);
         const char*stem9=HS9.stem; const char*where9=HS9.where;
         float hs=HS9.size, hp=HS9.pitch, lpow9=HS9.lpow;
-        float*tint9=HS9.tint;
+
         /* the SHARED resolver -- the same one the practical pass uses, so the light and the
          * mesh cannot end up in different hands, and so an unspecified second prop takes
          * the other hand instead of silently overlapping the first. */
@@ -1836,7 +1838,7 @@ static void drawHeldOne(int i,const char*spec,int which,
         /* ⛔ AN UNTEXTURED PROP MUST TAKE THE TINT PATH. The authored primitives (mug,
          * hammer, board, torch) carry no texture, and the textured branch samples an
          * unbound unit -- so the coffee came out a BLACK CYLINDER in her hand and nothing
-         * said a word. uUse=0 hands the shader a flat colour instead, which is exactly
+         * said a word. useTex=0 hands the renderer a flat colour instead, which is exactly
          * what the town kit's untextured props already do. */
         /* ⭐ A HELD LIGHT DRAWS AS ITS OWN COLOUR, UNLIT. Shaded like everything else it is
          * the DARKEST thing in the frame -- the practical sits inside it, so every one of its
@@ -1845,9 +1847,8 @@ static void drawHeldOne(int i,const char*spec,int which,
          * nothing else: no sun, no sky, no practicals. It always takes the tint path, so a
          * textured lamp still glows the colour the script named. */
         { Pack*HP=&g_setPk[pk];
-          if(lpow9>0.f||HP->nTex==0){ glUniform1f(uUse,0.f); glUniform3f(uTint,tint9[0],tint9[1],tint9[2]); }
-          else                      { glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f); } }
-        if(uEmis9>=0) glUniform1f(uEmis9,(lpow9>0.f)?1.f:0.f);
+          if(lpow9>0.f||HP->nTex==0){   }
+          else                      {   } }
         /* ⭐ ep 12: HELD PART-WAY ALONG (`where:0.3`). The point `along` of the way from the prop's grip end (nearP)
          * to its far tip goes to the attach point, instead of its origin -- so everything downstream (the ember's
          * light, the tip's smoke, the drag's filter-to-mouth test) reads the prop where it is actually held. */
@@ -1864,53 +1865,27 @@ static void drawHeldOne(int i,const char*spec,int which,
                    printf("[held] slot %d%s '%s' -> pack %d on the %s at (%.2f,%.2f,%.2f), size %.2f%c",
                           i,w9,stem9,pk,ATTN9[att9],m[12],m[13],m[14],hs,10);
                    printf("[held]   mesh longest side %.3f -> scaled x%.2f%c",ext9,k9,10); fflush(stdout); }
-        /* ⭐ ep 12: ON THE TINT PATH, EACH MESH MAY NAME ITS OWN COLOUR, and a prop with a GLOW mesh glows only
-         * there -- the ember, not the paper -- at the drag's brightness. Without a glow mesh a light is emissive
-         * all over, exactly as before. */
-        { const HeldProp*HQ9=heldPropOf(pk);
-          if(lpow9>0.f||g_setPk[pk].nTex==0){ int gl9=HQ9&&HQ9->glow;
-              g_propMC.uTint=uTint; g_propMC.uEmis=uEmis9; memcpy(g_propMC.base,tint9,12);
-              g_propMC.emisAll=(lpow9>0.f&&!gl9)?1.f:0.f;
-              g_propMC.emisGlow=(HS9.smoke>0.f)?heldDragK(i,which):1.f; } }
-        drawProp(&g_setPk[pk],m,uModel,uPal,uBind);
-        g_propMC.uTint=-1; g_propMC.uEmis=-1;
-        memcpy(g_heldM[i][which],m,64); g_heldMSt[i][which]=g_frameStamp; g_heldMPk[i][which]=pk;   /* ⭐ ep 12: where it IS */
-        /* ⛔ AND HAND IT BACK IMMEDIATELY. A uniform is program state: leave uEmis at 1 and
-         * the next thing drawn on this program is a flat silhouette. */
-        if(uEmis9>=0) glUniform1f(uEmis9,0.f); }
+        /* ⭐ ep 12: EACH MESH MAY NAME ITS OWN COLOUR (`#rrggbb` in its name), and `#rrggbb*` marks the part that glows: the ember, not the
+         * paper. vkMesh reads the name. (The old renderer also dimmed the ember with the drag, heldDragK: not carried across yet.) */
+        drawProp(&g_setPk[pk],m);
+        memcpy(g_heldM[i][which],m,64); g_heldMSt[i][which]=g_frameStamp; g_heldMPk[i][which]=pk; }
 
-static void drawHeld(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
-    glActiveTexture(GL_TEXTURE0);
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-    /* off the CURRENT program, the way the set's own lp/lc are fetched below: drawHeld is
-     * handed five uniform slots by whichever program the world is drawing on, and a sixth
-     * argument through every caller for one prop is not worth it. -1 on a program that has
-     * no uEmis (the hologram), and an unset GL float uniform is zero, so it is off. */
-    GLint uEmis9=-1; { GLint pc9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pc9);
-        if(pc9) uEmis9=glGetUniformLocation((GLuint)pc9,"uEmis"); }
+static void drawHeld(void){
     for(int i=0;i<SCN_MAXCAST;i++){
-        drawHeldOne(i,g_castProp [i],0,uModel,uPal,uBind,uUse,uTint,uEmis9);
-        drawHeldOne(i,g_castProp2[i],1,uModel,uPal,uBind,uUse,uTint,uEmis9); }
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-    if(uEmis9>=0) glUniform1f(uEmis9,0.f); }
+        drawHeldOne(i,g_castProp [i],0);
+        drawHeldOne(i,g_castProp2[i],1); } }
 
 /* ⭐ THE BOARDS (ROBOT NEKO ep 10), drawn after the cast in the frame the riders were posed in.
  * drawHeld runs in the set pass BEFORE any body is drawn, so everything it hangs is one frame old --
  * invisible on a mug, and on a stop-motion exposure a kickflip's board a whole exposure behind the
  * feet on the frame it lands. Same drawHeldOne, same parser, same resolver: only the pass differs.
  * REVA_BOARDDBG=1 says where each board landed, deck top and wheels, against its rider's floor. */
-static void drawBoards(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
-    glActiveTexture(GL_TEXTURE0);
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-    GLint uEmis9=-1; { GLint pc9=0; glGetIntegerv(GL_CURRENT_PROGRAM,&pc9);
-        if(pc9) uEmis9=glGetUniformLocation((GLuint)pc9,"uEmis"); }
+static void drawBoards(void){
     g_heldBoardPass=1;
     for(int i=0;i<SCN_MAXCAST;i++){
-        drawHeldOne(i,g_castProp [i],0,uModel,uPal,uBind,uUse,uTint,uEmis9);
-        drawHeldOne(i,g_castProp2[i],1,uModel,uPal,uBind,uUse,uTint,uEmis9); }
+        drawHeldOne(i,g_castProp [i],0);
+        drawHeldOne(i,g_castProp2[i],1); }
     g_heldBoardPass=0;
-    glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-    if(uEmis9>=0) glUniform1f(uEmis9,0.f);
     { static int dbg9=-1; if(dbg9<0){ const char*e9=getenv("REVA_BOARDDBG"); dbg9=(e9&&e9[0]!='0'); }
       static unsigned n9=0;
       if(dbg9&&(n9++%30)==0){

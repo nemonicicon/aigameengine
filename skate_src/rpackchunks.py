@@ -436,6 +436,11 @@ def carry(path, old_data, report=print):
     """path has just been baked over old_data: keep in it what old_data had and it hasn't. Nothing to keep leaves the file exactly as the bake wrote it"""
     body = open(path, "rb").read()
     chunks, keep, lost = lift(Img(merged(old_data)), Img(merged(body)))
+    # what each mesh is made of is said by mesh name, so it comes across as it is: a record whose mesh has gone finds nothing, and does no harm
+    matl = next((c for t, _w, c in split(old_data)[1] if t == b"MATL"), None)
+    if matl is not None and not any(t == b"MATL" for t, _w, _c in split(body)[1]):
+        chunks.append((b"MATL", None, matl))
+        keep["materials"] = struct.unpack_from("<I", matl, 0)[0] if len(matl) >= 4 else 0
     tools = tools_of(old_data)
     if tools:   # what a tool made comes back when the tool runs again
         chunks.append((b"TOOL", None, ("\n".join(tools) + "\n").encode("utf-8")))
@@ -446,7 +451,7 @@ def carry(path, old_data, report=print):
     if chunks:
         split_body, existing = split(body)
         open(path, "wb").write(join(split_body, existing + chunks))
-        report("[carry] kept from the old pack: %d clips, %d morphs, %d marks" % (keep["clips"], keep["morphs"], keep["marks"]))
+        report("[carry] kept from the old pack: %d clips, %d morphs, %d marks%s" % (keep["clips"], keep["morphs"], keep["marks"], ", and what %d meshes are made of" % keep["materials"] if keep.get("materials") else ""))
     here = os.path.dirname(os.path.abspath(__file__))
     for line in tools:
         parts = line.split("\t")

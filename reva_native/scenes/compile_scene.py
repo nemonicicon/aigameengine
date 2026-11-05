@@ -199,6 +199,9 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # ⭐ 10-22: hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0] -- the body carried round an axis
               # (Viktor round the treadmill drum); sticky, `off` hands it back.
               hroll="", proll="", p2roll="", p3roll="",
+              # (step 23) heyes= peyes= p2eyes= p3eyes=r,g,b[,amount] -- that body's eyes glow that colour from this line on; sticky, `off` puts them out.
+              # Past 1 the amount is brighter than the colour, for the bloom. It needs eyes the engine can find: meshes of their own, or a built person's.
+              heyes="", peyes="", p2eyes="", p3eyes="",
               # ⭐ ep 10: dur=<sec> makes a line with NOTHING after `|` an ACTION line: no voice, no
               # subtitle, no mouth, that long in the timeline. NOT sticky (it is an event, like beat).
               dur="",
@@ -222,6 +225,9 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # (4:3, vignette, tape grain, a REC dot) and fish= is the lens on the front of it (0 = the
               # club's own glass, ~0.55 a fisheye). Both sticky, both land on the cut.
               feed="", fish="",
+              # (step 25, 11-05) THE LENS'S ROLL, ITS FOCUS AND SHUTTER, AND FILM'S SEPIA AND GRAIN: sticky, landing on the cut.
+              # camroll=DEG; focus=<distance>|aim|off[,soft]; shutter=0..1; sepia=0..1; grain=0..1 (engine/post.inc)
+              camroll="", focus="", shutter="", sepia="", grain="",
               tod="", tone="",
               # ⭐ (10-23) camspan=N: this line's cammove/camorbit runs across it and the N-1 lines after it -- the
               # compiler sets the move's camsecs from the timeline (blocking.py's long narration, said as sentences).

@@ -24,9 +24,7 @@ static float g_tapeMusicIn=-1.f;   /* the music clock's reading, off a tape */
 static float musicClockRead(void);   /* engine/gameworld.inc */
 static float g_heroFaceY=0.f; static int g_heroFaceOn=0;   /* E->heroFace: which way the hero's asked to turn, this tick */
 static float g_timeScale=1.f;   /* E->timeScale */
-#ifdef REVA_PACKET
 static struct { int n; float vp[16][16],eye[16][3]; int x[16],y[16],w[16],h[16]; } g_wallV;   /* the lab's multi-camera wall, this frame */
-#endif
 static struct { int n; float e[4][3],a[4][3]; } g_gameViews;   /* E->views: split screen. The first view's lens is also the lens everything else goes by */
 /* the Z4 bank BY NAME (cached; one NOT FOUND line per name). The cab's dead walk z_walk_a/b/c (z_run past 3 u/s) and
  * stand in z_idle_a/b -- the clips the film's `zombie` casting note plays, through the same canonical transfer. */
@@ -79,7 +77,7 @@ static void gmBanner(const char*s,float t){
     if(strcmp(GM.msg,s)) sfxPlay("banner",0.35f,NULL,0);   /* a NEW banner pings; a repeat does not */
     snprintf(GM.msg,sizeof GM.msg,"%s",s); GM.msgT=t; }
 /* ---- neon overlay lines: the game layer's own geometry (rings, markers, cursors,
- * platforms, hit arcs). One dynamic GL_LINES batch, flushed once per frame. ---- */
+ * platforms, hit arcs). One line batch (gfxLines3D), flushed once per frame. ---- */
 #define GMV_MAX 4096
 static float gmV[GMV_MAX*6]; static int gmN=0;
 static void gmLine(float x1,float y1,float z1,float x2,float y2,float z2,float r,float g,float b){

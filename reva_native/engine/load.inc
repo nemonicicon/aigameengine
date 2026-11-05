@@ -1,3 +1,97 @@
+/* (step 21, 11-04) the next pack loaded keeps its first texture's pixels, for a mover's sheet of pictures to be cut from (engine/settrack.inc, stkSheet) */
+static int g_texKeep=0,g_texKeepW=0,g_texKeepH=0,g_texKeepFlip=0; static unsigned char*g_texKeepPx=NULL;
+/* ---- WHAT A MESH IS MADE OF (queue steps 22 and 23, 11-04). A pack says it in a MATL chunk after its body, by mesh name, so no bake is needed to say it and none can lose it
+ * (skate_src/author/material.py writes one): a count, then for each a 40-byte name and six floats: how rough, how much a metal, how much fine detail, how deep for parallax,
+ * its kind for a body (1 skin, 2 hair, 3 an eye, 4 cloth, 5 its texture's alpha says, pixel by pixel, 6 fur: then depth is how long it is in metres, detail how fine, and metal how curly, 0 straight to 1 wool), and which mesh of that name it means, counted from 1 in the pack's order (0: every one).
+ * A mesh the chunk doesn't name is looked up by what its name or its pack's has in it: data/materials.txt first, a line `<word> <rough> <metal> [detail]`, then the engine's own
+ * short list. A skinned mesh's kind comes from its name the same way. Nothing matching, it's an ordinary rough surface of no kind.
+ * ⛔ The tables match words inside names, so keep their words long enough not to turn up by accident: "arm" is in "armour", and "face" in "surface", which is why kinds are only
+ * read off meshes with bones. Hair's words come before the eye's: an eyebrow is hair. A kind's words are read in the part of a name ahead of its hide list (~h=), which names other pieces.
+ * A wardrobe piece (wear~slot~piece~outfits) is cloth unless its slot or its name says it's hard or shines: shoes, a belt, a watch, a harness, latex. Those are left to the material words. */
+static int g_loadQuiet;   /* declared further down: a pack that streams back says nothing the second time */
+#define MAT_FILE_MAX 64
+static struct { char key[24]; float r,m,d; } g_matFile[MAT_FILE_MAX]; static int g_matFileN=-1;
+static const struct { const char*key; float r,m,d; } MAT_TABLE[]={
+    {"chrome",0.12f,1.f,0.f},{"mirror",0.05f,1.f,0.f},{"gold",0.25f,1.f,0.f},{"steel",0.35f,1.f,0.f},{"metal",0.40f,1.f,0.f},{"iron",0.55f,1.f,0.f},
+    {"glass",0.08f,0.f,0.f},{"plastic",0.40f,0.f,0.f},{"latex",0.22f,0.f,0.f},{"vinyl",0.25f,0.f,0.f},{"leather",0.50f,0.f,0.f},{"rubber",0.90f,0.f,0.f},
+    {"wood",0.70f,0.f,0.30f},{"concrete",0.90f,0.f,0.60f},{"asphalt",0.92f,0.f,0.70f},{"brick",0.85f,0.f,0.50f},{"stone",0.85f,0.f,0.50f}};
+static const struct { const char*key; int kind; float r; } MAT_KIND[]={
+    {"person_body",5,0.60f},   /* a person built while the game runs: one mesh, its kinds painted into its texture's alpha (engine/people.inc) */
+    {"hair",2,0.50f},{"brow",2,0.50f},{"lash",2,0.50f},{"beard",2,0.50f},{"pony",2,0.50f},{"braid",2,0.50f},
+    {"fur",6,0.60f},{"fleece",6,0.60f},{"wool",6,0.60f},{"pelt",6,0.60f},{"fluff",6,0.60f},   /* before cloth's: a fur skirt is fur */
+    {"eye",3,0.20f},{"iris",3,0.20f},{"cornea",3,0.20f},   /* with the eyes setting on the shader makes it wet itself; without it, this keeps its glint from running away */
+    {"skin",1,0.55f},{"body",1,0.55f},{"face",1,0.55f},{"head",1,0.55f},
+    {"cloth",4,0.85f},{"shirt",4,0.85f},{"coat",4,0.85f},{"dress",4,0.85f},{"skirt",4,0.85f},{"pants",4,0.85f},{"jacket",4,0.85f},{"hood",4,0.85f},{"scarf",4,0.85f},{"sock",4,0.85f},{"wear~",4,0.85f},{"cargo",4,0.85f},{"tank",4,0.85f},
+    {"sleeve",4,0.85f},{"bandana",4,0.85f},{"panties",4,0.85f},{"glove",4,0.85f},{"robe",4,0.85f},{"tunic",4,0.85f},{"uniform",4,0.85f},{"trouser",4,0.85f},{"jeans",4,0.85f},{"_top",4,0.85f}};
+static const char*const MAT_NOTCLOTH[]={"~shoes~","~feet~","~belt","~wrists~","~ears~","~harness~","~neck~","~arms~","~decals~","~thigh~","latex","vinyl","leather","tech","stud","metal","chain","rubber","plastic","glass","boot","heel","sneaker"};
+static int matWordIn(const char*name,const char*key){ const size_t kl=strlen(key); if(!kl) return 0; for(const char*p=name;*p;p++){ size_t i=0; while(i<kl&&p[i]&&((p[i]|32)==(key[i]|32))) i++; if(i==kl) return 1; } return 0; }
+/* (step 23) EYES NOBODY NAMED. A body from another tool often has its eyeballs as meshes under the body's own name (Anima's four are all `anima_body`), so no word finds them.
+ * They're found by what an eye is: a small skinned mesh as deep as it's wide and tall, high on the body, a little off its middle line, with a twin mirrored across it. Only meshes
+ * the words left as skin or as nothing are looked at, a few hundred of each one's vertices, through its own bones at rest. The pack's own chunk still has the last word. */
+static void packEyesFind(Pack*P){
+    enum { EC=24 }; struct { unsigned mi; float c[3],e; } cd[EC]; int nc=0;
+    if(P->nMeshes<3||!P->nNodes||P->nNodes>4096u) return;
+    float(*T)[3]=(float(*)[3])malloc(sizeof(float[3])*P->nNodes); float(*Q)[4]=(float(*)[4])malloc(sizeof(float[4])*P->nNodes); float(*S)[3]=(float(*)[3])malloc(sizeof(float[3])*P->nNodes);
+    M4*W=(M4*)malloc(sizeof(M4)*P->nNodes); float*pal=(float*)malloc(sizeof(float)*16u*MAXB); float(*bb)[6]=(float(*)[6])malloc(sizeof(float[6])*P->nMeshes);
+    if(T&&Q&&S&&W&&pal&&bb){ bodyRest(P,T,Q,S); bodyFK(P,T,Q,S,W);
+        float lo[3]={1e9f,1e9f,1e9f},hi[3]={-1e9f,-1e9f,-1e9f};
+        for(unsigned mi=0;mi<P->nMeshes;mi++){ PMesh*M=&P->meshes[mi]; float*b=bb[mi]; b[0]=b[1]=b[2]=1e9f; b[3]=b[4]=b[5]=-1e9f;
+            if(!(M->flags&4)||M->boneCount<1||M->boneCount>MAXB||!M->verts) continue;
+            bodyPalette(P,mi,W,pal);
+            const float*vp=(const float*)(P->pk+M->offPos),*bd=(const float*)(P->pk+M->offBind); const unsigned char*vj=P->pk+M->offJoints,*vw=P->pk+M->offWeights;
+            const unsigned step=M->verts>400u?M->verts/400u:1u;
+            for(unsigned v=0;v<M->verts;v+=step){ const float*q=vp+v*3; float bp[3],x[3]={0,0,0},ws=0.f; for(int r=0;r<3;r++) bp[r]=bd[r]*q[0]+bd[4+r]*q[1]+bd[8+r]*q[2]+bd[12+r];
+                for(int k=0;k<4;k++){ const float w=(float)vw[v*4+k]*(1.f/255.f); if(w<=0.f) continue; const float*m=pal+(vj[v*4+k]<M->boneCount?vj[v*4+k]:0)*16; ws+=w; for(int r=0;r<3;r++) x[r]+=w*(m[r]*bp[0]+m[4+r]*bp[1]+m[8+r]*bp[2]+m[12+r]); }
+                if(ws<=0.f) continue;
+                for(int r=0;r<3;r++){ if(x[r]<b[r]) b[r]=x[r]; if(x[r]>b[3+r]) b[3+r]=x[r]; } }
+            if(b[0]<=b[3]) for(int r=0;r<3;r++){ if(b[r]<lo[r]) lo[r]=b[r]; if(b[3+r]>hi[r]) hi[r]=b[3+r]; } }
+        const float H=hi[1]-lo[1],cx0=0.5f*(lo[0]+hi[0]);
+        if(H>1e-4f){
+            for(unsigned mi=0;mi<P->nMeshes&&nc<EC;mi++){ const float*b=bb[mi]; const PMesh*M=&P->meshes[mi]; const int k=(int)(P->meshMat[mi][4]+0.5f);
+                if(b[0]>b[3]||M->verts<24u||M->verts>20000u||(k!=0&&k!=1)) continue;
+                const float ex=b[3]-b[0],ey=b[4]-b[1],ez=b[5]-b[2],big=ex>ey?(ex>ez?ex:ez):(ey>ez?ey:ez),small=ex<ey?(ex<ez?ex:ez):(ey<ez?ey:ez);
+                if(small<=0.f||big>small*1.25f||big<0.008f*H||big>0.045f*H) continue;                    /* as deep as it's wide and tall, and an eye's size against the body */
+                const float cx=0.5f*(b[0]+b[3])-cx0,cy=(0.5f*(b[1]+b[4])-lo[1])/H;
+                if(cy<0.80f||fabsf(cx)<0.005f*H||fabsf(cx)>0.035f*H) continue;                           /* in the head, and to one side of the middle, inside the face */
+                cd[nc].mi=mi; cd[nc].c[0]=cx; cd[nc].c[1]=0.5f*(b[1]+b[4]); cd[nc].c[2]=0.5f*(b[2]+b[5]); cd[nc].e=big; nc++; }
+            int got=0; unsigned char twin[EC]; memset(twin,0,sizeof twin);
+            for(int a=0;a<nc;a++) for(int b=0;b<nc;b++){ if(a==b||cd[a].c[0]*cd[b].c[0]>=0.f) continue;
+                if(fabsf(fabsf(cd[a].c[0])-fabsf(cd[b].c[0]))<0.004f*H&&fabsf(cd[a].c[1]-cd[b].c[1])<0.004f*H&&fabsf(cd[a].c[2]-cd[b].c[2])<0.004f*H&&cd[a].e<cd[b].e*1.2f&&cd[b].e<cd[a].e*1.2f) twin[a]=1; }
+            for(int a=0;a<nc;a++) if(twin[a]){ float*o=P->meshMat[cd[a].mi]; o[4]=3.f; o[0]=0.20f; o[1]=0.f; got++; }
+            if(got&&!g_loadQuiet) printf("[material] %s: %d meshes taken as eyes, by their shape and where they sit\n",P->label,got); } }
+    free(T); free(Q); free(S); free(W); free(pal); free(bb); }
+static void packMaterials(Pack*P){
+    if(g_matFileN<0){ g_matFileN=0; FILE*f=fopen("data/materials.txt","r");
+        if(f){ char ln[160]; while(fgets(ln,sizeof ln,f)&&g_matFileN<MAT_FILE_MAX){ float r=0.85f,m=0.f,d=0.f; char k[24]; if(ln[0]=='#'||sscanf(ln,"%23s %f %f %f",k,&r,&m,&d)<3) continue;
+                snprintf(g_matFile[g_matFileN].key,24,"%s",k); g_matFile[g_matFileN].r=r<0.f?0.f:r>1.f?1.f:r; g_matFile[g_matFileN].m=m<0.f?0.f:m>1.f?1.f:m; g_matFile[g_matFileN].d=d<0.f?0.f:d>1.f?1.f:d; g_matFileN++; }
+            fclose(f); clubOpened("data/materials.txt"); printf("[material] data/materials.txt: %d words\n",g_matFileN); } }
+    P->meshMat=(float(*)[6])calloc(P->nMeshes?P->nMeshes:1,sizeof(float[6])); if(!P->meshMat) return;
+    for(unsigned mi=0;mi<P->nMeshes;mi++){ const char*nm=packStr(P,P->meshes[mi].name); float*o=P->meshMat[mi]; int hit=0; if(!nm) nm="";
+        for(int k=0;k<g_matFileN&&!hit;k++) if(matWordIn(nm,g_matFile[k].key)||matWordIn(P->label,g_matFile[k].key)){ o[0]=g_matFile[k].r; o[1]=g_matFile[k].m; o[2]=g_matFile[k].d; hit=1; }
+        for(size_t k=0;k<sizeof MAT_TABLE/sizeof MAT_TABLE[0]&&!hit;k++) if(matWordIn(nm,MAT_TABLE[k].key)){ o[0]=MAT_TABLE[k].r; o[1]=MAT_TABLE[k].m; o[2]=MAT_TABLE[k].d; hit=1; }
+        /* a body's surfaces: skinned meshes only */
+        if(P->meshes[mi].boneCount>1){ char own[96]; snprintf(own,sizeof own,"%s",nm); { char*h9=strstr(own,"~h="); if(h9) *h9=0; }
+            if(!strncmp(own,"wear~",5)){ char*t1=strchr(own+5,'~'),*t2=t1?strchr(t1+1,'~'):NULL; if(t2) *t2=0; }   /* a wardrobe piece: its slot and its name, and not the outfits it's in (furs is an outfit) */
+            for(size_t k=0;k<sizeof MAT_KIND/sizeof MAT_KIND[0];k++) if(matWordIn(own,MAT_KIND[k].key)){ int kd=MAT_KIND[k].kind;
+                if(kd==4) for(size_t q=0;q<sizeof MAT_NOTCLOTH/sizeof MAT_NOTCLOTH[0];q++) if(matWordIn(own,MAT_NOTCLOTH[q])){ kd=0; break; }
+                o[4]=(float)kd; if(!hit&&kd) o[0]=MAT_KIND[k].r;
+                if(kd==6){ o[3]=0.035f; o[2]=0.55f; }   /* fur nobody measured: three and a half centimetres, middling fine */
+                break; } } }
+    packEyesFind(P);
+    /* the pack's own word beats the tables' */
+    if(P->len>=16&&!memcmp(P->pk+P->len-4,"RPK2",4)){ unsigned f9[3]; memcpy(f9,P->pk+P->len-16,12);
+        if(f9[2]==P->len&&(size_t)f9[0]+(size_t)f9[1]*16<=P->len-16) for(unsigned d9=0;d9<f9[1];d9++){ const unsigned char*e9=P->pk+f9[0]+d9*16; unsigned o9,s9; memcpy(&o9,e9+4,4); memcpy(&s9,e9+8,4);
+            if(memcmp(e9,"MATL",4)||s9<4||(size_t)o9+s9>P->len) continue;
+            unsigned n; memcpy(&n,P->pk+o9,4); if(n>4096u||4u+(size_t)n*64u>s9){ printf("[material] %s: a MATL chunk that doesn't add up, ignored\n",P->label); continue; }
+            int got=0; for(unsigned k=0;k<n;k++){ const unsigned char*r9=P->pk+o9+4+k*64; char nm9[41]; memcpy(nm9,r9,40); nm9[40]=0; float v[6]; memcpy(v,r9+40,24);
+                for(int c=0;c<4;c++){ if(!(v[c]>=0.f)) v[c]=0.f; if(v[c]>(c==3?0.25f:1.f)) v[c]=c==3?0.25f:1.f; }
+                if(!(v[4]>=0.f)||v[4]>6.f) v[4]=0.f;
+                v[4]=(float)(int)(v[4]+0.5f); const int ord9=(v[5]>=1.f&&v[5]<4096.f)?(int)(v[5]+0.5f):0; int seen9=0; v[5]=0.f;
+                for(unsigned mi=0;mi<P->nMeshes;mi++){ const char*nm=packStr(P,P->meshes[mi].name); if(nm&&!strcmp(nm,nm9)){ seen9++; if(!ord9||seen9==ord9){ memcpy(P->meshMat[mi],v,24); got++; } } } }
+            printf("[material] %s: %u in its chunk, on %d meshes\n",P->label,n,got); } }
+    /* say what a body's surfaces came out as, once, so a wrong word in a name shows */
+    { int k9[7]={0,0,0,0,0,0,0}; for(unsigned mi=0;mi<P->nMeshes;mi++){ const int k=(int)(P->meshMat[mi][4]+0.5f); if(k>=0&&k<7) k9[k]++; }
+      if(k9[1]+k9[2]+k9[3]+k9[4]+k9[5]+k9[6]&&!g_loadQuiet) printf("[material] %s: %d skin, %d hair, %d eye, %d cloth, %d fur%s, %d plain\n",P->label,k9[1],k9[2],k9[3],k9[4],k9[6],k9[5]?", and one painted pixel by pixel":"",k9[0]); } }
 /* ⭐ A TRANSITION PLAYS ONCE IN A SCENE (ROBOT NEKO ep 9). The same measure as the idle rule: a clip
  * whose last frame is more than IDLE_LOOP_DEG from its first is a move, not a loop. A scene keeps a
  * line's clip for as long as no later line changes it -- kaeli's bail stayed on for eighteen lines and
@@ -55,9 +149,14 @@ static Pack loadPack(const char*path){
     if(!f){ fprintf(stderr,"open pack FAILED: [%s] errno=%d (%s)\n",path,errno,strerror(errno));
             fflush(stderr); die("open pack"); }
     struct stat st; fstat(fileno(f),&st); P.len=st.st_size;
-    P.pk=malloc(P.len); if(fread(P.pk,1,P.len,f)!=P.len) die("read"); fclose(f); }
-    if(memcmp(P.pk,"RPK1",4)) die("magic");
-    packChunksMerge(&P.pk,&P.len,path); packSumPrint(P.pk,path);
+    P.pk=malloc(P.len); if(fread(P.pk,1,P.len,f)!=P.len) die("read"); fclose(f);
+    netSigAdd(path,P.pk,P.len); }   /* (step 29) in a session, what this machine read goes into what the host holds against its own */
+    /* ⭐ (step 28) nothing of a pack is believed until all of it has been checked against the file's own length (engine/packcheck.inc). A pack can come from anyone.
+     * Once more after its chunks are merged, because that writes new tables: what the loader reads is then what was checked */
+    { char why[200]; if(!packCheck(P.pk,P.len,why,sizeof why)){ fprintf(stderr,"[pack] %s is broken, and isn't loaded: %s\n",path,why); fflush(stderr); die("a broken pack"); }
+      packChunksMerge(&P.pk,&P.len,path);
+      if(!packCheck(P.pk,P.len,why,sizeof why)){ fprintf(stderr,"[pack] %s is broken once its chunks are in, and isn't loaded: %s\n",path,why); fflush(stderr); die("a broken pack"); } }
+    packSumPrint(P.pk,path);
     unsigned*Hd=(unsigned*)(P.pk+4);
     P.nNodes=Hd[1]; P.nMeshes=Hd[2]; P.nMats=Hd[3]; P.nClips=Hd[4]; P.nTex=Hd[5];
     P.nodes=packNodes(P.pk,Hd[6],Hd[1]); P.meshes=(PMesh*)(P.pk+Hd[7]); P.clips=(PClip*)(P.pk+Hd[9]);
@@ -186,49 +285,37 @@ static Pack loadPack(const char*path){
         if(ntex>=0){ if(fl&2) texFlip[ntex]=1; }
         if(mesh<P.nMeshes&&P.meshTex[mesh]==-1){ P.meshTex[mesh]=tex; P.meshMatFlags[mesh]=fl; P.meshNTex[mesh]=ntex; if(ntex>=0) nNrm++; } }
     if(nNrm) printf("[normal] %s: %d of %u meshes carry a normal map\n",P.label,nNrm,P.nMeshes);
-    P.tex=calloc(P.nTex?P.nTex:1,sizeof(GLuint));
+    P.tex=calloc(P.nTex?P.nTex:1,sizeof(unsigned));
     unsigned char*texTab=P.pk+Hd[10];
     /* ⭐ RPK2 (11-02, design/pack_format.md): a footer at the very end names chunks after the old body. TEXC holds what the cook compressed, every level ready for the GPU */
     unsigned char*texc=NULL; unsigned texcN=0;
     if(P.len>=16&&!memcmp(P.pk+P.len-4,"RPK2",4)){ unsigned f9[3]; memcpy(f9,P.pk+P.len-16,12);
         if(f9[2]!=P.len||(size_t)f9[0]+(size_t)f9[1]*16>P.len-16){ printf("[pack] %s: a broken RPK2 footer, ignored\n",path); fflush(stdout); }
         else for(unsigned d9=0;d9<f9[1];d9++){ unsigned char*e9=P.pk+f9[0]+d9*16; unsigned o9,s9; memcpy(&o9,e9+4,4); memcpy(&s9,e9+8,4);
-            if(!memcmp(e9,"TEXC",4)&&s9>=4&&(size_t)o9+s9<=P.len){ texc=P.pk+o9; memcpy(&texcN,texc,4); } } }
+            if(!memcmp(e9,"TEXC",4)&&s9>=4&&(size_t)o9+s9<=P.len){ texc=P.pk+o9; memcpy(&texcN,texc,4);
+                if(texcN>(s9-4u)/32u){ printf("[pack] %s: a TEXC chunk that doesn't add up, ignored\n",path); fflush(stdout); texc=NULL; texcN=0; } } } }
     for(unsigned t=0;t<P.nTex;t++){ unsigned off=*(unsigned*)(texTab+t*16+8), len=*(unsigned*)(texTab+t*16+12);
-        const unsigned*bc9=NULL; for(unsigned k9=0;k9<texcN;k9++){ const unsigned*r9=(const unsigned*)(texc+4+k9*32); if(r9[0]==t){ bc9=r9; break; } }
+        unsigned bcRec[8]; const unsigned*bc9=NULL; for(unsigned k9=0;k9<texcN;k9++){ memcpy(bcRec,texc+4+(size_t)k9*32,32); if(bcRec[0]==t){ bc9=bcRec; break; } }
+        if(bc9&&!packTexcOk(bc9,P.len)){ printf("[pack] %s: texture %u's cooked copy doesn't fit the file, left out\n",path,t); fflush(stdout); bc9=NULL; }   /* (step 28) its size, its levels and where they are, before a byte of it is read */
         int tw,th,comp; unsigned char*img;
         if(bc9){
 #ifdef REVA_VK
-            if(gfxHasBC()&&(bc9[1]!=7||gfxHasBC7())){ glGenTextures(1,&P.tex[t]); gfxTextureBC(P.tex[t],(int)bc9[2],(int)bc9[3],(int)bc9[4],(int)bc9[1],P.pk+bc9[6],(int)(bc9[5]&1)); gfxTexturePage(P.tex[t]); continue; }
+            if(gfxHasBC()&&(bc9[1]!=7||gfxHasBC7())){ P.tex[t] = gfxTextureNew(); gfxTextureBC(P.tex[t],(int)bc9[2],(int)bc9[3],(int)bc9[4],(int)bc9[1],P.pk+bc9[6],(int)(bc9[5]&1)); gfxTexturePage(P.tex[t]); continue; }
 #endif
 #ifdef REVA_HEADLESS
-            glGenTextures(1,&P.tex[t]); continue;
+            P.tex[t] = gfxTextureNew(); continue;
 #endif
             tw=(int)bc9[2]; th=(int)bc9[3]; img=bcDecode(P.pk+bc9[6],tw,th,(int)bc9[1]); }   /* no BC on this path: the top level as plain pixels */
         else { stbi_set_flip_vertically_on_load(texFlip[t]);
             img=stbi_load_from_memory(P.pk+off,(int)len,&tw,&th,&comp,4); }
         if(!img){ printf("[pack] %s: texture %u has no image\n",path,t); fflush(stdout); continue; }
-        glGenTextures(1,&P.tex[t]); glBindTexture(GL_TEXTURE_2D,P.tex[t]);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,tw,th,0,GL_RGBA,GL_UNSIGNED_BYTE,img);
+        P.tex[t] = gfxTextureNew();
+        gfxTexture(P.tex[t], tw, th, img);
 #ifdef REVA_VK
         gfxTexturePage(P.tex[t]);
 #endif
-        /* ⭐ MIPMAPS. The club never generated any, and on a 4096x4096 alpha map drawn
-         * a few hundred pixels tall that is ruinous: one texel sampled per screen pixel, so
-         * the ALPHA TEST flips accept/reject at random and hair comes out as salt-and-pepper
-         * stipple with the sky showing through. It reads as a sorting artefact and is not one
-         * -- magnifying the render is what settled it: the noise is a regular per-pixel
-         * dither, and it appears on the EYELASHES too, which are four triangles.
-         * ⛔ GLES2 ONLY MIPMAPS POWER-OF-TWO TEXTURES when the wrap mode is REPEAT, and
-         * this loader deliberately uses REPEAT (a pack's UVs are not guaranteed to sit inside
-         * [0,1]). So NPOT textures keep plain LINEAR rather than becoming incomplete and
-         * sampling black. */
-        int potW = tw>0 && (tw&(tw-1))==0, potH = th>0 && (th&(th-1))==0;
-        int mip = potW && potH && !texNear[t];
-        if(mip) glGenerateMipmap(GL_TEXTURE_2D);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,
-                        texNear[t]?GL_NEAREST:(mip?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR));
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,texNear[t]?GL_NEAREST:GL_LINEAR);
+        /* ⭐ MIPMAPS: the renderer makes them for every texture it's handed (the old road never did, and alpha-tested hair came out as salt-and-pepper stipple) */
+
         /* REPEAT, NOT CLAMP. A pack's UVs are not guaranteed to sit inside [0,1]:
          * MEASURED on SK_veh_Sedan_01, u runs -1.538..0.955, because the mesh was
          * authored expecting the sampler to wrap. Clamped, every negative coordinate
@@ -239,9 +326,8 @@ static Pack loadPack(const char*path){
          * The props that were fine (mailbox 0.217..0.782, pickup 0.463..0.851) were fine
          * only because they happened to stay inside the tile; wrap mode never mattered
          * for them, so this cannot make them worse. */
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
-        stbi_image_free(img); }
+        if(g_texKeep&&t==0&&!g_texKeepPx){ g_texKeepPx=img; g_texKeepW=tw; g_texKeepH=th; g_texKeepFlip=texFlip[t]; }   /* a mover's sheet of pictures: kept, and its line frees it */
+        else stbi_image_free(img); }
     free(texFlip); free(texNear);
     M4 *world=malloc(P.nNodes*sizeof(M4));
     float mny=1e9f,mxy=-1e9f,mnx=1e9f,mxx=-1e9f,mnz=1e9f,mxz=-1e9f;
@@ -250,6 +336,9 @@ static Pack loadPack(const char*path){
         if(P.nodes[i].kind==1){ float y=world[i][13]; if(y<mny)mny=y; if(y>mxy)mxy=y;
             float x=world[i][12]; if(x<mnx)mnx=x; if(x>mxx)mxx=x;
             float z=world[i][14]; if(z<mnz)mnz=z; if(z>mxz)mxz=z; } }
+    /* ⛔ (11-04) A PACK WITH NO BONES AT ALL: a prop made by code with a plain root. Nothing was measured, its floor stayed at a billion, and a `prop` line stood it a billion
+     * units under the world: the talk game's room was never on screen, and its walls never stopped a lens. Its own origin is its floor. */
+    if(mny>1e8f){ mny=mxy=0.f; mnx=mxx=0.f; mnz=mxz=0.f; }
     /* ---- H1: mine the SECONDARY-MOTION CHAINS while the rest FK is still alive.
      * Families: tail/pony/braid/hair/bang/tress/ribbon, plus "ear" behind guards --
      * "forearm", "rear", "spear", "beard", "heart" and "gear" all contain it and are
@@ -363,23 +452,6 @@ static Pack loadPack(const char*path){
     if(P.nSt){ printf("[stretch] %s: %d stretch bone(s) --",P.label[0]?P.label:path,P.nSt);
         for(int q=0;q<P.nSt;q++) printf(" %s->%s (%.3f)",packStr(&P,P.nodes[P.stB[q]].name),packStr(&P,P.nodes[P.stA[q]].name),P.stLen[q]);
         printf("\n"); fflush(stdout); }
-    /* ---- H2: the DQS audit, while the rest FK is still alive ---- */
-    P.dqsOK=1;
-    for(unsigned mi=0;mi<P.nMeshes&&mi<8;mi++){ PMesh*M=&P.meshes[mi];
-        P.meshDqS[mi]=1.f;
-        if(!M->boneCount){ continue; }
-        unsigned short*bm=(unsigned short*)(P.pk+M->offBoneMap);
-        float*ibm=(float*)(P.pk+M->offIBM);
-        float mn=1e9f,mx=0.f,acc=0.f; unsigned nb=M->boneCount;
-        for(unsigned b=0;b<nb;b++){ M4 pm; m4_mul(pm,world[bm[b]],*(M4*)(ibm+b*16));
-            float s=sqrtf(pm[0]*pm[0]+pm[1]*pm[1]+pm[2]*pm[2]);
-            if(s<mn)mn=s;
-            if(s>mx)mx=s;
-            acc+=s; }
-        if(mn<1e-6f||mx/mn>1.02f){ P.dqsOK=0; }
-        else P.meshDqS[mi]=acc/(float)nb; }
-    if(P.nMeshes>8) P.dqsOK=0;
-    if(P.nSt) P.dqsOK=0;                  /* a stretch is a SCALE: dual quaternions cannot carry it */
     free(world);
     float span=(mxy-mny); P.scale=(span>1e-4f)?(3.15f/(span*1.13f)):1.0f;
     P.cx=(mnx+mxx)*0.5f; P.cz=(mnz+mxz)*0.5f; P.mny=mny;
@@ -727,7 +799,7 @@ static Pack loadPack(const char*path){
          * It did not read as "no expression": Anima's jaw is recorded against pack mesh 2
          * (anima_body, 67,300 verts) and engine mesh 2 after the reorder is anima_BOOTS
          * with 51,660, so the blend pushed face deltas into the boots' vertex buffer past
-         * its end -- glBufferSubData returned 0x502 and her face moved 1.55% of a panel,
+         * its end -- the old renderer's buffer update failed (0x502) and her face moved 1.55% of a panel,
          * which looks like a weak morph and is actually a morph on her shoes. */
         { unsigned*inv=(unsigned*)malloc(sizeof(unsigned)*P.nMeshes);
           for(unsigned m=0;m<P.nMeshes;m++) inv[ord[m]]=m;
@@ -773,16 +845,16 @@ static Pack loadPack(const char*path){
      * hair across her eyes, and I read that as a transparency fault for two rounds
      * before noticing the reorder ran after the upload loop. jacob: "damn thats
      * fucked up" -- it was, and it was this. */
-    P.vbo=calloc(P.nMeshes*6,sizeof(GLuint));
+    P.vbo=calloc(P.nMeshes*6,sizeof(unsigned));
     for(unsigned m=0;m<P.nMeshes;m++){ PMesh*M=&P.meshes[m]; if(!(M->flags&4)||M->boneCount>MAXB) continue;
         /* ⛔ NO BLEND STATE HERE -- this loop UPLOADS buffers, it does not draw. */
-        GLuint b[6]; glGenBuffers(6,b); memcpy(P.vbo+m*6,b,sizeof b);
-        glBindBuffer(GL_ARRAY_BUFFER,b[0]); glBufferData(GL_ARRAY_BUFFER,M->verts*12,P.pk+M->offPos,GL_STATIC_DRAW);
-        if(M->flags&1){ glBindBuffer(GL_ARRAY_BUFFER,b[1]); glBufferData(GL_ARRAY_BUFFER,M->verts*12,P.pk+M->offNorm,GL_STATIC_DRAW); }
-        glBindBuffer(GL_ARRAY_BUFFER,b[2]); glBufferData(GL_ARRAY_BUFFER,M->verts*4,P.pk+M->offJoints,GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER,b[3]); glBufferData(GL_ARRAY_BUFFER,M->verts*4,P.pk+M->offWeights,GL_STATIC_DRAW);
-        if(M->idxCount){ glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,b[4]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,M->idxCount*4,P.pk+M->offIdx,GL_STATIC_DRAW); }
-        if(M->flags&2){ glBindBuffer(GL_ARRAY_BUFFER,b[5]); glBufferData(GL_ARRAY_BUFFER,M->verts*8,P.pk+M->offUV,GL_STATIC_DRAW); } }
+        unsigned b[6]; gfxBuffersNew(6,b); memcpy(P.vbo+m*6,b,sizeof b);
+         gfxBufferData(b[0], M->verts*12, P.pk+M->offPos, 0);
+        if(M->flags&1){  gfxBufferData(b[1], M->verts*12, P.pk+M->offNorm, 0); }
+         gfxBufferData(b[2], M->verts*4, P.pk+M->offJoints, 0);
+         gfxBufferData(b[3], M->verts*4, P.pk+M->offWeights, 0);
+        if(M->idxCount){  gfxBufferData(b[4], M->idxCount*4, P.pk+M->offIdx, 0); }
+        if(M->flags&2){  gfxBufferData(b[5], M->verts*8, P.pk+M->offUV, 0); } }
     /* ⭐ REVA_HIDEMESH=<substring> -- drop any mesh whose NAME contains it, at load, for
      * EVERY draw path at once. Every path already gates on flags&4, so clearing that bit
      * here is the one place that hides a mesh from the hero, the partner, an actor, the
@@ -810,6 +882,7 @@ static Pack loadPack(const char*path){
     P.drawable=0;
     for(unsigned m=0;m<P.nMeshes;m++) if((P.meshes[m].flags&4)&&P.meshes[m].boneCount<=MAXB) P.drawable=1;
     if(!P.drawable) printf("INVISIBLE PACK (all meshes skipped): %s\n",P.label);
+    packMaterials(&P);   /* (step 22) what each mesh is made of, once the meshes are in their final order */
     return P;
 }
 #undef printf

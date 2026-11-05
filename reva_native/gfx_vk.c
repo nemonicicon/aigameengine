@@ -38,7 +38,7 @@ static VkInstance g_inst; static VkPhysicalDevice g_gpu; static VkDevice g_dev; 
 static VkPhysicalDeviceMemoryProperties g_mp; static VkDeviceSize g_uboAlign = 256;
 static int g_W, g_H, g_taps = 1, g_sunSize = 1024;
 static const VkFormat COLOR_FMT = VK_FORMAT_B8G8R8A8_UNORM; static VkFormat g_depthFmt;
-static GfxConfig g_cfg = {1, 1024, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1};
+static GfxConfig g_cfg = {1, 1024, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2048, 0, 0, 2, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 /* where the world draws. With the settings off it's the glass itself, in one pass, and none of this exists. Otherwise the world draws here, and the HUD goes on the glass after */
 static const VkFormat HDR_FMT = VK_FORMAT_R16G16B16A16_SFLOAT; static VkFormat g_sceneFmt = VK_FORMAT_B8G8R8A8_UNORM; static VkSampleCountFlagBits g_samples = VK_SAMPLE_COUNT_1_BIT; static int g_split;
 static int g_filmPost;   /* the post pass on colours that are already as they'll be shown: film's way. The world draws on an 8-bit target, so what's over white clips as it always has there, then the highlights roll on brightness and not channel by channel, or a bright colour goes grey */
@@ -56,20 +56,36 @@ static VkImage g_zImg, g_aoImg[2], g_volImg; static VkImageView g_zView, g_aoVie
 static VkImage g_img[MAX_IMAGES]; static VkImageView g_view[MAX_IMAGES]; static uint32_t g_nImg;
 static VkImage g_depth, g_sunImg; static VkImageView g_depthView, g_sunView; static VkDeviceMemory g_depthMem;
 static VkDescriptorSetLayout g_dslView, g_dslTex, g_dslPost; static VkPipelineLayout g_layout, g_layoutPost; static VkDescriptorPool g_dp; static VkSampler g_smpRepeat, g_smpShadow, g_smpClamp;
-enum { P_STATIC, P_STATIC_CUT, P_SKIN, P_SKIN_CUT, P_STATIC_BLEND, P_SKIN_BLEND, P_MOUTH, P_MOUTH_CUT, P_TOON, P_TOON_CUT, P_TOON_STATIC, P_TOON_STATIC_CUT, P_TOON_MOUTH, P_TOON_MOUTH_CUT, P_TOON_BLEND, P_INK, P_INK_STATIC, P_M_STATIC, P_M_STATIC_CUT, P_M_TOON_STATIC, P_M_TOON_STATIC_CUT, P_R_STATIC, P_R_STATIC_CUT, P_R_SKIN, P_R_SKIN_CUT, P_TR_STATIC, P_TR_STATIC_CUT, P_TR_SKIN, P_TR_SKIN_CUT, P_M_INK, P_M_INK_STATIC, P_GLOSS, P_TOON_GLOSS, P_TOON_GLOSS_A, P_SH_STATIC, P_SH_SKIN, P_LINE, P_HUD, P_FX_ALPHA, P_FX_ADD, P_FX_SOFT, P_SKY, P_HOLO_Z, P_HOLO, P_SPRITE, P_SPACE, P_BEAM, P_SKYDOME, P_SCREEN, P_WATER, P_FX_PUFF, P_FX_WEB, P_FX_WEBX, P_STAR_SURF, P_STAR_FACE, P_STAR_CORONA, P_STAR_LOOP, P_LINE_OVER, P_T_STATIC, P_T_STATIC_CUT, P_T_SKIN, P_T_SKIN_CUT, P_HEAD, P_HEADFLAT, P_B_SKIN, P_FLOORSH, P_POST, P_BLOOM0, P_BLOOM_DOWN, P_BLOOM_UP, P_AO, P_AOBLUR, P_VOL, P_N };
+static VkImage g_snapImg, g_zsImg, g_dumImg; static VkImageView g_snapView, g_zsView, g_dumView; static int g_mid;   /* (step 24) the scene's colour and depth as they stood mid-frame, what's bound where a machine doesn't take them, and whether this one does */
+static VkFormat g_glassFmt = VK_FORMAT_B8G8R8A8_UNORM; __attribute__((unused)) static VkColorSpaceKHR g_glassCs = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; static int g_hdrOut, g_exFresh; __attribute__((unused)) static int g_csExt; static VkImage g_exImg; static VkImageView g_exView;   /* (step 25) the glass's own format; whether it's an HDR10 display's; and the picture of the light past white */
+static int g_GW, g_GH, g_present; static float g_picShown, g_tubeP[11] = {448.f, 139.f, 0.47f, 0.25f, 1.f, 0.f, 0.30f, 0.55f, 2.4f, 0.025f, 0.f}; static VkImage g_picImg, g_glassImg[MAX_IMAGES]; static VkImageView g_picView, g_glassView[MAX_IMAGES]; static VkDescriptorSet g_picDs;   /* (step 25) the glass's size, whether the picture's its own, and the picture when it is */
+__attribute__((unused)) static void pictureSize(void); __attribute__((unused)) static void pictureMake(void);   /* below, with the pass that puts the picture on the glass. The SDL road's: the direct road's picture is the glass */
+enum { SRC_HDR, SRC_HIST0, SRC_HIST1, SRC_SCR0, SRC_SCR1 };   /* (step 25) where a lens's pass reads the scene from */
+static VkImage g_scrImg[2], g_histImg[2]; static VkImageView g_scrView[2], g_histView[2]; static VkDescriptorSet g_srcDs[5], g_taaDs[2]; static int g_lens, g_taaAt, g_taaOK, g_prevOK; static float g_prevVP[16]; static unsigned g_prevCuts;   /* (step 25) the lens's passes: two pictures to work in, two to keep the last frame in, and the last frame's lens */
+enum { P_STATIC, P_STATIC_CUT, P_SKIN, P_SKIN_CUT, P_STATIC_BLEND, P_SKIN_BLEND, P_MOUTH, P_MOUTH_CUT, P_TOON, P_TOON_CUT, P_TOON_STATIC, P_TOON_STATIC_CUT, P_TOON_MOUTH, P_TOON_MOUTH_CUT, P_TOON_BLEND, P_INK, P_INK_STATIC, P_FUR, P_FUR_STATIC, P_TOON_FUR, P_TOON_FUR_STATIC, P_M_STATIC, P_M_STATIC_CUT, P_M_TOON_STATIC, P_M_TOON_STATIC_CUT, P_R_STATIC, P_R_STATIC_CUT, P_R_SKIN, P_R_SKIN_CUT, P_TR_STATIC, P_TR_STATIC_CUT, P_TR_SKIN, P_TR_SKIN_CUT, P_M_INK, P_M_INK_STATIC, P_GLOSS, P_TOON_GLOSS, P_TOON_GLOSS_A, P_SH_STATIC, P_SH_SKIN, P_LINE, P_HUD, P_FX_ALPHA, P_FX_ADD, P_FX_SOFT, P_SKY, P_HOLO_Z, P_HOLO, P_SPRITE, P_SPACE, P_BEAM, P_SKYDOME, P_SCREEN, P_WATER, P_FX_PUFF, P_FX_WEB, P_FX_WEBX, P_STAR_SURF, P_STAR_FACE, P_STAR_CORONA, P_STAR_LOOP, P_LINE_OVER, P_T_STATIC, P_T_STATIC_CUT, P_T_SKIN, P_T_SKIN_CUT, P_HEAD, P_HEADFLAT, P_B_SKIN, P_FLOORSH, P_POST, P_BLOOM0, P_BLOOM_DOWN, P_BLOOM_UP, P_AO, P_AOBLUR, P_VOL, P_FX_GLOW, P_FX_SOFTZ, P_FX_GLOWZ, P_DECAL, P_DECAL_PAINT, P_LENS_DOF, P_LENS_MB, P_TAA, P_PRESENT, P_TUBE480, P_TUBE240, P_PRESENT_HDR, P_HDREX, P_N };
 static VkPipeline g_pipe[P_N];
 
 static uint32_t memType(uint32_t bits, VkMemoryPropertyFlags want) {
     for (uint32_t i = 0; i < g_mp.memoryTypeCount; i++) if ((bits & (1u << i)) && (g_mp.memoryTypes[i].propertyFlags & want) == want) return i;
     printf("[gfx] no memory type for %x\n", want); fflush(stdout); exit(1);
 }
+static int memTypeHas(uint32_t bits, VkMemoryPropertyFlags want) {
+    for (uint32_t i = 0; i < g_mp.memoryTypeCount; i++) if ((bits & (1u << i)) && (g_mp.memoryTypes[i].propertyFlags & want) == want) return 1;
+    return 0;
+}
 typedef struct { VkBuffer b; VkDeviceMemory m; char *map; VkDeviceSize size, used; } Arena;
-static void arenaMake(Arena *a, VkDeviceSize size, VkBufferUsageFlags use) {
+#define HOST_MEM (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+/* an arena is host memory the CPU writes; `want` asks for more (the capture buffer wants it CACHED, because the CPU reads that one
+ * back: uncached, a 1280x720 frame read ~50 ms), and a device without that type gets the plain kind */
+static void arenaMakeAs(Arena *a, VkDeviceSize size, VkBufferUsageFlags use, VkMemoryPropertyFlags want) {
     VkBufferCreateInfo i = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO}; i.size = size; i.usage = use; CK(vkCreateBuffer(g_dev, &i, NULL, &a->b));
     VkMemoryRequirements mr; vkGetBufferMemoryRequirements(g_dev, a->b, &mr);
-    VkMemoryAllocateInfo m = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO}; m.allocationSize = mr.size; m.memoryTypeIndex = memType(mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (!memTypeHas(mr.memoryTypeBits, want)) want = HOST_MEM;
+    VkMemoryAllocateInfo m = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO}; m.allocationSize = mr.size; m.memoryTypeIndex = memType(mr.memoryTypeBits, want);
     CK(vkAllocateMemory(g_dev, &m, NULL, &a->m)); CK(vkBindBufferMemory(g_dev, a->b, a->m, 0)); CK(vkMapMemory(g_dev, a->m, 0, VK_WHOLE_SIZE, 0, (void **)&a->map)); a->size = size; a->used = 0;
 }
+static void arenaMake(Arena *a, VkDeviceSize size, VkBufferUsageFlags use) { arenaMakeAs(a, size, use, HOST_MEM); }
+static void capMake(int W, int H);   /* the capture buffer, below its declaration */
 #define VB_USE (VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
 static Arena g_arena[256]; static int g_nArena; static Arena g_zero;
 /* what's been freed, and when: it can be used again once no frame in flight can still be reading it */
@@ -100,7 +116,8 @@ static void freeAdd(VkBuffer b, VkDeviceSize off, VkDeviceSize cap, char *p) {
     GFree *f = &g_free[g_nFree++]; f->b = b; f->off = off; f->cap = cap; f->p = p; f->at = g_frames;
 }
 /* ---- buffers and textures, by GL name ---------------------------------------------------- */
-typedef struct { VkBuffer b; VkDeviceSize off, cap; char *p; int dyn; } GBuf;
+typedef struct { VkBuffer b; VkDeviceSize off, cap; char *p; int dyn; unsigned long at; } GBuf;   /* at: the frame a dynamic one was given its place in */
+static unsigned long g_ringStamp = 1;   /* which frame's ring is being written: a dynamic buffer's place is only good for the frame it was given in */
 static GBuf *g_buf; static unsigned g_nBuf;
 static GBuf *bufOf(unsigned name) {
     if (name >= g_nBuf) { unsigned n = name + 4096; g_buf = realloc(g_buf, n * sizeof(GBuf)); memset(g_buf + g_nBuf, 0, (n - g_nBuf) * sizeof(GBuf)); g_nBuf = n; }
@@ -112,6 +129,8 @@ static GTex *g_tex; static unsigned g_nTex; static VkDescriptorSet g_whiteDs;
 /* each frame's short-lived things */
 typedef struct {
     float model[16], tint[4], extra[3]; VkBuffer vb[5]; VkDeviceSize off[5]; VkBuffer ib; VkDeviceSize ibOff; uint32_t nIndex, nVerts, bonesOff; VkDescriptorSet tex; int skin, flags, texKey, next, kind; float mouth[8];
+    VkBuffer restVb; VkDeviceSize restOff; float restScale;   /* (step 23) where its vertices were at rest, for fur: its own positions unless it said otherwise */
+    float mat[12]; VkDescriptorSet ntex;   /* (step 22) what it's made of: rough, metal, detail, depth; then its normal map's layer (-1 none), its kind (step 23: skin, hair, an eye, cloth) and two spare; then its eyes' glow, rgb and how much. And its normal map's page. One mesh is one material, so a call pushes it once */
 } Draw;
 /* a call: every copy of one mesh, chained through Draw.next. The lists run in this order in one array */
 enum { L_SUN, L_OPAQUE, L_GLOSS, L_BLEND, L_HOLO, L_N };
@@ -121,6 +140,7 @@ typedef struct {
     Draw *draws; int nDraw; int used; Batch *bat; int start[L_N + 1]; uint32_t instAt;
 } Frame;
 static Frame g_fr[FRAMES]; static int g_slot, g_frameLive; static Arena g_cap;
+static void capMake(int W, int H) { arenaMakeAs(&g_cap, (VkDeviceSize)W * H * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, HOST_MEM | VK_MEMORY_PROPERTY_HOST_CACHED_BIT); }
 __attribute__((unused)) static VkSemaphore g_rendered[MAX_IMAGES];
 static void *ringAlloc(Frame *f, VkDeviceSize n, VkDeviceSize align, uint32_t *off) {
     VkDeviceSize o = (f->ring.used + align - 1) & ~(align - 1);
@@ -131,7 +151,7 @@ static void *ringAlloc(Frame *f, VkDeviceSize n, VkDeviceSize align, uint32_t *o
 void gfxBufferData(unsigned name, long size, const void *data, int dynamic) {
     if (!g_dev || size <= 0) return;
     GBuf *g = bufOf(name);
-    if (dynamic) { Frame *f = &g_fr[g_slot]; uint32_t o; char *p = ringAlloc(f, (VkDeviceSize)size, 16, &o); if (data) memcpy(p, data, (size_t)size); g->b = f->ring.b; g->off = o; g->cap = (VkDeviceSize)size; g->p = p; g->dyn = 1; return; }
+    if (dynamic) { Frame *f = &g_fr[g_slot]; uint32_t o; char *p = ringAlloc(f, (VkDeviceSize)size, 16, &o); if (data) memcpy(p, data, (size_t)size); g->b = f->ring.b; g->off = o; g->cap = (VkDeviceSize)size; g->p = p; g->dyn = 1; g->at = g_ringStamp; return; }
     if (!g->b || g->dyn || (VkDeviceSize)size > g->cap) { if (g->b && !g->dyn && g->p && g->cap) freeAdd(g->b, g->off, (g->cap + 15) & ~(VkDeviceSize)15, g->p); g->p = arenaAlloc((VkDeviceSize)size, &g->b, &g->off); g->cap = (VkDeviceSize)size; g->dyn = 0; }
     if (data) memcpy(g->p, data, (size_t)size);
 }
@@ -148,6 +168,10 @@ void gfxBufferSub(unsigned name, long off, long size, const void *data) {
     if (!g_dev || name >= g_nBuf) return;
     GBuf *g = &g_buf[name];
     if (g->dyn && off == 0 && (VkDeviceSize)size >= g->cap) { gfxBufferData(name, size, data, 1); return; }   /* it lives in a ring that's come round since: a new place, in this frame's */
+    /* ⛔ 11-05: A PART of a dynamic buffer, written in a later frame than the one that placed it, went to the old place: in a ring that had come round and been
+     * given to something else. Hanging cloth writes its points into a buffer made for the most it could ever have, so it was always a part, and its skirt was
+     * drawn from whatever lay there that frame: sheets the size of the room, some frames and not others. It gets a new place in this frame's ring first */
+    if (g->dyn && g->at != g_ringStamp && g->cap) { Frame *f = &g_fr[g_slot]; uint32_t o; g->p = ringAlloc(f, g->cap, 16, &o); g->b = f->ring.b; g->off = o; g->at = g_ringStamp; }
     if (g->p && (VkDeviceSize)(off + size) <= g->cap) memcpy(g->p + off, data, (size_t)size);
 }
 static VkCommandBuffer oneBegin(void) {
@@ -297,6 +321,7 @@ void gfxFeed(unsigned name, const float *vp, const float *eye) { if (!g_cfg.scre
 void gfxScreen(unsigned name, const float *model, float amp) { if (!g_cfg.screens || g_nScr >= MAX_SCREENS || !name) return; g_scr[g_nScr].tex = name; memcpy(g_scr[g_nScr].model, model, 64); g_scr[g_nScr].amp = amp; g_nScr++; }
 void gfxHead(const GfxHead *h) { if (!g_cfg.screens || !tgOf(h->target)) return; g_head = *h; g_headOn = 1; }
 static struct { unsigned tex; float vp[16], rect[4]; } g_fs; static int g_fsOn;
+static int g_between, g_nScrWas, g_fsWas;   /* (step 25) a frame with no packet of its own, between two ticks: the screens and the floor's shadow are the last tick's, and nothing's drawn off-screen again */
 void gfxFloorShadow(unsigned name, const float *vp, const float *rect) { if (!g_cfg.screens || !tgOf(name)) return; g_fs.tex = name; memcpy(g_fs.vp, vp, 64); memcpy(g_fs.rect, rect, 16); g_fsOn = 1; }
 int gfxHasBC(void) {
     static int has = -1;
@@ -382,13 +407,16 @@ void gfxPagesBuild(void) {
 
 /* ---- pipelines --------------------------------------------------------------------------- */
 static VkShaderModule shaderOf(const uint32_t *code, size_t bytes) { VkShaderModuleCreateInfo i = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO}; i.codeSize = bytes; i.pCode = code; VkShaderModule m; CK(vkCreateShaderModule(g_dev, &i, NULL, &m)); return m; }
-enum { PF_DEPTH = 1, PF_DWRITE = 2, PF_BLEND = 4, PF_ADD = 8, PF_NOCOLOR = 16, PF_LINE = 32, PF_POINT = 64, PF_MASK0 = 128, PF_HULL = 256, PF_CULLF = 512, PF_CW = 1024, PF_DYNCULL = 2048, PF_GLOSS = 4096, PF_MASKA = 8192 };
-typedef struct { const uint32_t *vs; size_t vsN; const uint32_t *fs; size_t fsN; int flags, cutout, shadow, verts, pass; } PipeSpec;   /* verts: 0 static, 1 skin, 2 line, 3 hud, 4 effect, 5 sky point, 7 none, 8 a head, 9 positions alone. pass: 0 the world, 1 the HUD, 2 to the glass, 3 bloom, 4 occlusion, 5 its blur, 6 the air, 7 a picture drawn off-screen */
+enum { PF_DEPTH = 1, PF_DWRITE = 2, PF_BLEND = 4, PF_ADD = 8, PF_NOCOLOR = 16, PF_LINE = 32, PF_POINT = 64, PF_MASK0 = 128, PF_HULL = 256, PF_CULLF = 512, PF_CW = 1024, PF_DYNCULL = 2048, PF_GLOSS = 4096, PF_MASKA = 8192, PF_MUL = 16384, PF_RGB = 32768 };   /* MUL: what's there is multiplied by what's drawn (a stain). RGB: the target's alpha is left as it is */
+typedef struct { const uint32_t *vs; size_t vsN; const uint32_t *fs; size_t fsN; int flags, cutout, shadow, verts, pass; } PipeSpec;   /* verts: 0 static, 1 skin, 2 line, 3 hud, 4 effect, 5 sky point, 7 none, 8 a head, 9 positions alone, 11 static and 12 skin with where each vertex was at rest (fur). pass: 0 the world, 1 the HUD, 2 to the glass, 3 bloom, 4 occlusion, 5 its blur, 6 the air, 7 a picture drawn off-screen, 8 a full-screen picture that reads the view and a texture */
 typedef struct { float r[12], tint[4], extra[3]; uint32_t bone; float n[9]; } GInst;   /* one copy of a mesh: its model matrix's rows, its colour, its alpha, glow and layer, where its bones start in the ring, and what turns its normals */
 static VkPipeline pipeMake(const PipeSpec *s) {
     int off7 = s->pass == 7;   /* a picture drawn off-screen is plain: 8-bit, and no light but the sun's and the sky's */
-    int spec[8] = {g_taps, s->cutout, s->shadow, (off7 && g_cfg.linear == 2) ? 3 : g_cfg.linear, g_cfg.hemi, off7 ? 0 : g_cfg.lights > 0, off7 ? 1 : g_cfg.cascades, off7 ? 0 : g_cfg.probes};
-    VkSpecializationMapEntry me[8] = {{0, 0, 4}, {1, 4, 4}, {2, 8, 4}, {3, 12, 4}, {4, 16, 4}, {5, 20, 4}, {6, 24, 4}, {7, 28, 4}}; VkSpecializationInfo si = {8, me, sizeof spec, spec};
+    /* 8 to 12 are a surface's material (step 22): highlights, what it reflects, normal maps, fine detail, parallax. A picture drawn off-screen has none of them */
+    int spec[18] = {g_taps, s->cutout, s->shadow, (off7 && g_cfg.linear == 2) ? 3 : g_cfg.linear, g_cfg.hemi, off7 ? 0 : g_cfg.lights > 0, off7 ? 1 : g_cfg.cascades, off7 ? 0 : g_cfg.probes,
+                    off7 ? 0 : g_cfg.spec, off7 ? 0 : g_cfg.reflect, off7 ? 0 : g_cfg.normals, off7 ? 0 : g_cfg.detail, off7 ? 0 : g_cfg.parallax,
+                    off7 ? 0 : g_cfg.skin, off7 ? 0 : g_cfg.hair, off7 ? 0 : g_cfg.eyes, off7 ? 0 : g_cfg.sheen, (!off7 && g_mid && g_cfg.refract) ? 1 : 0};   /* 13 to 16: a body's skin, hair, eyes and cloth (step 23) */
+    VkSpecializationMapEntry me[18] = {{0, 0, 4}, {1, 4, 4}, {2, 8, 4}, {3, 12, 4}, {4, 16, 4}, {5, 20, 4}, {6, 24, 4}, {7, 28, 4}, {8, 32, 4}, {9, 36, 4}, {10, 40, 4}, {11, 44, 4}, {12, 48, 4}, {13, 52, 4}, {14, 56, 4}, {15, 60, 4}, {16, 64, 4}, {17, 68, 4}}; VkSpecializationInfo si = {18, me, sizeof spec, spec};   /* 17: water reads what's under it (step 24) */
     VkPipelineShaderStageCreateInfo st[2] = {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO}, {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO}};
     st[0].stage = VK_SHADER_STAGE_VERTEX_BIT; st[0].module = shaderOf(s->vs, s->vsN); st[0].pName = "main"; st[0].pSpecializationInfo = &si; int ns = 1;
     if (s->fs) { st[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT; st[1].module = shaderOf(s->fs, s->fsN); st[1].pName = "main"; st[1].pSpecializationInfo = &si; ns = 2; }
@@ -398,12 +426,16 @@ static VkPipeline pipeMake(const PipeSpec *s) {
 #define I_(skin_) do { uint32_t b_ = nb; vb[nb].binding = nb; vb[nb].stride = sizeof(GInst); vb[nb].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; nb++; A_(5, b_, VK_FORMAT_R32G32B32A32_SFLOAT, 0); A_(6, b_, VK_FORMAT_R32G32B32A32_SFLOAT, 16); A_(7, b_, VK_FORMAT_R32G32B32A32_SFLOAT, 32); A_(8, b_, VK_FORMAT_R32G32B32A32_SFLOAT, 48); A_(9, b_, VK_FORMAT_R32G32B32_SFLOAT, 64); if (skin_) { A_(10, b_, VK_FORMAT_R32_UINT, 76); } else { A_(11, b_, VK_FORMAT_R32G32B32_SFLOAT, 80); A_(12, b_, VK_FORMAT_R32G32B32_SFLOAT, 92); A_(13, b_, VK_FORMAT_R32G32B32_SFLOAT, 104); } } while (0)
     if (s->verts == 0) { B_(12); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); if (!s->shadow) { B_(12); A_(1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(8); A_(4, 2, VK_FORMAT_R32G32_SFLOAT, 0); } I_(0); }
     else if (s->verts == 1) { B_(12); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(12); A_(1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(4); A_(2, 2, VK_FORMAT_R8G8B8A8_UINT, 0); B_(4); A_(3, 3, VK_FORMAT_R8G8B8A8_UNORM, 0); B_(8); A_(4, 4, VK_FORMAT_R32G32_SFLOAT, 0); I_(1); }
+    else if (s->verts == 11) { B_(12); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(12); A_(1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(8); A_(4, 2, VK_FORMAT_R32G32_SFLOAT, 0); B_(12); A_(14, 3, VK_FORMAT_R32G32B32_SFLOAT, 0); I_(0); }
+    else if (s->verts == 12) { B_(12); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(12); A_(1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0); B_(4); A_(2, 2, VK_FORMAT_R8G8B8A8_UINT, 0); B_(4); A_(3, 3, VK_FORMAT_R8G8B8A8_UNORM, 0); B_(8); A_(4, 4, VK_FORMAT_R32G32_SFLOAT, 0); B_(12); A_(14, 5, VK_FORMAT_R32G32B32_SFLOAT, 0); I_(1); }
     else if (s->verts == 2) { B_(24); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32B32_SFLOAT, 12); }
     else if (s->verts == 4) { B_(36); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 12); A_(2, 0, VK_FORMAT_R32G32_SFLOAT, 28); }
     else if (s->verts == 6) { B_(32); A_(0, 0, VK_FORMAT_R32G32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32_SFLOAT, 8); A_(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 16); }
     else if (s->verts == 5) { B_(20); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32_SFLOAT, 12); }
     else if (s->verts == 8) { B_(32); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32B32_SFLOAT, 12); A_(2, 0, VK_FORMAT_R32G32_SFLOAT, 24); for (int m7 = 0; m7 < 8; m7++) { B_(12); vb[nb - 1].binding = (uint32_t)(1 + m7); va[na].location = (uint32_t)(3 + m7); va[na].binding = (uint32_t)(1 + m7); va[na].format = VK_FORMAT_R32G32B32_SFLOAT; va[na].offset = 0; na++; } }
     else if (s->verts == 9) { B_(12); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); }
+    else if (s->verts == 11) { B_(56); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32B32_SFLOAT, 12); A_(2, 0, VK_FORMAT_R32G32B32_SFLOAT, 24); A_(3, 0, VK_FORMAT_R32_SFLOAT, 36); A_(4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 40); }
+    else if (s->verts == 12) { B_(40); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); }
     else if (s->verts == 10) { B_(32); A_(0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0); A_(1, 0, VK_FORMAT_R32G32B32_SFLOAT, 12); A_(2, 0, VK_FORMAT_R32G32_SFLOAT, 24); }
     else if (s->verts != 7) { B_(8); A_(0, 0, VK_FORMAT_R32G32_SFLOAT, 0); }
     VkPipelineVertexInputStateCreateInfo vi = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO}; vi.vertexBindingDescriptionCount = nb; vi.pVertexBindingDescriptions = vb; vi.vertexAttributeDescriptionCount = na; vi.pVertexAttributeDescriptions = va;
@@ -418,11 +450,13 @@ static VkPipeline pipeMake(const PipeSpec *s) {
     VkPipelineColorBlendAttachmentState ba = {0}; ba.colorWriteMask = (s->flags & PF_MASKA) ? VK_COLOR_COMPONENT_A_BIT : (s->flags & PF_MASK0) ? 0 : 15;
     if (s->flags & (PF_BLEND | PF_ADD)) { ba.blendEnable = 1; ba.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; ba.dstColorBlendFactor = (s->flags & PF_ADD) ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; ba.colorBlendOp = VK_BLEND_OP_ADD; ba.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; ba.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; ba.alphaBlendOp = VK_BLEND_OP_ADD; }
     if (s->flags & PF_GLOSS) { ba.blendEnable = 1; ba.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; ba.dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; ba.colorBlendOp = VK_BLEND_OP_ADD; ba.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; ba.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; ba.alphaBlendOp = VK_BLEND_OP_ADD; }   /* its own colour, plus what's under it times how much a floor shows from here */
+    if (s->flags & PF_MUL) { ba.blendEnable = 1; ba.srcColorBlendFactor = VK_BLEND_FACTOR_DST_COLOR; ba.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; ba.colorBlendOp = VK_BLEND_OP_ADD; ba.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; ba.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE; ba.alphaBlendOp = VK_BLEND_OP_ADD; }
+    if (s->flags & PF_RGB) ba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT;
     VkPipelineColorBlendStateCreateInfo cb = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO}; cb.attachmentCount = (s->flags & PF_NOCOLOR) ? 0 : 1; cb.pAttachments = &ba;
     VkDynamicState dy[3] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE}; VkPipelineDynamicStateCreateInfo dsi = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO}; dsi.dynamicStateCount = (s->flags & PF_DYNCULL) ? 3 : 2; dsi.pDynamicStates = dy;
-    VkFormat fmt = (s->pass == 3 || s->pass == 6) ? HDR_FMT : (s->pass == 4 || s->pass == 5) ? AO_FMT : s->pass ? COLOR_FMT : g_sceneFmt;
+    VkFormat fmt = (s->pass == 3 || s->pass == 6) ? HDR_FMT : (s->pass == 4 || s->pass == 5) ? AO_FMT : s->pass == 10 ? g_glassFmt : (s->pass && s->pass != 9) ? COLOR_FMT : g_sceneFmt;   /* 9: a full-screen pass over the scene, into a picture like it. 10: onto the glass itself, whatever it's made of (step 25) */
     VkPipelineRenderingCreateInfo ri = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO}; if (!(s->flags & PF_NOCOLOR)) { ri.colorAttachmentCount = 1; ri.pColorAttachmentFormats = &fmt; } if (!s->pass || s->pass == 7 || (s->pass == 1 && !g_split)) ri.depthAttachmentFormat = g_depthFmt;
-    VkGraphicsPipelineCreateInfo g = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO}; g.pNext = &ri; g.stageCount = (uint32_t)ns; g.pStages = st; g.pVertexInputState = &vi; g.pInputAssemblyState = &ia; g.pViewportState = &vp; g.pRasterizationState = &rs; g.pMultisampleState = &ms; g.pDepthStencilState = &ds; g.pColorBlendState = &cb; g.pDynamicState = &dsi; g.layout = (s->pass == 2 || s->pass == 3 || s->pass == 5) ? g_layoutPost : g_layout;
+    VkGraphicsPipelineCreateInfo g = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO}; g.pNext = &ri; g.stageCount = (uint32_t)ns; g.pStages = st; g.pVertexInputState = &vi; g.pInputAssemblyState = &ia; g.pViewportState = &vp; g.pRasterizationState = &rs; g.pMultisampleState = &ms; g.pDepthStencilState = &ds; g.pColorBlendState = &cb; g.pDynamicState = &dsi; g.layout = (s->pass == 2 || s->pass == 3 || s->pass == 5 || s->pass == 9 || s->pass == 10) ? g_layoutPost : g_layout;
     VkPipeline p; CK(vkCreateGraphicsPipelines(g_dev, VK_NULL_HANDLE, 1, &g, NULL, &p)); return p;
 }
 #define SPV(n) spv_##n, sizeof spv_##n
@@ -436,6 +470,8 @@ static void pipesMake(void) {
         [P_TOON] = {SPV(mesh_skin_vert), SPV(mesh_toon_frag), D, 0, 0, 1}, [P_TOON_CUT] = {SPV(mesh_skin_vert), SPV(mesh_toon_frag), D, 1, 0, 1}, [P_TOON_STATIC] = {SPV(mesh_static_vert), SPV(mesh_toon_frag), D, 0, 0, 0}, [P_TOON_STATIC_CUT] = {SPV(mesh_static_vert), SPV(mesh_toon_frag), D, 1, 0, 0},
         [P_TOON_MOUTH] = {SPV(mesh_skin_mouth_vert), SPV(mesh_toon_mouth_frag), D, 0, 0, 1}, [P_TOON_MOUTH_CUT] = {SPV(mesh_skin_mouth_vert), SPV(mesh_toon_mouth_frag), D, 1, 0, 1}, [P_TOON_BLEND] = {SPV(mesh_skin_vert), SPV(mesh_toon_blend_frag), PF_DEPTH | PF_BLEND, 0, 0, 1},
         [P_INK] = {SPV(mesh_skin_ink_vert), SPV(ink_frag), D | PF_HULL, 0, 0, 1}, [P_INK_STATIC] = {SPV(mesh_static_ink_vert), SPV(ink_frag), D | PF_HULL, 0, 0, 0},
+        [P_FUR] = {SPV(mesh_skin_fur_vert), SPV(mesh_fur_frag), D, 0, 0, 12}, [P_FUR_STATIC] = {SPV(mesh_static_fur_vert), SPV(mesh_fur_frag), D, 0, 0, 11},   /* (step 23) a shell of fur */
+        [P_TOON_FUR] = {SPV(mesh_skin_fur_vert), SPV(mesh_toon_fur_frag), D, 0, 0, 12}, [P_TOON_FUR_STATIC] = {SPV(mesh_static_fur_vert), SPV(mesh_toon_fur_frag), D, 0, 0, 11},   /* and on a cel-shaded body: flat-coloured strands, over its line */
         [P_M_STATIC] = {SPV(mesh_static_vert), SPV(mesh_frag), D | PF_CW | PF_DYNCULL, 0, 0, 0}, [P_M_STATIC_CUT] = {SPV(mesh_static_vert), SPV(mesh_frag), D | PF_CW | PF_DYNCULL, 1, 0, 0}, [P_M_TOON_STATIC] = {SPV(mesh_static_vert), SPV(mesh_toon_frag), D | PF_CW | PF_DYNCULL, 0, 0, 0}, [P_M_TOON_STATIC_CUT] = {SPV(mesh_static_vert), SPV(mesh_toon_frag), D | PF_CW | PF_DYNCULL, 1, 0, 0},
         [P_R_STATIC] = {SPV(mesh_static_vert), SPV(mesh_refl_frag), D | PF_CW | PF_DYNCULL, 0, 0, 0}, [P_R_STATIC_CUT] = {SPV(mesh_static_vert), SPV(mesh_refl_frag), D | PF_CW | PF_DYNCULL, 1, 0, 0}, [P_R_SKIN] = {SPV(mesh_skin_vert), SPV(mesh_refl_frag), D, 0, 0, 1}, [P_R_SKIN_CUT] = {SPV(mesh_skin_vert), SPV(mesh_refl_frag), D, 1, 0, 1},
         [P_TR_STATIC] = {SPV(mesh_static_vert), SPV(mesh_toon_refl_frag), D | PF_CW | PF_DYNCULL, 0, 0, 0}, [P_TR_STATIC_CUT] = {SPV(mesh_static_vert), SPV(mesh_toon_refl_frag), D | PF_CW | PF_DYNCULL, 1, 0, 0}, [P_TR_SKIN] = {SPV(mesh_skin_vert), SPV(mesh_toon_refl_frag), D, 0, 0, 1}, [P_TR_SKIN_CUT] = {SPV(mesh_skin_vert), SPV(mesh_toon_refl_frag), D, 1, 0, 1},
@@ -443,7 +479,12 @@ static void pipesMake(void) {
         [P_GLOSS] = {SPV(mesh_static_vert), SPV(mesh_gloss_frag), D | PF_GLOSS, 0, 0, 0}, [P_TOON_GLOSS] = {SPV(mesh_static_vert), SPV(mesh_toon_gloss_frag), D | PF_GLOSS, 0, 0, 0}, [P_TOON_GLOSS_A] = {SPV(mesh_static_vert), SPV(mesh_toon_frag), PF_DEPTH | PF_MASKA, 0, 0, 0},
         [P_SH_STATIC] = {SPV(mesh_static_vert), NULL, 0, D | PF_NOCOLOR, 0, 1, 0}, [P_SH_SKIN] = {SPV(mesh_skin_vert), NULL, 0, D | PF_NOCOLOR, 0, 1, 1},
         [P_LINE] = {SPV(line_vert), SPV(line_frag), PF_DEPTH | PF_ADD | PF_LINE, 0, 0, 2}, [P_HUD] = {SPV(hud_vert), SPV(hud_frag), PF_BLEND, 0, 0, 3, 1}, [P_SPRITE] = {SPV(sprite_vert), SPV(sprite_frag), PF_BLEND, 0, 0, 6, 1},
-        [P_FX_ALPHA] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_BLEND, 0, 0, 4}, [P_FX_ADD] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_ADD, 0, 0, 4}, [P_FX_SOFT] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_BLEND, 1, 0, 4},
+        [P_FX_ALPHA] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_BLEND, 0, 0, 4}, [P_FX_ADD] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_ADD, 0, 0, 4}, [P_FX_SOFT] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_BLEND, 1, 0, 4}, [P_FX_GLOW] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_ADD, 1, 0, 4},
+        [P_FX_SOFTZ] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_BLEND, 2, 0, 4}, [P_FX_GLOWZ] = {SPV(fx_vert), SPV(fx_frag), PF_DEPTH | PF_ADD, 2, 0, 4},   /* (step 24) and fading out where they meet what's behind them */
+        [P_DECAL] = {SPV(decal_vert), SPV(decal_frag), PF_CULLF | PF_MUL | PF_RGB, 0, 0, 7, 0}, [P_DECAL_PAINT] = {SPV(decal_vert), SPV(decal_frag), PF_CULLF | PF_BLEND | PF_RGB, 1, 0, 7, 0},
+        [P_LENS_DOF] = {SPV(post_vert), SPV(lens_frag), 0, 1, 0, 7, 9}, [P_LENS_MB] = {SPV(post_vert), SPV(lens_frag), 0, 2, 0, 7, 9}, [P_TAA] = {SPV(post_vert), SPV(taa_frag), 0, 0, 0, 7, 9},   /* (step 25) the lens's passes */
+        [P_PRESENT] = {SPV(post_vert), SPV(present_frag), 0, 0, 0, 7, 10}, [P_TUBE480] = {SPV(post_vert), SPV(tube_frag), 0, 1, 0, 7, 10}, [P_TUBE240] = {SPV(post_vert), SPV(tube_frag), 0, 2, 0, 7, 10},   /* (step 25) the picture onto the glass */
+        [P_PRESENT_HDR] = {SPV(post_vert), SPV(present_frag), 0, 2, 0, 7, 10}, [P_HDREX] = {SPV(post_vert), SPV(hdrex_frag), 0, 0, 0, 7, 3},   /* and onto an HDR10 glass, with the light past white */
         [P_SKY] = {SPV(sky_vert), SPV(sky_frag), PF_DEPTH | PF_ADD | PF_POINT, 0, 0, 5},
         [P_HOLO_Z] = {SPV(mesh_skin_vert), NULL, 0, D | PF_MASK0, 0, 0, 1}, [P_HOLO] = {SPV(mesh_skin_vert), SPV(holo_frag), PF_DEPTH | PF_BLEND, 0, 0, 1},
         [P_SKYDOME] = {SPV(post_vert), SPV(skydome_frag), 0, g_cfg.sky, 0, 7, 0},
@@ -457,7 +498,7 @@ static void pipesMake(void) {
         [P_B_SKIN] = {SPV(mesh_skin_vert), SPV(white_frag), 0, 0, 0, 1, 7}, [P_FLOORSH] = {SPV(floorshadow_vert), SPV(floorshadow_frag), PF_DEPTH | PF_BLEND, 0, 0, 7, 0},
         [P_POST] = {SPV(post_vert), SPV(post_frag), 0, 0, 0, 7, 2}, [P_BLOOM0] = {SPV(post_vert), SPV(bloom_frag), 0, 0, 0, 7, 3}, [P_BLOOM_DOWN] = {SPV(post_vert), SPV(bloom_frag), 0, 1, 0, 7, 3}, [P_BLOOM_UP] = {SPV(post_vert), SPV(bloom_frag), PF_ADD, 2, 0, 7, 3},
         [P_AO] = {SPV(post_vert), SPV(ao_frag), 0, 0, 0, 7, 4}, [P_AOBLUR] = {SPV(post_vert), SPV(aoblur_frag), 0, 0, 0, 7, 5}, [P_VOL] = {SPV(post_vert), SPV(vol_frag), 0, 0, 0, 7, 6} };
-    for (int i = 0; i < P_N; i++) { if (i == P_SKYDOME && !g_cfg.sky) continue; if (i >= P_M_STATIC && i <= P_TOON_GLOSS_A && !g_cfg.mirrors) continue; if (i >= P_SCREEN && i <= P_FLOORSH && !g_cfg.screens) continue; if (i >= P_POST && !g_cfg.hdr) continue; if ((i == P_AO || i == P_AOBLUR) && !g_cfg.ao && !g_cfg.contact) continue; if (i == P_VOL && !g_cfg.volumetric) continue; g_pipe[i] = pipeMake(&t[i]); }
+    for (int i = 0; i < P_N; i++) { if (i == P_SKYDOME && !g_cfg.sky) continue; if (i >= P_FUR && i <= P_TOON_FUR_STATIC && !g_cfg.fur) continue; if (i >= P_M_STATIC && i <= P_TOON_GLOSS_A && !g_cfg.mirrors) continue; if (i >= P_SCREEN && i <= P_FLOORSH && !g_cfg.screens) continue; if (i >= P_POST && i <= P_VOL && !g_cfg.hdr) continue; if (i >= P_FX_SOFTZ && i <= P_DECAL_PAINT && !g_mid) continue; if (i == P_LENS_DOF && !(g_lens && g_cfg.dof)) continue; if (i == P_LENS_MB && !(g_lens && g_cfg.mblur)) continue; if (i == P_TAA && !(g_lens && g_cfg.taa)) continue; if (i >= P_PRESENT && i <= P_TUBE240 && (!g_present || (i == P_PRESENT) == (g_cfg.tube != 0) || (i == P_TUBE480 && g_cfg.tube != 1) || (i == P_TUBE240 && g_cfg.tube != 2))) continue; if ((i == P_PRESENT_HDR || i == P_HDREX) && !g_hdrOut) continue; if ((i == P_AO || i == P_AOBLUR) && !g_cfg.ao && !g_cfg.contact) continue; if (i == P_VOL && !g_cfg.volumetric) continue; g_pipe[i] = pipeMake(&t[i]); }
 }
 
 /* ---- start-up ---------------------------------------------------------------------------- */
@@ -465,8 +506,10 @@ static void deviceMake(const char **instExt, uint32_t nInst, const char **devExt
     VkApplicationInfo ai = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO}; ai.apiVersion = VK_API_VERSION_1_3; ai.pApplicationName = "aigameengine";
     VkInstanceCreateInfo ci = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO}; ci.pApplicationInfo = &ai; ci.enabledExtensionCount = nInst; ci.ppEnabledExtensionNames = instExt; CK(vkCreateInstance(&ci, NULL, &g_inst));
     uint32_t n = 8; VkPhysicalDevice pd[8]; vkEnumeratePhysicalDevices(g_inst, &n, pd); int best = -1;
-    for (uint32_t i = 0; i < n; i++) { VkPhysicalDeviceProperties p; vkGetPhysicalDeviceProperties(pd[i], &p); int s = p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 3 : (strstr(p.deviceName, "V3D") ? 3 : (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU ? 0 : 1)); if (s > 0 && (best < 0 || s > 1)) { best = (int)i; if (s == 3) break; } }
+    /* a discrete GPU or the Pi's V3D first, any other GPU next, and a software device (lavapipe) only when it's all there is: the receipt's test layer (step 19), never a player's */
+    int bestS = -1; for (uint32_t i = 0; i < n; i++) { VkPhysicalDeviceProperties p; vkGetPhysicalDeviceProperties(pd[i], &p); int s = p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 3 : (strstr(p.deviceName, "V3D") ? 3 : (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU ? 0 : 1)); if (s > bestS) { best = (int)i; bestS = s; if (s == 3) break; } }
     if (best < 0) { printf("[gfx] no GPU\n"); exit(1); } g_gpu = pd[best];
+    if (bestS == 0) printf("[gfx] a software device: deterministic pixels, the receipt's test layer, not a player's road\n");
     VkPhysicalDeviceProperties p; vkGetPhysicalDeviceProperties(g_gpu, &p); g_uboAlign = p.limits.minUniformBufferOffsetAlignment; if (g_uboAlign < 16) g_uboAlign = 16;
     printf("[gfx] %s, Vulkan %u.%u.%u, driver reports ubo align %u\n", p.deviceName, VK_VERSION_MAJOR(p.apiVersion), VK_VERSION_MINOR(p.apiVersion), VK_VERSION_PATCH(p.apiVersion), (unsigned)g_uboAlign); fflush(stdout);
     vkGetPhysicalDeviceMemoryProperties(g_gpu, &g_mp);
@@ -477,8 +520,10 @@ static void deviceMake(const char **instExt, uint32_t nInst, const char **devExt
     if (g_cfg.aniso > 0) { if (!have.samplerAnisotropy) g_cfg.aniso = 0; else if ((float)g_cfg.aniso > p.limits.maxSamplerAnisotropy) g_cfg.aniso = (int)p.limits.maxSamplerAnisotropy; }
     { VkSampleCountFlags ok = p.limits.framebufferColorSampleCounts & p.limits.framebufferDepthSampleCounts; int sc = g_cfg.msaa < 1 ? 1 : g_cfg.msaa; while (sc > 1 && !(ok & (VkSampleCountFlags)sc)) sc /= 2; g_cfg.msaa = sc; g_samples = (VkSampleCountFlagBits)sc; }
     if (g_cfg.hdr) { VkFormatProperties q; vkGetPhysicalDeviceFormatProperties(g_gpu, HDR_FMT, &q); VkFormatFeatureFlags w = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT; if ((q.optimalTilingFeatures & w) != w) g_cfg.hdr = 0; }
-    if (g_cfg.hdr) { if (g_cfg.linear) g_cfg.linear = 2; } else { if (g_cfg.linear == 2) g_cfg.linear = 1; g_cfg.tonemap = g_cfg.bloom = g_cfg.grade = g_cfg.ao = g_cfg.contact = g_cfg.volumetric = 0; }
-    g_readDepth = g_cfg.ao || g_cfg.contact || g_cfg.volumetric;
+    if (g_cfg.hdr) { if (g_cfg.linear) g_cfg.linear = 2; } else { if (g_cfg.linear == 2) g_cfg.linear = 1; g_cfg.tonemap = g_cfg.bloom = g_cfg.grade = g_cfg.ao = g_cfg.contact = g_cfg.volumetric = 0; g_cfg.softfx = g_cfg.decals = g_cfg.refract = 0; g_cfg.dof = g_cfg.mblur = g_cfg.taa = g_cfg.hdrout = 0; }
+    g_mid = g_cfg.hdr && (g_cfg.softfx || g_cfg.decals || g_cfg.refract);
+    g_lens = g_cfg.hdr && (g_cfg.dof || g_cfg.mblur || g_cfg.taa);
+    g_readDepth = g_cfg.ao || g_cfg.contact || g_cfg.volumetric || g_mid || g_lens;
     g_filmPost = g_cfg.hdr && !g_cfg.linear; g_sceneFmt = (g_cfg.hdr && !g_filmPost) ? HDR_FMT : COLOR_FMT; g_split = g_cfg.hdr || g_samples > VK_SAMPLE_COUNT_1_BIT;
     VkPhysicalDeviceVulkan13Features f13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES}; f13.dynamicRendering = 1;
     VkDeviceCreateInfo di = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO}; di.pNext = &f13; di.pEnabledFeatures = &want; di.queueCreateInfoCount = 1; di.pQueueCreateInfos = &qi; di.enabledExtensionCount = nDev; di.ppEnabledExtensionNames = devExt; CK(vkCreateDevice(g_gpu, &di, NULL, &g_dev)); vkGetDeviceQueue(g_dev, g_qf, 0, &g_q);
@@ -511,6 +556,78 @@ static void lutMake(const unsigned char *rgba, int n) { img3D(rgba, n, n, n, &g_
 static void probeBind(void) {
     for (int i = 0; i < FRAMES; i++) { VkDescriptorImageInfo im = {g_smpClamp, g_prView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.dstSet = g_fr[i].dsView; w.dstBinding = 5; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w.pImageInfo = &im; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
 }
+/* (step 22) a set's surroundings as a cube, for what a surface reflects: six faces of n x n, n a power of two, and every smaller level made here by halving, so a rough surface reads a blur of them */
+static VkImage g_envImg; static VkImageView g_envView; static VkDeviceMemory g_envMem; static int g_envOn, g_envMips = 1;
+static void imgCube(const unsigned char *rgba, int n, VkImage *outI, VkImageView *outV, VkDeviceMemory *outM, int *mipsOut) {
+    int mips = 1; for (int s = n; s > 1; s >>= 1) mips++; if (mips > 12) mips = 12;
+    VkImageCreateInfo i = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO}; i.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT; i.imageType = VK_IMAGE_TYPE_2D; i.format = VK_FORMAT_R8G8B8A8_UNORM; i.extent.width = i.extent.height = (uint32_t)n; i.extent.depth = 1; i.mipLevels = (uint32_t)mips; i.arrayLayers = 6; i.samples = VK_SAMPLE_COUNT_1_BIT; i.tiling = VK_IMAGE_TILING_OPTIMAL; i.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; CK(vkCreateImage(g_dev, &i, NULL, outI));
+    VkMemoryRequirements mr; vkGetImageMemoryRequirements(g_dev, *outI, &mr); VkMemoryAllocateInfo a = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO}; a.allocationSize = mr.size; a.memoryTypeIndex = memType(mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); CK(vkAllocateMemory(g_dev, &a, NULL, outM)); CK(vkBindImageMemory(g_dev, *outI, *outM, 0));
+    VkImageViewCreateInfo v = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO}; v.image = *outI; v.viewType = VK_IMAGE_VIEW_TYPE_CUBE; v.format = VK_FORMAT_R8G8B8A8_UNORM; v.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; v.subresourceRange.levelCount = (uint32_t)mips; v.subresourceRange.layerCount = 6; CK(vkCreateImageView(g_dev, &v, NULL, outV));
+    size_t offs[12], tot = 0; int sz[12]; for (int l = 0, s = n; l < mips; l++) { offs[l] = tot; sz[l] = s; tot += (size_t)s * s * 24; s = s > 1 ? s >> 1 : 1; }
+    Arena st; arenaMake(&st, tot, VK_BUFFER_USAGE_TRANSFER_SRC_BIT); unsigned char *o = (unsigned char *)st.map; memcpy(o, rgba, (size_t)n * n * 24);
+    for (int l = 1; l < mips; l++) { const int s = sz[l], p = sz[l - 1];
+        for (int f = 0; f < 6; f++) { const unsigned char *src = o + offs[l - 1] + (size_t)f * p * p * 4; unsigned char *dst = o + offs[l] + (size_t)f * s * s * 4;
+            for (int y = 0; y < s; y++) for (int x = 0; x < s; x++) for (int k = 0; k < 4; k++)
+                dst[(y * s + x) * 4 + k] = (unsigned char)((src[((2 * y) * p + 2 * x) * 4 + k] + src[((2 * y) * p + 2 * x + 1) * 4 + k] + src[((2 * y + 1) * p + 2 * x) * 4 + k] + src[((2 * y + 1) * p + 2 * x + 1) * 4 + k] + 2) / 4); } }
+    VkCommandBuffer cb = oneBegin();
+    VkImageMemoryBarrier b = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER}; b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; b.image = *outI; b.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; b.subresourceRange.levelCount = (uint32_t)mips; b.subresourceRange.layerCount = 6;
+    b.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+    VkBufferImageCopy c[12]; memset(c, 0, sizeof c);
+    for (int l = 0; l < mips; l++) { c[l].bufferOffset = offs[l]; c[l].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; c[l].imageSubresource.mipLevel = (uint32_t)l; c[l].imageSubresource.layerCount = 6; c[l].imageExtent.width = c[l].imageExtent.height = (uint32_t)sz[l]; c[l].imageExtent.depth = 1; }
+    vkCmdCopyBufferToImage(cb, st.b, *outI, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)mips, c);
+    b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT; b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+    oneEnd(cb); vkDestroyBuffer(g_dev, st.b, NULL); vkFreeMemory(g_dev, st.m, NULL); *mipsOut = mips;
+}
+static void envBind(void) {
+    for (int i = 0; i < FRAMES; i++) { VkDescriptorImageInfo im = {g_smpRepeat, g_envView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.dstSet = g_fr[i].dsView; w.dstBinding = 6; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w.pImageInfo = &im; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
+}
+/* it only changes behind a load, like the baked light. What's in it: red, how much of the sky that way is open; green, whether the sun reaches what's there; the shader puts today's sky and ground on them */
+/* (step 23) SKIN, WORKED OUT AHEAD: Penner's pre-integrated skin. Light that enters skin leaves it a little way off, by a profile that's been measured (d'Eon and Luebke's six
+ * Gaussians: their widths in square millimetres, and a weight each for red, green and blue, red travelling furthest). On a surface curved to a radius r, what leaves a point is the
+ * plain falloff at every point round the ring, weighted by that profile at the distance between them. So the table is: across, the cosine of the angle to the light, -1 to 1; down,
+ * 1/r from 0 (flat: the plain falloff, exactly) to SKIN_TIGHT per millimetre. Each Gaussian is summed over its own width, because the narrow ones would fall between the steps of any
+ * one grid and be lost, and they're most of blue. Square roots are stored, for the dark end's sake. The club's own sin, cos and exp, so it's the same bytes on every machine.
+ * Made only where the skin setting's on: a machine without it binds one white texel. */
+#define SKIN_LW 64
+#define SKIN_LH 32
+#define SKIN_TIGHT 0.32
+#define SKIN_STEPS 48
+double club_sin(double x); double club_cos(double x); double club_exp(double x);
+static VkImage g_skinImg; static VkImageView g_skinView; static VkDeviceMemory g_skinMem;
+static void skinLutMake(void) {
+    static const double var[6] = {0.0064, 0.0484, 0.187, 0.567, 1.99, 7.41};
+    static const double wt[6][3] = {{0.233, 0.455, 0.649}, {0.100, 0.336, 0.344}, {0.118, 0.198, 0.000}, {0.113, 0.007, 0.007}, {0.358, 0.004, 0.000}, {0.078, 0.000, 0.000}};
+    const double PI = 3.14159265358979323846;
+    unsigned char *px = malloc(SKIN_LW * SKIN_LH * 4); if (!px) return;
+    for (int y = 0; y < SKIN_LH; y++) { const double c = SKIN_TIGHT * (double)y / (double)(SKIN_LH - 1);
+        double R[6][SKIN_STEPS], ca[6][SKIN_STEPS], sa[6][SKIN_STEPS], k9[6];
+        if (c > 0.0) for (int g = 0; g < 6; g++) { const double r = 1.0 / c; double X = 8.0 * sqrt(var[g]) / r; if (X > PI) X = PI; const double da = 2.0 * X / (double)SKIN_STEPS;
+            for (int k = 0; k < SKIN_STEPS; k++) { const double a = -X + ((double)k + 0.5) * da, d = 2.0 * r * club_sin(0.5 * a); R[g][k] = club_exp(-d * d / (2.0 * var[g])); ca[g][k] = club_cos(a); sa[g][k] = club_sin(a); }
+            k9[g] = da * r / sqrt(2.0 * PI * var[g]); }   /* the profile is round a point; summed across the way the light doesn't change, what's left along the ring is a Gaussian of the same width that adds up to 1, so each one carries its own weight of the light and no more. (Weighted by its height at the point instead, the narrow ones take nearly all of it and skin hardly scatters.) */
+        for (int x = 0; x < SKIN_LW; x++) { const double ct = -1.0 + 2.0 * (double)x / (double)(SKIN_LW - 1), st = sqrt(1.0 - ct * ct > 0.0 ? 1.0 - ct * ct : 0.0); double out[3];
+            if (c <= 0.0) out[0] = out[1] = out[2] = ct > 0.0 ? ct : 0.0;
+            else { double num[3] = {0, 0, 0}, den[3] = {0, 0, 0};
+                for (int g = 0; g < 6; g++) { double n = 0.0, d = 0.0;
+                    for (int k = 0; k < SKIN_STEPS; k++) { const double l = ct * ca[g][k] - st * sa[g][k]; if (l > 0.0) n += l * R[g][k]; d += R[g][k]; }
+                    for (int ch = 0; ch < 3; ch++) { num[ch] += wt[g][ch] * n * k9[g]; den[ch] += wt[g][ch] * d * k9[g]; } }
+                for (int ch = 0; ch < 3; ch++) out[ch] = den[ch] > 0.0 ? num[ch] / den[ch] : 0.0; }
+            unsigned char *o = px + ((size_t)y * SKIN_LW + (size_t)x) * 4;
+            for (int ch = 0; ch < 3; ch++) { const double v = out[ch] < 0.0 ? 0.0 : out[ch] > 1.0 ? 1.0 : out[ch]; o[ch] = (unsigned char)(sqrt(v) * 255.0 + 0.5); }
+            o[3] = 255; } }
+    if (getenv("REVA_SKINLUT")) { FILE *f = fopen(getenv("REVA_SKINLUT"), "wb"); if (f) { fprintf(f, "P6\n%d %d\n255\n", SKIN_LW, SKIN_LH); for (int i = 0; i < SKIN_LW * SKIN_LH; i++) fwrite(px + i * 4, 1, 3, f); fclose(f); } }   /* the table as a picture, to look at */
+    img3D(px, SKIN_LW, SKIN_LH, 1, &g_skinImg, &g_skinView, &g_skinMem); free(px);
+}
+static void skinBind(void) {
+    for (int i = 0; i < FRAMES; i++) { VkDescriptorImageInfo im = {g_smpClamp, g_skinView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.dstSet = g_fr[i].dsView; w.dstBinding = 7; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w.pImageInfo = &im; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
+}
+void gfxEnvCube(const unsigned char *rgba, int size, const float *at) {
+    (void)at; if (!g_dev || g_cfg.reflect < 2) return;
+    if (!rgba && !g_envOn) return;
+    vkDeviceWaitIdle(g_dev); vkDestroyImageView(g_dev, g_envView, NULL); vkDestroyImage(g_dev, g_envImg, NULL); vkFreeMemory(g_dev, g_envMem, NULL);
+    static const unsigned char open[24] = {255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255};
+    if (rgba && size >= 1 && !(size & (size - 1))) { imgCube(rgba, size, &g_envImg, &g_envView, &g_envMem, &g_envMips); g_envOn = 1; } else { imgCube(open, 1, &g_envImg, &g_envView, &g_envMem, &g_envMips); g_envOn = 0; }
+    envBind();
+}
 /* a set's baked light. Like the grade, it only changes behind a load */
 void gfxProbes(const unsigned char *rgba, int w, int h, int d, const float *geo) {
     if (!g_dev || !g_cfg.probes) return;
@@ -530,14 +647,14 @@ void gfxLut(const unsigned char *rgba, int n) {
     postWrite();
 }
 static void targetsMake(void) {
-    g_depth = imgMakeX(g_depthFmt, (uint32_t)g_W, (uint32_t)g_H, 1, g_samples, 0, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | ((g_readDepth && g_samples == VK_SAMPLE_COUNT_1_BIT) ? VK_IMAGE_USAGE_SAMPLED_BIT : 0), VK_IMAGE_ASPECT_DEPTH_BIT, &g_depthView); g_depthMem = g_imgMem;
-    if (g_samples > VK_SAMPLE_COUNT_1_BIT) { g_msImg = imgMakeX(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, g_samples, 0, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_msView); g_msMem = g_imgMem; }
+    g_depth = imgMakeX(g_depthFmt, (uint32_t)g_W, (uint32_t)g_H, 1, g_samples, 0, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | ((g_readDepth && g_samples == VK_SAMPLE_COUNT_1_BIT) ? VK_IMAGE_USAGE_SAMPLED_BIT : 0) | ((g_mid && g_samples == VK_SAMPLE_COUNT_1_BIT) ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0), VK_IMAGE_ASPECT_DEPTH_BIT, &g_depthView); g_depthMem = g_imgMem;
+    if (g_samples > VK_SAMPLE_COUNT_1_BIT) { g_msImg = imgMakeX(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, g_samples, 0, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | (g_mid ? 0 : VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT), VK_IMAGE_ASPECT_COLOR_BIT, &g_msView);   /* read mid-frame, it's kept from one half of the pass to the next */ g_msMem = g_imgMem; }
     if (!g_cfg.hdr) return;
-    g_hdrImg = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_hdrView); g_hdrMem = g_imgMem; g_hdrDs = dsPost(g_hdrView);
+    g_hdrImg = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | (g_mid ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0) | (g_lens ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0), VK_IMAGE_ASPECT_COLOR_BIT, &g_hdrView); g_hdrMem = g_imgMem; g_hdrDs = dsPost(g_hdrView);
     if (g_cfg.bloom) for (int i = 0, w = g_W / 2, h = g_H / 2; i < BLOOM_N; i++, w /= 2, h /= 2) { g_blW[i] = w > 1 ? w : 1; g_blH[i] = h > 1 ? h : 1; g_blImg[i] = imgMake(HDR_FMT, (uint32_t)g_blW[i], (uint32_t)g_blH[i], 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_blView[i]); g_blMem[i] = g_imgMem; g_blDs[i] = dsPost(g_blView[i]); }
     if (!g_lutImg) { static const unsigned char none[32] = {0, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 255, 255, 0, 255, 0, 0, 255, 255, 255, 0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255}; lutMake(none, 2); }
     if (g_readDepth) {
-        if (g_samples > VK_SAMPLE_COUNT_1_BIT) { g_zImg = imgMake(g_depthFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, &g_zView); g_zMem = g_imgMem; g_zRead = g_zView; } else g_zRead = g_depthView;
+        if (g_samples > VK_SAMPLE_COUNT_1_BIT) { g_zImg = imgMake(g_depthFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | (g_mid ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0), VK_IMAGE_ASPECT_DEPTH_BIT, &g_zView); g_zMem = g_imgMem; g_zRead = g_zView; } else g_zRead = g_depthView;
         { VkDescriptorSetAllocateInfo a = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO}; a.descriptorPool = g_dp; a.descriptorSetCount = 1; a.pSetLayouts = &g_dslTex; CK(vkAllocateDescriptorSets(g_dev, &a, &g_zDs));
           VkDescriptorImageInfo im = {g_smpNear, g_zRead, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.dstSet = g_zDs; w.dstBinding = 0; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w.pImageInfo = &im; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
         int hw = g_W / 2 > 1 ? g_W / 2 : 1, hh = g_H / 2 > 1 ? g_H / 2 : 1;
@@ -546,6 +663,22 @@ static void targetsMake(void) {
         if (g_cfg.volumetric) { g_volImg = imgMake(HDR_FMT, (uint32_t)hw, (uint32_t)hh, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_volView); g_volMem = g_imgMem; }
     }
     g_postDs = dsPost(g_hdrView); postWrite();
+    if (g_lens) {   /* (step 25) the lens's passes: what they work in, what they read, and the last frame kept */
+        const VkImageUsageFlags use = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; VkCommandBuffer cb0 = oneBegin(); VkImageView sv[5] = {g_hdrView, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
+        if (g_cfg.dof || g_cfg.mblur) { g_scrImg[0] = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, use, VK_IMAGE_ASPECT_COLOR_BIT, &g_scrView[0]); sv[SRC_SCR0] = g_scrView[0]; }
+        if (g_cfg.dof && g_cfg.mblur) { g_scrImg[1] = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, use, VK_IMAGE_ASPECT_COLOR_BIT, &g_scrView[1]); sv[SRC_SCR1] = g_scrView[1]; }
+        if (g_cfg.taa) for (int i = 0; i < 2; i++) { g_histImg[i] = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, use, VK_IMAGE_ASPECT_COLOR_BIT, &g_histView[i]); sv[SRC_HIST0 + i] = g_histView[i];
+            barrierImg(cb0, g_histImg[i], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1); }
+        oneEnd(cb0);
+        VkDescriptorImageInfo zi = {g_smpNear, g_zRead, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        for (int i = 0; i < 5; i++) if (sv[i]) { g_srcDs[i] = dsPost(sv[i]); w.dstSet = g_srcDs[i]; w.dstBinding = 3; w.pImageInfo = &zi; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
+        if (g_cfg.taa) for (int i = 0; i < 2; i++) { VkDescriptorImageInfo hi = {g_smpClamp, g_histView[1 - i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; g_taaDs[i] = dsPost(g_hdrView);
+            w.dstSet = g_taaDs[i]; w.dstBinding = 1; w.pImageInfo = &hi; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); w.dstBinding = 3; w.pImageInfo = &zi; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); } }
+    if (g_mid) {   /* (step 24) where the scene's kept mid-frame */
+        g_snapImg = imgMake(g_sceneFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_snapView);
+        g_zsImg = imgMake(g_depthFmt, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, &g_zsView);
+        VkCommandBuffer cb0 = oneBegin(); barrierImg(cb0, g_snapImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1);
+        barrierImg(cb0, g_zsImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1); oneEnd(cb0); }
 }
 __attribute__((unused)) static void targetsFree(void) {
     vkDestroyImageView(g_dev, g_depthView, NULL); vkDestroyImage(g_dev, g_depth, NULL); vkFreeMemory(g_dev, g_depthMem, NULL);
@@ -564,16 +697,18 @@ static void commonMake(void) {
     sc.compareEnable = 1; sc.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL; sc.addressModeU = sc.addressModeV = sc.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; sc.maxLod = 0.f; CK(vkCreateSampler(g_dev, &sc, NULL, &g_smpShadow));
     sc.compareEnable = 0; CK(vkCreateSampler(g_dev, &sc, NULL, &g_smpClamp));
     sc.magFilter = VK_FILTER_NEAREST; sc.minFilter = VK_FILTER_NEAREST; CK(vkCreateSampler(g_dev, &sc, NULL, &g_smpNear));
-    VkDescriptorSetLayoutBinding bv[6] = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}};
+    VkDescriptorSetLayoutBinding bv[10] = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}};   /* 6: the set's surroundings as a cube (step 22). 7: skin's table (step 23). 8 and 9: the scene's colour and depth, read mid-frame (step 24) */
     VkDescriptorSetLayoutBinding bt[1] = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}};
-    VkDescriptorSetLayoutCreateInfo dl = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO}; dl.bindingCount = 6; dl.pBindings = bv; CK(vkCreateDescriptorSetLayout(g_dev, &dl, NULL, &g_dslView));
+    VkDescriptorSetLayoutCreateInfo dl = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO}; dl.bindingCount = 10; dl.pBindings = bv; CK(vkCreateDescriptorSetLayout(g_dev, &dl, NULL, &g_dslView));
     dl.bindingCount = 1; dl.pBindings = bt; CK(vkCreateDescriptorSetLayout(g_dev, &dl, NULL, &g_dslTex));
     { VkDescriptorSetLayoutBinding bp[5] = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}}; dl.bindingCount = 5; dl.pBindings = bp; CK(vkCreateDescriptorSetLayout(g_dev, &dl, NULL, &g_dslPost));
-      VkPushConstantRange pp = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 64}; VkPipelineLayoutCreateInfo pl2 = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO}; pl2.setLayoutCount = 1; pl2.pSetLayouts = &g_dslPost; pl2.pushConstantRangeCount = 1; pl2.pPushConstantRanges = &pp; CK(vkCreatePipelineLayout(g_dev, &pl2, NULL, &g_layoutPost)); }
-    VkDescriptorSetLayout sets[2] = {g_dslView, g_dslTex}; VkPushConstantRange pc = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 96};
-    VkPipelineLayoutCreateInfo pli = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO}; pli.setLayoutCount = 2; pli.pSetLayouts = sets; pli.pushConstantRangeCount = 1; pli.pPushConstantRanges = &pc; CK(vkCreatePipelineLayout(g_dev, &pli, NULL, &g_layout));
+      VkPushConstantRange pp = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128}; VkPipelineLayoutCreateInfo pl2 = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO}; pl2.setLayoutCount = 1; pl2.pSetLayouts = &g_dslPost; pl2.pushConstantRangeCount = 1; pl2.pPushConstantRanges = &pp; CK(vkCreatePipelineLayout(g_dev, &pl2, NULL, &g_layoutPost)); }
+    /* (step 22) a third set, the same shape as the second: a mesh's normal map, on its page. And 32 more bytes of push constants, at 80: what the mesh is made of */
+    VkDescriptorSetLayout sets[3] = {g_dslView, g_dslTex, g_dslTex}; VkPushConstantRange pc = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128};   /* 128 with step 23's eye glow: all a device has to offer */
+    VkPipelineLayoutCreateInfo pli = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO}; pli.setLayoutCount = 3; pli.pSetLayouts = sets; pli.pushConstantRangeCount = 1; pli.pPushConstantRanges = &pc; CK(vkCreatePipelineLayout(g_dev, &pli, NULL, &g_layout));
     VkDescriptorPoolSize ps[3] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_TEX * 2 + 128}}; VkDescriptorPoolCreateInfo dpi = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO}; dpi.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; dpi.maxSets = MAX_TEX * 2 + 64; dpi.poolSizeCount = 3; dpi.pPoolSizes = ps; CK(vkCreateDescriptorPool(g_dev, &dpi, NULL, &g_dp));
     targetsMake();
+    if (!g_mid) { g_dumImg = imgMake(VK_FORMAT_R8G8B8A8_UNORM, 1, 1, 1, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_dumView); VkCommandBuffer cb0 = oneBegin(); barrierImg(cb0, g_dumImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1); oneEnd(cb0); }   /* a shader names the scene's depth whatever the settings, so there's always something bound: nothing's read from it */
     { VkCommandBuffer cb = oneBegin(); barrierImg(cb, g_sunImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1); oneEnd(cb); }
     { static const unsigned char white[4] = {255, 255, 255, 255}; GTex t; memset(&t, 0, sizeof t); texUpload(&t, 1, 1, white); g_whiteDs = t.dsA; }
     arenaMake(&g_zero, 16u * 1024u * 1024u, VB_USE); memset(g_zero.map, 0, g_zero.size);
@@ -589,12 +724,19 @@ static void commonMake(void) {
         w[0].dstSet = f->dsView; w[0].dstBinding = 0; w[0].descriptorCount = 1; w[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; w[0].pBufferInfo = &bu;
         w[1].dstSet = f->dsView; w[1].dstBinding = 1; w[1].descriptorCount = 1; w[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w[1].pImageInfo = &si2;
         vkUpdateDescriptorSets(g_dev, 4, w, 0, NULL);
-        VkWriteDescriptorSet wa = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; wa.dstSet = f->dsView; wa.dstBinding = 4; wa.descriptorCount = 1; wa.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; wa.pImageInfo = &si3; vkUpdateDescriptorSets(g_dev, 1, &wa, 0, NULL); }
+        VkWriteDescriptorSet wa = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; wa.dstSet = f->dsView; wa.dstBinding = 4; wa.descriptorCount = 1; wa.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; wa.pImageInfo = &si3; vkUpdateDescriptorSets(g_dev, 1, &wa, 0, NULL);
+        { VkDescriptorImageInfo s8 = {g_smpClamp, g_mid ? g_snapView : g_dumView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}, s9 = {g_smpNear, g_mid ? g_zsView : g_dumView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+          VkWriteDescriptorSet w8[2] = {{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}, {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
+          for (int k = 0; k < 2; k++) { w8[k].dstSet = f->dsView; w8[k].dstBinding = (uint32_t)(8 + k); w8[k].descriptorCount = 1; w8[k].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w8[k].pImageInfo = k ? &s9 : &s8; }
+          vkUpdateDescriptorSets(g_dev, 2, w8, 0, NULL); } }
     { static const unsigned char white[32] = {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}; img3D(white, 2, 2, 2, &g_prImg, &g_prView, &g_prMem); probeBind(); }
-    if (getenv("REVA_SHOT") || getenv("REVA_SCENEFPS") || getenv("REVA_LABCTL") || getenv("REVA_BRIDGE") || getenv("REVA_SELSHOT") || getenv("REVA_MODESHOT")) arenaMake(&g_cap, (VkDeviceSize)g_W * g_H * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    { static const unsigned char open[24] = {255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255}; imgCube(open, 1, &g_envImg, &g_envView, &g_envMem, &g_envMips); envBind(); }   /* no surroundings baked: the whole sky's open */
+    if (g_cfg.skin) skinLutMake(); else { static const unsigned char one[4] = {255, 255, 255, 255}; img3D(one, 1, 1, 1, &g_skinImg, &g_skinView, &g_skinMem); }
+    skinBind();   /* the shader names the table whatever the settings, so there's always one bound */
+    if (getenv("REVA_SHOT") || getenv("REVA_SCENEFPS") || getenv("REVA_LABCTL") || getenv("REVA_BRIDGE") || getenv("REVA_SELSHOT") || getenv("REVA_MODESHOT")) capMake((g_present && !g_hdrOut) ? g_GW : g_W, (g_present && !g_hdrOut) ? g_GH : g_H);
     pipesMake();
     printf("[gfx] ready: %dx%d, depth format %d, sun map %d, %d shadow tap(s), %d pipelines built at start-up\n", g_W, g_H, g_depthFmt, g_sunSize, g_taps, g_cfg.hdr ? P_N : P_POST);
-    printf("[gfx] settings: anisotropic %d, MSAA %d, linear %d, HDR %d, tonemap %d, bloom %d, grade %d, hemisphere %d, lights %d, cascades %d, occlusion %d, contact %d, volumetric %d, shadow tiles %d, probes %d, sky %d, screens %d, mirrors %d\n", g_cfg.aniso, g_cfg.msaa, g_cfg.linear, g_cfg.hdr, g_cfg.tonemap, g_cfg.bloom, g_cfg.grade, g_cfg.hemi, g_cfg.lights, g_cfg.cascades, g_cfg.ao, g_cfg.contact, g_cfg.volumetric, g_cfg.shadowTiles, g_cfg.probes, g_cfg.sky, g_cfg.screens, g_cfg.mirrors); fflush(stdout);
+    printf("[gfx] settings: anisotropic %d, MSAA %d, linear %d, HDR %d, tonemap %d, bloom %d, grade %d, hemisphere %d, lights %d, cascades %d, occlusion %d, contact %d, volumetric %d, shadow tiles %d, probes %d, sky %d, screens %d, mirrors %d; highlights %d, reflections %d, normal maps %d, detail %d, parallax %d; skin %d, hair %d, eyes %d, sheen %d, fur %d\n", g_cfg.aniso, g_cfg.msaa, g_cfg.linear, g_cfg.hdr, g_cfg.tonemap, g_cfg.bloom, g_cfg.grade, g_cfg.hemi, g_cfg.lights, g_cfg.cascades, g_cfg.ao, g_cfg.contact, g_cfg.volumetric, g_cfg.shadowTiles, g_cfg.probes, g_cfg.sky, g_cfg.screens, g_cfg.mirrors, g_cfg.spec, g_cfg.reflect, g_cfg.normals, g_cfg.detail, g_cfg.parallax, g_cfg.skin, g_cfg.hair, g_cfg.eyes, g_cfg.sheen, g_cfg.fur); fflush(stdout); printf("[gfx] effects and the world: particles %d, soft %d, decals %d, detail %d, refraction %d, foliage %d, beam lights %d; the scene is %s mid-frame%c", g_cfg.particles, g_cfg.softfx, g_cfg.decals, g_cfg.lod, g_cfg.refract, g_cfg.foliage, g_cfg.beamlights, g_mid ? "read" : "not read", 10); printf("[gfx] the display: depth of field %d, motion blur %d, over time %d, the tube's look %d, HDR out %d, between ticks %d%c", g_cfg.dof, g_cfg.mblur, g_cfg.taa, g_cfg.tube, g_cfg.hdrout, g_cfg.interp, 10); fflush(stdout);
 }
 void gfxConfig(const GfxConfig *c) { g_cfg = *c; g_taps = c->shadowTaps; g_sunSize = c->sunMap; }
 
@@ -603,16 +745,27 @@ void gfxConfig(const GfxConfig *c) { g_cfg = *c; g_taps = c->shadowTaps; g_sunSi
 static VkSwapchainKHR g_chain; static VkSurfaceKHR g_surf;
 void gfxInit(void *sdlWindow, int *W, int *H) {
     SDL_Window *win = (SDL_Window *)sdlWindow; unsigned ne = 0; SDL_Vulkan_GetInstanceExtensions(win, &ne, NULL); const char *ex[16]; SDL_Vulkan_GetInstanceExtensions(win, &ne, ex);
+    { uint32_t n = 0; vkEnumerateInstanceExtensionProperties(NULL, &n, NULL); VkExtensionProperties *xp = malloc(sizeof *xp * (n ? n : 1)); vkEnumerateInstanceExtensionProperties(NULL, &n, xp);   /* (step 25) a display's colour spaces other than sRGB are named by an extension */
+      for (uint32_t i = 0; i < n; i++) if (!strcmp(xp[i].extensionName, "VK_EXT_swapchain_colorspace") && ne < 15) { ex[ne++] = "VK_EXT_swapchain_colorspace"; g_csExt = 1; break; }
+      free(xp); }
     const char *de[1] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME}; deviceMake(ex, ne, de, 1);
     if (!SDL_Vulkan_CreateSurface(win, g_inst, &g_surf)) { printf("[gfx] surface: %s\n", SDL_GetError()); exit(1); }
     VkBool32 ok = 0; vkGetPhysicalDeviceSurfaceSupportKHR(g_gpu, g_qf, g_surf, &ok); if (!ok) { printf("[gfx] this queue can't present\n"); exit(1); }
     VkSurfaceCapabilitiesKHR sc; vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_gpu, g_surf, &sc);
-    VkSwapchainCreateInfoKHR sw = {.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR}; sw.surface = g_surf; sw.minImageCount = sc.minImageCount < 3 ? 3 : sc.minImageCount; if (sc.maxImageCount && sw.minImageCount > sc.maxImageCount) sw.minImageCount = sc.maxImageCount; sw.imageFormat = COLOR_FMT; sw.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; sw.imageExtent = sc.currentExtent; sw.imageArrayLayers = 1; sw.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; sw.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; sw.preTransform = sc.currentTransform; sw.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; sw.presentMode = VK_PRESENT_MODE_FIFO_KHR; sw.clipped = 1;
+    if (g_cfg.hdrout) { g_hdrOut = 0;   /* (step 25) HDR on the glass: only if this display, in the mode it's in, says it takes HDR10 */
+        if (g_cfg.hdr && g_cfg.tonemap && !g_cfg.tube && g_csExt) { uint32_t nf = 0; vkGetPhysicalDeviceSurfaceFormatsKHR(g_gpu, g_surf, &nf, NULL); VkSurfaceFormatKHR *sf = malloc(sizeof *sf * (nf ? nf : 1)); vkGetPhysicalDeviceSurfaceFormatsKHR(g_gpu, g_surf, &nf, sf);
+            for (uint32_t i = 0; i < nf; i++) if (sf[i].format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 && sf[i].colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT) { g_glassFmt = sf[i].format; g_glassCs = sf[i].colorSpace; g_hdrOut = 1; }
+            free(sf); }
+        if (g_hdrOut) printf("[gfx] HDR out: the display takes HDR10. The picture goes on at 200 nits for white, and what was past white is added up to %d%c", g_cfg.hdrout > 1 ? g_cfg.hdrout : 1000, 10);
+        else printf("[gfx] HDR out: this display, in the mode it is in, does not offer HDR10 (or a setting it needs is off: hdr, tonemap, no tube). The picture is as it was%c", 10);
+        fflush(stdout);
+        if (!g_hdrOut) g_cfg.hdrout = 0; }
+    VkSwapchainCreateInfoKHR sw = {.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR}; sw.surface = g_surf; sw.minImageCount = sc.minImageCount < 3 ? 3 : sc.minImageCount; if (sc.maxImageCount && sw.minImageCount > sc.maxImageCount) sw.minImageCount = sc.maxImageCount; sw.imageFormat = g_glassFmt; sw.imageColorSpace = g_glassCs; sw.imageExtent = sc.currentExtent; sw.imageArrayLayers = 1; sw.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; sw.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; sw.preTransform = sc.currentTransform; sw.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; sw.presentMode = VK_PRESENT_MODE_FIFO_KHR; sw.clipped = 1;
     CK(vkCreateSwapchainKHR(g_dev, &sw, NULL, &g_chain)); g_nImg = MAX_IMAGES; vkGetSwapchainImagesKHR(g_dev, g_chain, &g_nImg, g_img);
-    g_W = (int)sc.currentExtent.width; g_H = (int)sc.currentExtent.height; *W = g_W; *H = g_H;
+    g_W = (int)sc.currentExtent.width; g_H = (int)sc.currentExtent.height; pictureSize(); *W = g_W; *H = g_H;
     VkSemaphoreCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    for (uint32_t i = 0; i < g_nImg; i++) { VkImageViewCreateInfo v = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO}; v.image = g_img[i]; v.viewType = VK_IMAGE_VIEW_TYPE_2D; v.format = COLOR_FMT; v.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; v.subresourceRange.levelCount = 1; v.subresourceRange.layerCount = 1; CK(vkCreateImageView(g_dev, &v, NULL, &g_view[i])); CK(vkCreateSemaphore(g_dev, &si, NULL, &g_rendered[i])); }
-    commonMake();
+    for (uint32_t i = 0; i < g_nImg; i++) { VkImageViewCreateInfo v = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO}; v.image = g_img[i]; v.viewType = VK_IMAGE_VIEW_TYPE_2D; v.format = g_glassFmt; v.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; v.subresourceRange.levelCount = 1; v.subresourceRange.layerCount = 1; CK(vkCreateImageView(g_dev, &v, NULL, &g_view[i])); CK(vkCreateSemaphore(g_dev, &si, NULL, &g_rendered[i])); }
+    commonMake();    pictureMake();
 }
 void gfxInitKms(int a, uint32_t b, uint32_t c, void *d, int e, int f, void (*g)(unsigned, unsigned)) { (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; printf("[gfx] the direct road is not in this build\n"); exit(1); }
 #else
@@ -655,7 +808,7 @@ void gfxKmsRemode(void *drmMode, int W, int H) {
     g_kMode = *(drmModeModeInfo *)drmMode; g_W = W; g_H = H;
     kImagesMake(W, H);
     targetsMake();
-    if (g_cap.map) { vkDestroyBuffer(g_dev, g_cap.b, NULL); vkFreeMemory(g_dev, g_cap.m, NULL); arenaMake(&g_cap, (VkDeviceSize)W * H * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT); }
+    if (g_cap.map) { vkDestroyBuffer(g_dev, g_cap.b, NULL); vkFreeMemory(g_dev, g_cap.m, NULL); capMake(W, H); }
     g_kFirst = 1; g_prevImg = -1; g_prevSlot = -1; g_kNext = 0;
     printf("[gfx] now %dx%d\n", W, H); fflush(stdout);
 }
@@ -665,8 +818,16 @@ static int g_prevImg = -1, g_prevSlot = -1; __attribute__((unused)) static int g
 static double g_waited = 0.0;
 static double nowMs(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6; }
 double gfxWaited(void) { double w = g_waited; g_waited = 0.0; return w; }
+/* (step 25) a frame between two ticks. The engine asked for nothing, so what it asks for each frame outside the packet has to stand from the last one: the screens in the
+ * world, the floor's shadow, and every dynamic buffer, whose place is in a frame's ring and good for that frame alone. They were written into the other frame's ring a
+ * moment ago, which is still whole, and are carried over into this one */
+void gfxBackBetween(void) {
+    Frame *f = &g_fr[g_slot]; g_between = 1; g_nScr = g_nScrWas; g_fsOn = g_fsWas;
+    for (unsigned i = 1; i < g_nBuf; i++) { GBuf *g = &g_buf[i]; if (!g->dyn || !g->cap || !g->p || g->at != g_ringStamp - 1) continue;
+        uint32_t o; char *np = ringAlloc(f, g->cap, 16, &o); memcpy(np, g->p, (size_t)g->cap); g->p = np; g->b = f->ring.b; g->off = o; g->at = g_ringStamp; }
+}
 void gfxBackBegin(void) {
-    Frame *f = &g_fr[g_slot]; double t0 = nowMs(); CK(vkWaitForFences(g_dev, 1, &f->fence, VK_TRUE, UINT64_MAX)); g_waited += nowMs() - t0; f->ring.used = 0; f->nDraw = 0; g_frameLive = 1;
+    Frame *f = &g_fr[g_slot]; double t0 = nowMs(); CK(vkWaitForFences(g_dev, 1, &f->fence, VK_TRUE, UINT64_MAX)); g_waited += nowMs() - t0; f->ring.used = 0; g_ringStamp++; f->nDraw = 0; g_frameLive = 1;
 }
 /* one of the packet's draws, in this machine's handles */
 static void drawOf(Frame *f, const GfxDraw *m, uint32_t base) {
@@ -678,6 +839,7 @@ static void drawOf(Frame *f, const GfxDraw *m, uint32_t base) {
     /* a stream it hasn't got reads zeros. Positions are required, and the indices if it has any. */
     const unsigned order[5] = {m->vb[0], m->vb[1], m->vb[2], m->vb[3], m->vb[5]};
     for (int i = 0; i < 5; i++) { GBuf *g = order[i] ? bufOf(order[i]) : NULL; if (g && g->b) { d->vb[i] = g->b; d->off[i] = g->off; } else { d->vb[i] = g_zero.b; d->off[i] = 0; } }
+    { GBuf *r9 = m->rest ? bufOf(m->rest) : NULL; if (r9 && r9->b) { d->restVb = r9->b; d->restOff = r9->off; } else { d->restVb = d->vb[0]; d->restOff = d->off[0]; } d->restScale = m->restScale; }   /* taken before a moved face's positions take the stream's place: at rest is where the pack has them */
     if (m->posOn) { d->vb[0] = f->ring.b; d->off[0] = (VkDeviceSize)base + m->posOff; }   /* a face that's moved: its positions came in the packet */
     memcpy(d->mouth, m->mouth, 32);
     if (m->nVerts * 12u > g_zero.size) { static int said = 0; if (!said) { said = 1; printf("[gfx] a mesh of %u vertices is past the zero stream\n", m->nVerts); } }
@@ -687,6 +849,10 @@ static void drawOf(Frame *f, const GfxDraw *m, uint32_t base) {
     if (!shadow) { const GTex *t = (m->tex && m->tex < g_nTex && g_tex[m->tex].dsA) ? &g_tex[m->tex] : NULL; d->tex = t ? t->dsA : g_whiteDs; d->extra[2] = t ? (float)t->layer : 0.f; d->texKey = !t ? 0 : t->page ? t->page : (int)m->tex + MAX_PAGES; }
     d->tint[0] = m->tint[0]; d->tint[1] = m->tint[1]; d->tint[2] = m->tint[2]; d->tint[3] = m->useTex;
     d->extra[0] = m->alpha; d->extra[1] = (m->flags & GFX_GLOW) ? 1.f : 0.f;
+    { const int said = m->mat[0] > 0.f || m->mat[1] > 0.f || m->mat[2] > 0.f || m->mat[3] > 0.f;   /* nothing said: an ordinary rough surface that isn't a metal */
+      d->mat[0] = said ? m->mat[0] : 0.85f; d->mat[1] = m->mat[1]; d->mat[2] = m->mat[2]; d->mat[3] = m->mat[3]; d->mat[5] = m->kind; d->mat[6] = d->mat[7] = 0.f; memcpy(d->mat + 8, m->eye, 16);
+      if (m->kind > 5.5f && m->kind < 6.5f) { d->mat[7] = d->mat[1]; d->mat[1] = 0.f; }   /* fur: its second number says how curly, not how much a metal. It rides where the fur's shader reads it, and the skin under it is no metal */
+      const GTex *nt = (!shadow && g_cfg.normals + g_cfg.parallax > 0 && m->ntex && m->ntex < g_nTex && g_tex[m->ntex].dsA) ? &g_tex[m->ntex] : NULL; d->ntex = nt ? nt->dsA : g_whiteDs; d->mat[4] = nt ? (float)nt->layer : -1.f; }
     d->skin = skin; d->kind = (int)(m->id >> 28); d->flags = m->flags; if (!shadow && m->tex && m->tex < g_nTex && g_tex[m->tex].holes && m->useTex >= 0.5f) d->flags |= GFX_CUTOUT;
     memcpy(d->model, m->model, 64); d->bonesOff = base + m->palOff;
     f->nDraw++;
@@ -774,6 +940,7 @@ static int g_calls, g_binds, g_stretched;
 /* what turns a mesh's normals. Scaled the same every way that's its own matrix, so a plain prop's light doesn't change by a bit. Stretched, normals don't follow the matrix: they stay square to the surface, which is the matrix's cofactors */
 static void normalRows(const float *m, float *n) {
     float a = m[0] * m[0] + m[1] * m[1] + m[2] * m[2], b = m[4] * m[4] + m[5] * m[5] + m[6] * m[6], c = m[8] * m[8] + m[9] * m[9] + m[10] * m[10];
+    { static int off9 = -1; if (off9 < 0) { const char *e9 = getenv("REVA_NOSTRETCHN"); off9 = (e9 && e9[0] != '0') ? 1 : 0; if (off9) { printf("[gfx] REVA_NOSTRETCHN: a stretched prop's normals are only stretched, the control\n"); fflush(stdout); } } if (off9) { n[0] = m[0]; n[1] = m[4]; n[2] = m[8]; n[3] = m[1]; n[4] = m[5]; n[5] = m[9]; n[6] = m[2]; n[7] = m[6]; n[8] = m[10]; return; } }
     float hi = a > b ? a : b, lo = a < b ? a : b; if (c > hi) hi = c; if (c < lo) lo = c;
     if (hi - lo <= hi * 0.002f || hi <= 0.f) { n[0] = m[0]; n[1] = m[4]; n[2] = m[8]; n[3] = m[1]; n[4] = m[5]; n[5] = m[9]; n[6] = m[2]; n[7] = m[6]; n[8] = m[10]; return; }
     float x0 = m[5] * m[10] - m[6] * m[9], y0 = m[6] * m[8] - m[4] * m[10], z0 = m[4] * m[9] - m[5] * m[8];   /* column 1 x column 2 */
@@ -787,6 +954,7 @@ static int sameMesh(const Draw *a, const Draw *b, int L) {
     if (a->mouth[6] > 0.f || b->mouth[6] > 0.f) return 0;   /* an open mouth is its own call: its numbers are pushed */
     if ((a->flags ^ b->flags) & (GFX_TOON | GFX_TOONROOM | GFX_NOINK | GFX_MIRRORED | GFX_MIRCULL | GFX_REFL)) return 0;
     if (L == L_OPAQUE && (a->tex != b->tex || (a->flags & GFX_CUTOUT) != (b->flags & GFX_CUTOUT))) return 0;
+    if (memcmp(a->mat + 8, b->mat + 8, 16)) return 0;   /* two bodies whose eyes glow differently are two calls: the glow is pushed with the call */
     for (int i = 0; i < 5; i++) if (a->vb[i] != b->vb[i] || a->off[i] != b->off[i]) return 0;
     return 1;
 }
@@ -825,6 +993,18 @@ static void streamsBind(const Frame *f, VkCommandBuffer cb, const Batch *ba, con
     else vkCmdDraw(cb, d->nVerts, (uint32_t)ba->n, 0, 0);
     g_calls++;
 }
+/* a shell of fur: the same streams, and one more, where each vertex was at rest */
+static void streamsBindFur(const Frame *f, VkCommandBuffer cb, const Batch *ba, const Draw *d) {
+    VkBuffer b[7]; VkDeviceSize o[7]; uint32_t n = 0;
+    if (d->skin) { for (int i = 0; i < 5; i++) { b[n] = d->vb[i]; o[n++] = d->off[i]; } }
+    else { b[0] = d->vb[0]; b[1] = d->vb[1]; b[2] = d->vb[4]; o[0] = d->off[0]; o[1] = d->off[1]; o[2] = d->off[4]; n = 3; }
+    b[n] = d->restVb; o[n++] = d->restOff;
+    b[n] = f->ring.b; o[n++] = (VkDeviceSize)f->instAt + (VkDeviceSize)ba->first * sizeof(GInst);
+    vkCmdBindVertexBuffers(cb, 0, n, b, o);
+    if (d->nIndex) { vkCmdBindIndexBuffer(cb, d->ib, d->ibOff, VK_INDEX_TYPE_UINT32); vkCmdDrawIndexed(cb, d->nIndex, (uint32_t)ba->n, 0, 0, 0); }
+    else vkCmdDraw(cb, d->nVerts, (uint32_t)ba->n, 0, 0);
+    g_calls++;
+}
 static struct { float t[4], ink, inkC[3]; } g_toon; static float g_viewAsp = 1.f;
 void gfxToonSet(float cel, float rim, float keyFromLens, float roomGradient, float ink, const float *inkRGB) { g_toon.t[0] = cel; g_toon.t[1] = rim; g_toon.t[2] = keyFromLens; g_toon.t[3] = roomGradient; g_toon.ink = ink; memcpy(g_toon.inkC, inkRGB, 12); }
 /* blendPass: 0 opaque, 1 blended, 2 a hologram's depth, 3 a hologram's colour, 4 the glossy floor */
@@ -832,8 +1012,12 @@ static int g_offScreen;   /* the list is going into a picture drawn off-screen *
 static float g_glossNum[4];   /* this frame's GfxView.gloss */
 static int g_wallOnly;   /* this frame's GfxView.wall */
 static void drawList(Frame *f, VkCommandBuffer cb, uint32_t viewOff, int shadowPass, int blendPass) {
-    VkPipeline cur = VK_NULL_HANDLE; VkDescriptorSet curTex = VK_NULL_HANDLE; int L = shadowPass ? L_SUN : blendPass == 0 ? L_OPAQUE : blendPass == 1 ? L_BLEND : blendPass == 4 ? L_GLOSS : L_HOLO;
+    VkPipeline cur = VK_NULL_HANDLE; VkDescriptorSet curTex = VK_NULL_HANDLE, curN = g_whiteDs; int L = shadowPass ? L_SUN : blendPass == 0 ? L_OPAQUE : blendPass == 1 ? L_BLEND : blendPass == 4 ? L_GLOSS : L_HOLO;
+    const int matOn = !shadowPass && !g_offScreen && (g_cfg.spec | g_cfg.reflect | g_cfg.normals | g_cfg.detail | g_cfg.parallax | g_cfg.skin | g_cfg.hair | g_cfg.eyes | g_cfg.sheen);   /* a setting that reads a mesh's material is on: each call pushes it */
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 0, 1, &f->dsView, 1, &viewOff);
+    if (!shadowPass) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 2, 1, &g_whiteDs, 0, NULL);   /* the shader names a normal map whether or not a setting reads it, so there's always one bound */
+    int eyeLive = 0;   /* (step 23) the call before pushed eyes that glow, so the next has to push its own, even if that's none */
+    if (!shadowPass && !matOn) { static const float none[12] = {0.85f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 80, 48, none); }   /* the shader reads a glow whatever the settings, so there's always one pushed: none */
     for (int i = f->start[L]; i < f->start[L + 1]; i++) { const Batch *ba = &f->bat[i]; const Draw *d = &f->draws[ba->d0];
         if (g_wallOnly && !shadowPass && d->kind != GFX_KIND_HERO && d->kind != GFX_KIND_CAST) continue;
         VkPipeline p = g_offScreen ? g_pipe[d->skin ? ((d->flags & GFX_CUTOUT) ? P_T_SKIN_CUT : P_T_SKIN) : ((d->flags & GFX_CUTOUT) ? P_T_STATIC_CUT : P_T_STATIC)] : shadowPass ? g_pipe[d->skin ? P_SH_SKIN : P_SH_STATIC] : blendPass == 2 ? g_pipe[P_HOLO_Z] : blendPass == 3 ? g_pipe[P_HOLO] : blendPass == 4 ? g_pipe[(d->flags & GFX_TOON) ? P_TOON_GLOSS : P_GLOSS] : blendPass ? g_pipe[d->skin ? P_SKIN_BLEND : P_STATIC_BLEND] : (d->flags & GFX_CUTOUT) ? g_pipe[d->skin ? P_SKIN_CUT : P_STATIC_CUT] : g_pipe[d->skin ? P_SKIN : P_STATIC];
@@ -847,16 +1031,30 @@ static void drawList(Frame *f, VkCommandBuffer cb, uint32_t viewOff, int shadowP
         if (mir9 && !d->skin) vkCmdSetCullMode(cb, (d->flags & GFX_MIRCULL) ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE);
         if (mo9 || toon9 || refl9 || gl9) { float pc[20]; memcpy(pc, d->mouth, 32); pc[7] = (d->flags & GFX_TOONROOM) ? 1.f : 0.f; memcpy(pc + 8, g_toon.t, 16); memcpy(pc + 12, g_toon.inkC, 12); pc[15] = g_toon.ink; pc[16] = g_viewAsp; pc[17] = refl9 ? g_glossNum[0] : gl9 ? g_glossNum[2] : 0.f; pc[18] = refl9 ? g_glossNum[1] : gl9 ? g_glossNum[3] : 0.f; pc[19] = 0.f; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 80, pc); }
         if (!shadowPass && d->tex != curTex) { vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &d->tex, 0, NULL); curTex = d->tex; g_binds++; }
+        { const int eye9 = !shadowPass && !g_offScreen && d->mat[11] > 0.f;   /* this call's body has eyes that glow */
+          if (matOn || eye9 || eyeLive) { vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 80, 48, d->mat); eyeLive = eye9; }
+          if (matOn && d->ntex != curN) { vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 2, 1, &d->ntex, 0, NULL); curN = d->ntex; g_binds++; } }
         streamsBind(f, cb, ba, d, shadowPass);
         if (toon9 && !blendPass && !(d->flags & GFX_NOINK) && g_toon.ink > 0.f) { p = g_pipe[mir9 ? (d->skin ? P_M_INK : P_M_INK_STATIC) : (d->skin ? P_INK : P_INK_STATIC)]; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p); cur = p; streamsBind(f, cb, ba, d, shadowPass); }   /* the line, the same copies again */
+        /* (step 23) fur: the same copies again, once for each shell, each further out along its strands and leaning the way the body's fur is pushed. A cel-shaded body's has its own pipelines; a mirror's copies go without */
+        if (g_cfg.fur > 0 && !g_offScreen && !shadowPass && !blendPass && d->mat[5] > 5.5f && d->mat[5] < 6.5f && d->mat[3] > 0.f && !(d->flags & (GFX_MIRRORED | GFX_BLEND))) {
+            float pc[12]; memcpy(pc, d->mat, 48); pc[11] = d->restScale > 0.f ? d->restScale : 0.f;
+            p = g_pipe[(d->flags & GFX_TOON) ? (d->skin ? P_TOON_FUR : P_TOON_FUR_STATIC) : (d->skin ? P_FUR : P_FUR_STATIC)]; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p); cur = p;
+            for (int s9 = 1; s9 <= g_cfg.fur; s9++) { pc[6] = (float)s9 / (float)g_cfg.fur; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 80, 48, pc); streamsBindFur(f, cb, ba, d); }
+            eyeLive = 1; }   /* what's pushed now is this mesh's fur, so the next call pushes its own */
         if (gl9 && (d->flags & GFX_TOON) && g_cfg.hdr && !g_filmPost) { p = g_pipe[P_TOON_GLOSS_A]; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p); cur = p; streamsBind(f, cb, ba, d, shadowPass); } }   /* a toon floor stands off the post pass as the rest of the toon does: its alpha's the blend's, so that's written after */
 }
 /* REVA_SHOT: each frame's picture is also copied out, because pixels are the only proof. Off, this costs a branch. */
 int gfxRead(void *rgba, int w, int h) {
-    if (!g_cap.map || w != g_W || h != g_H) return 0;
-    vkDeviceWaitIdle(g_dev); unsigned char *o = rgba; const unsigned char *s = (const unsigned char *)g_cap.map;
-    for (int y = 0; y < h; y++) { const unsigned char *r = s + (size_t)(h - 1 - y) * w * 4; for (int x = 0; x < w; x++) { o[0] = r[2]; o[1] = r[1]; o[2] = r[0]; o[3] = r[3]; o += 4; r += 4; } }
-    return 1;
+    if (!g_cap.map || w != ((g_present && !g_hdrOut) ? g_GW : g_W) || h != ((g_present && !g_hdrOut) ? g_GH : g_H)) return 0;
+    vkDeviceWaitIdle(g_dev);
+    /* The capture buffer is host-coherent memory, which the CPU reads uncached: swizzled a byte at a time straight out of it, a
+     * 1280x720 frame took half a second, and a take fell from 57 frames a second to 2 (11-04). One memcpy brings it over in
+     * wide loads, and the swizzle runs on the copy. */
+    size_t n = (size_t)w * (size_t)h * 4; unsigned char *c = (unsigned char *)malloc(n); if (!c) return 0;
+    memcpy(c, g_cap.map, n); unsigned char *o = rgba;
+    for (int y = 0; y < h; y++) { const unsigned char *r = c + (size_t)(h - 1 - y) * w * 4; for (int x = 0; x < w; x++) { o[0] = r[2]; o[1] = r[1]; o[2] = r[0]; o[3] = r[3]; o += 4; r += 4; } }
+    free(c); return 1;
 }
 /* a star: the surface and the cut faces solid, the corona and the loops added. Its numbers go in the push block, and its spots in the ring */
 static void starPass(Frame *f, VkCommandBuffer cb, const GfxStar *s) {
@@ -873,10 +1071,43 @@ static void starPass(Frame *f, VkCommandBuffer cb, const GfxStar *s) {
         for (int i = 0; i < s->nLoop && i < 24; i++) { pc[16] = s->loopAng[i]; pc[17] = s->loopPh[i]; vkCmdPushConstants(cb, g_layout, st, 0, 96, pc); vkCmdDraw(cb, (uint32_t)(s->loopOff[i + 1] - s->loopOff[i]), 1, (uint32_t)s->loopOff[i], 0); } } }
 }
 /* the packet's effects, in the order they were asked for */
+/* (step 24) THE SCENE, READ MID-FRAME. Where a setting asks (softfx, decals, refract) and the picture has its HDR target, a frame that has something to read it is drawn in two
+ * halves: everything solid, then its depth and colour are copied aside (g_zsImg, g_snapImg: set 0's bindings 9 and 8), then what's laid over it, which can read them. A frame with
+ * nothing that reads them is one pass, as it always was. g_midLive: this is the second half, so a particle's soft pipeline and a decal's projection have something true to read. */
+static int g_midLive; static uint32_t g_dcAt, g_dcFlatAt; static int g_dcN[2], g_dcTexN, g_dcFlatN[2]; static unsigned g_dcTexName[GFX_MAX_DECALS];
+/* the frame's decals into the ring. Projected: ten vec4s each (its matrix, the way back, its colour, its numbers), stains first, then paint, then pictures. Flat: six effect vertices each */
+static void decalsUp(Frame *f, const GfxPacket *pk, int projected) {
+    g_dcN[0] = g_dcN[1] = g_dcTexN = g_dcFlatN[0] = g_dcFlatN[1] = 0; if (pk->nDecal <= 0) return;
+    if (projected) { float *o = ringAlloc(f, (VkDeviceSize)pk->nDecal * 160, 16, &g_dcAt); int at = 0;
+        for (int pass = 0; pass < 3; pass++) for (int i = 0; i < pk->nDecal; i++) { const GfxDecal *d = &pk->decal[i]; const int k = (int)(d->kind + 0.5f), cls = k >= 6 ? 2 : k == 4 ? 1 : 0; if (cls != pass) continue;
+            float *q = o + at * 40; memcpy(q, d->m, 64); if (!inv44(d->m, q + 16)) memset(q + 16, 0, 64); memcpy(q + 32, d->col, 16); q[36] = d->kind; q[37] = d->fade; q[38] = d->seed;
+            q[39] = (cls == 2 && d->tex && d->tex < g_nTex && g_tex[d->tex].dsA) ? (float)g_tex[d->tex].layer : 0.f; at++;
+            if (cls < 2) g_dcN[cls]++; else g_dcTexName[g_dcTexN++] = d->tex; }
+        return; }
+    static const float Q[6][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1}}; float *o = ringAlloc(f, (VkDeviceSize)pk->nDecal * 216, 4, &g_dcFlatAt); int at = 0;
+    for (int pass = 0; pass < 2; pass++) for (int i = 0; i < pk->nDecal; i++) { const GfxDecal *d = &pk->decal[i]; const int k = (int)(d->kind + 0.5f), cls = k == 4 ? 1 : 0; if (cls != pass || k >= 6) continue;   /* a picture has no flat stand-in: the effect path has no texture */
+        const float *m = d->m; float ly = sqrtf(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]); if (ly < 1e-6f) ly = 1.f;
+        for (int c = 0; c < 6; c++) { float u = Q[c][0], w = Q[c][1], *p = o + (at * 6 + c) * 9; for (int a = 0; a < 3; a++) p[a] = m[12 + a] + m[a] * 0.5f * u + m[8 + a] * 0.5f * w + m[4 + a] / ly * 0.03f;
+            if (cls) { p[3] = d->col[0]; p[4] = d->col[1]; p[5] = d->col[2]; p[6] = d->col[3] * d->fade; }
+            else { const float av = (d->col[0] + d->col[1] + d->col[2]) / 3.f; p[3] = d->col[0] * 0.3f; p[4] = d->col[1] * 0.3f; p[5] = d->col[2] * 0.3f; p[6] = d->col[3] * d->fade * (1.f - 0.9f * (av > 1.f ? 1.f : av)); }   /* a stain's colour is what it leaves of the light: laid flat, that's a dark mark, stronger the darker its colour */
+            p[7] = u; p[8] = w; }
+        at++; g_dcFlatN[cls]++; }
+}
+static void decalsDraw(Frame *f, VkCommandBuffer cb, const GfxPacket *pk, int projected) {
+    if (pk->nDecal <= 0) return;
+    if (projected) { if (!g_pipe[P_DECAL] || !g_pipe[P_DECAL_PAINT]) return; float pc[4] = {(float)(g_dcAt / 16u), 0.f, 0.f, 0.f};
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_whiteDs, 0, NULL);
+        if (g_dcN[0]) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_DECAL]); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); vkCmdDraw(cb, 36, (uint32_t)g_dcN[0], 0, 0); }
+        if (g_dcN[1] || g_dcTexN) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_DECAL_PAINT]); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); }
+        if (g_dcN[1]) vkCmdDraw(cb, 36, (uint32_t)g_dcN[1], 0, (uint32_t)g_dcN[0]);
+        for (int i = 0; i < g_dcTexN; i++) { const unsigned t = g_dcTexName[i]; vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, (t && t < g_nTex && g_tex[t].dsA) ? &g_tex[t].dsA : &g_whiteDs, 0, NULL); vkCmdDraw(cb, 36, 1, 0, (uint32_t)(g_dcN[0] + g_dcN[1] + i)); }
+        return; }
+    for (int c = 0; c < 2; c++) if (g_dcFlatN[c]) { VkDeviceSize o = (VkDeviceSize)g_dcFlatAt + (VkDeviceSize)(c ? g_dcFlatN[0] : 0) * 216u; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[c ? P_FX_ALPHA : P_FX_SOFT]); vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)g_dcFlatN[c] * 6u, 1, 0, 0); }
+}
 static void fxDraw(Frame *f, VkCommandBuffer cb, const GfxPacket *pk, uint32_t base, int under, int vi) {
     VkPipeline cur = VK_NULL_HANDLE;
     for (int i = 0; i < pk->nFx; i++) { const GfxFx *x = &pk->fx[i]; if (x->under != under || (x->view >= 0 && x->view != vi)) continue;
-        VkPipeline p = g_pipe[x->how == GFX_FX_SKY ? P_SKY : x->how == GFX_FX_ADD ? P_FX_ADD : x->how == GFX_FX_SOFT ? P_FX_SOFT : x->how == GFX_FX_PUFF ? P_FX_PUFF : x->how == GFX_FX_WEB ? P_FX_WEB : x->how == GFX_FX_WEBX ? P_FX_WEBX : P_FX_ALPHA]; if (!p) continue;
+        VkPipeline p = g_pipe[x->how == GFX_FX_SKY ? P_SKY : x->how == GFX_FX_ADD ? P_FX_ADD : x->how == GFX_FX_SOFT ? P_FX_SOFT : x->how == GFX_FX_SOFTZ ? ((g_midLive && g_cfg.softfx) ? P_FX_SOFTZ : P_FX_SOFT) : x->how == GFX_FX_GLOW ? P_FX_GLOW : x->how == GFX_FX_GLOWZ ? ((g_midLive && g_cfg.softfx) ? P_FX_GLOWZ : P_FX_GLOW) : x->how == GFX_FX_PUFF ? P_FX_PUFF : x->how == GFX_FX_WEB ? P_FX_WEB : x->how == GFX_FX_WEBX ? P_FX_WEBX : P_FX_ALPHA]; if (!p) continue;
         if (x->how == GFX_FX_PUFF && (x->tex >= g_nTex || !g_tex[x->tex].dsNear)) continue;
         if (p != cur) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p); cur = p; }
         if (x->how == GFX_FX_PUFF) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[x->tex].dsNear, 0, NULL);
@@ -944,6 +1175,92 @@ static void depthPass(Frame *f, VkCommandBuffer cb, VkImage img, VkImageView vie
     vkCmdEndRendering(cb);
     barrierImg(cb, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
 }
+/* (step 25) THE LENS'S PASSES, between the scene and the post pass, on the scene's own light: anti-aliasing over time (taa), depth of field (dof) and motion blur (mblur).
+ * Each is a full-screen pass from one picture into another, and whatever the last one leaves is copied back to the HDR target, so bloom and the post pass read it
+ * where they always did. A frame whose lens asks for none of them runs none: depth of field wants a focus and a softness, motion blur a shutter. Split screen has none.
+ * Where each point was in the last frame comes from its depth and the two lenses, so it's the lens's own move that's followed. */
+static void lensOne(VkCommandBuffer cb, int pipe, VkDescriptorSet ds, VkImage to, VkImageView toView, const float *pc) {
+    barrierImg(cb, to, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
+    passBegin(cb, toView, g_W, g_H, VK_ATTACHMENT_LOAD_OP_DONT_CARE); vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[pipe]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutPost, 0, 1, &ds, 0, NULL);
+    vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128, pc); vkCmdDraw(cb, 3, 1, 0, 0); vkCmdEndRendering(cb);
+    barrierImg(cb, to, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+}
+static void lensPasses(Frame *f, VkCommandBuffer cb, const GfxView *v, const uint32_t *viewOffs, int nv) {
+    if (!g_lens) return;
+    const ViewUBO *u = (const ViewUBO *)(f->ring.map + viewOffs[0]);
+    float cur[16], inv[16], re[16], pc[32]; memcpy(cur, v->nViews > 0 ? v->views[0].vp : v->vp, 64); clipFix(cur);
+    const int one = nv == 1 && inv44(cur, inv), was = one && g_prevOK && !v->reset && v->cuts == g_prevCuts;   /* was: the last frame was this lens's too, a moment ago */
+    if (was) mul44(re, g_prevVP, inv);
+    int src = SRC_HDR, taaDone = 0;
+    if (one && g_cfg.taa) { const int i = g_taaAt; memset(pc, 0, sizeof pc); if (was) memcpy(pc, re, 64); pc[16] = 1.f / (float)g_W; pc[17] = 1.f / (float)g_H; pc[18] = (was && g_taaOK) ? 1.f : 0.f; pc[19] = 0.9f;
+        lensOne(cb, P_TAA, g_taaDs[i], g_histImg[i], g_histView[i], pc); src = SRC_HIST0 + i; g_taaAt ^= 1; taaDone = 1; }
+    g_taaOK = taaDone;
+    if (one && g_cfg.dof && v->dof > 0.f && v->focus > 0.f) { memset(pc, 0, sizeof pc); memcpy(pc, inv, 64); memcpy(pc + 16, u->eye, 12); pc[19] = v->focus; memcpy(pc + 20, u->fwd, 12); pc[23] = v->dof;
+        pc[24] = 1.f / (float)g_W; pc[25] = 1.f / (float)g_H; pc[26] = 0.022f * (float)g_H; pc[27] = (float)g_H;
+        lensOne(cb, P_LENS_DOF, g_srcDs[src], g_scrImg[0], g_scrView[0], pc); src = SRC_SCR0; }
+    if (was && g_cfg.mblur && v->shutter > 0.f) { memset(pc, 0, sizeof pc); memcpy(pc, re, 64); pc[16] = v->shutter > 1.f ? 1.f : v->shutter; pc[17] = 0.06f; pc[24] = 1.f / (float)g_W; pc[25] = 1.f / (float)g_H; pc[27] = (float)g_H;
+        const int to = src == SRC_SCR0 ? 1 : 0; lensOne(cb, P_LENS_MB, g_srcDs[src], g_scrImg[to], g_scrView[to], pc); src = SRC_SCR0 + to; }
+    if (src != SRC_HDR) { VkImage si = src == SRC_HIST0 ? g_histImg[0] : src == SRC_HIST1 ? g_histImg[1] : g_scrImg[src - SRC_SCR0];   /* what the last pass left goes back where bloom and the post pass read the scene */
+        VkImageCopy r = {0}; r.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; r.srcSubresource.layerCount = 1; r.dstSubresource = r.srcSubresource; r.extent.width = (uint32_t)g_W; r.extent.height = (uint32_t)g_H; r.extent.depth = 1;
+        barrierImg(cb, si, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1);
+        barrierImg(cb, g_hdrImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, 1);
+        vkCmdCopyImage(cb, si, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_hdrImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &r);
+        barrierImg(cb, g_hdrImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+        barrierImg(cb, si, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT, 1); }
+    memcpy(g_prevVP, cur, 64); g_prevOK = 1; g_prevCuts = v->cuts;
+}
+/* (step 25) THE PICTURE AND THE GLASS. The picture is what the engine draws and everything in this file works in (g_W x g_H). The glass is the swapchain. They were
+ * always the same; now a setting can make the picture its own size (`width`, `height`), its own shape (`aspect`), or a tube's (`tube`: 640 x 480, or 640 x 240 shown 4:3
+ * as the Pi's 240p is). When they differ, every pass draws into g_picImg where it drew into the swapchain (g_img and g_view name it, and the real ones are kept in g_glass*),
+ * and one last pass puts the picture on the glass, in its place, with black round it: plainly, or as a tube would show it. When they're the same none of this runs. */
+static void pictureSize(void) {
+    g_GW = g_W; g_GH = g_H; int w = g_W, h = g_H; float shown = 0.f;
+    if (g_cfg.tube == 1) { w = 640; h = 480; } else if (g_cfg.tube == 2) { w = 640; h = 240; shown = 4.f / 3.f; }
+    else { if (g_cfg.resH > 0) { h = g_cfg.resH; w = g_cfg.resW > 0 ? g_cfg.resW : (int)((float)h * (float)g_GW / (float)g_GH + 0.5f); }
+        if (g_cfg.aspect > 0) { const float a = (float)g_cfg.aspect / 1000.f; if ((float)w / (float)h > a) w = (int)((float)h * a + 0.5f); else h = (int)((float)w / a + 0.5f); } }
+    w &= ~1; h &= ~1; if (w < 32) w = 32; if (h < 32) h = 32;
+    g_present = (w != g_GW || h != g_GH || g_cfg.tube || g_hdrOut); g_W = w; g_H = h; g_picShown = shown;
+    if (g_present) printf("[gfx] the picture is %d x %d%s, on a glass of %d x %d%s\n", w, h, shown > 0.f ? " shown 4:3" : "", g_GW, g_GH, g_cfg.tube ? ", as a tube shows it" : "");
+}
+static void pictureMake(void) {
+    if (!g_present) return;
+    g_picImg = imgMake(COLOR_FMT, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_picView); g_picDs = dsPost(g_picView);
+    for (uint32_t i = 0; i < g_nImg; i++) { g_glassImg[i] = g_img[i]; g_glassView[i] = g_view[i]; g_img[i] = g_picImg; g_view[i] = g_picView; }
+    VkImageView xv = g_picView;   /* the presenter's shader names a second picture whatever the glass is, so there's always one bound */
+    if (g_hdrOut) { g_exImg = imgMake(HDR_FMT, (uint32_t)g_W, (uint32_t)g_H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT, &g_exView); xv = g_exView;
+        VkCommandBuffer cb0 = oneBegin(); barrierImg(cb0, g_exImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, VK_ACCESS_SHADER_READ_BIT, 1); oneEnd(cb0); }
+    { VkDescriptorImageInfo xi = {g_smpClamp, xv, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; VkWriteDescriptorSet w = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}; w.dstSet = g_picDs; w.dstBinding = 1; w.descriptorCount = 1; w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; w.pImageInfo = &xi; vkUpdateDescriptorSets(g_dev, 1, &w, 0, NULL); }
+}
+static void presentPass(VkCommandBuffer cb, uint32_t idx) {
+    barrierImg(cb, g_picImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+    barrierImg(cb, g_glassImg[idx], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
+    VkRenderingAttachmentInfo c = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; c.imageView = g_glassView[idx]; c.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; c.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; c.storeOp = VK_ATTACHMENT_STORE_OP_STORE; c.clearValue.color.float32[3] = 1.f;
+    VkRenderingInfo r = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO}; r.renderArea.extent.width = (uint32_t)g_GW; r.renderArea.extent.height = (uint32_t)g_GH; r.layerCount = 1; r.colorAttachmentCount = 1; r.pColorAttachments = &c; vkCmdBeginRendering(cb, &r);
+    const float shape = g_picShown > 0.f ? g_picShown : (float)g_W / (float)g_H; float dw = (float)g_GH * shape, dh = (float)g_GH; if (dw > (float)g_GW) { dw = (float)g_GW; dh = dw / shape; }
+    const int iw = (int)(dw + 0.5f), ih = (int)(dh + 0.5f), x0 = (g_GW - iw) / 2, y0 = (g_GH - ih) / 2;
+    VkViewport vw = {(float)x0, (float)(y0 + ih), (float)iw, -(float)ih, 0.f, 1.f}; VkRect2D sc = {{x0, y0}, {(uint32_t)iw, (uint32_t)ih}}; vkCmdSetViewport(cb, 0, 1, &vw); vkCmdSetScissor(cb, 0, 1, &sc);
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[g_cfg.tube == 2 ? P_TUBE240 : g_cfg.tube ? P_TUBE480 : g_hdrOut ? P_PRESENT_HDR : P_PRESENT]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutPost, 0, 1, &g_picDs, 0, NULL);
+    if (g_cfg.tube) { static unsigned field; const float *t = g_tubeP; const float pitch = t[5] >= 3.f ? t[5] : (ih > 1500 ? 4.f : 3.f);
+        float gain = t[10]; if (gain <= 0.f) { const float beam = 2.5066283f * t[2] * (g_cfg.tube == 2 ? 0.5f : 0.5f * (1.f + t[7])), mask = t[4] > 0.5f ? (1.f + 2.f * (1.f - t[6])) / 3.f * (t[4] < 1.5f ? 1.f - t[6] / (2.f * pitch) : 1.f) : 1.f; gain = 0.92f / (beam * mask); if (gain > 1.7f) gain = 1.7f; }
+        float pc[16] = {(float)g_W, (float)g_H, (float)iw, (float)ih, t[0], t[1], t[2], t[3], t[4], pitch, t[6], t[7], t[8], (float)(field++ & 1u), t[9], gain};
+        vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 64, pc); }
+    else { float pc[4] = {200.f, g_exFresh ? 1.f : 0.f, 0.f, 0.f}; vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); }
+    g_exFresh = 0;
+    vkCmdDraw(cb, 3, 1, 0, 0); vkCmdEndRendering(cb);
+}
+/* the light past white, for an HDR10 glass: the same scene, bloom and exposure the post pass is about to read, into a picture of its own. A frame through a fisheye or a phone's frame has none */
+static void exPass(VkCommandBuffer cb, const float *pc, const GfxView *v) {
+    barrierImg(cb, g_exImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
+    passBegin(cb, g_exView, g_W, g_H, VK_ATTACHMENT_LOAD_OP_CLEAR);
+    if (!(v->fish > 0.f) && !(v->feed > 0.5f)) { float pe[4] = {(float)(g_cfg.hdrout > 1 ? g_cfg.hdrout : 1000) / 200.f, 0.f, 0.f, 0.f};
+        vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_HDREX]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutPost, 0, 1, &g_postDs, 0, NULL);
+        vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 64, pc); vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 64, 16, pe); vkCmdDraw(cb, 3, 1, 0, 0); }
+    vkCmdEndRendering(cb); g_exFresh = 1;
+    barrierImg(cb, g_exImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+}
+void gfxTube(const float *p) { static const float own[11] = {448.f, 139.f, 0.47f, 0.25f, 1.f, 0.f, 0.30f, 0.55f, 2.4f, 0.025f, 0.f}; memcpy(g_tubeP, p ? p : own, sizeof g_tubeP); }
+float gfxShownAspect(void) { return g_picShown; }
+void gfxShotSize(int *w, int *h) { if (g_present && !g_hdrOut) { *w = g_GW; *h = g_GH; } }
 static void toGlass(Frame *f, VkCommandBuffer cb, uint32_t idx, const GfxView *v, const uint32_t *viewOffs, int nv) {
     vkCmdEndRendering(cb);
     if (!g_hdrImg) { barrierImg(cb, g_img[idx], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1); passBegin(cb, g_view[idx], g_W, g_H, VK_ATTACHMENT_LOAD_OP_LOAD); return; }
@@ -957,16 +1274,19 @@ static void toGlass(Frame *f, VkCommandBuffer cb, uint32_t idx, const GfxView *v
             float pb[8] = {1.f / (float)hw, 1.f / (float)hh, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}; vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 32, pb); vkCmdDraw(cb, 3, 1, 0, 0); vkCmdEndRendering(cb);
             barrierImg(cb, g_aoImg[1], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1); }
         if (g_cfg.volumetric && v->haze > 0.f) depthPass(f, cb, g_volImg, g_volView, P_VOL, v, viewOffs, nv, v->haze, 90.f, 0.f); }
+    lensPasses(f, cb, v, viewOffs, nv);
     if (g_cfg.bloom) {
         const int nb = g_filmPost ? 2 : BLOOM_N;   /* film's is a tight glow on what's saturated */
         for (int i = 0; i < nb; i++) bloomStep(cb, i, i ? P_BLOOM_DOWN : P_BLOOM0, i ? g_blDs[i - 1] : g_hdrDs, i ? g_blW[i - 1] : g_W, i ? g_blH[i - 1] : g_H, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED);
         for (int i = nb - 2; i >= 0; i--) bloomStep(cb, i, P_BLOOM_UP, g_blDs[i + 1], g_blW[i + 1], g_blH[i + 1], VK_ATTACHMENT_LOAD_OP_LOAD, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
-    passBegin(cb, g_view[idx], g_W, g_H, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_POST]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutPost, 0, 1, &g_postDs, 0, NULL);
     const int fo9 = !g_filmPost || v->filmPostOn;   /* film's pass can be off for a take, and then it's a straight copy */
     float pc[16] = {(v->exposure > 0.f ? v->exposure : 1.f) * ((!g_filmPost && v->dayExposure > 0.f) ? v->dayExposure : 1.f), (g_cfg.bloom && fo9) ? (g_filmPost ? v->filmBloom * 0.5f : 0.35f) : 0.f, (float)g_lutSize, g_cfg.tonemap ? 1.f : 0.f, fo9 ? v->knee : 0.f, (g_cfg.ao || g_cfg.contact) ? 1.f : 0.f, (g_cfg.volumetric && v->haze > 0.f) ? 1.f : 0.f, g_cfg.linear ? 0.f : 1.f, fo9 ? v->filmGrade : 0.f, fo9 ? v->filmVig : 0.f, (float)g_W / (float)g_H, 0.f, v->fish, v->fishTh, v->feed, v->feedT};
-    vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 64, pc); vkCmdDraw(cb, 3, 1, 0, 0);
+    float pe[8] = {fo9 ? v->sepia : 0.f, fo9 ? v->flash : 0.f, fo9 ? v->burn : 0.f, fo9 ? v->grain : 0.f, fo9 ? v->weave[0] : 0.f, fo9 ? v->weave[1] : 0.f, v->tsec, 0.f};   /* (step 25) film's look for the frame */
+    if (g_hdrOut) exPass(cb, pc, v);   /* (step 25) the light past white, for an HDR10 glass */
+    passBegin(cb, g_view[idx], g_W, g_H, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_POST]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutPost, 0, 1, &g_postDs, 0, NULL);
+    vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 64, pc); vkCmdPushConstants(cb, g_layoutPost, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 64, 32, pe); vkCmdDraw(cb, 3, 1, 0, 0);
 }
 void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     Frame *f = &g_fr[g_slot]; if (!g_frameLive) return; g_frameLive = 0;
@@ -978,10 +1298,13 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     int nv = v->nViews > 0 ? v->nViews : 1; uint32_t viewOffs[16];
     uint32_t viewOff; ViewUBO *u = ringAlloc(f, sizeof(ViewUBO), g_uboAlign, &viewOff); viewOffs[0] = viewOff;
     memcpy(u->vp, v->vp, 64); clipFix(u->vp); memcpy(u->sunVP, v->sunVP, 64); clipFix(u->sunVP);
+    if (g_lens && g_cfg.taa && v->nViews <= 0) {   /* (step 25) anti-aliasing over time: each frame is drawn a part of a pixel off the last, eight places in turn */
+        static const float H2[8] = {0.5f, 0.25f, 0.75f, 0.125f, 0.625f, 0.375f, 0.875f, 0.0625f}, H3[8] = {0.3333333f, 0.6666667f, 0.1111111f, 0.4444444f, 0.7777778f, 0.2222222f, 0.5555556f, 0.8888889f}; static unsigned jn; const int k = (int)(jn++ & 7u);
+        const float jx = (H2[k] - 0.5f) * 2.f / (float)g_W, jy = (H3[k] - 0.5f) * 2.f / (float)g_H; for (int c = 0; c < 4; c++) { u->vp[c * 4] += jx * u->vp[c * 4 + 3]; u->vp[c * 4 + 1] += jy * u->vp[c * 4 + 3]; } }
     u->eye[0] = v->eye[0]; u->eye[1] = v->eye[1]; u->eye[2] = v->eye[2]; u->eye[3] = 1.f; u->sunDir[0] = v->sunDir[0]; u->sunDir[1] = v->sunDir[1]; u->sunDir[2] = v->sunDir[2]; u->sunDir[3] = v->sunI;
     memcpy(u->sunCol, v->sunCol, 12); u->sunCol[3] = 1.f; memcpy(u->sky, v->sky, 12); u->sky[3] = 1.f; memcpy(u->fog, v->fog, 12); u->fog[3] = v->fogD;
     if (g_cfg.linear) for (int i = 0; i < 3; i++) { u->sunCol[i] = powf(u->sunCol[i], 2.2f); u->sky[i] = powf(u->sky[i], 2.2f); u->fog[i] = powf(u->fog[i], 2.2f); }   /* the sets' colours are authored as they look */
-    u->misc[0] = g_filmPost ? ((!v->filmPostOn && v->filmTone > 0.f) ? v->filmTone : 100.f) : v->knee; u->misc[1] = v->shadowOn ? 1.f : 0.f; u->misc[2] = 0.5f / (float)g_sunSize; u->misc[3] = v->tsec; u->misc2[0] = (float)g_H / 720.f; u->misc2[1] = u->misc2[2] = u->misc2[3] = 0.f;
+    u->misc[0] = g_filmPost ? ((!v->filmPostOn && v->filmTone > 0.f) ? v->filmTone : 100.f) : v->knee; u->misc[1] = v->shadowOn ? 1.f : 0.f; u->misc[2] = 0.5f / (float)g_sunSize; u->misc[3] = v->tsec; u->misc2[0] = (float)g_H / 720.f; u->misc2[1] = g_envOn ? 1.f : 0.f; u->misc2[2] = (float)(g_envMips - 1); u->misc2[3] = 0.f;   /* y: the set has its surroundings baked; z: that cube's smallest level */
     memset(u->ground, 0, (size_t)((char *)(u + 1) - (char *)u->ground));
     { float gs = 0.f; for (int i = 0; i < 3; i++) gs += v->ground[i]; for (int i = 0; i < 3; i++) u->ground[i] = gs > 0.f ? (g_cfg.linear ? powf(v->ground[i], 2.2f) : v->ground[i]) : u->sky[i] * (i == 0 ? 0.50f : i == 1 ? 0.44f : 0.36f); }
     if (g_fsOn) memcpy(u->shv, g_fs.vp, 64);
@@ -1022,7 +1345,7 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
         { float l = sqrtf(v->views[i].vp[3] * v->views[i].vp[3] + v->views[i].vp[7] * v->views[i].vp[7] + v->views[i].vp[11] * v->views[i].vp[11]); if (l > 0.f) { w->fwd[0] = v->views[i].vp[3] / l; w->fwd[1] = v->views[i].vp[7] / l; w->fwd[2] = v->views[i].vp[11] / l; } }
         if (nL) clustersFill(f, w, v->views[i].vp, v->views[i].eye, w->fwd, v, v->views[i].x, v->views[i].y, v->views[i].w, v->views[i].h, lightsAt); }
     if (v->nViews <= 0 && nL) clustersFill(f, u, v->vp, v->eye, u->fwd, v, 0, 0, g_W, g_H, lightsAt);
-    if (g_readDepth || (g_cfg.sky && v->skyDome) || v->space) for (int i = 0; i < nv; i++) { ViewUBO *w = i == 0 ? u : (ViewUBO *)(f->ring.map + viewOffs[i]); float fx[16]; if (v->nViews > 0) { memcpy(fx, v->views[i].vp, 64); clipFix(fx); } else { memcpy(fx, v->vp, 64); clipFix(fx); } inv44(fx, w->inv);
+    if (g_readDepth || (g_cfg.sky && v->skyDome) || v->space) for (int i = 0; i < nv; i++) { ViewUBO *w = i == 0 ? u : (ViewUBO *)(f->ring.map + viewOffs[i]); float fx[16]; if (v->nViews > 0) { memcpy(fx, v->views[i].vp, 64); clipFix(fx); } else { memcpy(fx, v->vp, 64); clipFix(fx); } inv44(fx, w->inv); w->cl2[2] = (float)(v->nViews > 0 ? v->views[i].x : 0); w->cl2[3] = (float)(v->nViews > 0 ? v->views[i].y : 0);
         int vw = v->nViews > 0 ? v->views[i].w : g_W, vh = v->nViews > 0 ? v->views[i].h : g_H; w->cl3[0] = (float)vw; w->cl3[1] = (float)vh; w->cl3[2] = (float)vh / (float)vw; g_viewAsp = (float)vh / (float)vw; }
     uint32_t tileOff[16]; for (int i = 0; i < nTile; i++) { ViewUBO *cu = ringAlloc(f, sizeof(ViewUBO), g_uboAlign, &tileOff[i]); memcpy(cu, u, sizeof(ViewUBO)); memcpy(cu->sunVP, tileVP[i], 64); }
     /* each cascade draws through its own copy of the view's block, with its lens where the sun's goes */
@@ -1057,7 +1380,7 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     /* pictures drawn off-screen, for the screens */
     if (g_headOn) { headDraw(f, cb); g_headOn = 0; }
     if (g_feedOn) { feedDraw(f, cb, u); g_feedOn = 0; }
-    if (g_fsOn) floorMapDraw(f, cb, u);
+    if (g_fsOn && !g_between) floorMapDraw(f, cb, u);
     /* the lights' own shadows */
     if (nTile) { barrierImg(cb, g_atlasImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 1);
         VkRenderingAttachmentInfo d = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; d.imageView = g_atlasView; d.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; d.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; d.storeOp = VK_ATTACHMENT_STORE_OP_STORE; d.clearValue.depthStencil.depth = 1.f;
@@ -1065,33 +1388,59 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
         int ts = ATLAS_SIZE / 4; for (int i = 0; i < nTile; i++) { int tx = (i % 4) * ts, ty = (i / 4) * ts; VkViewport vw = {(float)tx, (float)(ty + ts), (float)ts, -(float)ts, 0.f, 1.f}; VkRect2D sc = {{tx, ty}, {(uint32_t)ts, (uint32_t)ts}}; vkCmdSetViewport(cb, 0, 1, &vw); vkCmdSetScissor(cb, 0, 1, &sc); drawList(f, cb, tileOff[i], 1, 0); }
         vkCmdEndRendering(cb);
         barrierImg(cb, g_atlasImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1); }
+    /* (step 24) does anything in this frame read the scene mid-frame? Then it's drawn in two halves */
+    int mid = 0; if (g_mid && g_hdrImg) { if (g_cfg.decals && pk->nDecal > 0) mid = 1;
+        if (!mid && g_cfg.softfx) for (int i = 0; i < pk->nFx && !mid; i++) if (!pk->fx[i].under && (pk->fx[i].how == GFX_FX_SOFTZ || pk->fx[i].how == GFX_FX_GLOWZ)) mid = 1;
+        if (!mid && g_cfg.refract) for (int i = 0; i < pk->nDraw && !mid; i++) if (pk->draws[i].flags & GFX_WATER) mid = 1; }
+    const int dcProj = mid && g_cfg.decals; decalsUp(f, pk, dcProj);
     /* the picture */
     barrierImg(cb, g_img[idx], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
     barrierImg(cb, g_depth, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 1);
     if (g_msImg) barrierImg(cb, g_msImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
     if (g_hdrImg) barrierImg(cb, g_hdrImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1);
-    { VkRenderingAttachmentInfo c = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}, d = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; c.imageView = g_msImg ? g_msView : g_hdrImg ? g_hdrView : g_view[idx]; c.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; c.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; c.storeOp = g_msImg ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE; for (int k = 0; k < 3; k++) c.clearValue.color.float32[k] = g_cfg.linear == 2 ? powf(v->clear[k], 2.2f) : v->clear[k]; c.clearValue.color.float32[3] = 1.f;
+    for (int part = 0; part < (mid ? 2 : 1); part++) {
+    { VkRenderingAttachmentInfo c = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}, d = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; c.imageView = g_msImg ? g_msView : g_hdrImg ? g_hdrView : g_view[idx]; c.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; c.loadOp = part ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR; c.storeOp = (g_msImg && !(mid && part == 0)) ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE; for (int k = 0; k < 3; k++) c.clearValue.color.float32[k] = v->bars ? 0.f : g_cfg.linear == 2 ? powf(v->clear[k], 2.2f) : v->clear[k]; c.clearValue.color.float32[3] = 1.f;
       if (g_msImg) { c.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT; c.resolveImageView = g_hdrImg ? g_hdrView : g_view[idx]; c.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; }
       if (g_zImg) { barrierImg(cb, g_zImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 1); d.resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT; d.resolveImageView = g_zView; d.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; }
-      d.imageView = g_depthView; d.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; d.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; d.storeOp = g_readDepth ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE; d.clearValue.depthStencil.depth = 1.f;
+      d.imageView = g_depthView; d.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; d.loadOp = part ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR; d.storeOp = g_readDepth ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE; d.clearValue.depthStencil.depth = 1.f;
       VkRenderingInfo r = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO}; r.renderArea.extent.width = (uint32_t)g_W; r.renderArea.extent.height = (uint32_t)g_H; r.layerCount = 1; r.colorAttachmentCount = 1; r.pColorAttachments = &c; r.pDepthAttachment = &d; vkCmdBeginRendering(cb, &r); }
     for (int vi = 0; vi < nv; vi++) { int rx = 0, ry = 0, rw = g_W, rh = g_H; if (v->nViews > 0) { rx = v->views[vi].x; ry = v->views[vi].y; rw = v->views[vi].w; rh = v->views[vi].h; } viewOff = viewOffs[vi];
     { VkViewport vw = {(float)rx, (float)(ry + rh), (float)rw, -(float)rh, 0.f, 1.f}; VkRect2D sc = {{rx, ry}, {(uint32_t)rw, (uint32_t)rh}}; vkCmdSetViewport(cb, 0, 1, &vw); vkCmdSetScissor(cb, 0, 1, &sc); }
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 0, 1, &f->dsView, 1, &viewOff);
+    if (part == 0) {
+    if (v->bars) { VkClearAttachment ca = {0}; ca.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; for (int k = 0; k < 3; k++) ca.clearValue.color.float32[k] = g_cfg.linear == 2 ? powf(v->clear[k], 2.2f) : v->clear[k]; ca.clearValue.color.float32[3] = 1.f;   /* (step 25) the scene's own colour inside its view, black outside */
+        VkClearRect cr = {{{rx, ry}, {(uint32_t)rw, (uint32_t)rh}}, 0, 1}; vkCmdClearAttachments(cb, 1, &ca, 1, &cr); }
     if (g_cfg.sky && v->skyDome) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SKYDOME]); vkCmdDraw(cb, 3, 1, 0, 0); }
     if (v->space) { uint32_t at; float *o = ringAlloc(f, 288, 16, &at); memcpy(o, v->space, 288); float pc[4] = {(float)(at / 16u), 0.f, 0.f, 0.f}; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SPACE]); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); vkCmdDraw(cb, 3, 1, 0, 0); }
     fxDraw(f, cb, pk, base, 1, vi);
     if (g_fsOn && g_tex[g_fs.tex].ds) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_FLOORSH]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[g_fs.tex].ds, 0, NULL); float pc[20]; memset(pc, 0, 64); memcpy(pc + 16, g_fs.rect, 16); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 80, pc); vkCmdDraw(cb, 6, 1, 0, 0); }
     drawList(f, cb, viewOff, 0, 0);
     screensDraw(cb);
-    if (f->start[L_GLOSS + 1] > f->start[L_GLOSS]) drawList(f, cb, viewOff, 0, 4);
+    if (f->start[L_GLOSS + 1] > f->start[L_GLOSS]) drawList(f, cb, viewOff, 0, 4); }
+    if (part == 1 || !mid) { g_midLive = mid;
+    decalsDraw(f, cb, pk, dcProj);
+    if (pk->nDecal) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 0, 1, &f->dsView, 1, &viewOff);
     drawList(f, cb, viewOff, 0, 1);
     starPass(f, cb, &pk->star);
     if (pk->nBeam) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_BEAM]); for (int i = 0; i < pk->nBeam; i++) { vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 96, pk->beam[i]); vkCmdDraw(cb, 36, 1, 0, 0); } }
     if (pk->nLine) { for (int i = 0; i < pk->nLine; i++) { VkPipeline lp9 = g_pipe[pk->lines[i].over ? P_LINE_OVER : P_LINE]; if (!lp9) continue; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, lp9); VkDeviceSize o = (VkDeviceSize)base + pk->lines[i].off; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)pk->lines[i].n, 1, 0, 0); } }
     fxDraw(f, cb, pk, base, 0, vi);
     drawList(f, cb, viewOff, 0, 2);
-    drawList(f, cb, viewOff, 0, 3); }
+    drawList(f, cb, viewOff, 0, 3); g_midLive = 0; } }
+    if (mid && part == 0) {   /* (step 24) everything solid is down: its depth and its colour are copied to where what's drawn next can read them, and the pass goes on from what it has */
+        vkCmdEndRendering(cb); VkImage zs = g_zImg ? g_zImg : g_depth; VkImageCopy r = {0}; r.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; r.srcSubresource.layerCount = 1; r.dstSubresource = r.srcSubresource; r.extent.width = (uint32_t)g_W; r.extent.height = (uint32_t)g_H; r.extent.depth = 1;
+        barrierImg(cb, zs, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1);
+        barrierImg(cb, g_zsImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, 1);
+        vkCmdCopyImage(cb, zs, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_zsImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &r);
+        barrierImg(cb, g_zsImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+        if (zs == g_depth) barrierImg(cb, g_depth, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 1);
+        r.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; r.dstSubresource = r.srcSubresource;
+        barrierImg(cb, g_hdrImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1);
+        barrierImg(cb, g_snapImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, 1);
+        vkCmdCopyImage(cb, g_hdrImg, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_snapImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &r);
+        barrierImg(cb, g_snapImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 1);
+        barrierImg(cb, g_hdrImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 1); } }
+    if (!g_between) { g_nScrWas = g_nScr; g_fsWas = g_fsOn; } g_between = 0;
     g_nScr = 0; g_fsOn = 0;
     if (g_split) toGlass(f, cb, idx, v, viewOffs, nv);
     if (nv > 1) { VkViewport vw = {0.f, (float)g_H, (float)g_W, -(float)g_H, 0.f, 1.f}; VkRect2D sc = {{0, 0}, {(uint32_t)g_W, (uint32_t)g_H}}; vkCmdSetViewport(cb, 0, 1, &vw); vkCmdSetScissor(cb, 0, 1, &sc); }
@@ -1100,11 +1449,14 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
             if (sp) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[h->tex].dsNear, 0, NULL);
             float pc[8] = {h->scr[0], h->scr[1], 0.f, 0.f, h->col[0], h->col[1], h->col[2], h->col[3]}; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 32, pc); VkDeviceSize o = (VkDeviceSize)base + h->off; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)h->n, 1, 0, 0); } }
     vkCmdEndRendering(cb);
-    { VkImageLayout from = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      if (g_cap.map) { barrierImg(cb, g_img[idx], VK_IMAGE_ASPECT_COLOR_BIT, from, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1);
-          VkBufferImageCopy c = {0}; c.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; c.imageSubresource.layerCount = 1; c.imageExtent.width = (uint32_t)g_W; c.imageExtent.height = (uint32_t)g_H; c.imageExtent.depth = 1; vkCmdCopyImageToBuffer(cb, g_img[idx], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_cap.b, 1, &c); from = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; }
+    if (g_present) presentPass(cb, idx);   /* (step 25) the picture onto the glass */
+    if (g_hdrOut && g_cap.map) { VkBufferImageCopy c = {0}; c.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; c.imageSubresource.layerCount = 1; c.imageExtent.width = (uint32_t)g_W; c.imageExtent.height = (uint32_t)g_H; c.imageExtent.depth = 1;   /* a shot of an HDR10 glass is the picture under it */
+        barrierImg(cb, g_picImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1); vkCmdCopyImageToBuffer(cb, g_picImg, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_cap.b, 1, &c); }
+    { VkImageLayout from = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; VkImage gi9 = g_present ? g_glassImg[idx] : g_img[idx]; const int gw9 = g_present ? g_GW : g_W, gh9 = g_present ? g_GH : g_H;
+      if (g_cap.map && !g_hdrOut) { barrierImg(cb, gi9, VK_IMAGE_ASPECT_COLOR_BIT, from, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 1);
+          VkBufferImageCopy c = {0}; c.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; c.imageSubresource.layerCount = 1; c.imageExtent.width = (uint32_t)gw9; c.imageExtent.height = (uint32_t)gh9; c.imageExtent.depth = 1; vkCmdCopyImageToBuffer(cb, gi9, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g_cap.b, 1, &c); from = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; }
 #ifdef REVA_SDL
-      barrierImg(cb, g_img[idx], VK_IMAGE_ASPECT_COLOR_BIT, from, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, 1);
+      barrierImg(cb, gi9, VK_IMAGE_ASPECT_COLOR_BIT, from, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, 1);
 #endif
     }
     vkEndCommandBuffer(cb);

@@ -2,6 +2,16 @@
  * One text file, key=value per line, loaded at boot, flushed by the club on a record / a mode change /
  * exit; temp + rename so a crash mid-write leaves last night's file. REVA_NOSAVE=1 makes it blind. */
 #include "club.h"
+#include <dirent.h>
+#ifdef _WIN32
+#include <direct.h>
+#define SAVE_MKDIR(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define SAVE_MKDIR(p) mkdir(p,0755)
+#endif
+/* save/ is made the first time something's written, if it isn't there: a game played from its own folder hasn't one. It does nothing to a folder that's there */
+static void saveDir(void){ static int done=0; if(!done){ done=1; (void)SAVE_MKDIR("save"); } }
 #define SAVE_MAX 256
 static char  g_svKey[SAVE_MAX][48], g_svVal[SAVE_MAX][96];
 static int   g_svN=0, g_svDirty=0, g_svOff=-1;
@@ -29,9 +39,102 @@ void saveFlush(void){
     if(saveOff()||!g_svDirty) return;
     /* temp + rename: a crash between open and close leaves LAST night's file, not half of
      * tonight's. */
-    char tmp[64]; snprintf(tmp,sizeof tmp,"%s.tmp",SAVE_PATH);
+    char tmp[64]; snprintf(tmp,sizeof tmp,"%s.tmp",SAVE_PATH); saveDir();
     FILE*f=fopen(tmp,"w"); if(!f){ printf("[save] cannot write %s\n",tmp); return; }
     fprintf(f,"# THE CLUB -- what it remembers. key=value, one per line.\n");
     for(int i=0;i<g_svN;i++) fprintf(f,"%s=%s\n",g_svKey[i],g_svVal[i]);
     fclose(f); remove(SAVE_PATH); if(rename(tmp,SAVE_PATH)) printf("[save] rename failed\n");
     g_svDirty=0; }
+
+/* ---- step 20 (11-04): A GAME'S OWN SAVE, in named slots. save/<game>_<slot>.txt: a version line at the top, then key=value lines, text a player can read and edit.
+ * Everything in is bounds-checked: the slot name is letters, digits, - and _ (31 at most), a key 47 characters, a value 95, SLOT_MAX keys, and a file without a version line that's a
+ * number is no save at all. One store for what's being written and one for what was read, so a game can read a slot and write another. REVA_NOSAVE makes both blind. */
+#define SLOT_MAX 256
+typedef struct { int n,version; char k[SLOT_MAX][48],v[SLOT_MAX][96]; } SlotStore;
+static SlotStore g_slotW,g_slotR; static char g_slotPath[192]; static int g_slotOpen=0;
+static int slotPath(const char*game,const char*slot,char*out,size_t cap){
+    char g[32]; int n=0;
+    for(const char*p=game?game:"game";*p&&n<31;p++){ char c=*p; if(c>='A'&&c<='Z') c=(char)(c+32);
+        if((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-') g[n++]=c; else if(c==' '&&n&&g[n-1]!='_') g[n++]='_'; }
+    if(!n){ g[n++]='g'; }
+    g[n]=0;
+    if(!slot||!*slot){ return 0; }
+    n=0;
+    for(const char*p=slot;*p;p++){ char c=*p; if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='_'||c=='-')) return 0; if(++n>31) return 0; }
+    snprintf(out,cap,"save/%s_%s.txt",g,slot); return 1; }
+static void slotPut(SlotStore*S,const char*k,const char*v){
+    if(!k||!v){ return; }
+    char kk[48]; int n=0;
+    for(const char*p=k;*p&&n<47;p++){ char c=*p; if(c=='='||c=='\n'||c=='\r') continue; kk[n++]=c; } kk[n]=0; if(!n) return;
+    int i=-1; for(int j=0;j<S->n;j++) if(!strcmp(S->k[j],kk)){ i=j; break; }
+    if(i<0){ if(S->n>=SLOT_MAX){ printf("[save] %d keys is the most a slot holds, dropping %s\n",SLOT_MAX,kk); return; } i=S->n++; snprintf(S->k[i],sizeof S->k[i],"%s",kk); }
+    n=0; for(const char*p=v;*p&&n<95;p++){ char c=*p; if(c=='\n'||c=='\r') c=' '; S->v[i][n++]=c; } S->v[i][n]=0; }
+void slotBegin(const char*game,const char*slot,int version){
+    g_slotW.n=0; g_slotW.version=version<1?1:version; g_slotOpen=slotPath(game,slot,g_slotPath,sizeof g_slotPath);
+    if(!g_slotOpen) printf("[save] slot '%s': a name is letters, digits, - and _, 31 at most\n",slot?slot:""); }
+void slotSet(const char*k,const char*v){ if(g_slotOpen) slotPut(&g_slotW,k,v); }
+static int g_slotNetOn,g_slotNetHost;   /* a session's copy of the host's saves: below, with slotLoad */
+int slotEnd(void){
+    if(!g_slotOpen){ return 0; }
+    g_slotOpen=0;
+    if(g_slotNetOn){   /* (step 29) in a session the save goes into every machine's copy of the host's, and only the host's file is written */
+        static char t[40001]; int n=snprintf(t,sizeof t,"version %d\n# a save: key=value, one a line, yours to edit\n",g_slotW.version);
+        for(int i=0;i<g_slotW.n&&n<(int)sizeof t-160;i++) n+=snprintf(t+n,sizeof t-(size_t)n,"%s=%s\n",g_slotW.k[i],g_slotW.v[i]);
+        slotNetPut(g_slotPath,t,n);
+        if(!g_slotNetHost) return 1; }
+    if(saveOff()) return 0;
+    char tmp[200]; snprintf(tmp,sizeof tmp,"%s.tmp",g_slotPath); saveDir();
+    FILE*f=fopen(tmp,"w"); if(!f){ printf("[save] cannot write %s\n",tmp); return 0; }
+    fprintf(f,"version %d\n# a save: key=value, one a line, yours to edit\n",g_slotW.version);
+    for(int i=0;i<g_slotW.n;i++) fprintf(f,"%s=%s\n",g_slotW.k[i],g_slotW.v[i]);
+    fclose(f); remove(g_slotPath); if(rename(tmp,g_slotPath)){ printf("[save] rename failed for %s\n",g_slotPath); return 0; }
+    return 1; }
+/* ---- step 29 (11-05): A SESSION'S SAVES ARE THE HOST'S. What a game reads from a save differs from one machine to the next, and a game that reads it into its rules would
+ * part from the others at the first tick. So when players gather, the host's slots for this game are handed to everyone before anything's loaded (engine/net.inc), and for
+ * as long as the session lasts every machine reads those, from memory, and none reads its own. A save made in the session goes into that copy on every machine, so a later
+ * load sees it everywhere; only the host writes it to a file, so nobody's own save is written over by somebody else's game. */
+#define SLOTNET_MAX 16
+#define SLOTNET_BYTES 40000
+static struct { char path[64]; char*d; int n; } g_slotNet[SLOTNET_MAX]; static int g_slotNetN=0,g_slotNetOn=0,g_slotNetHost=0;
+void slotNetBegin(int host){ for(int i=0;i<g_slotNetN;i++){ free(g_slotNet[i].d); g_slotNet[i].d=NULL; } g_slotNetN=0; g_slotNetOn=1; g_slotNetHost=host; }
+void slotNetEnd(void){ g_slotNetOn=0; }
+void slotNetPut(const char*path,const char*bytes,int n){
+    if(!path||!path[0]||n<0||n>SLOTNET_BYTES) return;
+    int i=-1; for(int j=0;j<g_slotNetN;j++) if(!strcmp(g_slotNet[j].path,path)){ i=j; break; }
+    if(i<0){ if(g_slotNetN>=SLOTNET_MAX){ printf("[save] a session holds %d slots at most, and %s isn't one of them\n",SLOTNET_MAX,path); return; } i=g_slotNetN++; snprintf(g_slotNet[i].path,sizeof g_slotNet[i].path,"%s",path); g_slotNet[i].d=NULL; }
+    char*d=(char*)malloc((size_t)n+1); if(!d) return;
+    if(n) memcpy(d,bytes,(size_t)n);
+    d[n]=0; free(g_slotNet[i].d); g_slotNet[i].d=d; g_slotNet[i].n=n; }
+/* the host's slots for this game, each handed to `offer` by its path. How many */
+int slotNetOffer(const char*game,void(*offer)(const char*path,const void*bytes,int n)){
+    char p[192]; if(saveOff()||!slotPath(game,"x",p,sizeof p)) return 0;
+    size_t pl=strlen(p); if(pl<10) return 0;
+    p[pl-5]=0;   /* "save/<game>_x.txt" without its "x.txt" */
+    const char*pre=p+5; const size_t prel=strlen(pre); char names[SLOTNET_MAX][64]; int nn=0;
+    DIR*d=opendir("save"); if(!d) return 0;
+    for(struct dirent*e;(e=readdir(d))&&nn<SLOTNET_MAX;){ const size_t l=strlen(e->d_name); if(l>prel+4&&l<58&&!strncmp(e->d_name,pre,prel)&&!strcmp(e->d_name+l-4,".txt")){ memcpy(names[nn],"save/",5); memcpy(names[nn]+5,e->d_name,l+1); nn++; } }
+    closedir(d);
+    for(int i=1;i<nn;i++) for(int j=i;j>0&&strcmp(names[j-1],names[j])>0;j--){ char t[64]; memcpy(t,names[j],64); memcpy(names[j],names[j-1],64); memcpy(names[j-1],t,64); }   /* a folder's own order is the disk's: by name, so every host offers them the same way */
+    int sent=0;
+    for(int i=0;i<nn;i++){ FILE*f=fopen(names[i],"rb"); if(!f) continue; static char buf[SLOTNET_BYTES+1]; const int n=(int)fread(buf,1,SLOTNET_BYTES+1,f); fclose(f);
+        if(n>SLOTNET_BYTES){ printf("[save] %s is too long to hand to the others, so nobody reads it in this session\n",names[i]); continue; }
+        offer(names[i],buf,n); sent++; }
+    return sent; }
+/* a save's text, a line at a time, from a file or from memory: the same checks either way */
+static int slotParse(const char*p,const char*text,int n){
+    int at=0,ver=0,first=1; char ln[256];
+    while(at<n){ int l=0; while(at<n&&text[at]!='\n'){ if(l<255) ln[l++]=text[at]; at++; } if(at<n) at++; ln[l]=0; while(l&&(ln[l-1]=='\r')) ln[--l]=0;
+        if(first){ first=0; if(sscanf(ln,"version %d",&ver)!=1||ver<1||ver>1000000000){ printf("[save] %s: no version line, so no save\n",p); return 0; } continue; }
+        if(ln[0]=='#') continue;
+        char*eq=strchr(ln,'='); if(!eq) continue;
+        *eq=0; slotPut(&g_slotR,ln,eq+1); }
+    if(first){ printf("[save] %s: no version line, so no save\n",p); return 0; }
+    g_slotR.version=ver; return ver; }
+int slotLoad(const char*game,const char*slot){
+    g_slotR.n=0; g_slotR.version=0; char p[192]; if(!slotPath(game,slot,p,sizeof p)) return 0;
+    if(g_slotNetOn){ for(int i=0;i<g_slotNetN;i++) if(!strcmp(g_slotNet[i].path,p)&&g_slotNet[i].d) return slotParse(p,g_slotNet[i].d,g_slotNet[i].n); return 0; }   /* in a session: the host's, or none */
+    if(saveOff()) return 0;
+    FILE*f=fopen(p,"rb"); if(!f) return 0;
+    static char buf[SLOTNET_BYTES+1]; const int n=(int)fread(buf,1,SLOTNET_BYTES,f); fclose(f);
+    return slotParse(p,buf,n); }
+const char* slotGet(const char*k,const char*def){ if(!k) return def; for(int i=0;i<g_slotR.n;i++) if(!strcmp(g_slotR.k[i],k)) return g_slotR.v[i]; return def; }

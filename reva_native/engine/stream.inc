@@ -13,6 +13,7 @@ typedef struct { char stem[56]; float x,y,z,yaw,sc; SDL_atomic_t state; int slot
 #define ST_BODYJOB 0x20000000
 #define ST_VOICEJOB 0x10000000
 static void voiceRead(int k);   /* engine/face.inc */
+static void wnCellIn(int ci); static void wnCellOut(int ci); static void wnStreamStep(void); static void wnStreamReset(void);   /* engine/gameworld.inc: a cell's part of the path map (step 20) */
 #define ST_MAXBODY 128
 typedef struct { char stem[56],path[128]; SDL_atomic_t state; unsigned char*bytes; size_t len; int pack,done,want,idle,said,built; EngineBodySpec spec; } StBody;
 static StBody g_stBody[ST_MAXBODY]; static int g_stNBody=0;
@@ -58,9 +59,9 @@ static void stFarReady(void){ g_st.farPk=setPack(g_st.farStem); if(g_st.farPk<0)
         C->fx=(x0+x1)*0.5f; C->fz=(z0+z1)*0.5f; C->fr=hypotf(x1-x0,z1-z0)*0.5f+12.f; }
     printf("[stream] far detail: %s, %d of %d cells have one, out to %.0f u\n",g_st.farStem,found,g_st.n,g_st.farDist); fflush(stdout); }
 static void packFree(Pack*P){
-    if(P->vbo){ glDeleteBuffers((GLsizei)(P->nMeshes*6),P->vbo); free(P->vbo); }
-    if(P->tex){ glDeleteTextures((GLsizei)P->nTex,P->tex); free(P->tex); }
-    free(P->nodes); free(P->pk); free(P->meshTex); free(P->meshMatFlags); free(P->meshNTex); free(P->nodeCanon); free(P->gaitUPS); free(P->meshOff); free(P->meshKind); free(P->meshPiece); free(P->meshHiders);
+    if(P->vbo){ gfxBuffersDrop((int)(P->nMeshes*6),P->vbo); free(P->vbo); }
+    if(P->tex){ gfxTexturesDrop((int)P->nTex,P->tex); free(P->tex); }
+    free(P->nodes); free(P->pk); free(P->meshTex); free(P->meshMatFlags); free(P->meshNTex); free(P->meshMat); free(P->nodeCanon); free(P->gaitUPS); free(P->meshOff); free(P->meshKind); free(P->meshPiece); free(P->meshHiders);
     memset(P,0,sizeof *P); }
 /* the cell's bytes are read: make it a pack and put it in the world */
 static void stInstall(StCell*C){ char p[96]; double t0=wall_ms(); stPath(C,p,sizeof p);
@@ -79,17 +80,20 @@ static void stInstall(StCell*C){ char p[96]; double t0=wall_ms(); stPath(C,p,siz
 #endif
     g_packMem=NULL; C->bytes=NULL;
     snprintf(g_setNm[slot],64,"%s",C->stem);
+    /* ⛔ (11-05) a cell has no lighter copies, and its place in the table has to say so. This place doesn't come through setPack, so its row was whatever was there: nothing at all on a place never used,
+     * which reads as "its lighter copy is the pack in place 0". From step 24 until the roam game's receipt was next run, a cell far enough off cast the shadow of whatever sat in place 0, or none */
+    g_setLod[slot][0]=g_setLod[slot][1]=g_setLod[slot][2]=-1;
     Pack*Q=&g_setPk[slot]; SetInst*I=&g_setI[g_setNI]; memset(I,0,sizeof *I); I->pk=slot; I->mover=-1;
     float eff=C->sc*((Q->scale>1e-6f)?Q->scale:1.f),a=C->yaw*0.0174532925f,ca=cosf(a),sa=sinf(a);
     I->m[0]=ca*eff; I->m[2]=-sa*eff; I->m[5]=eff; I->m[8]=sa*eff; I->m[10]=ca*eff; I->m[15]=1.f; I->m[12]=C->x; I->m[13]=C->y-Q->mny*eff; I->m[14]=C->z;
     C->slot=slot; C->inst=g_setNI++; g_st.bytesHere+=Q->len; g_st.nHere++; SDL_AtomicSet(&C->state,ST_HERE); g_st.nIn++;
     memcpy(C->m,I->m,64);
     /* its collision: on the spot when this run is being measured, and otherwise the thread's. If its queue's full it's done on the next tick that has room */
-    if(g_st.sync){ C->grid=spGridOfPack(Q->pk,C->m); spLiveAdd(C->grid); SDL_AtomicSet(&C->gridBusy,3); }
+    if(g_st.sync){ C->grid=spGridOfPack(Q->pk,C->m); spLiveAdd(C->grid); SDL_AtomicSet(&C->gridBusy,3); wnCellIn((int)(C-g_st.c)); }
     else SDL_AtomicSet(&C->gridBusy,0);
     double ms=wall_ms()-t0; g_st.sumIn+=ms; if(ms>g_st.worstIn) g_st.worstIn=ms; }
 static void stEvict(StCell*C){ double t0=wall_ms(); int last=g_setNI-1;
-    if(C->grid){ spLiveDrop(C->grid); spGridFree(C->grid); free(C->grid); C->grid=NULL; }
+    if(C->grid){ wnCellOut((int)(C-g_st.c)); spLiveDrop(C->grid); spGridFree(C->grid); free(C->grid); C->grid=NULL; }
     SDL_AtomicSet(&C->gridBusy,0);
     g_st.bytesHere-=g_setPk[C->slot].len; packFree(&g_setPk[C->slot]); g_setNm[C->slot][0]=0; g_setFree[g_setNFree++]=C->slot;
     if(C->inst!=last){ g_setI[C->inst]=g_setI[last]; for(int i=0;i<g_st.n;i++) if(g_st.c[i].inst==last){ g_st.c[i].inst=C->inst; break; } }
@@ -102,7 +106,7 @@ static void stStart(void){ if(g_st.th) return; g_st.sync=getenv("REVA_FIXEDSTEP"
 #endif
     if(!g_st.sync) g_st.th=SDL_CreateThread(stThread,"stream",NULL);
     else g_st.th=(SDL_Thread*)1; }
-static void stStep(float x,float z,long tick){ if(!g_st.on||!g_st.n) return;
+static void stStep(float x,float z,long tick){ if(!g_st.on||!g_st.n) return; wnStreamStep();
     { static int said=0; const int fresh=!g_st.th; stStart();
       if(!(g_st.rin>0.f)) { g_st.rin=70.f; g_st.rout=90.f; }
       if(fresh||!said){ said=1; printf("[stream] %d cells, in at %.0f u, out at %.0f u, %s\n",g_st.n,g_st.rin,g_st.rout,g_st.sync?"read on the spot: this run is being measured":"read by a thread"); fflush(stdout); } }
@@ -117,13 +121,13 @@ static void stStep(float x,float z,long tick){ if(!g_st.on||!g_st.n) return;
         else if(s==ST_READ){ if(d2>=rout2){ free(C->bytes); C->bytes=NULL; SDL_AtomicSet(&C->state,ST_AWAY); } else if(!installed){ installed=1; stInstall(C); } }
         else if(s==ST_HERE){ int gb=SDL_AtomicGet(&C->gridBusy);
             if(gb==0){ int wr=SDL_AtomicGet(&g_st.wr); if(wr-SDL_AtomicGet(&g_st.rd)<ST_MAXQ){ SDL_AtomicSet(&C->gridBusy,1); g_st.q[wr%ST_MAXQ]=i|ST_GRIDJOB; SDL_AtomicSet(&g_st.wr,wr+1); } }
-            else if(gb==2){ spLiveAdd(C->grid); SDL_AtomicSet(&C->gridBusy,3); }
+            else if(gb==2){ spLiveAdd(C->grid); SDL_AtomicSet(&C->gridBusy,3); wnCellIn(i); }
             if(d2>rout2&&(!evicted||g_st.sync)&&gb!=1){ evicted=1; stEvict(C); } }
         if(d2<near2&&!C->late&&(SDL_AtomicGet(&C->state)!=ST_HERE||SDL_AtomicGet(&C->gridBusy)!=3)){ C->late=1; g_st.nLate++; } }
     if(tick-g_st.statT>=300){ g_st.statT=tick; double rd=SDL_AtomicGet(&g_st.readUs)/1000.0; if(rd>g_st.worstRead) g_st.worstRead=rd;
         printf("[stream] %d here, %.1f MB, %ld in and %ld out so far, %ld late. Worst read %.1f ms; putting one in %.2f ms on average, worst %.2f; taking one out, worst %.2f\n",g_st.nHere,(double)g_st.bytesHere/1048576.0,g_st.nIn,g_st.nOut,g_st.nLate,g_st.worstRead,g_st.nIn?g_st.sumIn/(double)g_st.nIn:0.0,g_st.worstIn,g_st.worstOut); fflush(stdout); } }
 /* a new set: wait for whatever's being read, and everything goes */
-static void stClear(void){ if(!g_st.on) return;
+static void stClear(void){ wnStreamReset(); if(!g_st.on) return;
     if(!g_st.sync&&g_st.th) while(SDL_AtomicGet(&g_st.rd)!=SDL_AtomicGet(&g_st.wr)) SDL_Delay(1);
     for(int i=0;i<g_st.n;i++){ StCell*C=&g_st.c[i]; free(C->bytes); C->bytes=NULL; C->grid=NULL; }   /* the live grids go with spClear */
     g_st.n=0; g_st.on=0; g_st.nHere=0; g_st.farStem[0]=0; g_st.farPk=-1; }

@@ -11,7 +11,7 @@
  * up) that slows in the air and BLOOMS. Both ride the set's `wind` -- the curtains' breeze, so the
  * smoke and the curtains agree which way the draught goes -- plus a divergence-free curl field, so the
  * smoke swirls instead of jittering.
- * THE LIGHT: lit per sprite on the CPU by the terms the body shader uses -- the sky ambient, the sun as
+ * THE LIGHT: lit per sprite on the CPU by the terms a body is lit with -- the sky ambient, the sun as
  * scatter, every set practical and every held light at the club's 1/(1+dd*0.055) -- so smoke by the
  * night light reads warm and smoke in the streetlight cool. An EMBER also lights its own smoke up close
  * (1/(1+dd*40)): the wisp glows at its root and not a foot above it.
@@ -20,9 +20,8 @@
  * the tip smokes harder. Automatic.
  * THE CLOCK: the EXPOSURE clock (g_animDtS). A held exposure holds the smoke like animated cotton; at
  * step=60 it advances every frame. Seeded per scene, so a fixed-step take is the same smoke twice.
- * ⛔ WHAT IT CANNOT DO: no soft fade where a sprite meets a wall (this ANGLE context has no
- * OES_depth_texture, so the depth buffer cannot be read back) -- the sprites stay small so the hard line
- * is short; no self-shadowing; no collision (smoke passes through a ceiling). */
+ * ⛔ WHAT IT CANNOT DO: no soft fade where a sprite meets a wall (a sprite doesn't read the depth
+ * of what's behind it) -- the sprites stay small so the hard line is short; no self-shadowing; no collision (smoke passes through a ceiling). */
 #define SMOKE_MAX    3000     /* sprites alive at once; past it new smoke is REFUSED, loudly */
 #define SMOKE_TEX    64
 #define SMOKE_DRAG_R 0.10f    /* u: the grip end / hand this close to the mouth mark is a drag */
@@ -272,8 +271,7 @@ static void smokeTick(void){
                        g_smk[it].p[0],g_smk[it].p[1],g_smk[it].p[2],g_smk[it].age,c9[0],c9[1],c9[2]); }
             fflush(stdout); } } }
 /* ---- the draw: camera-facing soft sprites, far to near, depth-tested and not depth-written ---- */
-static GLuint g_smkProg=0, g_smkTex=0, g_smkVB=0, g_smkIB=0;
-static GLint  g_smkVP=-1, g_smkTone=-1, g_smkSmp=-1;
+static unsigned g_smkTex=0;
 static float smkHash(int x,int y,int o){
     unsigned h=(unsigned)x*374761393u+(unsigned)y*668265263u+(unsigned)o*2246822519u;
     h=(h^(h>>13))*1274126177u; h^=h>>16; return (float)(h&0xffffu)/65535.f; }
@@ -282,30 +280,8 @@ static float smkVNoise(float x,float y,int o){
     fx=fx*fx*(3.f-2.f*fx); fy=fy*fy*(3.f-2.f*fy);
     float a=smkHash(ix,iy,o), b=smkHash(ix+1,iy,o), c=smkHash(ix,iy+1,o), d=smkHash(ix+1,iy+1,o);
     return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy; }
-static void smkInitGL(void){
-    if(g_smkProg) return;
-    const char*vs=
-      "attribute vec3 p; attribute vec2 uv; attribute vec4 c;\n"
-      "uniform mat4 vp; varying vec2 vuv; varying vec4 vc;\n"
-      "void main(){ vuv=uv; vc=c; gl_Position=vp*vec4(p,1.0); }\n";
-    const char*fs=
-      "precision mediump float; varying vec2 vuv; varying vec4 vc;\n"
-      "uniform sampler2D smp; uniform float uTone;\n"
-      "void main(){ float a=texture2D(smp,vuv).a*vc.a; if(a<0.002) discard;\n"
-      "  vec3 lit=vc.rgb;\n"
-      /* the SAME highlight knee the meshes roll off under, so smoke and faces clip alike */
-      "  if(uTone>0.0){ vec3 kn=vec3(uTone); vec3 ov=max(lit-kn,vec3(0.0));\n"
-      "    vec3 wp=vec3(0.96); lit=min(lit,kn)+(wp-kn)*(vec3(1.0)-exp(-ov/(wp-kn))); }\n"
-      "  gl_FragColor=vec4(lit,a); }\n";
-    GLuint pr=glCreateProgram();
-    glAttachShader(pr,sh(GL_VERTEX_SHADER,vs)); glAttachShader(pr,sh(GL_FRAGMENT_SHADER,fs));
-    glBindAttribLocation(pr,0,"p"); glBindAttribLocation(pr,1,"uv"); glBindAttribLocation(pr,2,"c");
-    glLinkProgram(pr);
-    GLint ok=0; glGetProgramiv(pr,GL_LINK_STATUS,&ok);
-    if(!ok){ char lg[512]; glGetProgramInfoLog(pr,512,NULL,lg);
-        printf("[smoke] LINK FAILED -- no smoke will be drawn: %s\n",lg); fflush(stdout); g_smkProg=(GLuint)-1; return; }
-    g_smkProg=pr;
-    g_smkVP=glGetUniformLocation(pr,"vp"); g_smkTone=glGetUniformLocation(pr,"uTone"); g_smkSmp=glGetUniformLocation(pr,"smp");
+static void smkInit(void){
+    if(g_smkTex) return;
     /* THE PUFF: a soft radial falloff broken up by three octaves of value noise, white, alpha only --
      * the colour is the light's. Mipmapped, so a far sprite is a blur and not a sparkle. */
     static unsigned char px[SMOKE_TEX*SMOKE_TEX*4];
@@ -317,29 +293,15 @@ static void smkInitGL(void){
         float a=base*(0.50f+0.50f*nz);
         unsigned char*o=px+(y*SMOKE_TEX+x)*4;
         o[0]=o[1]=o[2]=255; o[3]=(unsigned char)(a*255.f+0.5f); }
-    glGenTextures(1,&g_smkTex); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_smkTex);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,SMOKE_TEX,SMOKE_TEX,0,GL_RGBA,GL_UNSIGNED_BYTE,px);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-#ifdef REVA_PACKET
+    g_smkTex = gfxTextureNew();
+    gfxTexture(g_smkTex, SMOKE_TEX, SMOKE_TEX, px);
     gfxTextureHud(g_smkTex);
-#endif
-    static unsigned short ix[SMOKE_MAX*6];
-    for(int k=0;k<SMOKE_MAX;k++){ unsigned short b=(unsigned short)(k*4);
-        ix[k*6]=b; ix[k*6+1]=(unsigned short)(b+1); ix[k*6+2]=(unsigned short)(b+2);
-        ix[k*6+3]=b; ix[k*6+4]=(unsigned short)(b+2); ix[k*6+5]=(unsigned short)(b+3); }
-    glGenBuffers(1,&g_smkVB); glGenBuffers(1,&g_smkIB);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,g_smkIB); glBufferData(GL_ELEMENT_ARRAY_BUFFER,sizeof ix,ix,GL_STATIC_DRAW);
     printf("[smoke] ready: %dx%d puff, cap %d sprites\n",SMOKE_TEX,SMOKE_TEX,SMOKE_MAX); fflush(stdout); }
 static int smkCmp(const void*a,const void*b){
     float x=g_smk[*(const int*)a].d2, y=g_smk[*(const int*)b].d2; return (x<y)-(x>y); }   /* far first */
-static void smokeDraw(const float*vp){
+static void smokeDraw(void){
     if(!g_smokeOn||g_nSmk<=0) return;
-    smkInitGL();
-    if(g_smkProg==(GLuint)-1) return;
+    smkInit();
     static int ord[SMOKE_MAX]; int n=0;
     for(int i=0;i<g_nSmk;i++){ SmokeP*S=&g_smk[i]; float u=S->age/S->life;
         if(u>=1.f) continue;
@@ -370,33 +332,10 @@ static void smokeDraw(const float*vp){
             for(int a=0;a<3;a++) o[a]=S->p[a]+R[a]*CS[k][0]+U[a]*CS[k][1];
             o[3]=CU[k][0]; o[4]=CU[k][1];
             o[5]=S->c[0]; o[6]=S->c[1]; o[7]=S->c[2]; o[8]=S->a; } }
-#ifdef REVA_PACKET
     if(!g_noDraw){ static float t9[SMOKE_MAX*6*9]; int m9=0; static const int Q9[6]={0,1,2,0,2,3};   /* far first, as they're sorted */
         for(int j=0;j<n;j++) for(int k=0;k<6;k++){ const float*o=vb+(j*4+Q9[k])*9; float*w=t9+m9*9; w[0]=o[0]; w[1]=o[1]; w[2]=o[2]; w[3]=o[5]; w[4]=o[6]; w[5]=o[7]; w[6]=o[8]; w[7]=o[3]; w[8]=o[4]; m9++; }
         gfxFxTex(t9,m9,g_smkTex); }
-#endif
-    GLint prev=0; glGetIntegerv(GL_CURRENT_PROGRAM,&prev);
-    GLboolean cull=glIsEnabled(GL_CULL_FACE);
-    glUseProgram(g_smkProg);
-    glUniformMatrix4fv(g_smkVP,1,GL_FALSE,vp);
-    glUniform1f(g_smkTone,g_tone);
-    glUniform1i(g_smkSmp,0);
-    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,g_smkTex);
-    glDisable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDepthMask(GL_FALSE);
-    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    glBindBuffer(GL_ARRAY_BUFFER,g_smkVB);
-    glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)((size_t)n*4*9*sizeof(float)),vb,GL_STREAM_DRAW);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,36,(void*)0);
-    glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,36,(void*)12);
-    glEnableVertexAttribArray(2); glVertexAttribPointer(2,4,GL_FLOAT,GL_FALSE,36,(void*)20);
-    glDisableVertexAttribArray(3); glDisableVertexAttribArray(4);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,g_smkIB);
-    glDrawElements(GL_TRIANGLES,(GLsizei)(n*6),GL_UNSIGNED_SHORT,0);
-    /* ⛔ HAND EVERYTHING BACK: the passes after this one assume opaque, depth-writing, their own program */
-    glDisableVertexAttribArray(1); glDisableVertexAttribArray(2);
-    glDisable(GL_BLEND); glDepthMask(GL_TRUE);
-    if(cull) glEnable(GL_CULL_FACE);
-    glUseProgram((GLuint)prev); }
+}
 
 
 /* THE MOUTH OPENING, in one place. Two tracks, multiplied:

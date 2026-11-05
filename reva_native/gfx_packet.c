@@ -27,7 +27,7 @@ static int pkRoom(int n, int max, const char *what) { if (n < max) return 1; sta
 
 void gfxFrameBegin(void) {
     if (!g_pk.mem) { g_pk.mem = malloc(PK_MEM); g_pk.draws = malloc(sizeof(GfxDraw) * GFX_MAX_DRAWS); }
-    g_pk.nDraw = g_pk.nLine = g_pk.nHud = g_pk.nFx = g_pk.nBeam = 0; g_pk.star.on = 0; g_pk.memUsed = 0; memset(&g_stNext, 0, sizeof g_stNext); g_live = 1; g_palStamp++;
+    g_pk.nDraw = g_pk.nLine = g_pk.nHud = g_pk.nFx = g_pk.nBeam = g_pk.nDecal = 0; g_pk.star.on = 0; g_pk.memUsed = 0; memset(&g_stNext, 0, sizeof g_stNext); g_live = 1; g_palStamp++;
     gfxBackBegin();
 }
 
@@ -50,6 +50,7 @@ void gfxMesh(const GfxMesh *m) {
     else if (m->bind) { const float *A = m->model, *B = m->bind; for (int c = 0; c < 4; c++) for (int r = 0; r < 4; r++) d->model[c * 4 + r] = A[0 * 4 + r] * B[c * 4 + 0] + A[1 * 4 + r] * B[c * 4 + 1] + A[2 * 4 + r] * B[c * 4 + 2] + A[3 * 4 + r] * B[c * 4 + 3]; }
     else memcpy(d->model, m->model, 64);
     d->posOn = 0; d->mouth[6] = 0.f; if (m->mouth) memcpy(d->mouth, m->mouth, 32);
+    memcpy(d->mat, m->mat, 16); d->ntex = m->ntex; d->kind = m->kind; memcpy(d->eye, m->eye, 16); d->rest = m->rest; d->restScale = m->restScale;
     if (m->pos) { unsigned off2; void *o2 = pkAlloc((size_t)m->nVerts * 12, 16, &off2); if (o2) { memcpy(o2, m->pos, (size_t)m->nVerts * 12); d->posOn = 1; d->posOff = off2; } }
     { long n = m->nIndex ? m->nIndex : m->nVerts; if (m->flags & GFX_SHADOW) { g_stNext.sunDraws++; g_stNext.sunIndices += n; } else { g_stNext.draws++; g_stNext.indices += n; } }
     g_pk.nDraw++;
@@ -78,6 +79,23 @@ void gfxSprites(unsigned tex, const float *v, int n, float cw, float ch) {
 void gfxMemSay(void) {}
 void gfxToonSet(float a, float b, float c, float d, float e, const float *f) { (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; }
 #endif
+
+/* ---- names: a buffer or a texture is a number, in both builds ------------------------------------------------------------------------- */
+/* ⛔ 11-04: a name comes back when it's dropped, the oldest first and only once there's a good few, because the renderer's tables are as long as the
+ * highest name. Without this, a world that streams made them longer for as long as it ran. Names are never 0: the engine reads 0 as "none" */
+#define NAME_RING 65536u
+typedef struct { unsigned q[NAME_RING]; unsigned r, w, next; } NameRing;
+static NameRing g_bufNames = {.next = 1}, g_texNames = {.next = 1};
+static unsigned nameTake(NameRing *R) { return R->w - R->r > 256u ? R->q[R->r++ % NAME_RING] : R->next++; }
+static void nameBack(NameRing *R, unsigned n) { if (n && R->w - R->r < NAME_RING) R->q[R->w++ % NAME_RING] = n; }
+unsigned gfxBufferNew(void) { return nameTake(&g_bufNames); }
+unsigned gfxTextureNew(void) { return nameTake(&g_texNames); }
+void gfxBuffersNew(int n, unsigned *names) { for (int i = 0; i < n; i++) names[i] = nameTake(&g_bufNames); }
+void gfxTexturesNew(int n, unsigned *names) { for (int i = 0; i < n; i++) names[i] = nameTake(&g_texNames); }
+void gfxBufferDrop(unsigned name) { if (!name) return; gfxBufferFree(name); nameBack(&g_bufNames, name); }
+void gfxTextureDrop(unsigned name) { if (!name) return; gfxTextureFree(name); nameBack(&g_texNames, name); }
+void gfxBuffersDrop(int n, const unsigned *names) { for (int i = 0; i < n; i++) gfxBufferDrop(names[i]); }
+void gfxTexturesDrop(int n, const unsigned *names) { for (int i = 0; i < n; i++) gfxTextureDrop(names[i]); }
 void gfxFxTrisView(const float *v, int n, int how, int under, int view) {
     if (!g_live || n <= 0 || !pkRoom(g_pk.nFx, 64, "effects")) return;
     unsigned off; void *p = pkAlloc((size_t)n * 36, 16, &off); if (!p) return;
@@ -86,13 +104,14 @@ void gfxFxTrisView(const float *v, int n, int how, int under, int view) {
 void gfxFxTex(const float *v, int n, unsigned tex) { const int k = g_pk.nFx; gfxFxTrisView(v, n, GFX_FX_PUFF, 0, -1); if (g_pk.nFx > k) g_pk.fx[k].tex = tex; }
 void gfxFxTris(const float *v, int n, int how, int under) { gfxFxTrisView(v, n, how, under, -1); }
 
-void gfxSkyPoints(unsigned glBuffer, const float *pts, int n, int under) {
+void gfxSkyPoints(unsigned buffer, const float *pts, int n, int under) {
     if (!g_live || n <= 0 || !pkRoom(g_pk.nFx, 64, "effects")) return;
-    unsigned off = 0; if (!glBuffer) { void *p = pkAlloc((size_t)n * 20, 16, &off); if (!p) return; memcpy(p, pts, (size_t)n * 20); }
-    GfxFx *f = &g_pk.fx[g_pk.nFx++]; f->off = off; f->n = n; f->how = GFX_FX_SKY; f->under = under; f->vb = glBuffer; f->view = -1; f->tex = 0;
+    unsigned off = 0; if (!buffer) { void *p = pkAlloc((size_t)n * 20, 16, &off); if (!p) return; memcpy(p, pts, (size_t)n * 20); }
+    GfxFx *f = &g_pk.fx[g_pk.nFx++]; f->off = off; f->n = n; f->how = GFX_FX_SKY; f->under = under; f->vb = buffer; f->view = -1; f->tex = 0;
 }
 
 void gfxBeam(const float *d) { if (g_live && pkRoom(g_pk.nBeam, 64, "beams")) memcpy(g_pk.beam[g_pk.nBeam++], d, 96); }
+void gfxDecal(const GfxDecal *d) { if (g_live && pkRoom(g_pk.nDecal, GFX_MAX_DECALS, "decals")) g_pk.decal[g_pk.nDecal++] = *d; }
 
 void gfxStar(const GfxStar *s) { if (g_live) g_pk.star = *s; }
 
@@ -110,9 +129,12 @@ static unsigned long long pkHash(const GfxView *v) {
         if (d->posOn) h = fnv(h, g_pk.mem + d->posOff, (size_t)d->nVerts * 12);
         if (d->mouth[6] > 0.f) h = fnv(h, d->mouth, 28); }
     for (int i = 0; i < g_pk.nBeam; i++) h = fnv(h, g_pk.beam[i], 96);
+    for (int i = 0; i < g_pk.nDecal; i++) { h = fnv(h, g_pk.decal[i].m, 64); h = fnv(h, g_pk.decal[i].col, 16); h = fnv(h, &g_pk.decal[i].kind, 12); }   /* (step 24) a frame with none hashes as it did. A decal's picture is content, as a texture is */
     if (v->space) h = fnv(h, v->space, 288);
     if (v->filmGrade > 0.f || v->filmVig > 0.f) { h = fnv(h, &v->filmGrade, 4); h = fnv(h, &v->filmVig, 4); }
     if (v->gloss[3] > 0.f) h = fnv(h, v->gloss, 16);
+    if (v->bars) h = fnv(h, &v->bars, 4);
+    if (v->dof > 0.f || v->shutter > 0.f || v->sepia > 0.f || v->flash > 0.f || v->burn > 0.f || v->grain > 0.f || v->weave[0] != 0.f || v->weave[1] != 0.f) { h = fnv(h, &v->focus, 12); h = fnv(h, &v->sepia, 16); h = fnv(h, v->weave, 8); }   /* (step 25) the lens and film's look, when a frame has any */
     if (g_pk.star.on) { h = fnv(h, g_pk.star.c, sizeof g_pk.star.c * 3); h = fnv(h, g_pk.star.cut, 12); h = fnv(h, g_pk.star.spot, sizeof g_pk.star.spot); }
     for (int i = 0; i < g_pk.nLine; i++) h = fnv(h, g_pk.mem + g_pk.lines[i].off, (size_t)g_pk.lines[i].n * 24);
     for (int i = 0; i < g_pk.nHud; i++) { const GfxHudRec *r = &g_pk.hud[i]; h = fnv(h, g_pk.mem + r->off, (size_t)r->n * (r->tex ? 32 : 8)); h = fnv(h, r->scr, 8); h = fnv(h, r->col, 16); }
@@ -135,6 +157,63 @@ static void pkDump(const char *path, const GfxView *v, unsigned long long hash) 
     fclose(f);
 }
 
+/* ---- (step 25) THE PICTURES BETWEEN TWO TICKS ------------------------------------------------------------------------------------------------------------------------------
+ * The rules tick 60 times a second on every machine, so on a 100 or 144 Hz display there were 60 new pictures a second, each held for one refresh or two: a judder on every
+ * pan. With this on, the last two ticks' packets are kept whole, and every refresh draws the picture that lies between them where the clock says: a draw is paired with the
+ * same draw of the tick before by its stable id, and its matrix, its bones, its own positions and its colour are mixed, and so is the lens. What has no pair is the later
+ * tick's. It costs a tick of delay, and a copy of the packet a tick. */
+typedef struct { GfxPacket pk; GfxView v; GfxLight *lights; float space[72]; size_t memCap; int ok; } PkKept;
+static PkKept g_kept[2]; static int g_keptB, g_btwOn; static float g_btwT;
+static GfxPacket g_mix; static GfxView g_mixV; static size_t g_mixCap; static unsigned char *g_mixSeen; static int g_mixPaired, g_mixDraws;
+static void keptCopy(PkKept *k, const GfxPacket *p, const GfxView *v) {
+    if (k->memCap < p->memUsed || !k->pk.mem) { k->memCap = p->memUsed + (1u << 20); k->pk.mem = realloc(k->pk.mem, k->memCap); }
+    if (!k->pk.draws) k->pk.draws = malloc(sizeof(GfxDraw) * GFX_MAX_DRAWS);
+    if (!k->lights) k->lights = malloc(sizeof(GfxLight) * GFX_MAX_LIGHTS);
+    unsigned char *mem = k->pk.mem; GfxDraw *dr = k->pk.draws;
+    k->pk = *p; k->pk.mem = mem; k->pk.draws = dr; memcpy(mem, p->mem, p->memUsed); memcpy(dr, p->draws, sizeof(GfxDraw) * (size_t)p->nDraw);
+    k->v = *v; { int n = v->nLights < 0 ? 0 : v->nLights > GFX_MAX_LIGHTS ? GFX_MAX_LIGHTS : v->nLights; if (n) memcpy(k->lights, v->lights, sizeof(GfxLight) * (size_t)n); k->v.lights = k->lights; k->v.nLights = n; }
+    if (v->space) { memcpy(k->space, v->space, sizeof k->space); k->v.space = k->space; }
+    k->ok = 1;
+}
+#define MIX_SLOTS 32768
+static int g_mixSlot[MIX_SLOTS];
+static void mixBuild(float t) {
+    const PkKept *A = &g_kept[1 - g_keptB], *B = &g_kept[g_keptB];
+    if (g_mixCap < B->pk.memUsed || !g_mix.mem) { g_mixCap = B->pk.memUsed + (1u << 20); g_mix.mem = realloc(g_mix.mem, g_mixCap); }
+    if (!g_mix.draws) g_mix.draws = malloc(sizeof(GfxDraw) * GFX_MAX_DRAWS);
+    if (!g_mixSeen) g_mixSeen = malloc(65536);
+    unsigned char *mem = g_mix.mem; GfxDraw *dr = g_mix.draws;
+    g_mix = B->pk; g_mix.mem = mem; g_mix.draws = dr; memcpy(mem, B->pk.mem, B->pk.memUsed); memcpy(dr, B->pk.draws, sizeof(GfxDraw) * (size_t)B->pk.nDraw); g_mixV = B->v;
+    g_mixPaired = 0; g_mixDraws = g_mix.nDraw;
+    if (!A->ok || t >= 0.999f || A->v.cuts != B->v.cuts || B->v.reset || A->v.nViews != B->v.nViews || B->pk.nDraw > GFX_MAX_DRAWS) return;
+    if (t < 0.f) t = 0.f;
+    const float s = 1.f - t;
+#define MIXF(dst, a, b, n) do { for (int q_ = 0; q_ < (n); q_++) (dst)[q_] = (a)[q_] * s + (b)[q_] * t; } while (0)
+    MIXF(g_mixV.vp, A->v.vp, B->v.vp, 16); MIXF(g_mixV.eye, A->v.eye, B->v.eye, 3);
+    for (int i = 0; i < B->v.nViews && i < 16; i++) if (A->v.views[i].w == B->v.views[i].w && A->v.views[i].h == B->v.views[i].h) { MIXF(g_mixV.views[i].vp, A->v.views[i].vp, B->v.views[i].vp, 16); MIXF(g_mixV.views[i].eye, A->v.views[i].eye, B->v.views[i].eye, 3); }
+    /* the tick before's draws, by id: the same id twice (a body's copy in a mirror, its shadow) is taken in the order it was drawn */
+    memset(g_mixSlot, 0xff, sizeof g_mixSlot);
+    for (int i = A->pk.nDraw - 1; i >= 0; i--) { const GfxDraw *d = &A->pk.draws[i]; unsigned k = ((d->id * 2654435761u) ^ ((unsigned)d->flags * 40503u)) & (MIX_SLOTS - 1);
+        for (int q = 0; q < MIX_SLOTS; q++, k = (k + 1) & (MIX_SLOTS - 1)) if (g_mixSlot[k] < 0) { g_mixSlot[k] = i; break; } }
+    memset(g_mixSeen, 0, 65536);
+    for (int i = 0; i < g_mix.nDraw; i++) { GfxDraw *d = &g_mix.draws[i]; const GfxDraw *a = NULL; unsigned k = ((d->id * 2654435761u) ^ ((unsigned)d->flags * 40503u)) & (MIX_SLOTS - 1);
+        for (int q = 0; q < 64 && g_mixSlot[k] != -1; q++, k = (k + 1) & (MIX_SLOTS - 1)) { if (g_mixSlot[k] < 0) continue; const GfxDraw *c = &A->pk.draws[g_mixSlot[k]];
+            if (c->id == d->id && c->flags == d->flags && c->nIndex == d->nIndex && c->nVerts == d->nVerts && c->bones == d->bones) { a = c; g_mixSlot[k] = -2; break; } }
+        if (!a) continue;
+        g_mixPaired++;
+        MIXF(d->model, a->model, d->model, 16); MIXF(d->tint, a->tint, d->tint, 3); d->alpha = a->alpha * s + d->alpha * t; d->useTex = a->useTex * s + d->useTex * t;
+        if (d->bones && d->palOff + (size_t)d->bones * 48 <= B->pk.memUsed && a->palOff + (size_t)a->bones * 48 <= A->pk.memUsed && !g_mixSeen[(d->palOff >> 8) & 65535u]) { g_mixSeen[(d->palOff >> 8) & 65535u] = 1;   /* a pose many bodies share is mixed once */
+            float *pb = (float *)(mem + d->palOff); const float *pa = (const float *)(A->pk.mem + a->palOff); const int n = (int)d->bones * 12; for (int q = 0; q < n; q++) pb[q] = pa[q] * s + pb[q] * t; }
+        if (d->posOn && a->posOn && d->posOff + (size_t)d->nVerts * 12 <= B->pk.memUsed && a->posOff + (size_t)a->nVerts * 12 <= A->pk.memUsed) {
+            float *pb = (float *)(mem + d->posOff); const float *pa = (const float *)(A->pk.mem + a->posOff); const int n = (int)d->nVerts * 3; for (int q = 0; q < n; q++) pb[q] = pa[q] * s + pb[q] * t; } }
+#undef MIXF
+}
+void gfxBetweenSay(int *paired, int *draws) { *paired = g_mixPaired; *draws = g_mixDraws; }
+void gfxBetweenSet(int on, float t) { if (!on && g_btwOn) g_kept[0].ok = g_kept[1].ok = 0; g_btwOn = on; g_btwT = t; }
+void gfxBetween(void) {
+    if (!g_btwOn || !g_kept[g_keptB].ok) return;
+    gfxBackBegin(); gfxBackBetween(); mixBuild(g_btwT); gfxBackEnd(&g_mix, &g_mixV);
+}
 void gfxFrameEnd(const GfxView *v) {
     if (!g_live) return;
     g_live = 0; g_st = g_stNext;
@@ -143,15 +222,25 @@ void gfxFrameEnd(const GfxView *v) {
     if ((every > 0 && v->tick % every == 0) || (dumpTick >= 0 && v->tick >= dumpTick)) { unsigned long long h = pkHash(v);
         if (every > 0 && v->tick % every == 0) printf("[packet] tick %ld %016llx draws %d sun %d hud %d lines %d mem %zu\n", v->tick, h, g_st.draws, g_st.sunDraws, g_pk.nHud, g_pk.nLine, g_pk.memUsed);
         if (dumpTick >= 0 && v->tick >= dumpTick) { pkDump(dumpPath, v, h); dumpTick = -1; } }
-    gfxBackEnd(&g_pk, v);
+    if (g_btwOn) { g_keptB ^= 1; keptCopy(&g_kept[g_keptB], &g_pk, v); mixBuild(g_btwT); gfxBackEnd(&g_mix, &g_mixV); }   /* (step 25) the picture between the tick before and this one */
+    else gfxBackEnd(&g_pk, v);
 }
 
 #ifdef REVA_HEADLESS
+/* no renderer: the packet is all there is. What the engine hands a renderer (geometry, textures, targets, Holly's head) goes nowhere, and a frame read back is none */
 void gfxTextureNear(unsigned name) { (void)name; }
 void gfxTextureHud(unsigned name) { (void)name; }
-/* no renderer: the packet is all there is */
 void gfxBackBegin(void) {}
 void gfxBackEnd(const GfxPacket *p, const GfxView *v) { (void)p; (void)v; }
+void gfxBufferData(unsigned name, long size, const void *data, int dynamic) { (void)name; (void)size; (void)data; (void)dynamic; }
+void gfxBufferSub(unsigned name, long off, long size, const void *data) { (void)name; (void)off; (void)size; (void)data; }
+void gfxTexture(unsigned name, int w, int h, const void *rgba) { (void)name; (void)w; (void)h; (void)rgba; }
+void gfxTargetMake(unsigned tex, int w, int h, int nearest) { (void)tex; (void)w; (void)h; (void)nearest; }
+void gfxHead(const GfxHead *h) { (void)h; }
+int gfxRead(void *rgba, int w, int h) { (void)rgba; (void)w; (void)h; return 0; }
+void gfxShotSize(int *w, int *h) { (void)w; (void)h; }
+float gfxShownAspect(void) { return 0.f; }
+void gfxBackBetween(void) {}
 void gfxBufferFree(unsigned name) { (void)name; }
 void gfxTextureFree(unsigned name) { (void)name; }
 void gfxUploadAsync(int on) { (void)on; }

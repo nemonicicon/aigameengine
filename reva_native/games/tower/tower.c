@@ -75,7 +75,7 @@ static void newGame(void) {
     S.round = 1; S.score = 0; S.over = 0; S.wait = 0.f; S.route = 0;
     E->bodyRise(-1);
     for (int k = 1; k < MAX_PLAYERS; k++) E->bodyRise(playerBody(k));
-    sfxBus(BUS_MUSIC, S.music, 1.f);
+    E->musicGain(S.music, 1.f);
     E->run->stage = 0;
     E->mark("start", &x, NULL, &z);
     *E->heroX = x; *E->heroZ = z;
@@ -88,7 +88,7 @@ static void boot(void) {
     S.again = E->action("again", PAD_B);
     E->animGraph("hero.anim");
     S.crateProp = E->prop("tw_crate"); S.beaconProp = E->prop("tw_beacon"); S.liftProp = E->prop("tw_lift");
-    sfxPreload("hit"); sfxPreload("ping"); sfxPreload("step"); sfxPreload("banner");
+    E->soundLoad("hit"); E->soundLoad("ping"); E->soundLoad("step"); E->soundLoad("banner");
     S.nViews = 1;
     S.p[0].on = 1;
     S.chasing = 1; S.music = 1.f;
@@ -133,7 +133,7 @@ static void start(int onSet) {
     newGame();
     lenses(0.f);   /* before the first frame, so the picture opens on it rather than cutting to it */
     E->banner("LIGHT THE BEACONS", 3.f);
-    musicPlay("music.wav", 0.5f, 1);
+    E->music("music.wav", 0.5f, 1);
 }
 
 /* one of the things chasing them goes down, away from what hit it, and is gone a moment later */
@@ -165,7 +165,7 @@ static void punchFrom(float x, float y, float z) {
     }
     if (hits) {
         S.score += 10 * hits;
-        sfxPlay("hit", 0.9f, NULL, 0);
+        E->sound("hit", 0.9f, NULL, 0);
         E->timeScale(0.2f); S.stop = 0.03f;
         if (!S.noShake) E->shake(0.25f, 0.25f);
     }
@@ -209,7 +209,7 @@ static void tick(float dt) {
             E->uiBegin(&S.menu, -1, 6.f, 9.f, 23.f, 10.f);
             if (E->uiButton("PLAY AGAIN")) again = 1;
             E->uiChoice("CHASING YOU", HOW_MANY, 3, &S.chasing);
-            if (E->uiSlider("MUSIC", &S.music, 0.f, 1.f, 0.1f)) sfxBus(BUS_MUSIC, S.music * 0.25f, 0.1f);
+            if (E->uiSlider("MUSIC", &S.music, 0.f, 1.f, 0.1f)) E->musicGain(S.music * 0.25f, 0.1f);
             int shake = !S.noShake;
             if (E->uiToggle("SHAKE", &shake)) S.noShake = !shake;
             E->uiEnd();
@@ -232,7 +232,7 @@ static void tick(float dt) {
             if (!S.lit[b] && E->inTrigger(name, x, y + 1.f, z)) {
                 S.lit[b] = 1; S.left--; S.score += 50;
                 E->paint(S.beacon[b], 1.f, 0.75f, 0.2f);
-                sfxPlay("ping", 0.8f, NULL, 0);
+                E->sound("ping", 0.8f, NULL, 0);
                 E->banner("BEACON LIT", 1.5f);
                 E->particles(S.bx[b], S.by[b] + 1.f, S.bz[b], 60, 6.f, 1.2f, 0.18f, 1.f, 0.9f, 0.4f, 3.f);
             }
@@ -252,14 +252,14 @@ static void tick(float dt) {
 static void objectHit(int obj, int other, int who, float speed) {
     (void)other;
     const EngineObject *c = E->object(obj);
-    if (c && speed > 2.f) { float at[3] = {c->x, c->y, c->z}; sfxPlay("step", speed > 8.f ? 0.8f : speed * 0.1f, at, 0); }
+    if (c && speed > 2.f) { float at[3] = {c->x, c->y, c->z}; E->sound("step", speed > 8.f ? 0.8f : speed * 0.1f, at, 0); }
     if (c && who >= 0 && E->team[who] == 1 && speed > 4.f) { knockDown(who, c->x, c->z, speed * 0.5f); S.score += 10; }
 }
 
 /* the graph says when a fist or a pair of hands arrives. who is a body, or -1 for the first player */
 static void clipEvent(int who, const char *name) {
     float x = who < 0 ? *E->heroX : body(who)->x, y = who < 0 ? *E->heroFeet : E->feet[who], z = who < 0 ? *E->heroZ : body(who)->z, at[3] = {x, y, z};
-    if (!strcmp(name, "step")) { sfxPlay("step", 0.3f, at, 0); return; }
+    if (!strcmp(name, "step")) { E->sound("step", 0.3f, at, 0); return; }
     if (!strcmp(name, "hit")) { punchFrom(x, y, z); return; }
     if (!strcmp(name, "grab") && !S.over) for (int k = 0; k < MAX_PLAYERS; k++) if (S.p[k].on) {
         float px, py, pz;
@@ -267,9 +267,9 @@ static void clipEvent(int who, const char *name) {
         if (hypotf(px - x, pz - z) < GRAB_REACH && fabsf(py - y) < 2.f) {
             S.over = 1; S.wait = 0.f; E->run->stage = 3;
             E->bodyLimp(k ? playerBody(k) : -1, (px - x) * 2.f, 2.f, (pz - z) * 2.f);   /* whoever's caught goes down */
-            sfxBus(BUS_MUSIC, 0.25f, 0.5f);   /* it comes down when it's over, and back up with the next game */
+            E->musicGain(0.25f, 0.5f);   /* it comes down when it's over, and back up with the next game */
             E->banner("CAUGHT", 4.f);
-            sfxPlay("hit", 0.8f, NULL, 0);
+            E->sound("hit", 0.8f, NULL, 0);
             return;
         }
     }

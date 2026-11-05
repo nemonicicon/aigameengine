@@ -253,8 +253,9 @@ static void perfLayer(Pack*P,float Q[][4],int who,int li,float t){
           else if(dt0>0.f){ float a=1.f-expf(-dt0/1.2f); for(int k=0;k<3;k++) FD[k]+=(fc[k]-FD[k])*a;
               float l=sqrtf(FD[0]*FD[0]+FD[1]*FD[1]+FD[2]*FD[2]); if(l>1e-5f) for(int k=0;k<3;k++) FD[k]/=l; } }
       else if(fresh){ FD[0]=0.f; FD[1]=0.f; FD[2]=1.f; } }
-    { float E[3],F[3];
-      if(tgt>=0&&perfEye(me,E)&&perfEye(tgt,F)){
+    { float E[3],F[3]; const int pt=(me<STK_LOOKS&&me<g_stkNK&&g_stkLook[me][3]>0.5f);   /* (step 21) the set's timeline has a place for this body to look: it beats who's talking, and a body told not to look */
+      if(pt){ F[0]=g_stkLook[me][0]; F[1]=g_stkLook[me][1]; F[2]=g_stkLook[me][2]; }
+      if((pt||(tgt>=0&&perfEye(tgt,F)))&&perfEye(me,E)){
           float by=who?g_partYaw:g_rvHead, dx=F[0]-E[0], dy=F[1]-E[1], dz=F[2]-E[2], d=sqrtf(dx*dx+dz*dz);
           if(d>1e-4f){ float f=dx*sinf(by)+dz*cosf(by), r=dx*cosf(by)-dz*sinf(by);
               const float*FD=g_perfF[me];
@@ -264,8 +265,9 @@ static void perfLayer(Pack*P,float Q[][4],int who,int li,float t){
               if(yawT<-3.14159f) yawT+=6.28318f;
               if(yawT>0.70f) yawT=0.70f;
               if(yawT<-0.70f) yawT=-0.70f;
-              if(pitchT>0.35f) pitchT=0.35f;
-              if(pitchT<-0.35f) pitchT=-0.35f; } } }
+              { const float pm=pt?0.55f:0.35f;   /* a place the track gave can be well above or below: a body looks up at something tall */
+                if(pitchT>pm) pitchT=pm;
+                if(pitchT<-pm) pitchT=-pm; } } } }
     if(!aimed&&!refuse){   /* NOBODY TO LOOK AT: look about */
         float Pd=3.2f+0.7f*(float)me; int k=(int)floorf(t/Pd); float u=t-(float)k*Pd;
         int kk=(u<perfRnd(me,k,5)*0.5f*Pd)?k-1:k;

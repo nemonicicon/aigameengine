@@ -140,24 +140,8 @@ static void meshTintOf(Pack*P,unsigned mi,float*c){
         c[0]=((v>>16)&255)/255.f; c[1]=((v>>8)&255)/255.f; c[2]=(v&255)/255.f; } }
 
 /* ⭐ AND `#rrggbbAA` MAKES IT SHEER. jacob: "her pajamas should be threadbare, sheer, loose,
- * old". uAlpha went into both mesh shaders for the water and defaults to 1.0, so a garment
- * only has to ask -- two more hex digits on the name it already carries. 1.0 if absent, so
+ * old". A mesh's alpha defaults to 1.0, so a garment only has to ask -- two more hex digits on the name it already carries. 1.0 if absent, so
  * every existing mesh is unchanged. */
-/* \u2b50 THE TRANSPARENT PASS. flags&8 means the source material asked for alphaMode
- * BLEND -- hair cards, lace, eyelashes. The shader's `discard` handles CUTOUTS, but a cutout
- * has hard binary edges and hair is built from overlapping semi-transparent quads: cut at a
- * threshold it comes out a solid silhouette with a speckled fringe.
- * \u26d4 Depth-write MUST be off for these, or a nearer card punches a hole in the ones
- * behind it and the hair fills with background.
- * \u2b50 Restoring on every OPAQUE mesh is what keeps the state from leaking out of a pack:
- * blended meshes sort last within a pack, and the next pack starts with an opaque one. */
-static void meshAlphaState(const PMesh*M){
-    if(g_glossDraw){ glEnable(GL_BLEND); glBlendFunc(GL_ONE,GL_SRC_ALPHA); glDepthMask(GL_TRUE); return; }   /* ⭐ (10-23) the glossy floor */
-    if(M&&(M->flags&8u)){
-        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
-    } else { glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
-}
 
 static float meshAlphaOf(Pack*P,unsigned mi){
     const char*mn=packStr(P,P->meshes[mi].name);
@@ -174,8 +158,7 @@ static float meshAlphaOf(Pack*P,unsigned mi){
  * prototype is cheaper than moving three systems. */
 #define CLOTH_SLOTS  16
 #define CLOTH_ACTOR0 SCN_MAXCAST /* slots below this are hero + cast */
-static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world,
-                     GLint uModel,GLint uPal,GLint uBind,GLint uDqS);
+static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world);
 
 static const char*g_actorOver=NULL; static float g_actorOverW=1.f;   /* the layer for the actor being drawn (09-11) */
 /* ⭐ A SET ACTOR'S MORPHS (10-18): the hero and the scene partner always blended their clip's morph tracks; a set actor
@@ -191,50 +174,70 @@ static void jiggleTick(Pack*P,M4*W,const float*model,int slot);   /* the soft ma
 static int meshIsCloth(Pack*P,unsigned mi);
 /* the old shadow pass's cast list, which the hero and the crowd fill as they draw */
 #define NCASTMAX 8
+/* ⭐ (queue step 24) A SET ACTOR'S LIGHTER COPIES. A body can have props/<stem>~lod1.rpack and ~lod2 (skate_src/author/lod.py): the same skeleton, the same meshes by
+ * name, fewer triangles. When the actor is small in the picture its copy is drawn on the actor's own pose, so it moves exactly as the body does. What a copy doesn't have:
+ * a face that moves, cloth that hangs or swings on chains of its own, hair kept off the head vertex by vertex. Far off, none of them is seen. It wears what the body wears,
+ * piece by piece by name. The machine's `lod` setting says how soon: the body itself is the top detail and is never thinned up close. */
+static Pack* actorLod(Pack*P,const float*mdl){
+    const ptrdiff_t pi=P-g_setPk; if(pi<0||pi>=SET_MAXP) return NULL;
+    if(g_setLod[pi][0]<0&&g_setLod[pi][1]<0) return NULL;
+    static const float bias9[5]={0.5f,0.75f,1.f,1.4f,2.f};
+    const float ex=mdl[12]-g_camEye[0], ey=mdl[13]-g_camEye[1], ez=mdl[14]-g_camEye[2], d=sqrtf(ex*ex+ey*ey+ez*ez)+1e-3f;
+    const float big=fmaxf(P->effH,1.f)/d*bias9[g_gfxLod<0?0:g_gfxLod>4?4:g_gfxLod];
+    int lv=-1; if(big<0.075f&&g_setLod[pi][1]>=0) lv=1; else if(big<0.20f&&g_setLod[pi][0]>=0) lv=0; else if(big<0.075f&&g_setLod[pi][0]>=0) lv=0;
+    if(lv<0) return NULL;
+    Pack*Q=&g_setPk[g_setLod[pi][lv]];
+    return Q->nNodes==P->nNodes?Q:NULL; }   /* a copy made from an older bake of the body has other bones: it isn't this body's */
+static void sunStash(Pack*P,int mi,const float*pal,int nb,const float*model,int crowd);
+static void bodyMeshesLod(Pack*P,Pack*Q,M4*W,const float*model,float*pal){
+    if(Q->meshOff&&P->meshOff){ unsigned long long w9=0ull;   /* what the body has on, piece by piece by name */
+        for(int i=0;i<P->nPiece;i++) if((P->worn>>i)&1ull){ const int j=wardFind(Q->pieceName,Q->nPiece,P->pieceName[i]); if(j>=0) w9|=1ull<<j; }
+        if(w9!=Q->worn||Q->outfit!=P->outfit){ Q->worn=w9; Q->outfit=P->outfit; wardApply(Q); } }
+    static int dbg9=-1; if(dbg9<0){ const char*e9=getenv("REVA_LODDBG"); dbg9=(e9&&e9[0]!='0')?1:0; }
+    static const float wh9[3]={1.f,1.f,1.f}, gr9[3]={0.2f,1.f,0.2f};
+    if(dbg9){ static struct { const Pack*q; float x,z; } seen9[32]; static int nSeen9=0; int k9=0; for(;k9<nSeen9;k9++) if(seen9[k9].q==Q&&seen9[k9].x==model[12]&&seen9[k9].z==model[14]) break;
+        if(k9==nSeen9&&nSeen9<32){ seen9[nSeen9].q=Q; seen9[nSeen9].x=model[12]; seen9[nSeen9].z=model[14]; nSeen9++; printf("[lod] the actor %s at %.0f,%.0f is drawn from %s\n",P->label,model[12],model[14],Q->label); fflush(stdout); } }   /* REVA_LODDBG: said once an actor and copy */
+    for(unsigned mi=0;mi<Q->nMeshes;mi++){ PMesh*M=&Q->meshes[mi];
+        if(!(M->flags&4)||M->boneCount>MAXB||MOFF(Q,mi)) continue;
+        bodyPalette(Q,mi,W,pal);
+        sunStash(Q,(int)mi,pal,(int)M->boneCount,model,0);
+        bodyDrawMesh(Q,mi,model,pal,&Q->vbo[mi*6],dbg9?gr9:wh9,dbg9?0.55f:1.f,0,1); } }
 static float castPal[NCASTMAX][MAXB*16]; static M4 castModelA[NCASTMAX];
 static Pack*castP[NCASTMAX]; static int castMi[NCASTMAX]; static int nCast=0;
 /* one owner's way through bodyMeshes. hero: she also goes on the cast list, her cloth never casts, and the tint is left as it's set. noCast: this pass casts nothing. meshEnd: draw only the meshes below this (0 for all).
  * texTint: the tint over a texture, and NULL leaves uUse and uTint alone. */
-typedef struct { GLint mModel,mPal,mBind,mDqS,uUse,uTint,uOpen; int clothSlot,dq; const float*morphW; int hero,noCast; unsigned meshEnd; const float*texTint; } BodyGL;
-static void mouthMeshArm(Pack*P,unsigned mi,const float*wts,GLint uOpen); static float mouthOpenOf(Pack*P,const float*wts); static void skinPal(GLint loc,GLint locS,int dq,const float*mats,int n,float s);
+typedef struct { int clothSlot; const float*morphW; int hero,noCast; unsigned meshEnd; const float*texTint; } BodyGL;
+static float mouthOpenOf(Pack*P,const float*wts);
 static void bodyMeshes(Pack*P,M4*W,const float*model,float*pal,const BodyGL*g){
     unsigned end9=(g->meshEnd&&g->meshEnd<P->nMeshes)?g->meshEnd:P->nMeshes;
+    g_vkWorld=W;   /* (step 23) the posed nodes, for a VertexCollide pack's hair (engine/body.inc, hairFitPos) */
     for(unsigned mi=0;mi<end9;mi++){ PMesh*M=&P->meshes[mi];
-        if(g->morphW) mouthMeshArm(P,mi,g->morphW,g->uOpen);
-#ifdef REVA_PACKET
         g_vkOpen=(g->morphW&&(int)mi!=P->fmInterior)?mouthOpenOf(P,g->morphW):0.f;
-#endif
         if(!(M->flags&4)||M->boneCount>MAXB||MOFF(P,mi)) continue;
-            meshAlphaState(M);
         bodyPalette(P,mi,W,pal);
         /* ⛔ THE MOUTH INTERIOR MUST NOT CAST. It is teeth, a tongue and a cavity dome sealed inside her skull -- it can throw no shadow anyone could see, and it would spend a place on the cast list.
          * ⛔ AND A CLOTH MESH MUST NOT CAST. The shadow pass replays the stashed palette against the real model matrix; a simulated garment's palette is the identity, so its shadow would be the garment's REST pose. */
         if(g->hero&&!g->noCast&&nCast<NCASTMAX&&(int)mi!=P->fmInterior&&!meshIsCloth(P,mi)){ memcpy(castPal[nCast],pal,M->boneCount*64); castP[nCast]=P; castMi[nCast]=(int)mi; memcpy(castModelA[nCast],model,64); nCast++; }
         if(g->hero&&!g->noCast&&(int)mi!=P->fmInterior&&!meshIsCloth(P,mi)) sunStash(P,(int)mi,pal,(int)M->boneCount,model,0);   /* ⭐ the hero casts under the sun (09-11) */
-        int isCloth9=clothPrep(g->clothSlot,P,mi,pal,model,W,g->mModel,g->mPal,g->mBind,g->mDqS);
+        int isCloth9=clothPrep(g->clothSlot,P,mi,pal,model,W);
         if(!isCloth9){
             if(!g->hero&&(int)mi!=P->fmInterior) sunStash(P,(int)mi,pal,(int)M->boneCount,model,0);   /* ⭐ she casts (09-11) */
-            skinPal(g->mPal,g->mDqS,g->dq&&P->dqsOK,pal,(int)M->boneCount,mi<8?P->meshDqS[mi]:1.f);
-            glUniformMatrix4fv(g->mBind,1,GL_FALSE,(float*)(P->pk+M->offBind)); }
-        GLuint bs9[6]; GLuint*b=&P->vbo[mi*6];
+             }
+        unsigned bs9[6]; unsigned*b=&P->vbo[mi*6];
         if(isCloth9==2){ memcpy(bs9,b,sizeof bs9); bs9[0]=g_skVbo[0]; bs9[1]=g_skVbo[1]; b=bs9; }   /* hanging cloth: its own buffers */
-        bodyStreams(M,b);
         { int tx=P->meshTex[mi];
-          if(tx>=0){ glBindTexture(GL_TEXTURE_2D,P->tex[tx]); if(g->texTint){ glUniform1f(g->uUse,1.f); glUniform3f(g->uTint,g->texTint[0],g->texTint[1],g->texTint[2]); } }
-          else if(g->texTint){ float c9[3]; meshTintOf(P,mi,c9); glUniform1f(g->uUse,0.f); glUniform3f(g->uTint,c9[0],c9[1],c9[2]); }   /* an authored mesh carries its own colour, in its name */
-          nrmBind(P,mi); }
-        { static const float wh9[3]={1.f,1.f,1.f}; bodyDrawMesh(P,mi,model,W,pal,b,wh9,1.f,isCloth9,1,g->mModel); }
-        if(isCloth9){ if(g_labAlpha>=0) glUniform1f(g_labAlpha,1.f); glDisable(GL_BLEND); glDepthMask(GL_TRUE); glUniformMatrix4fv(g->mModel,1,GL_FALSE,model); }
-        if(!g->hero){ glUniform1f(g->uUse,1.f); glUniform3f(g->uTint,1.f,1.f,1.f); } }
-#ifdef REVA_PACKET
-    g_vkOpen=0.f;
-#endif
+          if(tx>=0){  if(g->texTint){   } }
+          else if(g->texTint){ float c9[3]; meshTintOf(P,mi,c9);   }   /* an authored mesh carries its own colour, in its name */
+           }
+        { static const float wh9[3]={1.f,1.f,1.f}; bodyDrawMesh(P,mi,model,pal,b,wh9,1.f,isCloth9,1); }
+        if(isCloth9){    }
+        if(!g->hero){   } }
+    g_vkOpen=0.f; g_vkWorld=NULL;
 }
-static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*model,
-                      GLint mModel,GLint mPal,GLint mBind,float*pal,
+static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*model,float*pal,
                       const SkPose*sk,float*footOut,float plantMix,
                       WmsState*wms,float wdt,float skSig,int groundIt,
-                      const float*lookAt,int clothSlot,GLint uUse,GLint uTint){   /* footOut: 2 rig-space feet + the rest-foot height */
+                      const float*lookAt,int clothSlot){   /* footOut: 2 rig-space feet + the rest-foot height */
     if(!P||P->nNodes>1024) return;
     static float T[1024][3], Q[1024][4], S[1024][3]; static M4 W[1024];
     float restFoot=1e9f;
@@ -357,7 +360,13 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
              * the soles, which lands its wheels on the road. One number, used twice, in
              * opposite directions: they cannot drift apart. */
             mdl[13]+=((restFoot-ftY)*eff + SK_DECK_H)*plantMix; } }
-    glUniformMatrix4fv(mModel,1,GL_FALSE,mdl);
+    /* REVA_ACTORBOX=1: once a second, how far each actor's bones reach as posed, in its rig's units, and where it stands. A body's size from its own file, worked out anywhere
+     * else, can be set beside this with no picture: it's how a dog that came out as a spike was told from a file that was one (step 23) */
+    { static int box9=-1; if(box9<0){ const char*e9=getenv("REVA_ACTORBOX"); box9=(e9&&e9[0]=='1'); }
+      if(box9&&(g_frameStamp%60u)==0u){ float lo9[3]={1e9f,1e9f,1e9f},hi9[3]={-1e9f,-1e9f,-1e9f}; int nb9=0;
+          for(unsigned i9=0;i9<P->nNodes;i9++){ if(P->nodes[i9].kind!=1u) continue; nb9++; for(int k9=0;k9<3;k9++){ const float v9=W[i9][12+k9]; if(v9<lo9[k9]) lo9[k9]=v9; if(v9>hi9[k9]) hi9[k9]=v9; } }
+          printf("[actorbox] %s clip %d%s: %d bones reach %.3f %.3f %.3f, y %.3f to %.3f; drawn x%.3f at y %.3f\n",P->label,clip,dnP?" (borrowed)":"",nb9,hi9[0]-lo9[0],hi9[1]-lo9[1],hi9[2]-lo9[2],lo9[1],hi9[1],
+                 sqrtf(mdl[0]*mdl[0]+mdl[1]*mdl[1]+mdl[2]*mdl[2]),mdl[13]); fflush(stdout); } }
     if(g_actorChainSlot>=0) chainPublish(g_actorChainSlot,mdl);   /* her chains feel where she goes */
     if(g_actorChainSlot>=0) jiggleTick(P,W,mdl,g_actorChainSlot);  /* ⭐ and her soft mass springs (09-29) */
     /* ⭐ AND IF IT IS STANDING IN WATER, THE WATER KNOWS. The push scales with speed, so
@@ -365,7 +374,9 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
      * makes a splash -- all three out of one multiply, because the body already knows how
      * fast it is going. waterDisturb ignores anything outside a pool's footprint. */
     if(g_nWat) waterDisturb(mdl[12],mdl[13],mdl[14],0.85f,0.010f*(float)g_chDt*60.f);
-    { static const float wh9[3]={1.f,1.f,1.f}; BodyGL g9={mModel,mPal,mBind,-1,uUse,uTint,-1,clothSlot,0,NULL,0,0,0,wh9}; bodyMeshes(P,W,mdl,pal,&g9); } }
+    { Pack*Q9=actorLod(P,mdl);
+      if(Q9) bodyMeshesLod(P,Q9,W,mdl,pal);
+      else { static const float wh9[3]={1.f,1.f,1.f}; BodyGL g9={clothSlot,NULL,0,0,0,wh9}; bodyMeshes(P,W,mdl,pal,&g9); } } }
 
 
 static void actorsTick(float dt){
@@ -423,7 +434,11 @@ static void actorsTick(float dt){
          * so a burst opens on its first frame (a boy waking, not a boy already awake) */
         { const char*cn9=(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)?packStr(A->dnP,A->dnP->clips[A->dnC].name)
                         :((A->clip>=0&&(unsigned)A->clip<P->nClips)?packStr(P,P->clips[A->clip].name):"");
-          if(capWait9&&cn9&&!strncmp(cn9,"z_rm_",5)) grate=0.f; }
+          const int rm9=(cn9&&!strncmp(cn9,"z_rm_",5)); if(capWait9&&rm9) grate=0.f;
+          /* (step 21) where her clip starts: `clip>12.5s` or `clip>0.33` on her line, or the set's `clipstart` for a z_rm_ clip. While a capture's waiting she stands on that frame, and plays on from it */
+          if(!A->cued||(capWait9&&rm9)){ const PClip*c8=(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)?&A->dnP->clips[A->dnC]:((A->clip>=0&&(unsigned)A->clip<P->nClips)?&P->clips[A->clip]:NULL);
+              if(c8){ double st9=-1.0; if(A->cueS>=0.f) st9=(double)A->cueS*c8->fps; else if(A->cueF>=0.f) st9=(double)A->cueF*c8->frames; else if(rm9&&g_clipStartS>0.f) st9=(double)g_clipStartS*c8->fps;
+                  if(st9>=0.0){ if(c8->frames>1&&st9>(double)c8->frames-1.0) st9=(double)c8->frames-1.0; A->phase=st9; } A->cued=1; } } }
         if(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)
             A->phase+=dt*A->dnP->clips[A->dnC].fps*grate;
         else if(A->clip>=0&&(unsigned)A->clip<P->nClips)

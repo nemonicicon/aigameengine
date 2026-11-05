@@ -97,7 +97,6 @@ __attribute__((unused)) static void videoPoll(int*W,int*H){
     { static int on=-1; static long ticks=0; static long every=0; if(on<0){ const char*e=getenv("REVA_VIDEOFLIP"); on=(e&&e[0])?1:0; every=on?(long)(atof(e)*60.0):0; }
       if(on&&every>0&&++ticks>=every){ ticks=0; g_videoWant=(g_vNow==1)?0:1; } } }
 
-#ifdef REVA_PACKET
 /* ---- SETUP: the short flow a first boot walks through, and the pause menu's SCREEN SETUP. It draws on the TV's grid, says each step out loud, and takes about three minutes.
  * ⛔ Rules from the research, for any set: a test pattern is dim and doesn't stay still for long; nothing sits at full white; and every trial of a mode goes back by itself. */
 enum { SU_SEE, SU_SEE50, SU_OFFER, SU_KEEP, SU_EDGE, SU_ROUND, SU_BLACK, SU_WHITE, SU_READ, SU_DONE, SU_PATTERN, SU_END };
@@ -308,4 +307,3 @@ static void setupAtBoot(int*W,int*H,int composite){
     }
     if(g_btnStart||(g_btnA&&g_btnB)){ printf("[screen] a button held at power-on: setup again\n"); fflush(stdout); remove("save/display.txt"); scrDefaults(); g_fitReset=1; g_btnStart=g_btnA=g_btnB=0; }
     if(!g_fit.found||g_fitReset) setupRun(W,H,1); }
-#endif

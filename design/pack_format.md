@@ -4,6 +4,8 @@
 
 `anim_bench/packdump.py` holds this document to the truth. `--check` tests every rule marked **checked** below, and on 11-02 all 404 packs on disk passed. `--selftest` breaks a real pack 28 ways to prove the checks can fail, and none got through. `packcheck.py` in `skate_src/author` tests what a body means (the bind, the hands, the weights), which this document doesn't cover.
 
+**The engine holds a pack to these rules too** (queue step 28, 11-05, `engine/packcheck.inc`). Until then only the Python check did, and the loader followed every offset, count and index on trust: a fuzzer made it read and write outside the file a dozen ways with one changed byte. `packCheck` now reads the whole file once before the loader touches it, and again after its chunks are merged: the header, every table against the file's length, every name, parent, bone, joint, index, clip, track, texture and morph. A pack that fails is refused by name, with the reason, and nothing of it is used. So a rule added here needs its line in three places: this document, `packdump.py --check`, and `packCheck`.
+
 ## The file
 
 Everything is little-endian. Offsets count from the start of the file. Nothing promises alignment: 191 of the 404 packs have arrays that don't start on a 4-byte boundary, so a strict reader has to copy, not cast.
@@ -143,6 +145,8 @@ A reader looks at the last 4 bytes, and a footer whose `fileSize` isn't the file
 - A material's flip is already baked in.
 
 The engine hands `TEXC` straight to the GPU on Vulkan. The GL path and any GPU without BC decode the top level to plain pixels at load (`bcDecode`). The no-display build skips it.
+
+**`MATL`, what each mesh is made of (queue step 22).** A `u32` count, then 64 bytes each: a 40-byte mesh name, zero-padded, and six `f32`: how rough (0 a mirror to 1 chalk), how much a metal (0 or 1), how much fine detail up close (0 to 1), how deep its surface is for parallax (0 to 0.25, in the texture's widths; the height is its normal map's alpha), its kind for a body (step 23: 0 plain, 1 skin, 2 hair, 3 an eye, 4 cloth, 5 its texture's alpha says pixel by pixel, 6 fur), and which mesh of that name it means, counted from 1 in the pack's order, 0 for every one (a body whose parts all carry one name needs it: `material.py "<mesh>@N=..."`). For fur the fourth number is how long it is in metres, the third how fine, and the second how curly, 0 straight to 1 wool. By name, so a mesh can move. `skate_src/author/material.py` writes it. A bake carries it across as it is (`rpackchunks.carry`): a record whose mesh has gone finds nothing. A mesh the chunk doesn't name is looked up by words in its name: `data/materials.txt` (`<word> <rough> <metal> [detail]`), then the engine's own short list; nothing matching is rough 0.85 and not a metal. The engine clamps what it reads, and a chunk whose count doesn't fit its size is ignored, loudly.
 
 **`NOTE`.** Text saying what made the pack.
 

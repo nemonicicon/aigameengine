@@ -37,7 +37,7 @@ static void boot(void) {
     S.fire = E->action("fire", PAD_A);
     S.again = E->action("again", PAD_B);
     E->clear(0.02f, 0.02f, 0.06f);
-    sfxPreload("shot"); sfxPreload("kill"); sfxPreload("hurt"); sfxPreload("banner");   /* loading a file mid-game is a late frame */
+    E->soundLoad("shot"); E->soundLoad("kill"); E->soundLoad("hurt"); E->soundLoad("banner");   /* loading a file mid-game is a late frame */
     S.player[0].on = 1;
     newGame();
 }
@@ -62,7 +62,7 @@ static void playerTick(int i, float dt) {
     S.player[i].cool -= dt;
     if (fire && S.player[i].cool <= 0.f) for (int k = 0; k < MAX_SHOTS; k++) if (!S.shot[k].on) {
         S.shot[k].on = 1; S.shot[k].x = S.player[i].x; S.shot[k].y = SHIP_Y - 12.f; S.player[i].cool = 0.22f;
-        sfxPlay("shot", 0.6f, NULL, 0);
+        E->sound("shot", 0.6f, NULL, 0);
         break;
     }
 }
@@ -99,12 +99,12 @@ static void tick(float dt) {
         for (int k = 0; k < MAX_SHOTS; k++) if (S.shot[k].on && fabsf(S.shot[k].x - S.rock[i].x) < 11.f && fabsf(S.shot[k].y - S.rock[i].y) < 11.f) {
             S.shot[k].on = 0; S.rock[i].on = 0; S.score += 10 * S.wave;
             S.spark[i].x = S.rock[i].x; S.spark[i].y = S.rock[i].y; S.spark[i].t = 0.25f;
-            sfxPlay("kill", 0.6f, NULL, 0);
+            E->sound("kill", 0.6f, NULL, 0);
             break;
         }
         if (S.rock[i].on && S.rock[i].y > SHIP_Y + 8.f) {   /* it landed: that's a ship */
             S.rock[i].on = 0; S.ships--; S.shake = 0.3f;
-            sfxPlay("hurt", 0.8f, NULL, 0);
+            E->sound("hurt", 0.8f, NULL, 0);
             if (S.ships <= 0) { S.over = 1; S.wait = 0.f; E->banner("GAME OVER", 6.f); }
         }
     }

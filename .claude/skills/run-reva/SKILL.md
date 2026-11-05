@@ -5,24 +5,24 @@ description: Build, launch, screenshot and drive THE CLUB (reva) — the Firestr
 
 # Run THE CLUB (reva)
 
-One C file (`reva_native/crowd_kms.c`, ~11k lines) compiled to a fullscreen GLES2/ANGLE
-game. **It has no CLI surface** — no `--version`, no headless mode, no test runner that
-proves anything about what you'd see. Every answer it has comes out as pixels.
+One C file (`reva_native/crowd_kms.c`, a table of contents over `engine/*.inc`) compiled to a fullscreen Vulkan
+game. **How it looks only ever comes out as pixels**: there's no `--version`, and no test that proves
+anything about what you'd see. (What it *decides* has a receipt, with no window: `driver.py check`, under Test.)
 
 So the harness is a screenshot driver: **`.claude/skills/run-reva/driver.py`**. It
 builds, launches, drives the menus / the lab / a set / a scene via a control file,
 captures frames, tiles four-angle contact sheets, and records a scene to MP4 with audio.
 
-All paths below are relative to the repo root (`C:\MyVeryOwnVideoGames\reva`).
+All paths below are relative to the repo root.
 Platform: **Windows 11, native** — not a container, not WSL. There's a real GPU.
 
 ## Prerequisites
 
-Already installed on this machine; verified present this session:
+What it needs is in README.md's Quick start. To see that it's there:
 
 ```bash
 ls /c/msys64/mingw64/bin/gcc.exe
-/c/Users/jacob/AppData/Local/Python/pythoncore-3.14-64/python.exe -c "import PIL; print(PIL.__version__)"
+"${CLUB_PYTHON:-python}" -c "import PIL; print(PIL.__version__)"
 ```
 
 `ffmpeg` (WinGet, `Gyan.FFmpeg`) is only needed for `scene`. The driver finds it itself.
@@ -31,7 +31,7 @@ ls /c/msys64/mingw64/bin/gcc.exe
 APPDATA and poisons results. Set it once per shell:
 
 ```bash
-PY=/c/Users/jacob/AppData/Local/Python/pythoncore-3.14-64/python.exe
+PY="${CLUB_PYTHON:-python}"     # a real Python 3 with numpy and Pillow
 D=.claude/skills/run-reva/driver.py
 ```
 
@@ -49,6 +49,18 @@ $PY $D promote
 ```
 
 That order is the repo's law: `crowd.exe` is what `dance.bat` and any live window run.
+
+⭐ **The engine with no driver at all** (queue step 27, 11-05):
+
+```bash
+$PY $D buildsoft                       # crowd_soft.exe: the engine's own rasterizer, 320 x 240 on the processor, nothing links Vulkan
+$PY $D lab /tmp/a.png --soft --subject r2moves --ctl "face=0 grid=0 dqs=0 set=parsons stage=30,-20,0"   # a picture through it, and NO WINDOW IS OPENED
+$PY reva_native/scenes/everything.py --shoot /tmp/every.png --soft    # the whole test scene, 13 cameras, 40 s
+```
+
+`--soft` works on `shot`, `lab`, `looks`, `face` and `up`: the rasterizer draws in memory, so a shot needs no window (`REVA_NOWINDOW=1`, which the driver sets). Reach for it when a
+look doesn't need the PC's picture: nothing lands on jacob's screen. Its picture is the budget's: no shadows, mirrors, screens, beams, fur or materials. Its pixels are the same on
+every machine, and `driver.py check` hashes three of its frames (`zombie_soft`, `sample_soft`).
 
 ## Run — the agent path
 
@@ -90,14 +102,14 @@ $PY $D shot /tmp/club.png --mode 0 --frame 320
 ```bash
 # THE ANIM LAB — one or two bodies, a control line, your choice of camera
 $PY $D lab /tmp/lab.png --subject r2moves \
-  --ctl "face=0 grid=4 dqs=0 clip=z_kiss partner=kmoves pclip=z_kiss hi5=3 aimy=1.5" \
+  --ctl "face=0 grid=4 clip=z_kiss partner=kmoves pclip=z_kiss hi5=3 aimy=1.5" \
   --grep hi5
 ```
 
 ```bash
 # A SET — the world. Same command; the ctl carries the level, the lighting and the mark.
 $PY $D lab /tmp/street.png --subject r2moves --frame 480 \
-  --ctl "face=0 grid=0 dqs=0 set=parsons stage=30,-20,0 partner=kaeli_pj pclip=idle pgap=1.4 pyaw=150 sun=40,150,1.2,1.0,0.96,0.90 sky=0.44,0.50,0.62"
+  --ctl "face=0 grid=0 set=parsons stage=30,-20,0 partner=kaeli_pj pclip=idle pgap=1.4 pyaw=150 sun=40,150,1.2,1.0,0.96,0.90 sky=0.44,0.50,0.62"
 ```
 
 `reva_native/sets/*.set` is the level format — `prop`, `propr`, `actor`, `path`, `cue`,
@@ -111,7 +123,7 @@ always grabbed the next frame of a RUNNING window and kept it running.
 
 ```bash
 $PY $D up --new --subject r2moves          # boot once (measured 23 s); it answers a probe shot
-$PY $D lab /tmp/a.png --live --new --subject r2moves --ctl "face=0 grid=0 dqs=0 set=_bench cam=3.4,2.7,0,0,2.6,0,26"
+$PY $D lab /tmp/a.png --live --new --subject r2moves --ctl "face=0 grid=0 set=_bench cam=3.4,2.7,0,0,2.6,0,26"
 $PY $D face /tmp/f.png --live --new --subject r2moves --jaw 0.7     # 4-5 s a shot
 $PY $D down
 ```
@@ -191,10 +203,14 @@ this also steers a **running** window.
 | `grid=N` | multi-cam wall, N panels |
 | `jaw=0..1` / `-1` | park the mouth open / hand back to the scene |
 | `look=0/1` | the listener's gaze at the speaker |
-| `dqs=0` | force LBS skinning (DQS balloons reva2's shoulders) |
 | `hi5=1..4` | print a two-body contact gate (1 hands, 3 kiss, 4 massage) |
 | `scene=<name>` | play `scenes/<name>.scn` (its staging then owns clip/pgap/pyaw/look) |
 | `aimy=` | close-up aim height |
+| `camroll=DEG` · `cam=...,fov,roll` | (11-05) the lens rolled about its own line |
+| `focus=<dist>\|aim\|off[,soft]` · `shutter=0..1` | depth of field and motion blur (settings `dof`, `mblur`) |
+| `sepia=` `grain=` `flash=` `burn=` `weave=x,y` | film's look in the post pass, standing until said again |
+| `trackt=<s>\|play\|off` | a set's timeline held at a moment, run round, or back on the scene's clock |
+| `words=1` · `lang=<code>\|off` | (11-05) a page of every script the TV font has · the words of `lang/<code>.txt` (a language with a `wide` line needs its `data/<name>.tvw` baked, or its letters are `?`) |
 
 ⛔ **The engine only re-reads the file when `seq=` CHANGES.** The driver stamps a fresh
 `seq` per write; hand-edit it and you must bump `seq` yourself or nothing happens.
@@ -212,6 +228,12 @@ this also steers a **running** window.
 | `REVA_SSAA=2` · `REVA_GRADE=1` · `REVA_VIG=0.6` | (10-23) the take's look: 2x supersampling resolved in the post pass, the grade, the vignette -- `scene --film` sets all three + the post pass |
 | `REVA_OLDCAPS=1` · `REVA_NOGLOSS=1` · `REVA_TOONRIM=0` | (10-23) the controls: the old segment-font captions, a matte floor, no toon rim |
 | `REVA_TOONKEY=0` · `REVA_ROOMGRAD=0` | (10-23, round 2) the controls: a toon body's cel cut on the set's sun instead of the key from the lens; a room's surfaces flat floor to ceiling |
+| `REVA_GFX="tube=1"` (or `2`, `aspect=4:3`, `taa=1`, `hdrout=1`) | (11-05) the display's settings, fixed at boot: the flat-panel look, the picture's shape, anti-aliasing over time, HDR on the glass |
+| `REVA_INTERP=1` · `REVA_BTWDBG=<folder>` | the pictures between ticks on a display faster than 60, in the lab too; and a count a second with eight refreshes saved |
+| `REVA_FAIR=1.3333` | a game's picture held to a fair shape on a wider screen |
+| `REVA_NOWINDOW=1` · `REVA_SOFTSAY=1` | (11-05, `crowd_soft.exe` only) the engine's own rasterizer with no window at all · a line every 120 frames: meshes, triangles asked for and drawn, pixels, ms a frame |
+| `REVA_SOFTRES=WxH` · `REVA_SOFTTEX=<side>` · `REVA_SOFTSMOOTH=1` · `REVA_SOFTLIGHTS=<0..8>` | (11-05) its picture's size (the receipt's is 320x240), its textures' biggest side (512), smoothed texels, lamps a mesh (4) |
+| `REVA_LANG=<code>` | (11-05) a game in another language's words for one run: `lang/<code>.txt` beside the game. Off unless asked; `scenes/everything.py --words OUT.png [--lang ja]` is the look |
 | `REVA_ACT=0` · `REVA_ACTDBG=1` | (10-23, round 3) THE PERFORMANCE LAYER off (the old head layer, the control) · each slot's look target as it changes, and once a second the clip's head, the correction and the head |
 
 **A take is STREAMED** (10-24): `scene` pipes each finished frame into ffmpeg and deletes it -- `--tmp` holds a frame,
@@ -268,6 +290,25 @@ $PY reva_native/anim_bench/warncheck.py                # the warning ratchet: ne
 
 `check` says whether the sim still does exactly what it did. It says nothing about the picture. Otherwise the bench instruments are the tests:
 
+⭐ **Online play** (queue step 29, 11-05): two to four machines, one game. `games/rally` is the game to try it with.
+
+```bash
+$PY $D check --game rally                              # builds crowd_rally_h.exe and runs the game's own receipt
+$PY reva_native/anim_bench/netcheck.py                 # every case of online play on this machine, no window: about a minute
+$PY reva_native/scenes/everything.py --net /tmp/net.png   # two machines' pictures side by side, no window
+```
+
+To play it: `reva_native/games/rally/host.bat` on one machine and `join.bat <its address>` on the other (`join.bat 127.0.0.1` for a second window on this one), after `$PY $D buildvk --game rally`.
+
+⭐ **Broken files, and a game as a package** (queue step 28, 11-05). The fuzzer needs Linux's gcc, so it runs in the build container; the packager runs here.
+
+```bash
+docker exec revalinux python3 /src/anim_bench/fuzzcheck.py --build   # the checked engines, ~3.5 min, after any engine change
+docker exec revalinux python3 /src/anim_bench/fuzzcheck.py           # every kind of file, broken hundreds of ways: ~20 min
+$PY reva_native/package.py --game sample                             # dist/sample-<version>-windows-x64 and its .zip, replayed before it's zipped
+$PY reva_native/anim_bench/toolcheck.py                              # what's moved since toolchain.lock was pinned
+```
+
 ```bash
 $PY reva_native/anim_bench/facecheck.py                # the face, incl. the see-through test
 $PY reva_native/anim_bench/posturecheck.py <log>       # is it STANDING, or merely still
@@ -317,8 +358,8 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
   `crowd.exe 400 packs r2moves` loads that body as the hero and skips them. Get it wrong
   and `REVA_SHOT` fires on a frame the capture path never reaches: **no file, no error.**
 - ⛔ **`REVA_SHOT` is what ARMS a capture.** `SHOTN`/`SHOTEVERY` only say how many and how
-  often. And **the engine never exits when its quota is met** — a harness must poll for
-  the frames and then kill it.
+  often. A run armed with it **ends itself once its last frame is written**; the harnesses here
+  still poll for their frames and stop a run that never got that far.
 - ⛔ **The engine needs a WINDOWS path for `REVA_SHOT_PATH`.** A `/c/...` path gets
   `shot FAILED to open ... (a native exe needs a Windows path)`.
 - ⛔ **Only one instance at a time.** Two fight over the GPU and the ctl file. The driver
@@ -340,9 +381,8 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
   alpha-discarded ghost. If authored geometry is missing, suspect the tint path.
 - ⛔ **A contact sheet and a full frame can disagree — THE FULL FRAME WINS.**
   `zombiecheck.py` twice reported clips broken that a full frame showed were fine.
-- ⛔ **Run it from a NORMAL shell.** In a scrubbed environment (`env -i`) ANGLE cannot
-  create its D3D11 device: `No available renderers` → `SDL_CreateWindow: Could not
-  initialize EGL`. The driver reports only `NO FRAME WRITTEN`; re-run with `--verbose`.
+- ⛔ **Run it from a NORMAL shell.** In a scrubbed environment (`env -i`) the display's driver can't be
+  found and no window opens. The driver reports only `NO FRAME WRITTEN`; re-run with `--verbose`.
 - ⛔ **The skate PARK is broken** for every body on disk, and `skate.bat` names packs that
   do not exist. Only the ACTOR skate path works (`design/skating.md`).
 - ⛔ **`crowd.exe 0 packs select` SEGFAULTS** — a zero-dancer crowd is unguarded.
@@ -366,7 +406,7 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
 | `no crowd.exe -- run driver.py build first` | Build, then `promote` (or pass `--new`). |
 | `no frames for angle ... -- is sets/<n>.set present?` | `ls reva_native/sets/` |
 | Black or garbage PNG | Another instance was running: `$PY $D kill`, retry. |
-| `Could not initialize EGL` / `No available renderers` | Scrubbed environment — use a normal shell. |
+| no window, no device | Scrubbed environment — use a normal shell. |
 
 ## Where things are
 

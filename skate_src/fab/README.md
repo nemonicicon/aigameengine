@@ -61,7 +61,7 @@ or board clipping) and print the numbers.
 
 ```bash
 # riding + tricks (ride push pop kf shove manual). It refuses reva_native/packs -- bake a COPY, then copy it in
-python skate_src/author/moves/z_sk_ride.py  D:/reva902/robot_neko/ep10/A1/packs/v1_<pack>.rpack
+python skate_src/author/moves/z_sk_ride.py  reva_native/packs/v1_<pack>.rpack
 # board handling (carry catchup stepoff dropin bail, and the pickup that still fails). --live allows the live pack;
 # --force bakes past failed gates (ep 10 shipped with --force: see the robot-neko ledger for which gates and by how much)
 python skate_src/author/moves/z_sk_board.py reva_native/packs/v1_<pack>.rpack --live --force

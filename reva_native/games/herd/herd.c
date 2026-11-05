@@ -36,7 +36,7 @@ static void newGame(void) {
 static void boot(void) {
     S.gather = E->action("gather", PAD_A);
     S.again = E->action("again", PAD_B);
-    sfxPreload("banner"); sfxPreload("turn");
+    E->soundLoad("banner"); E->soundLoad("turn");
 }
 
 static void lens(void) {
@@ -108,7 +108,7 @@ static int bodyStep(int i, float dt) {
         if (mine && E->team[j] == 2 && a < TURN_REACH) {
             E->team[j] = 1;
             E->particles(o->x, 1.5f, o->z, 10, 4.f, 0.5f, 0.2f, 0.4f, 0.7f, 1.2f, 6.f);
-            sfxPlay("turn", 0.3f, NULL, 0);
+            E->sound("turn", 0.3f, NULL, 0);
         }
     }
     b->x = x; b->z = z; b->rotY = b->h; b->moving = b->spd > 0.2f; b->state = b->moving;

@@ -66,7 +66,7 @@ static void rbStep(float dt){
         if(sp<0.12f&&B->p[1]<=B->rg+0.02f){ B->still+=dt; if(B->still>0.6f){ B->v[0]=B->v[1]=B->v[2]=0.f; B->w[0]=B->w[1]=B->w[2]=0.f;
             if(g_rbDbg){ printf("[rigid] %d at rest at (%.1f,%.1f,%.1f) after %d hits\n",i,B->p[0],B->p[1],B->p[2],B->hits); fflush(stdout); } } }
         else B->still=0.f; } }
-static void rbDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
+static void rbDraw(void){
     for(int i=0;i<g_nRb;i++){ RigidBody*B=&g_rb[i]; if(!B->on) continue;
         Pack*Q=&g_setPk[B->pk]; float sc=B->sc*((Q->scale>1e-6f)?Q->scale:1.f); (void)sc;
         float x=B->q[0],y=B->q[1],z=B->q[2],w=B->q[3];
@@ -75,9 +75,6 @@ static void rbDraw(GLint uModel,GLint uPal,GLint uBind,GLint uUse,GLint uTint){
         M4 m; memset(m,0,64);
         m[0]=R[0]*B->sc; m[1]=R[1]*B->sc; m[2]=R[2]*B->sc; m[4]=R[3]*B->sc; m[5]=R[4]*B->sc; m[6]=R[5]*B->sc; m[8]=R[6]*B->sc; m[9]=R[7]*B->sc; m[10]=R[8]*B->sc; m[15]=1.f;
         m[12]=B->p[0]-(m[0]*cx+m[4]*cy+m[8]*cz); m[13]=B->p[1]-(m[1]*cx+m[5]*cy+m[9]*cz); m[14]=B->p[2]-(m[2]*cx+m[6]*cy+m[10]*cz);
-        glUniform1f(uUse,1.f); glUniform3f(uTint,1.f,1.f,1.f);
-#ifdef REVA_PACKET
         g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; g_vkOwner=((unsigned)GFX_KIND_PROP<<28)|((0xe000u+(unsigned)i)<<12);   /* it used to draw under whatever was drawn last's name and colour */
-#endif
-        drawProp(Q,m,uModel,uPal,uBind); } }
+        drawProp(Q,m); } }
 

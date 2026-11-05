@@ -46,8 +46,14 @@ FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
     "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
 
 GAME = "games/rvz/rvz.c" if os.path.exists(os.path.join(NATIVE, "games", "rvz", "rvz.c")) else "games/sample/sample.c"   # the game's one file; the kit has only the sample
-SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", GAME, "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
-LIBS = ["-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lEGL", "-lGLESv2", "-lm"]
+SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", GAME, "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
+LIBS = ["-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lvulkan-1", "-lm"]   # step 18 (11-04): the old renderer is gone, so every build is the Vulkan engine
+RENDER = ["gfx_packet.c", "gfx_vk.c"]   # the frame as data, and what draws it. The no-display build takes the first alone
+DEFS = ["-DREVA_VK"]
+# ⭐ THE ENGINE'S OWN RASTERIZER (queue step 27, 11-05): gfx_soft.c in gfx_vk.c's place, and nothing links Vulkan. 320 x 240 on the processor, the same pixels on every machine
+SOFT_RENDER = ["gfx_packet.c", "gfx_soft.c"]
+SOFT_DEFS = ["-DREVA_SOFT"]
+SOFT_LIBS = [l for l in LIBS if l != "-lvulkan-1"]
 
 # the face rig's panel rectangles in the saved 1280x720 image (crowd_kms.c, g_labFace):
 # eight heads across the top half, then the mouth and the eyes big across the bottom.
@@ -66,7 +72,7 @@ def win(p):
 
 
 def kill(_a=None):
-    for exe in ("crowd.exe", "crowd_new.exe", "crowd_band.exe", "crowd_vk.exe"):
+    for exe in ("crowd.exe", "crowd_new.exe", "crowd_band.exe", "crowd_vk.exe", "crowd_soft.exe"):
         subprocess.run(["taskkill", "/IM", exe, "/F"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return 0
@@ -88,7 +94,7 @@ def build(a):
     # you hand it is only inherited by the child. Passing "gcc" here fails with
     # WinError 2 even though env["PATH"] starts with mingw64. Name it absolutely; the
     # env PATH still matters, because the linker looks up its DLLs through it.
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-o", out] + SRC + LIBS
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + ["-o", out] + SRC + RENDER + LIBS
     print("build: " + " ".join(cmd))
     r = subprocess.run(cmd, cwd=NATIVE, env=env,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -117,13 +123,13 @@ def other_game(a):
 
 
 def buildvk(a):
-    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe. gl_null.c stands in for GL and gfx_vk.c draws. Only what has come across to gfx.h shows up. reva_native/rvz_vk.bat plays it."""
+    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe, or crowd_<game>_vk.exe for one game with no old game modes. Since step 18 (11-04) `build` makes the same engine as crowd_new.exe; this stays for the games. reva_native/rvz_vk.bat plays it."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
     name = other_game(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it
     exe = f"crowd_{name}_vk.exe" if name else "crowd_vk.exe"
     src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_VK", "-DKHRONOS_STATIC"] + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + ["gl_null.c", "gfx_packet.c", "gfx_vk.c"] + [l for l in LIBS if l not in ("-lEGL", "-lGLESv2", "-lm")] + ["-lvulkan-1", "-lm"]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + RENDER + LIBS
     r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
     if r.returncode != 0 or errs:
@@ -136,21 +142,59 @@ def buildvk(a):
 
 def check(a):
     """⭐ THE SIM'S RECEIPT (11-02, engine plan Phase 1). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window, the same answer on any machine.
-    It says whether the sim still does exactly what it did. It says nothing about the picture; that's what eyes and `bench` are for."""
+    It says whether the sim still does exactly what it did, and whether it asks for the same picture. Since step 19 (11-04) it also draws one frame on Mesa's software
+    Vulkan (lavapipe) when that's on the machine, and hashes it: the same pixels every run, a window for a few seconds. It still says nothing about how the picture looks."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
     # --nodoors: the engine as the kit gets it, with no old game modes. It must print the same hashes. --game NAME: the same with that game, against its own hashes.
     name = other_game(a)
     exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"
     src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DKHRONOS_STATIC"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gl_null.c", "gfx_packet.c"] + [l for l in LIBS if l not in ("-lEGL", "-lGLESv2")]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
+    # ⭐ THE PIXELS (step 19, 11-04): with Mesa's software Vulkan (lavapipe) on this machine, the Vulkan engine is built too and hashcheck draws one frame on it.
+    # REVA_LAVAPIPE=<the lvp_icd json> names it; without it the pixels are skipped and said so.
+    icd = os.environ.get("REVA_LAVAPIPE") or os.path.normpath(os.path.join(ROOT, "..", "tools", "mesa-lavapipe", "x64", "lvp_icd.x86_64.json"))   # beside the checkout, unless it's named
+    vk = f"crowd_{name}_vk.exe" if name else "crowd_nodoors_vk.exe" if a.nodoors else "crowd_check_vk.exe"
+    builds = [cmd] + ([[os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", vk] + src + RENDER + LIBS] if os.path.exists(icd) else [])
+    # ⭐ THE ENGINE'S OWN RASTERIZER (step 27, 11-05): built too, for the games whose receipt has its pixels, and hashcheck hashes three of its frames with no window.
+    # Those are the same on every machine, so they need no driver's name beside them
+    soft = (f"crowd_{name}_soft.exe" if name else "crowd_nodoors_soft.exe" if a.nodoors else "crowd_check_soft.exe") if (name or "rvz") in ("rvz", "sample") else None
+    if soft:
+        builds.append([os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", soft] + src + SOFT_RENDER + SOFT_LIBS)
+    # every build at once: each is one compile of the one big file, so three take as long as one (jacob, 11-05: "do these builds have to take sooo long?")
+    procs = [subprocess.Popen(c, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") for c in builds]
+    failed = 0
+    for pr in procs:
+        out = pr.communicate()[0]
+        errs = [l for l in out.splitlines() if " error" in l or "undefined reference" in l or l.startswith("cc1")]
+        if pr.returncode != 0 or errs:
+            print("\n".join(errs[:40]) or out[-4000:])
+            print("check: build FAILED rc=%d" % pr.returncode)
+            failed = 1
+    if failed:
+        return 1
+    if not os.path.exists(icd):
+        print("check: no lavapipe at %s (REVA_LAVAPIPE names it): the pixels are skipped" % icd)
+    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--vk", os.path.join(NATIVE, vk)] if os.path.exists(icd) else []) + (["--soft", os.path.join(NATIVE, soft)] if soft else []) + (["--game", name] if name else []) + (["--bless"] if a.bless else []), cwd=NATIVE).returncode
+
+
+def buildsoft(a):
+    """⭐ THE ENGINE WITH NO DRIVER AT ALL (queue step 27): crowd_soft.exe, or crowd_<game>_soft.exe for one game with no old game modes. The engine's own rasterizer draws the
+    packet on the processor at 320 x 240 and puts it in a plain window. REVA_NOWINDOW=1 runs it with no window at all, which is how the receipt hashes its picture."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
+    name = other_game(a)
+    exe = f"crowd_{name}_soft.exe" if name else "crowd_soft.exe"
+    src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + SOFT_RENDER + SOFT_LIBS
     r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    errs = [l for l in r.stdout.splitlines() if " error" in l or "undefined reference" in l or l.startswith("cc1")]
+    errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
     if r.returncode != 0 or errs:
         print("\n".join(errs[:40]) or r.stdout[-4000:])
-        print("check: build FAILED rc=%d" % r.returncode)
+        print("buildsoft FAILED rc=%d" % r.returncode)
         return 1
-    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--game", name] if name else []) + (["--bless"] if a.bless else []), cwd=NATIVE).returncode
+    print("buildsoft OK -> %s" % os.path.join(NATIVE, exe))
+    return 0
 
 
 def promote(_a):
@@ -184,12 +228,19 @@ def _ctl(text):
     return path, body
 
 
+def _exe(a):
+    """which engine: --soft is the engine's own rasterizer (driver.py buildsoft), --new the build being tested, else the promoted one"""
+    return "crowd_soft.exe" if getattr(a, "soft", False) else "crowd_new.exe" if a.new else "crowd.exe"
+
+
 def _run(env_extra, exe, args, timeout=300, quiet=True):
     kill()
     exe_path = os.path.join(NATIVE, exe)
     if not os.path.exists(exe_path):
         print("no %s -- run `driver.py build` first" % exe); return None
     env = dict(os.environ, REVA_WINDOWED="1", **env_extra)
+    if exe.endswith("_soft.exe"):
+        env["REVA_NOWINDOW"] = "1"   # the rasterizer draws in memory: a shot needs no window, so none is put on anyone's screen
     r = subprocess.run([exe_path] + args, cwd=NATIVE, env=env, timeout=timeout,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     if not quiet:
@@ -211,7 +262,7 @@ def _ppm2png(ppm, png, crop=None, scale=None):
 
 
 def _capture(a, ctl_text, env_extra, crop=None, scale=None, argv3=None):
-    exe = "crowd_new.exe" if a.new else "crowd.exe"
+    exe = _exe(a)
     if ctl_text is not None:
         _, body = _ctl(ctl_text)
         print("ctl: " + body.strip())
@@ -280,12 +331,14 @@ def up(a):
     launch) and `kill` every window first, the live one included."""
     import json
     kill()
-    exe = "crowd_new.exe" if a.new else "crowd.exe"
+    exe = _exe(a)
     exe_path = os.path.join(NATIVE, exe)
     if not os.path.exists(exe_path):
         print("no %s -- run `driver.py build` first" % exe); return 1
     env = dict(os.environ, REVA_WINDOWED="1", REVA_LABCTL="anim_bench/lab_ctl.txt",
                REVA_AUTOMODE="11", REVA_ANIMSUBJ=a.subject, REVA_ANIMSTATE="0", REVA_FACEDBG="1")
+    if exe.endswith("_soft.exe"):
+        env["REVA_NOWINDOW"] = "1"   # kept up, and still nothing on the screen
     for kv in (a.env or []):
         k, _, v = kv.partition("="); env[k] = v
     flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
@@ -321,7 +374,7 @@ def down(_a):
 def _live_shot(a, ctl_text, crop=None, scale=None):
     import json
     rec = _live_rec()
-    exe = "crowd_new.exe" if a.new else "crowd.exe"
+    exe = _exe(a)
     why = None
     if rec is None:
         why = "no live window"
@@ -789,6 +842,8 @@ def looks(a):
         shots.append((name.strip(), a2.out))
     ims = [(n, Image.open(p).convert("RGB")) for n, p in shots]
     w, h = ims[0][1].size; tw, th = w // 2, h // 2
+    small = w < 640   # the engine's own rasterizer's 320 x 240: shown twice its size with its pixels hard, not at half
+    if small: tw, th = w * 2, h * 2
     cols = max(1, min(a.cols, len(ims))); rows = (len(ims) + cols - 1) // cols
     try: font = ImageFont.truetype("arialbd.ttf", 22)
     except Exception: font = ImageFont.load_default()
@@ -796,7 +851,7 @@ def looks(a):
     for k, (n, im) in enumerate(ims):
         x = 6 + (k % cols) * (tw + 6); y = 6 + (k // cols) * (th + 38)
         d.rectangle((x, y, x + tw - 1, y + 31), fill=(30, 60, 110)); d.text((x + 8, y + 4), n, font=font, fill=(255, 255, 255))
-        sheet.paste(im.resize((tw, th), Image.LANCZOS), (x, y + 32))
+        sheet.paste(im.resize((tw, th), Image.NEAREST if small else Image.LANCZOS), (x, y + 32))
     sheet.save(stem + "_sheet.png")
     print("looks: %d cameras of '%s' from one window -> %s_sheet.png   <-- LOOK AT IT" % (len(ims), a.set, stem))
     return 0
@@ -821,6 +876,7 @@ def main():
         sp.add_argument("--frame", type=int, default=420,
                         help="capture frame; boot takes ~250 frames, so keep it >300")
         sp.add_argument("--new", action="store_true", help="use crowd_new.exe")
+        sp.add_argument("--soft", action="store_true", help="use crowd_soft.exe: the engine's own rasterizer, 320 x 240, and no window is opened")
         sp.add_argument("--env", action="append", help="extra REVA_* var, K=V")
         sp.add_argument("--grep", help="echo matching stdout lines")
         sp.add_argument("--verbose", action="store_true")
@@ -831,11 +887,12 @@ def main():
 
     sub.add_parser("kill").set_defaults(fn=kill)
     sp = sub.add_parser("up"); sp.add_argument("--subject", default="r2moves")
-    sp.add_argument("--new", action="store_true"); sp.add_argument("--env", action="append")
+    sp.add_argument("--new", action="store_true"); sp.add_argument("--soft", action="store_true"); sp.add_argument("--env", action="append")
     sp.set_defaults(fn=up)
     sub.add_parser("down").set_defaults(fn=down)
     sub.add_parser("build").set_defaults(fn=build)
     sp = sub.add_parser("buildvk"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildvk)
+    sp = sub.add_parser("buildsoft"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildsoft)
     sp = sub.add_parser("check"); sp.add_argument("--bless", action="store_true"); sp.add_argument("--nodoors", action="store_true"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=check)
     sub.add_parser("promote").set_defaults(fn=promote)
 

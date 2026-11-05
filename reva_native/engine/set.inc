@@ -36,13 +36,44 @@ static SetMark* markFind(const char*nm){
             printf("[mark] '%s' NOT FOUND among the set's %d marks -- the body keeps its old placement\n",nm,g_setNMk); fflush(stdout); } }
     return NULL; }
 
-typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; } SetInst;   /* room: ep 9, draws self-lit */
+typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; float wash,fade; int pic; float sway,swayPh; } SetInst;   /* room: ep 9, draws self-lit. From the timeline (step 21): wash, how much of tint goes over its own texture or colour, 0..1; fade, how far gone it is, 0 solid to 1 not there; pic, which picture of its sheet, counted from 1, and 0 is its own texture */
 static float g_roomLit=1.0f;   /* ⭐ ep 9: a room's photographed light, as a gain (ctl roomlit=, REVA_ROOMLIT) */
 static Pack g_setPk[SET_MAXP]; static char g_setNm[SET_MAXP][64]; static int g_setNP=0; static int g_setFree[SET_MAXP],g_setNFree=0;   /* places in the table that something's given back */
 static SetInst g_setI[SET_MAXI]; static int g_setNI=0;
+/* ⭐ LEVEL OF DETAIL (queue step 24). A prop can have lighter copies beside it: props/<stem>~lod1.rpack, ~lod2, and ~far, which is a picture of it on two crossed
+ * cards (skate_src/author/lod.py makes all three from the prop). The set draws whichever suits how big the prop is in the picture, and the machine's `lod`
+ * setting says how soon it lets go: 0 soonest (a Pi), 2 as made, 4 holds the full prop twice as far. The prop itself is the top detail, so film's meshes are
+ * never thinned unless a set is seen from far off. They're looked for when the prop is loaded (setPack), so nothing is read from disk in the middle of a frame, and a
+ * prop with none costs three looks for a file. A SET ACTOR'S BODY has them the same way (its pack is a set pack): ~lod1 and ~lod2 on the same skeleton, drawn on the
+ * actor's own pose when it's small in the picture (engine/williams.inc, actorLod). They live in props/ whatever folder the body is in: a file in packs/ is in the crowd. */
+static short g_setLod[SET_MAXP][3];   /* a prop's ~lod1, ~lod2 and ~far, as places in g_setPk: -2 not looked for yet, -1 none */
+static int setPack(const char*stem);
+static int setLod(int pi,int level){
+    if(pi<0||pi>=SET_MAXP||level<0||level>2) return -1;
+    if(g_setLod[pi][level]==-2){ static const char*const tag[3]={"~lod1","~lod2","~far"}; g_setLod[pi][level]=-1;
+        if(!strchr(g_setNm[pi],'~')){ char st[96],pp[256]; snprintf(st,sizeof st,"%s%s",g_setNm[pi],tag[level]); snprintf(pp,sizeof pp,"props/%s.rpack",st);
+            FILE*t=fopen(pp,"rb"); if(t){ fclose(t); const int got=setPack(st); if(got>=0){ g_setLod[pi][level]=(short)got; printf("[lod] %s has a %s\n",g_setNm[pi],tag[level]+1); } } } }
+    return g_setLod[pi][level]; }
 /* the set's timeline (settrack.inc): `track` plays lights, beams and props against the scene's clock; `mover` is a prop it places */
 static float*g_stk=NULL; static float g_stkFps=30.f,g_stkOff=0.f; static int g_stkFrames=0,g_stkStride=0,g_stkNL=0,g_stkNB=0,g_stkNM=0,g_stkLast=-1,g_nMover=0;
 static void trackLoad(const char*path,float off); static void trackApply(void);
+/* (step 21, 11-04) what the timeline also gives: a place for each scene body to look, a mover's pictures, and where every z_rm_ clip starts */
+#define STK_LOOKS 8
+#define STK_SHEETS 16
+static float g_stkScrub=-1.f; static double g_stkPlay0=0.0;   /* (step 25) ctl `trackt=<seconds>`: the timeline held at that moment by hand, with no scene playing; `trackt=play` runs it round and round on the lab's own clock; `trackt=off` gives it back to the scene's */
+static int g_stkNC=0,g_stkNP=0; static float g_stkCam[9],g_stkPost[12];   /* (step 25) the timeline's lens and post rows, as they stand this frame */
+static int g_stkNK=0; static float g_stkLook[STK_LOOKS][4];             /* x y z and whether it's on, by scene slot */
+static struct { int pk,n; unsigned*tex; } g_stkSheet[STK_SHEETS]; static int g_stkNSheet=0;   /* a mover's sheet of pictures: its texture cut into cells, each a texture of its own */
+static float g_clipStartS=0.f;                                          /* the set's `clipstart <seconds>`: a take that starts part of the way into its performances */
+static int stkSheet(int pk,int cols,int rows); static void stkSheetsDrop(void);
+/* how one instance is drawn: its colour, how far it's faded and which picture it shows. Off again after, so nothing else is drawn that way */
+static void setInstLook(const SetInst*I){
+    if(I->tinted){ g_vkUse=0.f; memcpy(g_vkTint,I->tint,12); }
+    else if(I->wash>0.f){ g_vkUse=1.f-I->wash; memcpy(g_vkTint,I->tint,12); }
+    else { g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }
+    g_instFade=I->fade; g_instTex=0;
+    if(I->pic>0) for(int s=0;s<g_stkNSheet;s++) if(g_stkSheet[s].pk==I->pk){ g_instTex=g_stkSheet[s].tex[(I->pic-1)%g_stkSheet[s].n]; break; } }
+static void setInstLookOff(void){ g_instFade=0.f; g_instTex=0; }
 
 /* ================= RUNTIME COLLISION ==========================================
  * ⭐ The set already knows the shape of the world: every instance has a matrix and every
@@ -165,6 +196,8 @@ typedef struct { int pk, clip, board;
                  float navX[128], navZ[128]; int navN, navI;   /* the path the grid gave her */
                  int   threat;                 /* who she is fleeing / hunting (-1 none, -2 the hero) */
                  unsigned long long worn;      /* ⭐ (10-23) the pieces she wears (`outfit=`), put on as she is drawn */
+                 float cueS,cueF; int cued;    /* (step 21) where her clip starts: `clip>12.5s` or `clip>0.33` on her line, -1 for neither; cued once it's been done */
+                 float eye[4];                 /* (step 23) `eyes=r,g,b[,amount]` on her line: her eyes glow that colour */
                  } SetActor;
 static SetActor g_setA[SET_MAXA]; static int g_setNA=0;
 
@@ -204,12 +237,19 @@ static void navBuild(void){
                                if(C->z-C->r<z0)z0=C->z-C->r;
                                if(C->z+C->r>z1)z1=C->z+C->r; }
     x0-=24.f; z0-=24.f; x1+=24.f; z1+=24.f;
+    /* (step 28) the extent is a size before it's a count of cells, and a collider's reach is walked only where it crosses the grid: one of a million units' radius used to be walked cell by cell, off the grid, for ever */
+    if(!(x1-x0>0.f&&x1-x0<1e7f&&z1-z0>0.f&&z1-z0<1e7f)) return;
     int w=(int)ceilf(x1-x0), h=(int)ceilf(z1-z0);
     if(w>NAV_MAX){ w=NAV_MAX; } if(h>NAV_MAX){ h=NAV_MAX; }
-    g_navW=w; g_navH=h; g_navX0=x0; g_navZ0=z0; g_nav=(unsigned char*)calloc((size_t)w*h,1);
+    if(w<1) w=1;
+    if(h<1) h=1;
+    g_nav=(unsigned char*)calloc((size_t)w*h,1); if(!g_nav) return;
+    g_navW=w; g_navH=h; g_navX0=x0; g_navZ0=z0;
     const float body=0.45f;
-    for(int i=0;i<g_nCol;i++){ SetCol*C=&g_col[i]; float rr=C->r+body;
-        int a0=(int)floorf(C->x-rr-x0), a1=(int)ceilf(C->x+rr-x0), b0=(int)floorf(C->z-rr-z0), b1=(int)ceilf(C->z+rr-z0);
+    for(int i=0;i<g_nCol;i++){ SetCol*C=&g_col[i]; float rr=C->r+body; if(!(rr>=0.f&&rr<1e7f)||!(C->x-C->x==0.f)||!(C->z-C->z==0.f)) continue;
+        const float fa0=floorf(C->x-rr-x0), fa1=ceilf(C->x+rr-x0), fb0=floorf(C->z-rr-z0), fb1=ceilf(C->z+rr-z0);
+        if(fa1<0.f||fb1<0.f||fa0>(float)(w-1)||fb0>(float)(h-1)) continue;
+        const int a0=fa0<0.f?0:(int)fa0, a1=fa1>(float)(w-1)?w-1:(int)fa1, b0=fb0<0.f?0:(int)fb0, b1=fb1>(float)(h-1)?h-1:(int)fb1;
         for(int b=b0;b<=b1;b++) for(int a=a0;a<=a1;a++){ if(a<0||b<0||a>=w||b>=h) continue;
             float cx=x0+a+0.5f, cz=z0+b+0.5f, dx=cx-C->x, dz=cz-C->z;
             if(dx*dx+dz*dz<rr*rr&&!g_nav[b*w+a]){ g_nav[b*w+a]=1; g_navBlocked++; } } }
@@ -362,11 +402,10 @@ static float g_stage[3]={0,0,0}; static int g_stageOn=0;
 /* how fast the stage mark is carrying the pair this frame, so the hero can put a
  * gait under it instead of gliding. The partner already had this. */
 static float g_heroStageSpd=0.f;
-/* Z6 THE PRACTICALS. The shader's three point lights, claimed by the set file:
+/* Z6 THE PRACTICALS. The set's point lights, claimed by the set file:
  *     light x y z r g b [power]
- * SIX is the cap, and it is NLIGHT -- one name, in C and spliced into the shader
- * source, because the count used to be a literal 3 in four shader locations and six
- * C arrays that all had to agree by hand. Zeros mean "the sun and nothing
+ * SIX is the cap, and it is NLIGHT -- one name, because the count used to be a literal 3 in
+ * four places and six C arrays that all had to agree by hand. Zeros mean "the sun and nothing
  * else", which is exactly right for a daylit street and honest about a dark one. */
 /* ⛔ AND THE EXTRA SLOTS MUST START DARK. y=-99 with zero colour is what keeps an
  * unlit set unlit; three more slots of uninitialised memory is a room lit by the stack. */
@@ -377,7 +416,7 @@ static int g_setNL=0;
  * 4.26 u for a streetlight and a night light alike -- so a lamp bright enough to find two faces on a
  * pillow lit the far wall of the bedroom to cream (jacob, ONE AM: "its too bright in the room too").
  * `light x y z r g b [power] [reach]`: REACH is where that lamp is at HALF brightness, in club units.
- * Stored as EXTRA falloff over the club's 0.055, so a program nobody gave a reach to is unchanged. */
+ * Stored as EXTRA falloff over the club's 0.055, so a lamp nobody gave a reach to is unchanged. */
 static float g_setLk[NLIGHT];
 static float lightReachK(float reach){
     if(reach<=0.f) return 0.f;
@@ -418,6 +457,8 @@ static int setPack(const char*stem){
     const int slot=g_setNFree?g_setFree[--g_setNFree]:g_setNP++;
     g_setPk[slot]=loadPack(pp);
     snprintf(g_setNm[slot],64,"%s",stem);
+    g_setLod[slot][0]=g_setLod[slot][1]=g_setLod[slot][2]=-2;
+    if(!strchr(stem,'~')) for(int l9=0;l9<3;l9++) (void)setLod(slot,l9);   /* its lighter copies, now, while it's loading */
     return slot; }
 
 /* ⭐ ONE PLACE THAT TURNS A CLIP NAME INTO A CLIP. Used by the actor line at load AND by

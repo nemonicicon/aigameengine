@@ -9,17 +9,17 @@
  * to ~160x120 and blown back up. On an arena screen seen from across a room that is exactly the
  * right look.
  *
- * Mouth state is the same (open, wide, seal) triple the native renderer already receives over UDP.
+ * Mouth state is the (open, wide, seal) triple the scene's voice track drives.
  */
 #ifndef HOLLY_FBO_H
 #define HOLLY_FBO_H
 
 /* Build the head, its texture, its interior and the off-screen target.
- * Call once, after a GL context exists. Returns 0 on failure (already reported). */
+ * Call once, after gfxInit. Returns 0 on failure (already reported). */
 int holly_fbo_init(int w, int h, const char *model_path);
 
-/* Draw the head into the off-screen target. `t` drives the idle sway so he is not a corpse
- * between sentences. Leaves the previously bound framebuffer and viewport restored. */
+/* Draw the head into the off-screen target, this frame. `t` drives the idle sway so he is not a corpse
+ * between sentences. */
 void holly_fbo_render(float open, float wide, float seal, double t);
 
 /* The colour texture the screens sample. 0 until holly_fbo_init succeeds. */
@@ -31,9 +31,5 @@ int holly_fbo_height(void);
 
 #endif
 
-/* One-shot proof: read the off-screen target back and write a PPM. Diagnostic only. */
-void holly_fbo_dump(const char *path);
-
-/* ROBOT NEKO ep 9 probe: renders so far, and the target's framebuffer status now (0x8CD5 = complete). */
+/* ROBOT NEKO ep 9 probe: renders so far. */
 unsigned holly_fbo_renders(void);
-int holly_fbo_status(void);

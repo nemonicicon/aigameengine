@@ -16,7 +16,7 @@ def build(out):
     if os.name == "nt":
         gcc = r"C:\msys64\mingw64\bin\gcc.exe"
         env = dict(os.environ, PATH=r"C:\msys64\mingw64\bin;" + os.environ["PATH"])
-        cmd = [gcc, "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DKHRONOS_STATIC", "-DREVA_NODOORS", "-o", out, "crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "crowd_win_rc.o", "anim_bench/objcheck.c", "gl_null.c", "gfx_packet.c", "-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lm"]
+        cmd = [gcc, "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS", "-DREVA_NODOORS", "-o", out, "crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", "crowd_win_rc.o", "anim_bench/objcheck.c", "gfx_packet.c", "-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lm"]
     else:
         env = dict(os.environ, GAME="anim_bench/objcheck.c", EXTRA="-DREVA_NODOORS", OUTDIR=os.path.dirname(out))
         cmd = ["sh", "build_pi.sh", "headless"]

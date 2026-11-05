@@ -1,27 +1,25 @@
-#!/bin/sh
-# build_linux.sh -- THE CLUB on Linux, through SDL2 + Mesa (EGL/GLES). 2026-09-30.
-#
-# The Windows build was never Windows: SDL2 supplies the window, the GLES context and the pad,
-# and only four calls (_execv/_putenv/_chdir, the PHOSPHOR handoff) are Win32. -DREVA_SDL builds
-# that same platform on Linux; without it the file is the Pi's KMS/DRM renderer.
-#
-# Deps (Ubuntu/Debian):
-#   apt-get install libsdl2-dev libgles-dev libegl-dev libstb-dev
-# Headless (no GPU, no desktop): Mesa's llvmpipe under Xvfb renders every pass the club has --
-#   apt-get install xvfb libgl1-mesa-dri
-#   REVA_WINDOWED=1 xvfb-run -a -s "-screen 0 1280x720x24" ./crowd_linux 400 packs select
-# ⛔ stdout is block-buffered into a pipe: wrap with `stdbuf -o0` or the log ends at the kill.
-# ⛔ No `-Dmain=SDL_main` here -- that is the MinGW SDL2main shim, and Linux has no shim.
+#!/bin/bash
+# build_linux.sh -- THE CLUB on Linux: the Vulkan renderer on SDL2's window, or no display at all. Step 18 of the engine plan (11-04)
+# took the old renderer out, so there's one picture everywhere: gfx_vk.c draws the frame gfx_packet.c carries as data.
+#   ./build_linux.sh            -> crowd_linux    desktop: REVA_WINDOWED=1 ./crowd_linux 400 packs select;  no desktop: SDL_VIDEODRIVER=kmsdrm ./crowd_linux 400 packs select
+#   ./build_linux.sh headless   -> crowd_headless no display, no GPU: the sim only. Then: python3 anim_bench/hashcheck.py
+#   ./build_linux.sh soft       -> crowd_soft     the engine's own rasterizer (queue step 27): 320 x 240 on the processor, nothing links Vulkan. REVA_WINDOWED=1 ./crowd_soft 400 packs select;
+#                                                 REVA_NOWINDOW=1 draws with no window, which is the receipt's pixels: python3 anim_bench/hashcheck.py --soft ./crowd_soft
+# Deps: libsdl2-dev libvulkan-dev libstb-dev. Pixels with no GPU come from Mesa's lavapipe (mesa-vulkan-drivers), the receipt's test layer, step 19.
+# GAME=games/<name>/<name>.c picks the game; the sample stands in when the zombie game isn't in this tree.
 set -e
 cd "$(dirname "$0")"
-# the game's one file (GAME=games/x/x.c picks another); the kit has only the sample. EXTRA=-DREVA_NODOORS builds without the old game modes.
 GAME=${GAME:-games/rvz/rvz.c}
 [ -f "$GAME" ] || GAME=games/sample/sample.c
-if [ "$1" = headless ]; then   # no display, no GPU: the sim only (engine plan, Phase 1). Then: python3 anim_bench/hashcheck.py
-  gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_HEADLESS -o crowd_headless crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c $GAME gl_null.c gfx_packet.c -lSDL2 -lm
+ENGINE="crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c gfx_packet.c"
+if [ "$1" = headless ]; then   # no display, no GPU: the sim only (engine plan, Phase 1)
+  gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_HEADLESS -o crowd_headless $ENGINE $GAME -lSDL2 -lm
   echo "built crowd_headless"; exit 0
 fi
+if [ "$1" = soft ]; then   # the engine with no driver at all (queue step 27)
+  gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_SOFT -o crowd_soft $ENGINE $GAME gfx_soft.c -lSDL2 -lm
+  echo "built crowd_soft"; exit 0
+fi
 OUT=${1:-crowd_linux}
-# -ffp-contract=off: no fused multiply-add, so the sim hash (REVA_SIMHASH) can agree between x86 and ARM
-gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -o "$OUT" crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c $GAME -lSDL2 -lEGL -lGLESv2 -lm
+gcc -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_VK -o "$OUT" $ENGINE $GAME gfx_vk.c -lSDL2 -lvulkan -lm
 echo "built $OUT"

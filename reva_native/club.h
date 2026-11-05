@@ -10,33 +10,8 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 
-/* THE CLUB'S OWN MATH (11-02), in club_math.c: one answer on every machine. The engine's calls come here; floor, ceil, fabs, sqrt and fmod have one right answer already. */
-double club_sin(double x); double club_cos(double x); double club_tan(double x); double club_atan(double x); double club_atan2(double y,double x);
-double club_asin(double x); double club_acos(double x); double club_exp(double x); double club_log(double x); double club_pow(double x,double y);
-#ifndef CLUB_MATH_IMPL
-#define sin(x) club_sin(x)
-#define cos(x) club_cos(x)
-#define tan(x) club_tan(x)
-#define atan(x) club_atan(x)
-#define atan2(y,x) club_atan2(y,x)
-#define asin(x) club_asin(x)
-#define acos(x) club_acos(x)
-#define exp(x) club_exp(x)
-#define log(x) club_log(x)
-#define pow(x,y) club_pow(x,y)
-#define sinf(x) ((float)club_sin((double)(x)))
-#define cosf(x) ((float)club_cos((double)(x)))
-#define tanf(x) ((float)club_tan((double)(x)))
-#define atanf(x) ((float)club_atan((double)(x)))
-#define atan2f(y,x) ((float)club_atan2((double)(y),(double)(x)))
-#define asinf(x) ((float)club_asin((double)(x)))
-#define acosf(x) ((float)club_acos((double)(x)))
-#define expf(x) ((float)club_exp((double)(x)))
-#define logf(x) ((float)club_log((double)(x)))
-#define powf(x,y) ((float)club_pow((double)(x),(double)(y)))
-#define hypotf(x,y) club_hypotf(x,y)
-static inline float club_hypotf(float x,float y){ const double a=x,b=y; return (float)sqrt(a*a+b*b); }
-#endif
+/* THE CLUB'S OWN MATH (11-02) is club_math.h: one answer on every machine. A game gets that header through engine.h and nothing else of this one (step 20) */
+#include "club_math.h"
 
 /* club_math.c: column-major 4x4, the same math as crowd_bench */
 typedef float M4[16];
@@ -76,4 +51,13 @@ void saveSetS(const char*k,const char*v);
 void saveSetI(const char*k,long v);
 void saveLoad(void);
 void saveFlush(void);
+/* (step 20, 11-04) a game's own save, in named slots: save/<game>_<slot>.txt, text, a version line then key=value lines. E->saveBegin..E->loadGet in engine.h are these */
+void slotBegin(const char*game,const char*slot,int version);
+void slotSet(const char*k,const char*v);
+int  slotEnd(void);
+int  slotLoad(const char*game,const char*slot);
+const char* slotGet(const char*k,const char*def);
+/* (step 29) a session's saves are the host's: handed over when players gather, read from memory by every machine while it lasts (club_save.c says why) */
+void slotNetBegin(int host); void slotNetEnd(void); void slotNetPut(const char*path,const char*bytes,int n);
+int  slotNetOffer(const char*game,void(*offer)(const char*path,const void*bytes,int n));
 #endif

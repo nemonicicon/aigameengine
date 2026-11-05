@@ -6,14 +6,15 @@ static PNode* packNodes(const unsigned char*pk,unsigned off,unsigned n){ PNode*o
 typedef struct { unsigned name,node,verts,idxCount,boneCount,flags,offPos,offNorm,offUV,offJoints,offWeights,offIdx,offBoneMap,offIBM,offBind; } PMesh;
 /* the transparent pass, defined beside meshAlphaOf -- declared here because the draw
  * loops that use it all come earlier in the file than its definition. */
-static void meshAlphaState(const PMesh*M);
+
 typedef struct { unsigned name; float fps; unsigned frames,nTracks,offTracks; } __attribute__((packed)) PClip;
 typedef struct {
     unsigned char *pk; size_t len;
     unsigned nNodes,nMeshes,nClips,nMats,nTex;
     PNode *nodes; PMesh *meshes; PClip *clips; unsigned char *mats;
-    float scale; GLuint *vbo; GLuint *tex; int *meshTex; unsigned *meshMatFlags;
+    float scale; unsigned *vbo; unsigned *tex; int *meshTex; unsigned *meshMatFlags;
     int *meshNTex;     /* ⭐ per mesh: the normal map's texture slot, or -1 (09-11) */
+    float (*meshMat)[6];   /* (step 22) per mesh, what it's made of: how rough, how much a metal, how much fine detail, how deep for parallax; and (step 23) its kind for a body: 1 skin, 2 hair, 3 an eye, 4 cloth, 5 its texture's alpha says. One spare. From its MATL chunk, or the tables by name (engine/load.inc, packMaterials) */
     float cx,cz,mny;   /* rest bone-cloud center + floor (model units): every rig grounds/centers the SAME way */
     float effH,avoidR; /* rendered height (mesh-aware, giantess-correct) -> personal-space radius */
     /* ⛔ NOT `footR` -- that is the RIGHT FOOT's bone index, twenty lines down, and
@@ -67,11 +68,7 @@ typedef struct {
      * point on her back, on the spine), and STRETCHES along that line by the distance over its rest distance -- a
      * Stretch To constraint, the rig of choice for a drape between two limbs. LBS only (DQS cannot scale). */
     int nSt; short stB[8], stA[8]; float stLen[8], stDir[8][3];
-    /* H2 (homecoming): DUAL-QUATERNION SKINNING eligibility, audited at load. A mesh
-     * qualifies when its rest palette (world_rest x IBM) is rigid up to ONE uniform
-     * scale (spread <= 2%) -- that scale folds into the shader as dqS. Packs with
-     * per-bone scale baked into their rests (the ninja: 27x spread) stay on LBS. */
-    int dqsOK; float meshDqS[8];
+
 /* ⭐ THE MORPH CAP WAS 8, chosen when the only morphs were a breath and a jaw.
  * Anima's HiPoly body arrives with a full ARKit/Character Creator face: 107 shape keys
  * (six CC visemes, 8 brow shapes, per-eye look and blink, jawOpen, smile/frown). glTF
@@ -126,14 +123,14 @@ typedef struct {
      * AT THE END OF TIME's five-year-olds up to the height of the twelve-year-old: "kids are too big lmao"). */
     int trueScale; float trueH;   /* trueH: its true height in club units (10-22: the gait test of a child) */
     /* ⭐ PER-VERTEX COLLISION (10-18): a pack carrying a node named VertexCollide has its skirts (~skirt~/~cloth
-     * meshes) pushed out of its legs and its hair (wear~hair~ meshes) out of its head and neck, EVERY VERTEX, in
-     * the body vertex shaders; its hair chain joints out of the head too. The head is an ellipsoid measured from
+     * meshes) pushed out of its legs and its hair (wear~hair~ meshes) out of its head and neck, EVERY VERTEX (the
+     * old renderer did it in its vertex shader; since step 23 the hair's rule is done on the processor, engine/body.inc hairFitPos, and a skirt is simulated); its hair chain joints out of the head too. The head is an ellipsoid measured from
      * the pack's own head vertices in the head bone's frame (headC/headR, measureHead). */
     int vcol; int headOK; float headC[3], headR[3]; float headW0[16];
 } Pack;
-static int toonOn(const void*Pv,int toon); static void toonCelSet(int on);   /* the toon pass (10-18), below */
-static void toonSetLook(int hemi,int glow);   /* the ship's sets (10-18): a room's light, a glowing panel */
-static void toonInkDraw(int on,const char*meshName,GLsizei idxCount,GLsizei verts);
+static int toonOn(const void*Pv,int toon);
+
+
 /* ⭐ (10-22) MIRRORS: "half the walls on the ship were mirrored to make the rooms seem more spacious" (Pohl) --
  * a set's `mirror x y z yaw w h`; see mirInst */
 typedef struct { float p[3], n[3], w, h, R[16]; } Mirror;
@@ -141,9 +138,9 @@ static Mirror g_mir[4]; static int g_nMir=0, g_mirOff=-1;
 /* ⭐ (10-23) THE GLOSSY FLOOR: a set's `gloss y [F0] [max] [fade]` -- a mirror lying down (g_glossM), see glossFloorPass */
 static struct { int on; float y, f0, fmax, fade; } g_gloss={0,0.f,0.06f,0.35f,2.5f};
 static Mirror g_glossM; static int g_glossDraw=0;
-static void mirInst(GLint uModel,int toon,const char*meshName,GLsizei idxCount,GLsizei verts,int flags);
-static void colSet(Pack*P,M4*W,unsigned mi);   /* per-vertex collision (10-18), below */
-static int g_skirtLive=0; static float g_skirtBC[3]={0,0,0}; static GLuint g_skVbo[2]={0,0};   /* THE HANGING CLOTH (10-18) */
+
+
+static int g_skirtLive=0; static float g_skirtBC[3]={0,0,0}; static unsigned g_skVbo[2]={0,0};   /* THE HANGING CLOTH (10-18) */
 #define MOFF(P,mi) ((P)->meshOff&&(P)->meshOff[mi])
 static int wardFind(char tab[][32],int n,const char*nm){ for(int i=0;i<n;i++) if(!strcmp(tab[i],nm)) return i; return -1; }
 static int wardPiece(Pack*P,const char*nm){ int i=wardFind(P->pieceName,P->nPiece,nm); if(i>=0) return i;
@@ -157,8 +154,12 @@ static void wardApply(Pack*P){ if(!P||!P->meshOff) return;
     for(unsigned m=0;m<P->nMeshes;m++)
         P->meshOff[m]=(unsigned char)(P->meshKind[m]==2 ? (!((P->worn>>P->meshPiece[m])&1ull)||(P->meshHiders[m]&P->worn)!=0)
                                      : P->meshKind[m]==1 ? ((P->meshHiders[m]&P->worn)!=0) : 0); }
-/* put on an outfit: every piece tagged with it, nothing else */
+/* put on an outfit: every piece tagged with it, nothing else. `bare` is every body's: nothing on, and all its skin drawn. A body is modelled bare first
+ * and dressed after (jacob, 11-04: "we need to model her without clothes first so that when we add clothes to her they fit right"), and once it has a
+ * piece its first outfit is what it wears, so its bare body needs a name to be asked for by */
 static int wardWear(Pack*P,const char*outfit){ if(!P||!P->meshOff) return 0;
+    if(!strcmp(outfit,"bare")&&wardOutfitFind(P,outfit)<0){ P->outfit=-1; P->worn=0; wardApply(P);
+        printf("[wardrobe] %s wears nothing ('bare')\n",P->label); fflush(stdout); return 1; }
     int o=wardOutfitFind(P,outfit); if(o<0){ printf("[wardrobe] %s has no outfit '%s' --",P->label,outfit);
         for(int i=0;i<P->nOutfit;i++) printf(" %s",P->outfitName[i]);
         printf("\n"); fflush(stdout); return 0; }
@@ -246,8 +247,6 @@ static void chainPublish(int slot,const float*m){
     if(g_chMSt[slot][1]!=g_frameStamp){           /* a new frame: the last one becomes the previous */
         memcpy(g_chM[slot][0],g_chM[slot][1],64); g_chMSt[slot][0]=g_chMSt[slot][1]; g_chMSt[slot][1]=g_frameStamp; }
     memcpy(g_chM[slot][1],m,64); }
-/* the mesh shader's alpha, published so drawSet's water pass can reach it */
-static GLint g_labAlpha=-1;
 static float g_chLagMax=0.f; static double g_chLagAcc=0; static long g_chLagN=0;  /* tip lag telemetry */
 /* ⭐ CLOTH MEETS THE LEGS (10-18, THE WORLD AT THE END OF TIME's robes). A cloth chain (its root named Cloth*)
  * is pushed out of a capsule round each thigh (hip -> knee) and shin (knee -> ankle), each as thick as the body
@@ -616,4 +615,4 @@ static void rollGenome(Slot*s,int nClips,unsigned(*frameOf)(int),int keepBase){
     s->gArmSub=frnd()<0.3f?0.5f:1.f;
     s->moveT=(5.f+frnd()*9.f); (void)nClips; (void)frameOf; }
 
-static void die(const char*m){ fprintf(stderr,"FATAL: %s (egl 0x%x gl 0x%x)\n",m,eglGetError(),glGetError()); exit(1); }
+static void die(const char*m){ fprintf(stderr,"FATAL: %s\n",m); exit(1); }

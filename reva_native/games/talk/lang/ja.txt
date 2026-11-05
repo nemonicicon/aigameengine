@@ -1,0 +1,14 @@
+# lang/ja.txt -- TALK in Japanese: a conversation in a language of wide glyphs, with no spaces to break a row at. `wide` names the file its glyphs are in,
+# data/cjk16.tvw beside the game, which the engine doesn't ship: bake it from a font you may use, with exactly the letters this file has:
+#     python skate_src/author/fontbake.py reva_native/games/talk/data/cjk16.tvw <a font you may use> --text reva_native/games/talk/lang/ja.txt
+# Without it the letters show as ? and the game still runs. With it the game is read at the large size, 17 x 12, one glyph a cell.
+name 日本語
+wide cjk16
+"Where were you last night?" = "昨日の夜はどこにいたの？"
+"Out." = "外。"
+"Out where?" = "外って、どこ？"
+"Somewhere you have never been, and you would not like it." = "あなたが行ったことのない場所。きっと気に入らないと思う。"
+"Ask her again" = "もう一度聞く"
+"Let it go" = "やめておく"
+"Fine. I went to see the tower." = "わかった。塔を見に行ったの。"
+"Have it your way." = "好きにすればいい。"

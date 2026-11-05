@@ -529,6 +529,8 @@ typedef struct {
     int nt; unsigned short tri[SK_MAXT][3];       /* the outer wall's triangles (simulated points) */
     float osign, rsign, tmed, ax, ay, az, legM;    /* legM: off a leg, rig units (a garment's ease or a hair, + the wall) */
     float h0inv[16], H0[16];                      /* the hips at rest (inverse); last frame's rest->world */
+    int band; float bandY;                        /* hung by its top tenth, with no chain weights: and the height its band ends at, at rest (rig u) */
+    unsigned char tdup[SK_MAXT];                  /* a triangle of the mesh that says again one already said, the other way round: a wall seen from both sides */
     float cap0[SK_NCAP][8];
     /* THE SKIN UNDER IT, sampled: which mesh and vertex, where it was last frame and is now, which way it faces */
     int nbv; unsigned char bvm[SK_BODYMAX]; unsigned short bvv[SK_BODYMAX];
@@ -543,7 +545,7 @@ typedef struct {
     /* THE AIR OF HER OWN RUN: what the planted foot says the ground is doing under her (world u/s) */
     float air[3], fprev[2][3], fground; int fwarm;
     int worstE;                                   /* the most stretched edge, last step (the report) */
-    GLuint vbo[2];
+    unsigned vbo[2];
 } Skirt;
 static Skirt g_sk[SK_POOL];
 static void skBodyFrame(Skirt*S,Pack*P,M4*world,const float*model,int first);
@@ -639,6 +641,7 @@ static void skNormals(Skirt*S,const unsigned*ix,unsigned nidx,float sc){
     for(int p=0;p<np;p++){ S->nOut[p][0]=S->nOut[p][1]=S->nOut[p][2]=0.f; S->nR[p][0]=S->nR[p][1]=S->nR[p][2]=0.f; }
     for(unsigned t=0;t+2<nidx;t+=3){
         int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+        if(t/3<SK_MAXT&&S->tdup[t/3]) continue;
         if(S->twin[a]>=0||S->twin[b]>=0||S->twin[c]>=0) continue;
         float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->cur[b][k]-S->cur[a][k]; v[k]=S->cur[c][k]-S->cur[a][k]; }
         float n[3]={(u[1]*v[2]-u[2]*v[1])*S->osign,(u[2]*v[0]-u[0]*v[2])*S->osign,(u[0]*v[1]-u[1]*v[0])*S->osign};
@@ -650,6 +653,7 @@ static void skNormals(Skirt*S,const unsigned*ix,unsigned nidx,float sc){
         else for(int k=0;k<3;k++) S->pos[p][k]=S->cur[w][k]-S->nOut[w][k]*S->thick[p]*sc; }
     for(unsigned t=0;t+2<nidx;t+=3){
         int id[3]={S->vp[ix[t]],S->vp[ix[t+1]],S->vp[ix[t+2]]};
+        if(t/3<SK_MAXT&&S->tdup[t/3]) continue;
         float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->pos[id[1]][k]-S->pos[id[0]][k]; v[k]=S->pos[id[2]][k]-S->pos[id[0]][k]; }
         float n[3]={u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
         float l=sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]); if(l<1e-14f) continue;
@@ -725,9 +729,22 @@ static int skirtInit(Skirt*S,Pack*P,unsigned mi){
     #define SKH 15
     static int hh[1<<SKH]; static unsigned short opp0[SK_MAXE], opp1[SK_MAXE];
     for(int i=0;i<(1<<SKH);i++) hh[i]=-1;
+    /* ⭐ A WALL WOUND BOTH WAYS (11-05). A mesh may say each triangle twice, once each way round, so that one wall is seen from inside too (R.E.V.A.'s
+     * pleated skirt: a lining a wall's thickness behind is nothing where pleats are pressed flat). The second saying is the same cloth. Counted again it
+     * cancels every normal the cloth has -- which way is out of it, and what it's lit by -- and gives each triangle a twin facing the other way, so
+     * whatever pushes off a triangle is pushed both ways at once. It is drawn, and that is all */
+    memset(S->tdup,0,sizeof S->tdup); int nDup=0;
+    { static int th[1<<14]; static unsigned short tk3[SK_MAXT][3]; for(int i=0;i<(1<<14);i++) th[i]=-1;
+      for(unsigned t=0;t+2<M->idxCount&&t/3<SK_MAXT;t+=3){ int q[3]={S->vp[ix[t]],S->vp[ix[t+1]],S->vp[ix[t+2]]};
+          for(int i=0;i<2;i++) for(int j=0;j<2-i;j++) if(q[j]>q[j+1]){ int tm=q[j]; q[j]=q[j+1]; q[j+1]=tm; }
+          unsigned h=(((unsigned)q[0]*73856093u)^((unsigned)q[1]*19349663u)^((unsigned)q[2]*83492791u))&((1u<<14)-1u); int seen=0;
+          while(th[h]>=0){ const unsigned short*o=tk3[th[h]]; if(o[0]==q[0]&&o[1]==q[1]&&o[2]==q[2]){ seen=1; break; } h=(h+1)&((1u<<14)-1u); }
+          if(seen){ S->tdup[t/3]=1; nDup++; } else { th[h]=(int)(t/3); tk3[t/3][0]=(unsigned short)q[0]; tk3[t/3][1]=(unsigned short)q[1]; tk3[t/3][2]=(unsigned short)q[2]; } } }
+    if(nDup) printf("[skirt] %s '%s': %d of its %u triangles say again one already said (a wall wound both ways): drawn, and not counted as cloth twice\n",P->label,mnm,nDup,M->idxCount/3);
     S->ne=0; S->nt=0; int drop=0;
     for(unsigned t=0;t+2<M->idxCount;t+=3){
         int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+        if(t/3<SK_MAXT&&S->tdup[t/3]) continue;
         if(a==b||b==c||a==c||S->twin[a]>=0||S->twin[b]>=0||S->twin[c]>=0) continue;
         if(S->nt<SK_MAXT){ S->tri[S->nt][0]=(unsigned short)a; S->tri[S->nt][1]=(unsigned short)b; S->tri[S->nt][2]=(unsigned short)c; S->nt++; }
         int tri[3][3]={{a,b,c},{b,c,a},{c,a,b}};
@@ -749,9 +766,12 @@ static int skirtInit(Skirt*S,Pack*P,unsigned mi){
     /* THE WAISTBAND: no weight on a chain */
     int nPin=0, nFree=0;
     for(int p=0;p<np;p++){ S->pin[p]=0; if(S->twin[p]>=0) continue; if(pcw[p]<0.02f){ S->pin[p]=1; nPin++; } else nFree++; }
+    S->band=0; S->bandY=0.f;
     if(!nPin||!nFree){ float y0=1e9f,y1=-1e9f; nPin=nFree=0;
         for(int p=0;p<np;p++) if(S->twin[p]<0){ if(S->pr[p][1]<y0) y0=S->pr[p][1]; if(S->pr[p][1]>y1) y1=S->pr[p][1]; }
         for(int p=0;p<np;p++) if(S->twin[p]<0){ S->pin[p]=(S->pr[p][1]>y1-(y1-y0)*0.10f)?1:0; nPin+=S->pin[p]; nFree+=!S->pin[p]; }
+        /* a skirt hung by its top band (11-04, REVA's pleated mini): where the band ends, in the rig's own space. Nothing of it may rise above that (below) */
+        S->band=1; S->bandY=y1-(y1-y0)*0.10f;
         printf("[skirt] %s '%s': no Cloth_ chain weights -- the top tenth is the waistband\n",P->label,mnm); }
     if(!nPin||!nFree){ printf("[skirt] !! %s '%s': nothing to hang (%d pinned, %d free) -- NOT simulated\n",P->label,mnm,nPin,nFree); fflush(stdout); return 0; }
     /* THE TETHERS: the shortest way along the cloth from each free point to the waistband (Dijkstra on its edges) */
@@ -776,6 +796,7 @@ static int skirtInit(Skirt*S,Pack*P,unsigned mi){
     { float so=0.f, sr=0.f;
       for(unsigned t=0;t+2<M->idxCount;t+=3){
           int a=S->vp[ix[t]], b=S->vp[ix[t+1]], c=S->vp[ix[t+2]];
+          if(t/3<SK_MAXT&&S->tdup[t/3]) continue;
           float u[3],v[3]; for(int k=0;k<3;k++){ u[k]=S->pr[b][k]-S->pr[a][k]; v[k]=S->pr[c][k]-S->pr[a][k]; }
           float n[3]={u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
           for(int q=0;q<3;q++){ unsigned vv=ix[t+q]; sr+=n[0]*bn[vv][0]+n[1]*bn[vv][1]+n[2]*bn[vv][2]; }
@@ -1112,6 +1133,18 @@ static void skirtStep(Skirt*S,float dtFull,float sc,float cap1[][8],int ncap,con
                         for(int k=0;k<3;k++) S->prv[p][k]+=dn[k];
                         if(dl>1e-9f){ float vel[3]={S->cur[p][0]-S->prv[p][0],S->cur[p][1]-S->prv[p][1],S->cur[p][2]-S->prv[p][2]};
                             float vn=(vel[0]*dn[0]+vel[1]*dn[1]+vel[2]*dn[2])/dl; if(vn<0.f) for(int k=0;k<3;k++) S->prv[p][k]+=dn[k]/dl*vn; } } } }
+            /* ⭐ NEVER ABOVE ITS OWN BAND (11-04). A knee lifts a hem, and a long coat's hem never gets near its waist. A mini skirt's does: in a deep
+             * crouch the thighs come up level with its band, the cloth goes out the nearest way, which is up, and nothing brings it back: it sits
+             * round REVA's ribs as a tube (REVA_SKBAND=0 shows it; what blew out across the room was the renderer's fault, below). So in the hips'
+             * rest frame no free point of a band-hung skirt rises above where its band ends. Only skirts hung by
+             * the top-tenth rule take this (no Cloth_ weights), so no garment film has shot is touched. REVA_SKBAND=0 is the control */
+            { static int bandOn=-1; if(bandOn<0){ const char*e9=getenv("REVA_SKBAND"); bandOn=!(e9&&e9[0]=='0'); }
+              if(S->band&&bandOn){ float Hi[16];
+                if(skInv(Hm,Hi)) for(int p=0;p<np;p++){ if(S->pin[p]||S->twin[p]>=0) continue;
+                    float r[3]; skXf(Hi,S->cur[p],r);
+                    if(r[1]>S->bandY){ float xo[3]={S->cur[p][0],S->cur[p][1],S->cur[p][2]};
+                        r[1]=S->bandY; skXf(Hm,r,S->cur[p]);
+                        for(int k=0;k<3;k++) S->prv[p][k]+=S->cur[p][k]-xo[k]; } } } }   /* a move, not a throw */
             continue; }
           if(pass==1&&S->nhv&&g_skHands){ float rh=(0.006f+S->tmed)*sc;      /* off the hand's own skin: a hair and the wall */
             static float hpI[SK_HANDMAX][3]; float lo[3]={1e9f,1e9f,1e9f}, hi[3]={-1e9f,-1e9f,-1e9f};
@@ -1246,6 +1279,17 @@ static void skirtStep(Skirt*S,float dtFull,float sc,float cap1[][8],int ncap,con
                   float vn=r2[0]*n[0]+r2[1]*n[1]+r2[2]*n[2];
                   if(vn>0.f) for(int k=0;k<3;k++) S->prv[p][k]+=n[k]*vn; }
                 contacts++; if(pen>deep) deep=pen; } } } }
+    /* ⛔ OPEN (11-05): a short band-hung skirt after a deep crouch (REVA's 23 cm pleated mini in her skate push).
+     * FOUND: the sheets the size of the room were never this simulation's. Its points said where they were (REVA_SKIRTDBG, "furthest past its tether")
+     * and none was ever more than 3 cm past, in the same frames as a sheet. They were the renderer's: a part of a dynamic buffer written to a place its
+     * frame's ring had since given to something else (gfx_vk.c, gfxBufferSub), so every hanging cloth was at risk of it; and a wall wound both ways
+     * cancelled this cloth's normals (skirtInit, tdup). Both are fixed.
+     * LEFT, and this cloth's own. With the skin's layer on, the crouch stands the skirt out round her hips like a tutu (or, with the band rule off, flips
+     * it up round her ribs as a tube), and it stays there when she stands. With that layer off (REVA_SKSKIN=0) it drapes over her thighs in the crouch,
+     * and comes back down ragged, caught up on one side with its hem uneven. Friction off (REVA_SKMU=0), hands off, arm capsules off and the cone off
+     * change neither; the skin's layer makes no push deeper than 15 mm (REVA_SKIRTDBG=2 says none). Earlier, before the renderer's fault was known, bend
+     * stiffness, a lining, re-hanging and holding points to their tethers were tried against the sheets, which proves nothing about this.
+     * Her skirt rides her skin's own weights until it's right (build_reva.py --skirt-cloth hangs it instead). */
     /* ⛔ A POINT THAT WENT NON-FINITE is put back on its waistband anchor, and it is SAID: one NaN is a spike to the
      * edge of the frame (a triangle with a vertex at infinity), and a quiet fix would hide the pass that made it */
     { int bad=0; for(int p=0;p<np;p++){ if(S->twin[p]>=0) continue;
@@ -1262,8 +1306,7 @@ static void skirtStep(Skirt*S,float dtFull,float sc,float cap1[][8],int ncap,con
     memcpy(S->cap0,cap1,sizeof(float)*8*(size_t)ncap); S->ncap0=ncap; memcpy(S->H0,H1,64); }
 
 /* the clothPrep hook for a skirt: returns 2 when it drew the mesh from its own buffers (the caller binds g_skVbo) */
-static int skirtPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world,
-                     GLint uModel,GLint uPal,GLint uBind,GLint uDqS){
+static int skirtPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world){
     if(g_skirtSim<0){ const char*e=getenv("REVA_SKIRTSIM"); g_skirtSim=!(e&&e[0]=='0');
         const char*b=getenv("REVA_SKBEND"); if(b&&*b) g_skBend=(float)atof(b);
         const char*a=getenv("REVA_SKARMS"); if(a&&*a) g_skArms=atoi(a);
@@ -1273,7 +1316,7 @@ static int skirtPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*
         { const char*e9=getenv("REVA_SKSKIN"); if(e9&&e9[0]=='0') g_skSkin=0; e9=getenv("REVA_SKCONE"); if(e9&&e9[0]=='0') g_skCone=0;
           e9=getenv("REVA_SKMU"); if(e9&&*e9){ g_skMuS=(float)atof(e9); const char*c9=strchr(e9,','); g_skMuK=c9?(float)atof(c9+1):g_skMuS*0.7f; } }
         printf("[skirt] hanging cloth: %s (bend compliance %.1e, hands %s, arm capsules %s, the air of the run %s)\n",
-               g_skirtSim?"ON -- every ~skirt~ on a VertexCollide pack is simulated":"OFF (REVA_SKIRTSIM=0): the shader drape",
+               g_skirtSim?"ON -- every ~skirt~ on a VertexCollide pack is simulated":"OFF (REVA_SKIRTSIM=0): a skirt is only skinned to its chains (the old renderer's drape went with it)",
                g_skBend,g_skHands?"on":"off",g_skArms?"on":"off",g_skAir?"on":"off"); fflush(stdout); }
     if(g_vcolOn<0){ const char*e=getenv("REVA_VCOLLIDE"); g_vcolOn=!(e&&e[0]=='0');
         printf("[vcol] per-vertex collision: %s\n",g_vcolOn?"ON (packs with a VertexCollide node)":"OFF (REVA_VCOLLIDE=0)"); fflush(stdout); }
@@ -1376,33 +1419,35 @@ static int skirtPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*
                 wy=(y1-S->pr[i][1])/(y1-y0+1e-9f); wa=atan2f(S->pr[i][0]-S->ax,S->pr[i][2]-S->az)*57.2958f; }
             printf("[skirt] %s: %d contacts, deepest push %.1f mm, worst stretch %.3f (%.0f%% down, %.0f deg round), air %.2f m/s, %d capsules\n",
                    P->label,g_skContacts,g_skDeep*1000.f,g_skStretch,wy*100.f,wa,
-                   sqrtf(S->air[0]*S->air[0]+S->air[2]*S->air[2])/sc,nc); fflush(stdout); } }
+                   sqrtf(S->air[0]*S->air[0]+S->air[2]*S->air[2])/sc,nc); fflush(stdout); }
+          /* and the point that's furthest from its own tether's reach, with what holds it: a sheet across the room is one point somewhere it can't be */
+          { int far=-1; float fd=0.f; for(int p=0;p<S->np;p++){ int a=S->anchor[p]; const float*o=(S->twin[p]<0&&a>=0)?S->cur[a]:S->pos[p];
+                float dx=S->pos[p][0]-o[0], dy=S->pos[p][1]-o[1], dz=S->pos[p][2]-o[2], d=sqrtf(dx*dx+dy*dy+dz*dz)/sc-(a>=0?S->tlen[p]:0.f);
+                if(d>fd||!(d==d)){ fd=d; far=p; } }
+            if(far>=0){ int ne9=0, nb9=0; for(int e=0;e<S->ne;e++) if(S->e0[e]==far||S->e1[e]==far) ne9++; for(int e=0;e<S->nb;e++) if(S->b0[e]==far||S->b1[e]==far) nb9++;
+                printf("[skirt] %s: furthest past its tether: point %d of %d, %.3f m past (tether %.3f m), pin %d twin %d anchor %d, %d edges %d bends, at %.2f %.2f %.2f, its normal %.2f %.2f %.2f\n",
+                       P->label,far,S->np,fd,S->tlen[far],S->pin[far],S->twin[far],S->anchor[far],ne9,nb9,S->pos[far][0],S->pos[far][1],S->pos[far][2],S->nOut[far][0],S->nOut[far][1],S->nOut[far][2]); fflush(stdout); } } }
         /* the drawn mesh: every vertex at its point */
         static float vpos[SK_MAXV*3], vnrm[SK_MAXV*3];
         for(int v=0;v<S->nv;v++){ int p=S->vp[v]; memcpy(vpos+v*3,S->pos[p],12); memcpy(vnrm+v*3,S->nR[p],12); }
-        if(!S->vbo[0]){ glGenBuffers(2,S->vbo);
-            for(int k=0;k<2;k++){ glBindBuffer(GL_ARRAY_BUFFER,S->vbo[k]); glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)(SK_MAXV*12),NULL,GL_DYNAMIC_DRAW); } }
-        glBindBuffer(GL_ARRAY_BUFFER,S->vbo[0]); glBufferSubData(GL_ARRAY_BUFFER,0,(GLsizeiptr)(S->nv*12),vpos);
-        glBindBuffer(GL_ARRAY_BUFFER,S->vbo[1]); glBufferSubData(GL_ARRAY_BUFFER,0,(GLsizeiptr)(S->nv*12),vnrm); }
+        if(!S->vbo[0]){ gfxBuffersNew(2,S->vbo);
+            for(int k=0;k<2;k++){  gfxBufferData(S->vbo[k], (long)(S->nv*12), NULL, 1); } }   /* as big as it is, not as big as one could be: it's a new place in the frame's ring every frame */
+         gfxBufferSub(S->vbo[0], 0, (long)(S->nv*12), vpos);
+         gfxBufferSub(S->vbo[1], 0, (long)(S->nv*12), vnrm); }
     g_skVbo[0]=S->vbo[0]; g_skVbo[1]=S->vbo[1];
     /* the body's centre, for the lining's outline (colSet, uColOn 3) */
     { int hp=P->pb[0]; float c0[3]={0,0,0}; if(hp>=0){ c0[0]=world[hp][12]; c0[1]=world[hp][13]; c0[2]=world[hp][14]; }
       skXf(model,c0,g_skirtBC); g_skirtLive=1; }
     if(S->shStamp!=g_frameStamp){ S->shStamp=g_frameStamp; sunStashW(P,(int)mi,S->vbo[0],S->vbo[1],(int)M->boneCount,model); }
     static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    glUniformMatrix4fv(uModel,1,GL_FALSE,I9);
     for(unsigned b9=0;b9<M->boneCount&&b9<MAXB;b9++) memcpy(pal+b9*16,I9,64);
-    skinPal(uPal,uDqS,(uDqS>=0)?1:0,pal,(int)M->boneCount,1.f);
-    glUniformMatrix4fv(uBind,1,GL_FALSE,I9);
     { float al=meshAlphaOf(P,mi);
-      if(al<0.999f){ glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
-                     if(g_labAlpha>=0) glUniform1f(g_labAlpha,al); } }
+      if(al<0.999f){    } }
     return 2; }
 
-static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world,
-                     GLint uModel,GLint uPal,GLint uBind,GLint uDqS){
+static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*world){
     if(g_clothOff||slot<0||slot>=CLOTH_SLOTS) return 0;
-    { int sk9=skirtPrep(slot,P,mi,pal,model,world,uModel,uPal,uBind,uDqS); if(sk9) return sk9; }   /* a skirt is hanging cloth (10-18) */
+    { int sk9=skirtPrep(slot,P,mi,pal,model,world); if(sk9) return sk9; }   /* a skirt is hanging cloth (10-18) */
     if(!meshIsCloth(P,mi)) return 0;
     PMesh*M=&P->meshes[mi];
     if(M->verts>=CLOTH_MAXV){ static int said=0; if(!said){ said=1;
@@ -1504,18 +1549,13 @@ static int clothPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4*
                    slo[0],slo[1],slo[2],shi[0],shi[1],shi[2],shi[0]-slo[0],shi[1]-slo[1],shi[2]-slo[2],
                    nsph,nsph?sph[0][3]:0.f,10);
             fflush(stdout); } } }
-    glBindBuffer(GL_ARRAY_BUFFER,P->vbo[mi*6]);
-    glBufferSubData(GL_ARRAY_BUFFER,0,(GLsizeiptr)(C->nv*12),C->cur);
+    gfxBufferSub(P->vbo[mi*6], 0, (long)(C->nv*12), C->cur);
     static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    glUniformMatrix4fv(uModel,1,GL_FALSE,I9);
     for(unsigned b9=0;b9<M->boneCount&&b9<MAXB;b9++) memcpy(pal+b9*16,I9,64);
-    skinPal(uPal,uDqS,0,pal,(int)M->boneCount,1.f);
-    glUniformMatrix4fv(uBind,1,GL_FALSE,I9);
     /* ⭐ SHEER. Blending and no depth write, handed back by the caller's restore line. */
     { float al=meshAlphaOf(P,mi);
-      if(al<0.999f){ glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-                     glDepthMask(GL_FALSE);
-                     if(g_labAlpha>=0) glUniform1f(g_labAlpha,al); } }
+      if(al<0.999f){
+                      } }
     return 1; }
 
 

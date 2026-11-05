@@ -1,12 +1,16 @@
 /* engine.h -- everything a game sees of the engine (engine plan, Phase 3). A game includes this and nothing else of ours, so an AI working on a game needs this header and that game's file.
  * Quake II's shape: one table of what the engine offers (EngineAPI), one of what the game does (GameExport), and a version. The tables are append-only: a field never moves or changes
- * meaning, so an old game still links. The engine owns the loop and calls the game; the game never calls back into a draw. club.h comes with it: the club's math, one answer on every machine,
- * and the mixer. Bodies are the engine's fixed pool, reached by index. A game keeps its own state and reads nothing back from the renderer. Its tick writes that state; its draw and hud get it
- * const, which is the packet rule in C: what's on screen can't change what happens. */
+ * meaning, so an old game still links. The engine owns the loop and calls the game; the game never calls back into a draw. club_math.h comes with it, and nothing else of the club's: the
+ * club's math, one answer on every machine, which a deterministic game must use. Sound, music and a save are in the table (step 20). Bodies are the engine's fixed pool, reached by index.
+ * A game keeps its own state and reads nothing back from the renderer. Its tick writes that state; its draw and hud get it const, which is the packet rule in C: what's on screen can't
+ * change what happens. */
 #ifndef ENGINE_H
 #define ENGINE_H
 #include <stddef.h>
-#include "club.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "club_math.h"
 
 #define ENGINE_API_VERSION 1
 
@@ -25,7 +29,38 @@ typedef struct {
     unsigned char skin[3], hair[3], eyes[3], top[3], bottom[3], shoes[3];
     int hairStyle, sleeves, bottomKind;
 } EngineBodySpec;
-typedef struct { float heroSpd, heroSnap, heroTurn; float lensArm, lensPitch, lensFov, lensAimY; float shotHit, shotLife; float stickYaw; int bodyCap; int poseRate, poseNear; } EngineTuning;   /* stickYaw: which way the stick's up points, for a lens that turns. bodyCap: how many bodies may be drawn; 0 is the engine's own 390. poseRate: a crowd's far bodies on one clip share this many poses a second of clip, which is what lets counts go up; 0 is every body its own. poseNear: the nearest this many always keep their own */
+typedef struct { float heroSpd, heroSnap, heroTurn; float lensArm, lensPitch, lensFov, lensAimY; float shotHit, shotLife; float stickYaw; int bodyCap; int poseRate, poseNear; float fairAspect; } EngineTuning;   /* fairAspect (step 25): the shape this game is played in when players are against each other, width over height (1.3333 is 4:3). A screen wider than that shows the same world through the same lens, with black either side, so nobody sees round a corner because of their monitor. 0: the screen's own shape */   /* stickYaw: which way the stick's up points, for a lens that turns. bodyCap: how many bodies may be drawn; 0 is the engine's own 390. poseRate: a crowd's far bodies on one clip share this many poses a second of clip, which is what lets counts go up; 0 is every body its own. poseNear: the nearest this many always keep their own */
+
+/* a kind of particle: what an emitter makes (queue step 24). rate: how many a second. life: seconds, from the least to the most. speed: along the emitter's way, least to most.
+ * spread: the half-angle of the cone they're thrown in, degrees, 180 for every way. grav: how it falls, 9.8 like a stone, 0 hangs, under 0 rises. drag: how fast the air stops it.
+ * size0 and size1: at birth and at death, in the world's units. r0 g0 b0 a0 and r1 g1 b1 a1: its colour and how solid, at birth and at death; past 1 is bright, for what's added.
+ * stretch: 0 a round sprite, over 0 a streak along its own going, this many seconds of its speed long. spin: a round one turns, radians a second. wind: how much the set's wind
+ * carries it, 0 to 1. curl: how much the air swirls it. jitter: it's born anywhere in a ball this wide. add: 0 laid over the picture (smoke, dust), 1 added to it (fire, sparks).
+ * soft: it fades out where it meets a surface, on a machine that can. New fields only ever go on the end */
+typedef struct {
+    float rate, lifeMin, lifeMax, speedMin, speedMax, spread, grav, drag, size0, size1;
+    float r0, g0, b0, a0, r1, g1, b1, a1;
+    float stretch, spin, wind, curl, jitter;
+    int add, soft;
+} EngineParticles;
+/* (queue step 25) the lens's own look, for a cutscene: zero what you don't set, and E->lensLook(NULL, 0) puts it all back. roll: degrees about the lens's own line. focus: how far
+ * away it's focused, in world units, -1 for whatever it's aimed at, 0 for everything sharp; dof: how soft the rest goes, 1 a portrait lens wide open. shutter: how much of a
+ * frame it's open, 0 none to 1, so a fast pan smears (off unless a game asks: blur on a flat panel isn't for everyone). sepia, grain: 0 to 1. flash: white over the picture,
+ * for as long as it's set. burn: a film burn in from the edge, 0 to 1. What's drawn, never the rules; and nothing on a machine with no post pass */
+typedef struct { float roll, focus, dof, shutter, sepia, grain, flash, burn; } EngineLensLook;
+/* (queue step 24) a decal thrown at the world: whatever lies in its box takes the mark, a floor, a step, a wall, a prop. Where the machine reads the scene's depth mid-frame
+ * it folds over what's there; where it doesn't (a Pi) it's a flat mark, and the game needn't know which. Zero what you don't set */
+typedef struct {
+    int kind;                 /* 0 a soft round mark, 1 a splat, 2 a scorch, 3 a wet patch, 4 a painted stripe, 5 a crack, 6 a picture. 0 to 3 and 5 stain what's under them, and are lit and shadowed as it is; 4 and 6 are paint, lit by the sun and the sky */
+    float x, y, z;            /* its middle, on the surface */
+    float dx, dy, dz;         /* the way it's thrown: into the surface. All 0 is straight down */
+    float size, along;        /* how far across, in world units; and along, for a stripe or a picture that isn't square (0: the same) */
+    float deep;               /* how far through the surface it reaches, each way (0: half its size). A splat on a stair wants enough to reach the step below */
+    float turn;               /* about the throw, in degrees */
+    float r, g, b, a;         /* its colour, and how strong */
+    float seconds;            /* how long it stays, fading over its last quarter. 0 or less: until E->decalsClear or the level changes */
+    const char *picture;      /* for a picture: a model's name, as E->prop takes it, whose first texture it shows. Name one that's loaded: this doesn't read a file politely */
+} EngineDecal;
 
 /* a player's pad, as of this tick. x and y are the stick, -1..1, right and up positive, and exactly 0 in its dead zone. held is which buttons are down, pressed which went down this tick. Pad 0 is also the keyboard, and it's always connected. A tape carries all four */
 enum { PAD_A = 1, PAD_B = 2, PAD_X = 4, PAD_Y = 8, PAD_LB = 16, PAD_RB = 32, PAD_START = 64 };
@@ -199,7 +234,7 @@ typedef struct {
     int (*attach)(int body, int prop, const char *bone, float x, float y, float z, float yaw, float pitch, float roll, float scale);
     void (*detach)(int handle);
     void (*detachAll)(int body);
-    /* the music clock. Call it just after musicPlay: this many beats a minute, its first beat this many seconds in, this many beats to a bar. musicBeat is where it is, in beats, and GameExport.beat falls on the tick each comes round. In a live game it follows the sound, and a tape keeps what it read; in anything measured it's the tick. 0 for bpm turns it off */
+    /* the music clock. Call it just after music (below): this many beats a minute, its first beat this many seconds in, this many beats to a bar. musicBeat is where it is, in beats, and GameExport.beat falls on the tick each comes round. In a live game it follows the sound, and a tape keeps what it read; in anything measured it's the tick. 0 for bpm turns it off */
     void (*musicClock)(float bpm, float firstBeat, int beatsPerBar);
     float (*musicTime)(void);
     float (*musicBeat)(void);
@@ -212,6 +247,75 @@ typedef struct {
     int (*talkStart)(const char *name);
     int (*talking)(void);
     void (*talkStop)(void);
+    /* sound, music and a save of the game's own (step 20). None of it is in the sim: the receipt can't hear a sound or read a file.
+     * sound: one from sounds/, a wav or an ogg by name, at this gain, from a place in the world (3 floats) or NULL for everywhere, looping or once. Gives a handle for soundStop, or -1. soundBus: a bus's gain over this many seconds; 0 is effects, 1 music, 2 voices, 3 the menu.
+     * music: a file by path, streamed by a thread of its own so the disk can't make a frame late, taking over from what played; 1 if it opened. musicStop fades it out over this many seconds, and musicGain moves its gain, for a menu's slider or a line that wants it down.
+     * a save is a text file of your own, save/<game>_<slot>.txt: a version line at the top, then key=value lines, so a player can read it and edit it. saveBegin names the slot and the version, saveSet and the others put values, and saveEnd writes it in one go, 1 if it did.
+     * load reads a slot and gives its version, 0 for none or unreadable, and loadGet and the others then read its values, with your default where there's none or it isn't a number. Everything's checked on the way in: a slot name is letters, digits, - and _, 31 at most; a key 47 characters, a value 95, 256 keys. REVA_NOSAVE=1 makes them all blind, so a measured run can't depend on a file */
+    int (*sound)(const char *name, float gain, const float *pos, int loop);
+    void (*soundLoad)(const char *name);                        /* into the bank now, in boot, so its first play doesn't read the disk in the middle of a frame */
+    void (*soundStop)(int id);
+    void (*soundBus)(int bus, float gain, float seconds);
+    int (*music)(const char *path, float gain, int loop);
+    void (*musicStop)(float fadeSeconds);
+    void (*musicGain)(float gain, float seconds);
+    void (*saveBegin)(const char *slot, int version);
+    void (*saveSet)(const char *key, const char *value);
+    void (*saveSetI)(const char *key, long value);
+    void (*saveSetF)(const char *key, float value);
+    int (*saveEnd)(void);
+    int (*load)(const char *slot);
+    const char *(*loadGet)(const char *key, const char *def);
+    long (*loadGetI)(const char *key, long def);
+    float (*loadGetF)(const char *key, float def);
+    /* split screen: a conversation's lens goes in this player's picture, and -1, the start, is the whole screen's */
+    void (*talkView)(int view);
+    /* a file of your own that you've just opened: say so, and the list of what the game reads (REVA_OPENLOG, the cook check) has it */
+    void (*opened)(const char *path);
+    /* eyes that glow, on any body, -1 the hero: a colour, bright ones past 1, and how much of it, 0 to put them out. It's the body's eyes that glow, wherever its pack says they are, and not a light: add one with E->light if it should light the room. What's drawn, not the rules */
+    void (*bodyEyes)(int i, float r, float g, float b, float amount);
+    /* particles of any kind (queue step 24). particleKind gives one of the engine's own by name (smoke, fire, sparks, steam, dust, embers, fountain, snow, exhaust, pyro, fuse), to use as it is or to copy and change; NULL if there's no such. emitter starts one at a place, pointing a way, and gives a handle, or 0 when there are none left. emitterAt moves it and turns it. emitterRate says how many a second: 0 stops it making more, and what's in the air lives out its life. emitterGone lets the handle go. emitterBurst throws n at once. size is sizeof your EngineParticles. They're picture: their own dice, stepped by the tick, and never in the rules. Unlike particles above, which stays as it was, these come from the machine's own budget */
+    const EngineParticles *(*particleKind)(const char *name);
+    int (*emitter)(const EngineParticles *kind, size_t size, float x, float y, float z, float dx, float dy, float dz);
+    void (*emitterAt)(int handle, float x, float y, float z, float dx, float dy, float dz);
+    void (*emitterRate)(int handle, float perSecond);
+    void (*emitterGone)(int handle);
+    void (*emitterBurst)(const EngineParticles *kind, size_t size, float x, float y, float z, float dx, float dy, float dz, int n);
+    /* decals thrown at the world (queue step 24): decalAt(&d, sizeof d). From a fixed pool, the oldest making way; decalsClear takes every one a game has put down. E->decal is the older flat mark, and stays. What's drawn, not the rules */
+    void (*decalAt)(const EngineDecal *d, size_t size);
+    void (*decalsClear)(void);
+    /* the lens's look for a cutscene (queue step 25): roll, depth of field, motion blur, sepia, grain, a flash, a burn. lensLook(NULL, 0) is all of it off */
+    void (*lensLook)(const EngineLensLook *l, size_t size);
+    /* another language's words (queue step 26). Text is UTF-8 everywhere: the TV font has accented Latin, Greek and Cyrillic, and a language can bring bigger glyphs of its own.
+     * language("es") reads lang/es.txt beside the game, a file of `"your text" = "their text"` lines, and remembers the choice; language("") is the game's own words again;
+     * it returns 1 if that's the language now. Every string given to the TV's text or a menu is looked up whole, so a fixed label needs nothing. A string you build is looked
+     * up before you build it: snprintf(b, sizeof b, E->word("SCORE %d"), n). languageNow is the code in use, "" for none. What's drawn, never the rules */
+    int (*language)(const char *code);
+    const char *(*word)(const char *text);
+    const char *(*languageNow)(void);
+    /* online play (queue step 29): the same game on several machines, a pad or more each. Every machine works out the same world from the same dice and the same pads, so
+     * all that crosses the wire is pads, and a Pi and a PC can share a game. E->pads is the session's pads on every machine, exactly as on one machine: pad 0 is player 1
+     * wherever player 1 is sitting. A button is played a few ticks after it's pressed (netLag), the same on every machine, the presser's own included, and a machine that
+     * hasn't everyone's pads for a tick waits for them: a slow wire holds the picture and never changes the game.
+     * netState: 0 this run isn't online; 1 it's gathering its players or loading; 2 playing; 3 it's over, and netWhy says what happened: the game goes on, on this machine alone.
+     * netSeats: how many pads the session has. netHere(player): is that pad one of this machine's (always 1 when not online).
+     * ⛔ ALL OF THESE ARE FOR WHAT'S DRAWN: whose lens, whose half of a split, whose name is lit, a line that says the game is online. Ask them in draw and hud and
+     * never in tick. The rules must be the same on every machine: every tick's hash of them is compared as the game runs, and a game that decides anything by netHere
+     * is stopped at the tick it parted. And a game whose rules read even netState can't be replayed from its tape, which is how an online fault gets found.
+     * The same goes for anything else that differs between machines: the screen's shape, the reading size, the language, the clock on the wall.
+     * What tick may do is call netHost, netJoin and netLeave, from a menu: they end the run.
+     * A session is a whole run, from the first tick. netHost(port, pads, word) and netJoin(address, word) end this run and start the engine again in one, waiting for
+     * the players on a screen of the engine's own (port 0 is 7777; pads is how many the session has, 2 to 4; word, or NULL, keeps a stranger out; address is a name or
+     * four numbers, with ":port" if it isn't 7777). netLeave starts it again alone. After a session that couldn't start, netWhy says why, back in the game.
+     * A session's saves are the host's: E->load reads what the host had, on every machine, and a save made in it is kept by the host. The engine's own pause menu is off */
+    int (*netState)(void);
+    int (*netSeats)(void);
+    int (*netHere)(int player);
+    int (*netLag)(void);
+    const char *(*netWhy)(void);
+    void (*netHost)(int port, int pads, const char *word);
+    void (*netJoin)(const char *address, const char *word);
+    void (*netLeave)(void);
 } EngineAPI;
 
 /* a game fills in what it needs and leaves the rest out: a missing entry does nothing, and bodies walk on their own feet. Only version is required. */

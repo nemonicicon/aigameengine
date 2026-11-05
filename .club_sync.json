@@ -1,8 +1,8 @@
 {
- "reva": "d29a8cdf5d3785f5867327f0abfd1ac52f99808b",
- "reva_subject": "A DEAD INCLUDE THE PI'S SETUP LIST HAD STOPPED INSTALLING, and the kit's hygiene, second pass",
- "synced": "2026-11-05T10:58:10-08:00",
- "kit_base": "49cdfb2ebf3b85bb2e6613c684c914c6a67133b6",
+ "reva": "302858544b03f321e1d563e875ccc771c14a751c",
+ "reva_subject": "A GAME PACKAGED FOR A LINUX PC, FOR THE FIRST TIME: the packager's Linux target had never linked",
+ "synced": "2026-11-05T11:15:52-08:00",
+ "kit_base": "0867d86e66795cbf45b38991fd951e045162499e",
  "files": {
   ".claude/skills/build-the-capability/SKILL.md": "d3c765ec20897d336609c3644e5995ebbc01e564",
   ".claude/skills/film-craft/SKILL.md": "530faf4932b504f15389ee63a24aab0aff0da37b",
@@ -301,7 +301,7 @@
   "reva_native/holly.c": "1b3ba9db1572810b6e33d0883093b44fa59eb80b",
   "reva_native/holly_fbo.c": "c9c3c2149e362216b13cee66f336c03d3f3de15e",
   "reva_native/holly_fbo.h": "e7e02bde8fa7f67608fada34d50e5391c8c0e7ec",
-  "reva_native/package.py": "3e17a660fda488f1c2452a5a0f384c62e3b843a8",
+  "reva_native/package.py": "11f6f158783b784720ba130986cdf4c60608d563",
   "reva_native/reva.ico": "05cb0565d5c5530b5939e478128b048832f5f6df",
   "reva_native/scenes/_trk3_demo.scn": "184965ee299cc9507a6e6064d0f89bd36edcf67a",
   "reva_native/scenes/_trk3_demo.txt": "4d0587dd56bdc52efcbe202f2d50e67ef29a3fd5",

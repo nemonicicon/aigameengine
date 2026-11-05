@@ -187,7 +187,7 @@ def linux(a, name, dst, pi):
     b = box([BOX, "sh", "-c", "mkdir -p %s && tr -d '\\r' < /src/build_pi.sh > /build/build_pi.sh && tr -d '\\r' < /src/build_linux.sh > /build/build_linux.sh && cd /src && "
              "CC=%s OUTDIR=%s SRCDIR=/src GAME=games/%s/%s.c EXTRA=-DREVA_NODOORS sh /build/build_pi.sh soft && " % (out, cc, out, a.game, a.game)
              + ("CC=%s OUTDIR=%s SRCDIR=/src GAME=games/%s/%s.c EXTRA=-DREVA_NODOORS sh /build/build_pi.sh vk && " % (cc, out, a.game, a.game) if pi
-                else "%s -O2 -std=gnu17 -ffp-contract=off -DREVA_NODOORS -DREVA_SDL -DREVA_VK -o %s/crowd_vk crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c gfx_packet.c games/%s/%s.c gfx_vk.c -lSDL2 -lvulkan -lm && " % (cc, out, a.game, a.game))
+                else "%s -O2 -std=gnu17 -ffp-contract=off -DREVA_NODOORS -DREVA_SDL -DREVA_VK -o %s/crowd_vk crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c gfx_packet.c games/%s/%s.c gfx_vk.c -lSDL2 -l:libvulkan.so.1 -lm && " % (cc, out, a.game, a.game))   # the loader by its own name: the container has the Pi's Vulkan dev package, and a PC's can't be installed beside it (11-05: until then this target had never linked)
              + "%s -o %s/%s %s/crowd_vk && %s -o %s/%s-safe %s/crowd_soft && echo BUILT" % (strip, out, a.game, out, strip, out, a.game, out)], timeout=3600)
     if "BUILT" not in b.stdout:
         sys.exit("the build in the container failed:\n" + "\n".join(b.stdout.splitlines()[-15:]))

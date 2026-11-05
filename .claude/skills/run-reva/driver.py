@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 """driver.py -- build, launch and DRIVE the club (reva_native/crowd.exe) headlessly.
 
-The club is a fullscreen GLES2 game with no CLI surface: every answer it has comes out
-as PIXELS. This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
+The club is a fullscreen Vulkan game, and how it looks only ever comes out as PIXELS (what it
+decides has a receipt with no window: `check`). This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
 on disk that you are expected to LOOK at -- the engine's own law is "pixels or it
 didn't happen", and a log line is not a receipt.
 
     python .claude/skills/run-reva/driver.py <command> [...]
 
     build                      compile to crowd_new.exe (mingw64 PATH handled)
+    buildvk [--game X]         one game, with no old game modes -> crowd_X_vk.exe (no --game: crowd_vk.exe)
+    buildsoft [--game X]       the same on the engine's own rasterizer, no driver -> crowd_X_soft.exe
+    check [--game X]           THE RECEIPT: the rules' hashes and the frame's against anim_bench/hash_refs,
+                               no window (--bless writes them, once you know why they changed)
     promote                    crowd_new.exe -> crowd.exe (after you've looked)
     kill                       kill any running instance (only one may run)
+    up / down                  leave ONE window running for a run of shots (--live on lab, face, looks), close it
     packs [substr]             list packs, or census one pack's clips/morphs/marks
     shot OUT.png               boot the club and capture a frame
     lab OUT.png                the ANIM LAB with a ctl line (--ctl "...")
+    looks OUT.png              ONE SET FROM EVERY CAMERA in one boot (--set, --cams): a PNG a camera, and a sheet
     face OUT.png               the FACE RIG (8 angles + mouth/eye cams) + mark gizmo
     scene OUT.mp4              record a conversation scene with its audio muxed in
     bench OUT.png              ONE BODY, FOUR ANGLES x N frames, nothing else in frame

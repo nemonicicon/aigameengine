@@ -6,11 +6,11 @@
 #   game   a folder in games/, default rvz, which keeps the old doors in as build_pi.sh does; any other game builds without them
 #   data   also send what a run reads: the games, rules, voice and the receipts' references
 # It lands on the Pi as crowd_vk and crowd_headless for rvz, crowd_<game>_vk and crowd_<game>_h otherwise.
-# First time, in the container: dpkg --add-architecture arm64; apt-get update; apt-get install --no-install-recommends gcc-aarch64-linux-gnu libsdl2-dev:arm64 libvulkan-dev:arm64 libdrm-dev:arm64 libgbm-dev:arm64 libegl-dev:arm64 libgles-dev:arm64
+# First time, in the container: dpkg --add-architecture arm64; apt-get update; apt-get install --no-install-recommends gcc-aarch64-linux-gnu libsdl2-dev:arm64 libvulkan-dev:arm64 libdrm-dev:arm64
 set -e
 export MSYS_NO_PATHCONV=1
 WHAT=${1:-vk}; GAME=${2:-rvz}; DATA=${3:-}
-PI=${PI:-nemonic@reva.local}; PIDIR=${PIDIR:-engine_test/reva_native}; BOX=${BOX:-revalinux}
+PI=${PI:-pi@raspberrypi.local}; PIDIR=${PIDIR:-engine_test/reva_native}; BOX=${BOX:-revalinux}
 EXTRA=-DREVA_NODOORS; [ "$GAME" = rvz ] && EXTRA=
 OUT=crowd_${GAME}_vk; [ "$WHAT" = headless ] && OUT=crowd_${GAME}_h
 if [ "$GAME" = rvz ]; then OUT=crowd_vk; [ "$WHAT" = headless ] && OUT=crowd_headless; fi

@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 if [ "$(id -u)" != 0 ]; then echo "run this with sudo"; exit 1; fi
 if [ "$(uname -m)" != aarch64 ]; then echo "this is for a 64-bit Pi OS: the packs are read through packed structs of floats, which 32-bit VFP won't load"; exit 1; fi
 apt-get update
-apt-get install -y build-essential git libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev libsdl2-dev libstb-dev libvulkan-dev mesa-vulkan-drivers vulkan-tools python3 python3-numpy python3-pil kbd console-setup
+apt-get install -y build-essential git libdrm-dev libsdl2-dev libstb-dev libvulkan-dev mesa-vulkan-drivers vulkan-tools python3 python3-numpy python3-pil kbd console-setup
 vulkaninfo --summary 2>/dev/null | grep -E 'apiVersion|deviceName' || echo "vulkaninfo found no GPU: check dtoverlay=vc4-kms-v3d in config.txt"
 CFG=/boot/firmware/config.txt
 if [ "$1" = --composite ] && [ -f "$CFG" ]; then

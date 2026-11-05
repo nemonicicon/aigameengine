@@ -13,7 +13,7 @@
 /* THE CLUB'S OWN MATH (11-02) is club_math.h: one answer on every machine. A game gets that header through engine.h and nothing else of this one (step 20) */
 #include "club_math.h"
 
-/* club_math.c: column-major 4x4, the same math as crowd_bench */
+/* club_math.c: column-major 4x4 */
 typedef float M4[16];
 void m4_mul(M4 r,const M4 a,const M4 b);
 void m4_trs(M4 m,const float*t,const float*q,const float*s);

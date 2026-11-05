@@ -5,7 +5,7 @@
 # GPUAT=<s> among the ENVs samples the GPU's own busy counters for 10 s from that second: bin (vertices) and render (pixels).
 # RUNDIR=<dir> among the ENVs runs from there instead of reva_native: a game's own folder.
 LOG=$1; SECS=$2; shift 2
-ENVS=(); GPUAT=-1; RUNDIR=/home/nemonic/engine_test/reva_native
+ENVS=(); GPUAT=-1; RUNDIR="$(dirname "$(readlink -f "$0")")/reva_native"   # club-engine kit: beside this script, whoever's Pi it is
 # ⛔ (11-02) with no -- this loop never ended and took 2 GB in nine minutes
 while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do case "$1" in GPUAT=*) GPUAT=${1#GPUAT=};; RUNDIR=*) RUNDIR=${1#RUNDIR=};; esac; ENVS+=("$1"); shift; done
 if [ "$#" -eq 0 ]; then echo "[run] no -- before the command" > "$LOG"; exit 1; fi

@@ -52,7 +52,6 @@
 #else
 #include <xf86drm.h>
 #include <xf86drmMode.h>
-#include <gbm.h>
 #endif
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG

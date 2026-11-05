@@ -1,4 +1,4 @@
-# REVA's own words, off her sheet (D:/reva902/reva_sheet/sheet5.png). A minor, low, a little behind the beat.
+# REVA's own words, off her character sheet. A minor, low, a little behind the beat.
 #   <note> <beats> <phonemes>      - <beats> is a rest. Phonemes in sing_math.py; a syllable has one vowel.
 #   say <words>                    the words of the notes that follow
 bpm 66

@@ -1,5 +1,5 @@
 extends Node3D
-## demo/main.gd -- the club's camera rigs and skate moves in a Godot 4 scene, built in code.
+## demo/main.gd -- the engine's camera rigs and skate moves in a Godot 4 scene, built in code.
 ##
 ## CLANKER rides a ring among pillars on z_rm_sk_ride (the board animated by the move itself) and throws
 ## a trick every 2.5 s -- pop, kickflip, shove-it, manual, grab, method, each one-shot handing back to the

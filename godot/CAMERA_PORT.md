@@ -1,6 +1,6 @@
-# PORTING THE CLUB'S CAMERAS TO GODOT 4 — a brief for a person or an AI
+# PORTING THE ENGINE'S CAMERAS TO GODOT 4 — a brief for a person or an AI
 
-The club engine's camera rigs, specified exactly from the engine's C (`reva_native/engine/scene.inc`, `panic.inc` and `post.inc`; each function is named below), with
+The engine's camera rigs, specified exactly from the engine's C (`reva_native/engine/scene.inc`, `panic.inc` and `post.inc`; each function is named below), with
 the Godot 4 equivalent of each, an implementation (`club_camera.gd`, `club_camera_post.gdshader`) and a
 definition of done.
 
@@ -15,10 +15,10 @@ The rigs are scored with the REFERENCE filmer, `filmer=reva` (her moves on the s
 comparable: the demo's default filmer is now x3d, a smaller body whose retargeted filming move bobs the phone
 less (2.9x) -- a property of the filmer, not of the rig.
 Two bugs the Godot run found and fixed: `E` is a Godot shader built-in (the seven-segment flags collided),
-and the club's own phone chrome drew its timer digits 2.5x too narrow (now square in both orientations).
+and the engine's own phone chrome drew its timer digits 2.5x too narrow (now square in both orientations).
 
-**Units.** The club's world is ~1.75x metric ("club units", heads at y 2.6–3.1). Every distance below is
-given as `club u (≈ metres)`; the metre figure is club ÷ 1.75. Angles in degrees, rates in rad/s.
+**Units.** The engine's world is ~1.75x metric ("engine units", which its older notes call club units; heads at
+y 2.6–3.1). Every distance below is given as `u (≈ metres)`; the metre figure is u ÷ 1.75. Angles in degrees, rates in rad/s.
 **The rule behind all of it:** every shot is a camera that EXISTS in the place — a phone in someone's hand
 or a tripod someone left standing. The lens moves on its own smooth clock even when the bodies step.
 
@@ -43,7 +43,7 @@ damped lens lands ON a moving subject instead of behind it.
 
 ## 2 · The rigs
 
-| rig | club key | behaviour (exact) | Godot 4 |
+| rig | engine key | behaviour (exact) | Godot 4 |
 |---|---|---|---|
 | **tripod** | `cam=ex,ey,ez,ax,ay,az[,fov]` | eye and aim pinned until `cam=off` | a `Camera3D` placed and `look_at`; nothing moves |
 | **move** (dolly / crane / push-in) | `cammove=…` + `camsecs=` | eye, aim and fov eased from the line's `cam=` to the target over `camsecs` with `lensEase`; NO spring — the ease is the smoothing (`camTrackTick`, mode 3) | tween the three with an ease-in-out (or `lensEase` by hand) |
@@ -66,7 +66,7 @@ frame from the bodies' published eye, hand and hip marks — a larger port. Its 
 
 ## 3 · The lens and the phone's frame (the post pass)
 
-`club_camera_post.gdshader` is the club's post fragment shader as it was when this was ported (the engine's own is `reva_native/shaders/post.frag` now, and has grown since) for a
+`club_camera_post.gdshader` is the engine's post fragment shader as it was when this was ported (the engine's own is `reva_native/shaders/post.frag` now, and has grown since) for a
 `ColorRect` covering the viewport:
 
 - **The fisheye is a projection, not a polynomial**: radius on the frame = angle off the axis (`r = f·θ`),
@@ -81,7 +81,7 @@ frame from the bodies' published eye, hand and hip marks — a larger port. Its 
   that moves every frame, a red REC dot blinking (on 65% of each second) and a seven-segment `M:SS` timer
   drawn in the shader, top-left of HER screen — all AFTER the tone curve, because a camera's own frame is
   not part of the scene's exposure.
-- The club's **tone knee** (a luminance shoulder toward a 0.96 white point, `tone` = where it starts),
+- The engine's **tone knee** (a luminance shoulder toward a 0.96 white point, `tone` = where it starts),
   bloom and FXAA are Godot's `Environment` (tonemap, glow) and `Project Settings > Rendering > Anti
   Aliasing > FXAA`. The shader keeps the knee as an option (`tone` uniform, 0 = off) for a like-for-like
   comparison.
@@ -94,11 +94,11 @@ frame from the bodies' published eye, hand and hip marks — a larger port. Its 
 - ⛔ Aim height: a rider ~1.1 u (≈ 0.63 m) above the body origin, a body lying on the ground 0.55 u; at
   0.95 through a fisheye the skater's head was cut off on the kickflip.
 - ⛔ No lens here knows what is between it and its subject: a tracking lens went into a pillar. Godot has
-  what the club lacks — a `RayCast3D` / `SpringArm3D` from the aim to the eye — use it.
+  what the engine lacks — a `RayCast3D` / `SpringArm3D` from the aim to the eye — use it.
 - ⛔ Fast action under a moving lens must not be stepped: on a 12 fps exposure the pose jumps every 5th
   frame while the lens moves every frame, which reads as judder and double images.
 
-## 5 · Definition of done — test it the way the club does
+## 5 · Definition of done — test it the way the engine itself is tested
 
 Record with Godot's **Movie Maker** mode (fixed frame rate, deterministic: `--write-movie out.avi
 --fixed-fps 60`, or Project Settings > Editor > Movie Writer), convert to mp4 (`ffmpeg -i out.avi out.mp4`),

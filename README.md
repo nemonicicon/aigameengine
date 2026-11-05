@@ -1,217 +1,321 @@
-# THE CLUB — engine, animation tools and references
+# aigameengine
 
-Firestrider Studios' game engine and everything built around it for making characters move and
-filming them — **without the content**. No characters, props, levels, audio, episodes, story or
-game-design documents are in this repository; the engine, the games that prove it, the tools and the
-hard-won notes are.
+An AI-first game engine in C, from Firestrider Studios.
 
-It was built with an AI pair (Claude Code) over ten weeks of daily sessions: a working game engine on
-Vulkan, a second renderer of its own that needs no driver at all, eight small games, a stop-motion
-cartoon shot in it, a music video, and a skate-filming look test. Every rule in the docs was paid for
-by a real failure, and most of them say which one.
+It is a small, complete engine. It draws 3D characters with animation, cloth, hair and faces, and 2D
+sprites. It has physics, sound, menus, saves, split screen for four pads, and play across machines. It runs
+on a Windows or Linux PC, and on a Raspberry Pi 4 plugged into an old tube TV. With it come eight small
+games, the tools for bringing characters in and animating them, and the notes on how all of it was built.
 
-The engine and its tools are under the MIT licence ([LICENSE](LICENSE)). [NOTICES.md](NOTICES.md) says
-whose work is inside a build besides ours, and what must never be put in this repository.
+**AI-first** means it is made to be worked on by an AI assistant, with a person directing. You say what you
+want. Your assistant builds it, runs it, checks it and shows you a picture. For that to work, everything
+here runs from a command line, a game can be played and photographed with no window on the screen, and a
+check that takes seconds says whether a change altered the game. What stays yours is the judging: nothing
+here decides whether a picture looks right or a game feels good.
 
-## What is here
+Nothing from the studio's own games is included: no characters, levels, audio or story. The eight games
+make everything they need by code. The licence is MIT ([LICENSE](LICENSE), [NOTICES.md](NOTICES.md)).
 
-| | |
+## Where to go
+
+| You want to | Read |
 |---|---|
-| **The engine** | `reva_native/crowd_kms.c` — one translation unit, a table of contents over `reva_native/engine/*.inc`. A frame is plain data first (`gfx_packet.c`: the packet), and three things take it. The Vulkan 1.3 renderer (`gfx_vk.c`, the shaders in `shaders/`) draws it on SDL's window on a PC, and straight into the display card's buffers on a Raspberry Pi 4 with a composite CRT on the end of it. The engine's own rasterizer (`gfx_soft.c`) draws the same frame on the processor at 320 x 240, with no graphics driver, and the same pixels on every machine. The no-display build only hashes it. What it does: skinned characters (up to 1023 bones), morph targets, layered animation and an animation graph in a text file, root motion, a 46-slot canonical rig that takes Mixamo / Unreal / Character Creator / Daz / Rigify skeletons by bone name, retargeting, hair chains, cloth, a ragdoll, loose objects with physics, walking on real triangles, a contact pass (limbs out of furniture and each other), actor minds and paths, faces and conversations, people built from measurements while a game runs, a streaming world, sun shadows and up to 256 lights, materials (highlights, reflections, normal maps), skin, hair, eyes and fur, particles, decals, level of detail, water, foliage, a post pass (bloom, the tone knee, a grade, depth of field, a tube's look on a flat panel), sound, music and saves, menus and text that read on a tube, text past ASCII and a language as a file, four pads and split screen, a stop-motion exposure clock, a scene and dialogue system, the camera rigs (see [CAMERA.md](CAMERA.md)), and online play: one game on two to four machines. |
-| **The games** | `reva_native/games/` — a game is one C file against `reva_native/engine.h` (`EngineAPI` is what the engine offers, `GameExport` what a game does, both append-only behind a version). `sample` is TAG and the place to start one, `rocks` a 2D game with no bodies, `rally` bats and a ball for one to four and the place to start an online game, `tower` 3D action with walkable triangles, `herd` a crowd of hundreds, `roam` a streaming world, `talk` a talking game, `people` a character built while the game runs. Each has its own receipt, and everything in them is made by code. |
-| **The camera** | tripods, dollies, cranes, orbits, tracking and panning lenses, a hand-held phone that rides a character's wrist, a phone-screen feed, an equidistant fisheye, a shot ladder with guaranteed head room, and a stop-motion tripod. [CAMERA.md](CAMERA.md). |
-| **Animation tools** | `skate_src/author/` — authoring moves IN CODE (FK, aim, two-bone IK, eases with anticipation and settle), the move scores themselves (`moves/`: skating, board carry, a hug, a kiss, a cartwheel, a bow…), clip slicing, retargeting, faces (marks, jaw, mouth interior, ARKit morphs), fingers, a body's anatomy set from a table of measurements, and fitting PREMADE clothing onto a character. [ANIMATION.md](ANIMATION.md). |
-| **Asset pipelines** | `skate_src/` — rigged GLB → engine pack, BVH → pack, headless Unreal Engine → glTF export (any UE project's characters, weapons and props), an unrigged statue → a body that plays the move library, a procedural suburban street, a game's own cook (`cook_game.py`: a film pack to a game pack, textures compressed), lighter copies of a prop or a body for distance (`lod.py`), what a surface is made of (`material.py`), and the TV font's art (`tvfont_more.py`). |
-| **Checks** | `reva_native/anim_bench/` + `skate_src/film/` + `skate_src/robot_neko/`. The receipt (`hashcheck.py`): the rules' hashes, the frame's, one frame's pixels on Mesa's software Vulkan, and three frames of the engine's own rasterizer, which must be the same on every machine. `netcheck.py`: two to four engines in one online session on a wire made as bad as asked, every machine's hashes held against the others'. `fuzzcheck.py`: every kind of file a game reads, broken hundreds of ways, under the compiler's memory checkers. `warncheck.py`: no compiler warnings, any way it's built. Then the pack format's checker, posture, motion, weight and step checks; a four-angle-by-time bench for any body; film-grammar and framing audits; held-frame and clipped-highlight checks on a delivered video; an audio-event check; procedural foley. |
-| **References** | `design/` — the engine plan (`engine_plan.md`: its queue of 29 steps, what each built, what each didn't, and what was decided), animation principles (the Williams layer), authoring, skating, cloth, faces, scene direction, cinematography (Mascelli / Murch / Katz, distilled), the level format, the pack format, the character standard, and `engine_capabilities.md`: every capability with the failure that exposed it. `design/papers/README.md` lists the physics papers used (links, not copies). |
-| **AI workflow** | `CLAUDE.md` and `.claude/skills/` — the instructions and skills the AI worked from: how to build, run and screenshot the engine (`run-reva`, with `driver.py`), film craft, and "build the capability instead of working around it". `AGENTS.md` is the same brief for any other assistant. |
-
-## Using it with Godot 4 (or with any AI)
-
-`AGENTS.md` is the brief for an AI assistant (GPT, Grok, Codex, Claude): what to read, in what order, and the
-rules this engine was built by. `godot/` is the hand-off to a Godot 4 project:
-- `godot/animations/*.glb` — our skate moves (with the skateboard animated per trick) and other authored moves,
-  on a Mixamo-named skeleton, verified in Blender to 5 micrometres; `godot/ANIMATION_IMPORT.md` to retarget them.
-- `godot/CAMERA_PORT.md` — every camera rig specified exactly; `club_camera.gd` + `club_camera_post.gdshader`
-  implement them, VERIFIED in Godot 4.7.2 — `godot/` is itself a Godot project: open it and press F5.
-- `godot/characters/` — **ready-to-play characters**, each ONE `.glb` with its body, texture and rig, the 14 skate
-  moves already on its own skeleton and the board animated per trick (no retargeting): **CLANKER** the robot,
-  **X3D** the skater girl, **R.E.V.A. 902** with her four outfits, and **the Suit Man**, all four made entirely
-  by code (the first two's builders are here: `skate_src/robot/build_robot.py`, `skate_src/x3d/build_x3d.py`).
-  Clanker and x3d star in the demo: he rides, she films him. `godot/characters/club_hair.gd`:
-  `ClubHair.attach(instance)` gives any character's hair chains spring physics (Godot 4.4+);
-  `club_wardrobe.gd`: `ClubWardrobe.attach(instance, "<outfit>")` dresses one that has a wardrobe;
-  `godot/characters/README.md` lists them all.
-- `skate_src/author/rpack2gltf.py` — export any pack's skeleton and authored clips to `.glb` (`--mesh`: with
-  the pack's own skinned, textured body instead of the stick figure).
-
-## What is NOT here
-
-Characters (`reva_native/packs/` — the exceptions are the ones in `godot/characters/`, ours and made by code,
-and the games' own small bodies, built by code by each game's `make_body.py` or `make_assets.py`), props
-(`props/`), audio (`aud/`, `aud2/`), levels (`reva_native/sets/` keeps the bench's fixture, three small demo
-sets made by code, and one short episode's two), scenes and episodes (`reva_native/scenes/` keeps the engine's
-test fixtures, four songs for the singing voice that's made by math, and `one_take` and `this_morning`: the one
-episode that was made in this repository, with the two characters that are ours and made by code), source
-models, the game-mode designs and the story. Those were third-party assets (Fab, Sketchfab, Mixamo,
-Unreal marketplace projects) or the studio's own IP. The only typeface is the engine's own TV font; the wide
-glyphs a Chinese, Japanese or Korean game needs are baked from a font its maker has the right to use
-(`skate_src/author/fontbake.py`), and none ships.
-
-So **the club itself boots to `FATAL: no packs` until you bake a character** (below). The games in
-`reva_native/games/` need nothing: start there.
+| Play one of the games, or change one | [Quick start](#quick-start-windows) |
+| Work on it with an AI assistant | [Working with an AI assistant](#working-with-an-ai-assistant) |
+| Make your own game | [Make your own game](#make-your-own-game) |
+| Use the characters, moves or cameras in Godot 4 | [Using it with Godot 4](#using-it-with-godot-4) |
+| Animate or film a character of your own | [Bring your own character](#bring-your-own-character) |
+| Run it on Linux, or on a Raspberry Pi and a TV | [Other machines](#other-machines) |
+| Know what has been tested and what hasn't | [How far it has been checked](#how-far-it-has-been-checked) |
 
 ## Quick start (Windows)
 
-1. Install MSYS2 and, in its MINGW64 shell: `pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2 mingw-w64-x86_64-vulkan-devel mingw-w64-x86_64-stb`
-   (SDL2, the Vulkan headers and loader, and the stb headers — the engine includes `<stb/stb_image.h>`).
-   A Vulkan driver comes with your GPU's own driver. Shaders are prebuilt (`reva_native/gfx_spv.h`);
-   `glslc` from the Vulkan SDK is only needed to change one (`python reva_native/shaders/build_spv.py`).
-   `reva_native/toolchain.lock` names the exact versions it was last built and blessed with, and
-   `python reva_native/anim_bench/toolcheck.py` says what's different on your machine.
-2. Python 3 with `numpy` and `Pillow` for the tools. ⛔ Not the Microsoft Store `python` alias. Point
-   the tools at a real interpreter with `CLUB_PYTHON=/path/to/python.exe` (default: the Python running the tool).
-3. Build and play a game (⛔ `mingw64/bin` MUST be on PATH or gcc dies silently with exit 1; the driver sets it):
-   ```bash
-   python .claude/skills/run-reva/driver.py buildvk --game rocks     # -> reva_native/crowd_rocks_vk.exe
-   reva_native/games/rocks/play.bat
-   python .claude/skills/run-reva/driver.py check --game rocks       # the receipt: the same hashes as blessed, no window, seconds
-   ```
-   `--game sample` is TAG, and `rally`, `tower`, `herd`, `roam`, `talk`, `people` are the others (`roam`, `talk`
-   and `people` want `python reva_native/games/<name>/make_assets.py` first: their packs are made by code and
-   aren't kept in git). `buildvk` alone builds the club, as `reva_native/crowd_vk.exe`. By hand, the whole line
-   is one gcc call:
-   `gcc -O2 -std=gnu17 -ffp-contract=off -DREVA_VK -DREVA_NODOORS -o crowd_rocks_vk.exe crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c games/rocks/rocks.c crowd_win_rc.o gfx_packet.c gfx_vk.c -Dmain=SDL_main -lws2_32 -lmingw32 -lSDL2main -lSDL2 -lvulkan-1 -lm`
-   (`crowd_win_rc.o` is the UTF-8 manifest, `windres crowd_win.rc -O coff -o crowd_win_rc.o`; without it `fopen` dies on a non-ASCII pack name. `-DREVA_HEADLESS` with `gfx_packet.c` alone, no `gfx_vk.c` and no Vulkan, is the no-display build the receipt runs.)
-4. **No Vulkan driver, or none you trust?** The same game on the engine's own rasterizer, which links no
-   graphics library at all:
-   ```bash
-   python .claude/skills/run-reva/driver.py buildsoft --game rocks   # -> reva_native/crowd_rocks_soft.exe
-   cd reva_native/games/rocks && REVA_WINDOWED=1 ../../crowd_rocks_soft.exe 0 packs
-   ```
-   It's the budget picture: 320 x 240, no shadows, mirrors, fur or materials. `REVA_NOWINDOW=1` draws with no
-   window at all, which is how a picture is taken on a machine with no screen.
-5. Bake a character for the club itself: any rigged, animated GLB (a Mixamo export, a UE mannequin export, …):
-   ```bash
-   mkdir -p reva_native/packs
-   python skate_src/glb2rpack_anim.py my_character.glb reva_native/packs/v1_mychar.rpack --keepnames
-   ```
-   The engine loads every `packs/v1_*.rpack` at boot and maps its skeleton by bone name.
-6. Run the club: `python .claude/skills/run-reva/driver.py build` (-> `crowd_new.exe`; look at pixels, then
-   `promote`), then `REVA_WINDOWED=1 ./crowd.exe 400 packs select` (fullscreen without `REVA_WINDOWED`), or
-   drive it headless with the driver (`lab`, `bench`, `scene`, `looks`, `up`/`--live`).
+Install three things, once:
+
+1. **MSYS2**, where it installs itself (`C:\msys64`). Then, in its MINGW64 shell:
+   `pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2 mingw-w64-x86_64-vulkan-devel mingw-w64-x86_64-stb`
+2. **Python 3** from python.org, then `pip install numpy Pillow`. The `python` that opens the Microsoft Store
+   is not Python.
+3. **A graphics driver with Vulkan.** Any recent graphics card's driver has it. With none, see
+   [No graphics driver?](#no-graphics-driver)
+
+The commands on this page are for a bash shell, such as Git Bash, run from the repository's top folder.
+
+```bash
+python .claude/skills/run-reva/driver.py buildvk --game rocks
+reva_native/games/rocks/play.bat
+```
+
+That builds and starts `rocks`, a 2D shooter. A and D or the stick move, Space or the A button shoots. Leave
+it alone and it plays itself.
+
+Now check that your build is the same game as everyone else's:
+
+```bash
+python .claude/skills/run-reva/driver.py check --game rocks
+```
+
+It plays the game with no window and compares what happened, tick by tick, with the recorded answer.
+`all same` means your machine plays exactly the game ours does. The notes call this check **the receipt**.
+
+### The eight games
+
+Put another name in the same two commands.
+
+| Game | What it is | The place to start |
+|---|---|---|
+| `sample` | Tag: run the others down before the clock runs out | any game. It is the smallest |
+| `rocks` | a 2D shooter for up to four | a 2D game |
+| `rally` | bats and a ball for one to four | a game played across machines |
+| `tower` | climb, punch and light three beacons, with split screen | a 3D action game |
+| `herd` | hundreds of bodies on a field: gather yours, turn theirs | a crowd or strategy game |
+| `roam` | a world bigger than memory, loaded as you run across it | an open world |
+| `talk` | two people and a conversation, with faces that move | a game whose people talk |
+| `people` | a character creator: a person made from measurements | a game where players make themselves |
+
+`roam`, `talk` and `people` make their files before their first build:
+`python reva_native/games/<name>/make_assets.py`. The first lines of each game's C file say what it shows
+and how it's played.
+
+### No graphics driver?
+
+The engine has a second renderer of its own. It draws on the processor and links no graphics library.
+
+```bash
+python .claude/skills/run-reva/driver.py buildsoft --game rocks
+cd reva_native/games/rocks
+REVA_WINDOWED=1 ../../crowd_rocks_soft.exe 0 packs
+```
+
+It is the plain picture: 320 x 240, no shadows and no materials. Its pixels are the same on every machine.
+
+### If it doesn't work
+
+- **The build ends at once and says nothing.** gcc isn't where the driver looks. MSYS2 has to be at `C:\msys64`.
+- **`FATAL: no packs`.** That game makes its files first: see the line under the table above.
+- **Python opens the Microsoft Store, or a tool hangs.** That is the Store's stand-in. Install real Python.
+
+## Working with an AI assistant
+
+- **Claude Code:** open this folder. It reads [CLAUDE.md](CLAUDE.md) and the skills in `.claude/skills/` by
+  itself.
+- **Any other assistant** (ChatGPT, Codex, Grok and the rest): give it [AGENTS.md](AGENTS.md) first. It is
+  plain text, written to be pasted into a chat.
+
+Then ask in your own words. These work today, and this is what the engine gives your assistant to do them:
+
+| You ask | It uses |
+|---|---|
+| "Build rocks and show me a picture of it." | the engine's own renderer, which draws with no window |
+| "Play ten seconds holding right and shooting, and show me where it ends up." | the bridge: a running game takes commands |
+| "I changed the rocks' speed. Did anything else change?" | the receipt |
+| "Add a second kind of rock." | one C file, and one header that lists everything the engine offers |
+
+You don't type the commands below. They are here so you know what your assistant can do.
+
+```bash
+# a picture of a game with no window: it is drawn in memory, written to a file, and the run ends
+# (crowd_rocks_soft.exe is the build from "No graphics driver?" above)
+cd reva_native/games/rocks
+REVA_NOWINDOW=1 REVA_FIXEDSTEP=60 REVA_SHOT=500 REVA_SHOT_PATH='C:\somewhere\rocks.ppm' ../../crowd_rocks_soft.exe 0 packs
+
+# a running game, driven: stop its clock, press a button, run sixty ticks, ask where things stand
+REVA_NOWINDOW=1 REVA_BRIDGE=7766 ../../crowd_rocks_soft.exe 0 packs &
+python ../../anim_bench/bridge.py hold
+python ../../anim_bench/bridge.py press a 30
+python ../../anim_bench/bridge.py step 60
+python ../../anim_bench/bridge.py get_state
+python ../../anim_bench/bridge.py quit
+```
+
+Two things to hold your assistant to:
+
+- **A check says nothing has changed. It never says anything is right.** Look at a full picture, and play
+  the game, before you believe it works.
+- **If the engine can't do something, it gets built**, not worked around. `.claude/skills/build-the-capability`
+  is how.
+
+## Make your own game
+
+A game is one C file that includes one header.
+
+1. Copy `reva_native/games/sample` to `reva_native/games/mygame`, and rename `sample.c` in it to `mygame.c`.
+2. Build it with `--game mygame`, exactly as above. In the copied `play.bat`, change `crowd_sample_vk.exe`
+   to `crowd_mygame_vk.exe`.
+3. Change the game. `tick` runs sixty times a second and changes the game's state. `draw` and `hud` put
+   that state on the screen and cannot change it. [reva_native/engine.h](reva_native/engine.h) is
+   everything the engine offers a game, and a game uses nothing else.
+4. When it's worth protecting, give it a receipt: a few lines in `reva_native/anim_bench/hashcheck.py`
+   beside the other games', recorded once. Your assistant can add them.
+
+Start from `rocks` for 2D and from `rally` for a game played across machines.
+
+## What's in the repository
+
+| Folder | What's in it |
+|---|---|
+| `reva_native/` | the engine. `engine.h` is what a game sees, and `engine/` with the `.c` files beside it is the engine |
+| `reva_native/games/` | the eight games |
+| `reva_native/anim_bench/` | the checks: the receipt, the online check, the file-reader fuzzer and more |
+| `reva_native/devconsole/` | making a game on a Raspberry Pi with only a TV |
+| `skate_src/` | the tools: bringing characters in, writing animation in code, building levels |
+| `godot/` | what a Godot 4 project can take: characters, moves, camera rigs |
+| `design/` | the notes: the engine's plan step by step, the file formats, and the craft of animation and film |
+| `.claude/skills/` | what an AI assistant loads: how to build, run and photograph the engine, and film craft |
+| `AGENTS.md`, `CLAUDE.md` | the briefs an AI assistant reads first |
+
+About the names: `reva_native`, `skate_src`, `crowd_*.exe`, the `REVA_` switches and files called `club_*`
+all come from the project this engine grew out of. They are only names, kept so nothing breaks.
+
+## What the engine does
+
+- **Characters:** skinned bodies of up to 1023 bones, face and body shapes, layered animation, an animation
+  graph in a text file, hair, cloth, a ragdoll, talking faces, and people built from measurements while a
+  game runs. Skeletons from Mixamo, Unreal, Character Creator, Daz and Rigify are recognised by bone name.
+- **Worlds:** levels as text files, walking on a level's real triangles, loose objects with physics, crowds
+  of hundreds, and a world that loads as you cross it.
+- **The picture:** a Vulkan renderer with sun shadows, up to 256 lights, materials, skin, hair, eyes and
+  fur, particles, decals, water, foliage, depth of field and a tube TV's look on a flat panel. Beside it,
+  the engine's own renderer, which needs no graphics driver.
+- **What a game needs:** four pads, split screen, menus and text that read on a tube TV, sound and music,
+  saves, online play for two to four machines, and text in other languages, which is built and switched off.
+- **Film:** scenes and dialogue as text files, camera rigs, and a stop-motion clock. [CAMERA.md](CAMERA.md)
+  and [ANIMATION.md](ANIMATION.md) are the guides.
+
+`design/engine_plan.md` says what each part does, and also what each part doesn't.
+
+## Other machines
+
+### Linux
+
+```bash
+sudo apt-get install libsdl2-dev libvulkan-dev libstb-dev libdrm-dev
+cd reva_native
+./build_linux.sh                  # the Vulkan build: crowd_linux
+./build_linux.sh soft             # the engine's own renderer: crowd_soft
+./build_linux.sh headless         # no display at all, for the receipt: crowd_headless
+python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft
+```
+
+`GAME=games/rocks/rocks.c` in front of a build picks the game. `bash .github/ci.sh` from the top folder runs
+everything this repository's CI runs, in about five minutes, with no graphics card and no window.
+
+### Raspberry Pi 4
+
+On a fresh 64-bit Raspberry Pi OS Lite, from `reva_native`:
+
+```bash
+sudo bash devconsole/setup_pi.sh
+```
+
+It installs what the engine needs, builds it, builds the sample game and runs its receipt. The script is
+written and has not yet been tried on a fresh card. `build_pi.sh` has the builds one at a time. The Pi draws straight to the screen with no desktop under it.
+It has been run on a composite tube TV, at 240p and 480i: `setup_pi.sh --composite` turns that output on, and
+HDMI off. On its first start the engine asks about your screen, out loud.
+[reva_native/devconsole/README.md](reva_native/devconsole/README.md) is about making a game on the Pi itself,
+with your assistant in a chat box on the TV.
 
 ## Two machines, one game
-
-Online play is lockstep on the engine's tick: every machine works out the same world from the same dice and
-the same pads, so all that crosses the wire is pad state, and a Pi and a PC can share a game. A button is
-played a few ticks after it's pressed, on every machine, and a slow wire holds the picture for a moment
-instead of changing the game. It is not rollback; `design/engine_plan.md`, step 29, says why.
 
 ```bash
 python .claude/skills/run-reva/driver.py buildvk --game rally
 reva_native/games/rally/host.bat                  # on one machine: it waits, and shows its address
-reva_native/games/rally/join.bat 192.168.1.20     # on the other (join.bat 127.0.0.1: a second window on the same one)
-python .claude/skills/run-reva/driver.py check --game rally     # builds the no-display engine netcheck uses
-python reva_native/anim_bench/netcheck.py         # ten cases with no window, about a minute
+reva_native/games/rally/join.bat 192.168.1.20     # on the others, with the host's address
 ```
 
-`REVA_NET=host[:port[:pads]]` or `REVA_NET=join:address[:port]` makes any game's run a session, and a game's
-own menu can ask for the same (`E->netHost`, `E->netJoin`; `games/rally/rally.c` shows it). UDP, port 7777 on
-the host, which has to be reachable: the same network, or a port opened on a router. Nothing on the wire is
-secret or signed. It's for friends.
+`join.bat 127.0.0.1` in a second window is two players on one PC. Every machine works out the same game from
+the same pad presses, so only the pads cross the wire, and a PC and a Pi can share a game. A button is played
+a few ticks after it's pressed, on every machine alike. The host needs UDP port 7777 reachable: the same
+network, or a port opened on a router. Nothing on the wire is secret or signed. It is for friends.
 
 ## A game to hand to someone
 
 ```bash
-python reva_native/package.py --game rocks        # -> reva_native/dist/rocks-<version>-windows-x64/ and its .zip
+python reva_native/package.py --game rocks
 ```
 
-The folder holds the game on Vulkan, the same game on the engine's own rasterizer for a machine whose driver
-won't start, the libraries Windows hasn't got, exactly the files the game reads, the licences, and every
-file's sha256. Before it's zipped, the packaged build replays the game's receipt from inside its own folder.
-`--target pi` and `--target linux` build in a container (`docker`, a Debian image with the cross compiler).
+It writes a folder and a zip under `reva_native/dist/`: the game on both renderers, exactly the files it
+reads, and the licences. Before it zips, it replays the game's receipt from inside the folder.
 
-## Quick start (Linux)
+`--target linux` and `--target pi` do the same for those machines. They build inside a Docker container
+called `revalinux`: Debian 13 with the ARM cross compiler, and `reva_native` mounted at `/src`. Making that
+container isn't scripted yet. The first lines of `reva_native/anim_bench/pi/cross.sh` say what goes in it.
 
-The same files build against SDL2 and Vulkan with `-DREVA_SDL -DREVA_VK`. No GPU needed: Mesa's lavapipe
-(Vulkan on the CPU) renders every pass the club has, and the engine's own rasterizer needs no Vulkan at all.
+## Bring your own character
+
+The engine also has an animation lab and a scene player, which the animation and film tools use. They need a
+character, and none is included. Any rigged, animated GLB will do. This bakes the robot that ships in
+`godot/` and takes a picture of it from four sides, with no window:
 
 ```bash
-sudo apt-get install libsdl2-dev libvulkan-dev libstb-dev mesa-vulkan-drivers xvfb
-pip install numpy Pillow
-reva_native/build_linux.sh                        # -> reva_native/crowd_linux   (GAME=games/rocks/rocks.c picks a game)
-reva_native/build_linux.sh headless               # -> reva_native/crowd_headless: the rules only, no display
-reva_native/build_linux.sh soft                   # -> reva_native/crowd_soft: the engine's own rasterizer
-cd reva_native && python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft   # the receipt
-# with no GPU and no desktop: lavapipe under Xvfb
-VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json REVA_WINDOWED=1 xvfb-run -a -s "-screen 0 1280x720x24" stdbuf -o0 ./crowd_linux 400 packs select
+mkdir -p reva_native/packs
+python skate_src/glb2rpack_anim.py godot/characters/clanker/clanker.glb reva_native/packs/v1_clanker.rpack --keepnames
+python .claude/skills/run-reva/driver.py buildsoft
+python .claude/skills/run-reva/driver.py lab out/clanker.png --soft --subject clanker --ctl "face=0 grid=4 dqs=0 clip=z_rm_sk_ride partner=off"
 ```
 
-`bash .github/ci.sh` is what this repository's CI runs, on your own machine: every build above and the Pi's,
-five games' receipts, online play's ten cases on loopback, and the receipt again with fresh memory filled two
-ways. About five minutes where it was tried, with no GPU, no display and no window.
+Put your own file in place of the robot's. What you bake lands in folders git ignores, `packs/` and `props/`. It is
+yours and not in the repository, so keep your own copy. [ANIMATION.md](ANIMATION.md) goes on from here:
+writing moves in code, retargeting, faces, fingers and fitting clothes.
 
-`driver.py` is still the Windows driver, and `.claude/skills/run-reva/linux_lab.py` / `linux_scene.py` are
-its twins here. `anim_bench/fuzzcheck.py` and `anim_bench/netcheck.py` run here as they are (the fuzzer needs
-gcc's sanitizers, which is why it's a Linux tool).
+## Using it with Godot 4
 
-## Raspberry Pi 4
+The engine does not run inside Godot. What a Godot 4 project can take from `godot/`:
 
-`reva_native/build_pi.sh` (64-bit Raspberry Pi OS, `dtoverlay=vc4-kms-v3d`; `anim_bench/pi/cross.sh` builds
-the same from a PC in a container, about 45 seconds):
+- **Four ready characters:** Clanker the robot, X3D the skater, R.E.V.A. 902 and the Suit Man. Each is one
+  `.glb` with its rig, its texture and fourteen skate moves on its own skeleton.
+  [godot/characters/README.md](godot/characters/README.md) lists them.
+- **The moves** as glTF, with the steps to put them on your own character:
+  [godot/ANIMATION_IMPORT.md](godot/ANIMATION_IMPORT.md).
+- **The camera rigs:** a tripod, a dolly, a tracking lens, an orbit, a hand-held phone and a fisheye, as a
+  script and a shader with their exact spec: [godot/CAMERA_PORT.md](godot/CAMERA_PORT.md). The `godot`
+  folder is itself a Godot project. Open it and press F5.
+- **Helpers:** scripts for hair physics and wardrobes, and the cloth solver as a Godot extension, which has
+  to be built first (`reva_native/clubcloth/`).
 
-- **`vk`** → `crowd_vk`: the direct road. DRM master on the display card, Vulkan straight into its scanout
-  buffers, flipped by the engine itself at the video clock, so every frame has the kernel's flip timestamp. The
-  composite CRT at 480i or 240p (`engine/display.inc` asks about the screen on the first boot, out loud).
-- **`headless`** → `crowd_headless`: the rules only, for the receipt (`python3 anim_bench/hashcheck.py`). Windows
-  x86 and the Pi agree bit for bit.
-- **`soft`** → `crowd_soft`: the engine's own rasterizer, under a desktop or with no window.
-- **`dev`** and **`game`**: the dev console (`reva_native/devconsole/`). `crowd_dev` is the engine with no game in
-  it; `game` builds a game as a library that a running `crowd_dev` picks up between ticks; `REVA_BRIDGE=<port>`
-  and `anim_bench/bridge.py` drive a running engine with a line of JSON each way.
-- A game on a card: `python reva_native/package.py --game sample --target pi`, then
-  `reva_native/devconsole/make_image.sh` writes a Raspberry Pi OS image that boots into it.
+## What isn't here
 
-## Where it stands (11-05), and what nobody has checked
+- **Characters, props, levels and audio** from the studio's games. They were bought assets or the studio's
+  own. The exceptions are ours and made by code: the eight games' small files and the four Godot characters.
+- **Fonts.** The only typeface is the engine's own TV font. The wide glyphs that Chinese, Japanese and Korean
+  need are baked from a font you have the right to use (`skate_src/author/fontbake.py`), and none ships.
+- **The studio's game designs and stories.**
 
-The plan's queue of 29 steps is built. What is true of it, plainly:
+## How far it has been checked
 
-- **On a Windows PC:** every game's receipt is the same as blessed, no build has a compiler warning, and the
-  pictures have been looked at.
-- **On Linux (x86-64) and for the Pi's ARM:** everything compiles and links, five games' receipts and online
-  play's check agree with Windows, and the engine's own rasterizer draws the same pixels. The ARM builds ran
-  under an emulator. The Vulkan build has not been RUN on Linux since the old renderer came out: the machine
-  this was checked on has no display and no Vulkan driver. `roam`, `talk` and `people` have only made their
-  packs on Windows.
-- **The CI** (`.github/workflows/club.yml`): every step of it was run from this repository's files in a Debian
-  container before it was first pushed, on another version of gcc than GitHub's runner has. Whether it holds on
-  the runner is on this repository's Actions page, run by run.
-- **On a real Raspberry Pi 4:** the engine as it was on 11-04 ran on the direct road at 240p and 480i on a
-  composite tube. The Pi's hashes were the PC's when the two were last compared, on 11-02. Nothing built since
-  11-04 has been on one. Performance on the Pi is the plan's last phase, and it hasn't started.
-- **Online play** has only been across one PC's own loopback, with the wire's faults made by the engine. No
-  two real machines have played.
-- **The Pi image builder** has never written a card that was booted.
-- **The other languages' words** (`lang/es.txt`, `lang/ja.txt`) were written by the AI and nobody who reads
-  those languages has checked them, which is why languages are built and left off.
+Plainly, as of 2026-11-05.
 
-## Where to start reading
+| | What has been run | What has not |
+|---|---|---|
+| **Windows PC** | every game's receipt, online play between engines on one PC, and the pictures looked at | two real machines playing each other |
+| **Linux PC** | five games' receipts, the online check and the own renderer's pixels, on every push | the Vulkan build: it compiles and links, and nobody has started it on Linux since Vulkan became the engine's only GPU renderer on 2026-11-04 |
+| **Raspberry Pi 4** | the engine as it was on 2026-11-04, on a real Pi and a tube TV at 240p and 480i | anything built since, which has only run under an ARM emulator. `setup_pi.sh` on a fresh card, and the card image builder |
+| **Godot 4 hand-off** | the cameras and characters in Godot 4.7.2, when each was made. Its scripts were loaded again on 2026-11-05 | the demo itself, which was not run again for this update |
 
-- `CLAUDE.md` — the build, the instruments (`REVA_*` environment switches) and the laws.
-- `design/engine_plan.md` — what's built, step by step, what each step didn't build, and what was decided.
-- `reva_native/engine.h` and `reva_native/games/sample/sample.c` — the boundary, and the smallest game on it.
-  `reva_native/games/rally/rally.c` is the smallest one that's played across machines.
-- `design/animation_principles.md` → `design/animation_authoring.md` → `design/skating.md`.
-- `CAMERA.md` → `design/scene_direction.md` → `design/cinematography.md`.
-- `design/engine_capabilities.md` — what the engine can do, and what each thing cost.
-- `NOTICES.md` — what the licence covers, and what's somebody else's.
+Two more things to know. The Spanish and Japanese words in the games' `lang/` folders were written by an AI
+and no reader of those languages has checked them, which is why languages are built and switched off. And
+performance on the Pi is the plan's last phase, which hasn't started.
 
-## Notes
+## Words you'll meet
 
-- Paths in the tools are repo-relative; outputs default to `./out` (`CLUB_OUT`, `REVA_OUTROOT`).
-- The docs quote the studio's director (jacob) verbatim; that is where the rules came from. Some of the
-  design notes also say where a take was written on the machine they were made on: that's history, not a
-  path you need.
-- ⛔ `packs/ props/ aud/ aud2/ save/ shelf/` are gitignored content folders: a script that "sets up the
-  tree" by creating them empty over live ones wipes a working install with `git status` clean.
+| Word | What it means here |
+|---|---|
+| **tick** | one step of a game's rules. Sixty a second, and the same on every machine |
+| **the receipt** | the check that a game still does exactly what it did: a fingerprint of its rules and of each frame, compared with a recorded one |
+| **tape** | a recording of the pads, tick by tick. Playing it back replays a session exactly |
+| **pack** | a character or a prop baked into the engine's own file (`.rpack`): mesh, skeleton, animation, textures |
+| **set** | a level, as a text file (`.set`) |
+| **scene** | a directed conversation or a film shot, as a text file |
+| **rung** | a picture quality level, from `pi` up to `ultra` |
+| **the lab** | the engine's built-in animation lab: one character, any clip, several cameras |
+| **the bridge** | a running engine's command port: stop the clock, step it, press a button, take a picture |
+
+## More to read
+
+- [CLAUDE.md](CLAUDE.md): every build, every switch, and the rules this engine was built by.
+- `design/engine_plan.md`: what was built, step by step, and what was decided along the way.
+- `design/engine_capabilities.md`: each thing the engine can do, and the failure that led to it.
+- [reva_native/games/sample/sample.c](reva_native/games/sample/sample.c): the smallest whole game.
+
+This engine was built by one person directing an AI, over ten weeks. The notes quote jacob, the studio's
+director, word for word, because that is where the rules came from.

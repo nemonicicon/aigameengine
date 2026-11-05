@@ -12,8 +12,8 @@ A frame is plain data first, and three things take it: the Vulkan renderer, the 
 it. The games that prove it are in `reva_native/games/` (one C file each against `engine.h`), and one game
 can be played on two to four machines. Then the animation authoring tools, the checks and the references.
 **No content** (characters, levels, audio) is included; the games need none. The licence is MIT (`LICENSE`),
-and `NOTICES.md` says what in a build is somebody else's. Maps: `README.md` (its Quick start builds and
-plays a game in three lines), `CLAUDE.md` (the build, the switches and the laws), `design/engine_plan.md`,
+and `NOTICES.md` says what in a build is somebody else's. Maps: `README.md` (written for people: its
+Quick start builds and plays a game in two commands), `CLAUDE.md` (the build, the switches and the laws), `design/engine_plan.md`,
 `ANIMATION.md`, `CAMERA.md`. This engine does not run inside another engine — what travels to Godot is the
 **animations** (as glTF) and the **camera rigs** (as a spec to port), both prepared for Godot 4 in `godot/`.
 
@@ -24,7 +24,8 @@ plays a game in three lines), `CLAUDE.md` (the build, the switches and the laws)
 | start a game | `reva_native/engine.h` (everything a game sees of the engine), then `reva_native/games/sample/sample.c` (TAG, 3D, one body built by code) or `games/rocks/rocks.c` (2D, no bodies) | a game is a folder in `reva_native/games/` with one C file of the same name: `python .claude/skills/run-reva/driver.py buildvk --game <name>`, then its `play.bat` |
 | know a change broke nothing | `CLAUDE.md`, "The tick, the receipt, the dice, the ladder" | `driver.py check --game sample`: the rules' hashes and the frame's against the blessed ones, no window, seconds. A new game adds its scenarios to `reva_native/anim_bench/hashcheck.py` and blesses them once; after that, `--bless` only when you know why a hash changed |
 | play it across machines | `reva_native/games/rally/rally.c`, and the first comment of `reva_native/club_net.c` | `REVA_NET=host` on one machine, `REVA_NET=join:<address>` on the others. ⛔ A game's tick never reads anything of the session. `python reva_native/anim_bench/netcheck.py` is the check |
-| run it with no graphics driver | `README.md`, Quick start, step 4 | `driver.py buildsoft --game <name>` |
+| run it with no graphics driver | `README.md`, "No graphics driver?" | `driver.py buildsoft --game <name>` |
+| show the person a picture, or play the game yourself, with no window | `CLAUDE.md`, "Headless verification instruments" | the `buildsoft` build with `REVA_NOWINDOW=1` and `REVA_SHOT`, and the bridge (`REVA_BRIDGE`, `reva_native/anim_bench/bridge.py`) |
 | hand it to someone | `README.md`, "A game to hand to someone" | `python reva_native/package.py --game <name>` |
 
 ## If you are helping a Godot 4 project — start here

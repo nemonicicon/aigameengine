@@ -1,7 +1,7 @@
 # ANIMATION — the toolchain, from a rigged model to a checked move
 
-Everything here is Python (numpy + Pillow) unless it says it drives the engine. Engine packs are the
-club's own `.rpack` format (`skate_src/author/rpack.py` reads and append-writes it; the layout is in its
+Everything here is Python (numpy + Pillow) unless it says it drives the engine. Packs are in the
+engine's own `.rpack` format (`skate_src/author/rpack.py` reads and append-writes it; the layout is in its
 docstring). `skate_src/author/rpack2gltf.py` exports a pack's skeleton and its authored clips to glTF (`.glb`)
 for any other engine (`--mesh` brings the pack's own skinned, textured body; `--board` the skateboard
 channel) — verified by re-reading in Blender, joints and every vertex (`godot/verify_export_blender.py`);

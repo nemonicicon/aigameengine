@@ -1,5 +1,5 @@
 extends SceneTree
-## check_pose.gd -- does GODOT pose our moves where the club engine does?
+## check_pose.gd -- does GODOT pose our moves where the engine does?
 ##   godot --headless --path godot --script res://demo/check_pose.gd -- clip=z_rm_sk_kf frames=0,9,15,21
 ##   godot ... -- file=moves clip=z_upright frames=0,4 before=z_rm_skiphand@1.5
 ##   godot ... -- file=clanker clip=z_rm_sk_kf frames=0,9,15,21 all=1     (or file=res://<any .glb>)
@@ -7,7 +7,7 @@ extends SceneTree
 ## as `POSE <frame> <name> x y z`, for check_pose_compare.py to hold against the pack's own forward
 ## kinematics -- a second, independent path to the same numbers.
 ## `before=clip@sec` plays another move first: a bone the move does not key must NOT keep the last
-## move's pose (the club engine puts it at rest; Godot keeps it unless a track holds it).
+## move's pose (the engine puts it at rest; Godot keeps it unless a track holds it).
 
 var scene: Node3D
 var ap: AnimationPlayer

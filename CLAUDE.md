@@ -1,4 +1,4 @@
-# THE CLUB — engine + tools (content not included)
+# aigameengine — the engine and its tools (content not included)
 
 One engine (`reva_native/crowd_kms.c`, one translation unit: a table of contents over `reva_native/engine/*.inc`,
 so search across `engine/` to find a function). A frame is plain data first (`gfx_packet.c`, the packet), and three
@@ -8,8 +8,9 @@ only hashes it. Around it: the games that prove it (`reva_native/games/`, each o
 `reva_native/engine.h`), the asset pipelines and authoring tools (`skate_src/`), the checks
 (`reva_native/anim_bench/`, `skate_src/film/`, `skate_src/robot_neko/`), and the references (`design/`, `README.md`,
 `CAMERA.md`, `ANIMATION.md`). `LICENSE` is MIT, and `NOTICES.md` says whose work is inside a build and what must
-never be put in this repository. Characters, props, levels and audio are NOT here: the club prints `FATAL: no packs`
-until a character is baked into `reva_native/packs/`. The games need nothing, so start there.
+never be put in this repository. Characters, props, levels and audio are NOT here: the animation lab and the scene
+player stop at `FATAL: no packs` until a character is baked into `reva_native/packs/`. The games need nothing, so
+start there.
 
 ## Where this repository comes from
 The engine is built in a private workbench and arrives here by a sync, one reviewed step at a time
@@ -23,7 +24,7 @@ home first, so make engine changes in the workbench.
   on PATH or gcc dies SILENTLY with exit 1 and no output: `export PATH=/c/msys64/mingw64/bin:$PATH`. The driver
   sets it itself.
 - `.claude/skills/run-reva/driver.py` carries every build line (`SRC`, `RENDER`, `DEFS`, `LIBS` in one place):
-  `build` → `crowd_new.exe` (the club), `buildvk [--game X]` → `crowd_vk.exe` or `crowd_X_vk.exe` (one game),
+  `build` → `crowd_new.exe` (what the lab, bench and scene commands run, once promoted), `buildvk [--game X]` → `crowd_vk.exe` or `crowd_X_vk.exe` (one game),
   `buildsoft [--game X]` → `crowd_soft.exe` or `crowd_X_soft.exe` (the same on the engine's own rasterizer),
   `check [--game X]` → the receipt (no `--game` here is the sample), `promote` → `crowd_new.exe` over `crowd.exe`.
   It makes `crowd_win_rc.o` (the UTF-8 manifest; without it `fopen` dies on a pack with a non-ASCII name) when
@@ -50,7 +51,7 @@ home first, so make engine changes in the workbench.
 - `reva_native/build_linux.sh` → `crowd_linux`: Vulkan on SDL's window (`-DREVA_SDL -DREVA_VK`); `headless` →
   `crowd_headless`, the rules only; `soft` → `crowd_soft`, the engine's own rasterizer, which links no Vulkan.
   `GAME=games/<name>/<name>.c` picks the game (the sample when none is named). Deps: `libsdl2-dev libvulkan-dev
-  libstb-dev`; with no GPU, `mesa-vulkan-drivers` (lavapipe, Vulkan on the CPU: every pass the club has, the same
+  libstb-dev`; with no GPU, `mesa-vulkan-drivers` (lavapipe, Vulkan on the CPU: every pass the renderer has, the same
   pixels every run) and `xvfb`.
 - The receipt: `cd reva_native && python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft`.
   `bash .github/ci.sh` is everything this repository's CI runs, on your own machine: every build here and the
@@ -107,8 +108,8 @@ home first, so make engine changes in the workbench.
   every `REVA_SHOT` frame does). Same inputs must print the same hashes. Build with `-ffp-contract=off` (the
   scripts do) or x86 and ARM disagree on the last bit. When a hash parts: `REVA_SIMHASH=1` finds the tick,
   `REVA_SIMDUMP=<tick>:<file>` names the value, `REVA_PACKETDUMP=<tick>:<file>` gives the frame as text to diff.
-- **`rand()` is the club's own LCG** on every platform (`REVA_RAND=libc` for the library's), and the math
-  the sim uses is the club's own (`club_math.c`), because each C library rounds its own way.
+- **`rand()` is the engine's own LCG** on every platform (`REVA_RAND=libc` for the library's), and the math
+  the sim uses is the engine's own (`club_math.c`), because each C library rounds its own way.
 - **The uninitialised-memory test:** two runs with `MALLOC_PERTURB_=85` and `=170` must print identical
   `[simhash]` lines. `calloc` the arrays the sim reads.
 - **The tape: `REVA_RECORD=<file>` / `REVA_REPLAY=<file>`.** The pads and keyboard after the polls, one
@@ -205,6 +206,13 @@ off), `REVA_NOFINGERS=1`, `REVA_NORAGDOLL=1`, `REVA_RDDBG=1`, `REVA_MEMSAY=<tick
 feature's A/B is its setting: `REVA_GFX="normals=0"`.
 A screenshot prints what its frame cost the renderer. PPM output: convert and LOOK before claiming anything
 renders. Boot costs ~250 frames; capture below ~300 and you shoot a loading screen.
+
+A picture of any game with no window, from the game's own folder, on the build `buildsoft --game X` makes:
+`REVA_NOWINDOW=1 REVA_FIXEDSTEP=60 REVA_SHOT=500 REVA_SHOT_PATH=<a Windows path>.ppm ../../crowd_X_soft.exe <the arguments in its play.bat>`.
+A running engine, driven: start it with `REVA_BRIDGE=7766`, then `python reva_native/anim_bench/bridge.py discover`
+lists what it takes (`hold`, `step n`, `press a 30`, `stick x y n`, `get_state`, `hash`, `screenshot FILE`, `quit`).
+⛔ `screenshot` is the next frame DRAWN. With the clock held nothing is drawn, so `run` first, or the call waits two
+minutes and gives up.
 
 ## The laws (each one paid for)
 - **Verify before narrate.** Log lines are not receipts; pixels or it didn't happen.

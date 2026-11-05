@@ -1,4 +1,4 @@
-# THE CAMERA — every lens the club has, and the rule each one cost
+# THE CAMERA — every lens the engine has, and the rule each one cost
 
 *(Porting to Godot 4: `godot/CAMERA_PORT.md` has the exact math for each rig and a reference implementation.)*
 

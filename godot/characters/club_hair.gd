@@ -1,22 +1,22 @@
 class_name ClubHair
-## club_hair.gd -- hair physics for ANY character from the club, on Godot's SpringBoneSimulator3D (Godot 4.4+).
+## club_hair.gd -- hair physics for ANY character from the engine, on Godot's SpringBoneSimulator3D (Godot 4.4+).
 ##
 ##   var who := preload("res://characters/x3d/x3d.glb").instantiate()
 ##   add_child(who)
 ##   ClubHair.attach(who)                  # every hair chain it has, swinging
 ##
-## The chains are found the way the club engine's own solver finds them (reva_native/engine/load.inc; the solver is chainSim in engine/pack.inc): a bone whose name
+## The chains are found the way the engine's own solver finds them (reva_native/engine/load.inc; the solver is chainSim in engine/pack.inc): a bone whose name
 ## says tail / pony / braid / hair / bang / tress / ribbon, whose parent's does not, starts a chain, and the chain
 ## walks its matching children (each matching child of the root is its own chain -- braids come in pairs).
 ## The simulator works in world space (center_from = world origin), so hair swings when the character turns,
-## lifts on a jump and trails while it moves -- as the club engine does since 09-27. No collision: like the
-## club's solver, the stiffness keeps it near its pose. Measured on x3d: standing, it hangs where it is posed
+## lifts on a jump and trails while it moves -- as the engine does since 09-27. No collision: like the
+## engine's solver, the stiffness keeps it near its pose. Measured on x3d: standing, it hangs where it is posed
 ## (on vs off 0.1-0.7% of pixels); riding a 4 m circle at 2 m/s, it swings out and trails.
 
 const NAMES := ["tail", "pony", "braid", "hair", "bang", "tress", "ribbon", "cloth", "breast"]
 ## per family: stiffness, drag, gravity. Hair swings and hangs; CLOTH (a garment's free panel, bones named Cloth_*:
 ## REVA's jacket hanging at her elbows, her bandana) is a little looser and heavier; SOFT MASS (bones named breast)
-## springs back to its pose and barely feels gravity -- the club engine's jiggle (jiggleTick), in Godot's springs.
+## springs back to its pose and barely feels gravity -- the engine's jiggle (jiggleTick), in Godot's springs.
 const FAMILY := {
 	"hair": [3.5, 0.5, 1.0],
 	"cloth": [2.5, 0.6, 1.0],
@@ -41,7 +41,7 @@ static func is_chain_name(bone_name: String) -> bool:
 	return false
 
 
-## [[root, end], ...] for every chain in the skeleton, as the club's miner would find them
+## [[root, end], ...] for every chain in the skeleton, as the engine's miner would find them
 static func find_chains(sk: Skeleton3D) -> Array:
 	var out := []
 	for b in sk.get_bone_count():

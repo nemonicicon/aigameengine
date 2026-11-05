@@ -1,6 +1,6 @@
 # OUR MOVES IN GODOT 4 — the animation library and how to use it
 
-Two files in `godot/animations/`, exported from the club engine by `skate_src/author/rpack2gltf.py`:
+Two files in `godot/animations/`, exported from the engine by `skate_src/author/rpack2gltf.py`:
 
 | file | what |
 |---|---|
@@ -25,7 +25,7 @@ Every animation keys EVERY bone (rest pose held where the move is silent), so a 
 last move's pose — the check found exactly that on the first export (an arm left in the air, 2.04 m out).
 
 **In Godot 4.7.2** (`demo/check_pose.gd` + `demo/check_pose_compare.py`): the files import with no error;
-posed at fixed frames, EVERY joint and the board land within **3 micrometres** of the club engine and the
+posed at fixed frames, EVERY joint and the board land within **3 micrometres** of the engine and the
 board's nose axis within 0.02 degrees — reva's skate and body moves and Clanker's alike. Switching from one
 move to another never leaves a bone where the last move put it. The demo project's `.import` files carry
 the loop modes and the optimizer setting below.
@@ -53,7 +53,7 @@ setting cannot move anything. `demo/set_import.py` now writes it where Godot rea
 3. **Loop modes** (Animation tab, per animation): set **Linear** loop on the LOOP rows below. A file's
    animation `extras.seamless` says only that its first and last frames match (every trick does: it starts
    and ends in the riding stance) — the table says how each is MEANT to be played.
-4. **Root motion:** the `z_rm_*` moves own their root — travel is on `Hips` translation (the club's
+4. **Root motion:** the `z_rm_*` moves own their root — travel is on `Hips` translation (the engine's
    convention: `z_rm_` = root motion). Point `AnimationMixer.root_motion_track` at the bone that carries it
    after retargeting, or keep the travel in the animation for a first look.
 5. **The board** (`reva_skate_moves.glb`): the `skateboard` node is a sibling of the skeleton, in the
@@ -103,5 +103,5 @@ setting cannot move anything. `demo/set_import.py` now writes it where Godot rea
 
 `skate_src/author/moves/*.py` are the SCORES these came from — keys on a real skeleton, eased with
 anticipation and settle, with DECLARED contacts (a foot on the deck, a hand on a rail) that a checker tests
-(`ANIMATION.md` §3). They write into the club's pack format; `rpack2gltf.py` brings the result to glTF.
+(`ANIMATION.md` §3). They write into the engine's pack format; `rpack2gltf.py` brings the result to glTF.
 The method (a move is a score + its declared contacts + a check that could fail) works in any engine.

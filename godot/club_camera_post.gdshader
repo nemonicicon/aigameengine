@@ -1,8 +1,8 @@
-// club_camera_post.gdshader -- the club engine's post pass, the fisheye and the phone's frame, for Godot 4.
+// club_camera_post.gdshader -- the engine's post pass, the fisheye and the phone's frame, for Godot 4.
 //
 // Translated from, and verified in Godot 4.7.2 against, the fragment shader in
-// the club engine as it was when this was ported (its own is reva_native/shaders/post.frag now, and has grown since). Bloom and FXAA are left to Godot (Environment glow,
-// Project Settings > Rendering > Anti Aliasing > FXAA); the club's tone knee is kept as an option.
+// the engine as it was when this was ported (its own is reva_native/shaders/post.frag now, and has grown since). Bloom and FXAA are left to Godot (Environment glow,
+// Project Settings > Rendering > Anti Aliasing > FXAA); the engine's tone knee is kept as an option.
 //
 // Use: a CanvasLayer over the 3D view, with a ColorRect (anchors: full rect) whose material is a
 // ShaderMaterial of this shader. ClubCamera (club_camera.gd) sets fish / tht / feed every frame.
@@ -12,7 +12,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 uniform float fish = 0.0;   // 0 = the rectilinear lens, 1 = a full equidistant fisheye (~0.4-0.6 is the skate-video look)
 uniform float tht = 0.8;    // the DIAGONAL half-angle the frame covers, radians (ClubCamera.fish_fov)
 uniform float feed = 0.0;   // 0 off, 1 phone portrait (9:16), 2 phone sideways (16:9)
-uniform float tone = 0.0;   // the club's luminance knee start (0.66 in its episodes); 0 = leave tone to the Environment
+uniform float tone = 0.0;   // the engine's luminance knee start (0.66 in its episodes); 0 = leave tone to the Environment
 
 float fhash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -63,7 +63,7 @@ float digit(vec2 p, int d) {
 
 void fragment() {
 	float asp = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;     // width / height
-	vec2 uv = vec2(SCREEN_UV.x, 1.0 - SCREEN_UV.y);             // the club's GL convention: origin bottom-left
+	vec2 uv = vec2(SCREEN_UV.x, 1.0 - SCREEN_UV.y);             // the convention this was ported from: origin bottom-left
 	// THE PHONE'S FRAME FIRST: everything after this is inside her screen
 	vec2 fu = uv;
 	float fasp = asp;
@@ -79,7 +79,7 @@ void fragment() {
 	vec2 fw = warpA(fu, fasp);
 	vec2 uvw = vec2(0.5 + (fw.x - 0.5) * wf, fw.y);
 	vec3 col = texture(screen_tex, vec2(uvw.x, 1.0 - uvw.y)).rgb;
-	// the club's knee: on LUMINANCE, toward a 0.96 white point (per channel greys a saturated colour)
+	// the engine's knee: on LUMINANCE, toward a 0.96 white point (per channel greys a saturated colour)
 	if (tone > 0.0) {
 		float l = luma(col);
 		float ov = max(l - tone, 0.0);
@@ -94,7 +94,7 @@ void fragment() {
 		col *= mix(1.0, 0.84, smoothstep(0.42, 0.80, r));                      // a phone lens falls off a little
 		float g = fhash(fu * vec2(720.0, 1280.0) + vec2(feedT * 37.0, feedT * 29.0));
 		col += (g - 0.5) * 0.022;                                                // sensor noise, not tape grain
-		// SQUARE CHROME: one unit across must be as many pixels as one unit up. The club's shader scaled x by
+		// SQUARE CHROME: one unit across must be as many pixels as one unit up. The engine's shader scaled x by
 		// 9/16 in portrait (and 1 sideways) the wrong way round -- its timer digits were 2.5x too narrow, found
 		// on a Godot capture. Across = (the phone's width = height * fasp), so divide the x offsets by fasp.
 		float kx = 1.0 / fasp;

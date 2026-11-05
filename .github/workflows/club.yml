@@ -1,4 +1,4 @@
-# THE CLUB -- what a push has to keep true (rewritten 2026-11-05, for the engine as it is since the old renderer left).
+# aigameengine -- what a push has to keep true (rewritten 2026-11-05, for the engine as it is since the old renderer left).
 # Every step is a part of .github/ci.sh, so the same lines run on any Linux machine: bash .github/ci.sh
 #
 # What it holds: every way the engine is built off Windows compiles and links; five games' receipts are the blessed
@@ -11,7 +11,7 @@
 # Every step was run from this repository's own files in a Debian 13 container (gcc 14.2) before this was written.
 # The receipts were blessed with gcc 16.2 on Windows and hold there too. This runner's gcc is another version again:
 # if a hash parts here and nowhere else, that's the first thing to look at, and reva_native/toolchain.lock has the pins.
-name: club
+name: checks
 on: [push, pull_request, workflow_dispatch]
 jobs:
   linux:

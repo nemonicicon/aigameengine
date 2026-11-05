@@ -1,8 +1,8 @@
-## club_camera.gd -- the club engine's camera rigs for Godot 4.
+## club_camera.gd -- the engine's camera rigs for Godot 4.
 ##
-## Translated from the club engine's C (reva_native/engine/scene.inc and post.inc) and VERIFIED in Godot 4.7.2 (demo/, demo/score_rigs.py):
+## Translated from the engine's C (reva_native/engine/scene.inc and post.inc) and VERIFIED in Godot 4.7.2 (demo/, demo/score_rigs.py):
 ## camSpring, camTrackTick, camShakeApply, fishFov. CAMERA_PORT.md says
-## what each rig must do and how to prove it (section 5). Units here are METRES (the club's / 1.75).
+## what each rig must do and how to prove it (section 5). Units here are METRES (the engine's / 1.75).
 ##
 ## Attach to a Camera3D. For the fisheye / phone frame, add a CanvasLayer with a full-rect ColorRect
 ## using club_camera_post.gdshader and assign its ShaderMaterial to `post_material`.
@@ -22,7 +22,7 @@ enum Mode { TRIPOD, MOVE, TRACK, PAN, ORBIT, HOLD }
 @export_group("Track")
 @export var track_distance := 1.7
 @export var track_height := 0.9
-@export var track_height_absolute := false    ## the club's `=h`: the eye stays at world y = track_height
+@export var track_height_absolute := false    ## the engine's `=h`: the eye stays at world y = track_height
 @export var track_azimuth_deg := 0.0          ## 0 = behind the subject, 90 = its front
 @export_group("Orbit")
 @export var orbit_radius := 2.4
@@ -39,7 +39,7 @@ enum Mode { TRIPOD, MOVE, TRACK, PAN, ORBIT, HOLD }
 @export var filmer_body: Node3D               ## the filmer (the phone is held out, away from her chest)
 @export var hold_drop := 0.0                  ## lower the phone toward the ground (the low pass)
 @export_group("Shake and lens")
-@export var shake_amplitude := 0.0            ## metres on the eye, a third of it on the aim (0.015 u = 0.009 m is the club's light shake)
+@export var shake_amplitude := 0.0            ## metres on the eye, a third of it on the aim (0.015 u = 0.009 m is the engine's light shake)
 @export var shake_hz := 1.5
 @export var lens_fov := 44.0                  ## the AUTHORED vertical fov; the fisheye widens the render past it
 @export_range(0.0, 1.0) var fish := 0.0
@@ -99,7 +99,7 @@ static func lens_ease(t: float) -> float:
 	return t * t * (3.0 - 2.0 * t)
 
 
-## camshake's noise: the club's lensHash / lensNoise1 (value noise, quintic fade), 32-bit wrap reproduced.
+## camshake's noise: the engine's lensHash / lensNoise1 (value noise, quintic fade), 32-bit wrap reproduced.
 static func _hash(i: int, ch: int) -> float:
 	var h := (i * 374761393 + ch * 668265263) & 0xFFFFFFFF
 	h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
@@ -132,7 +132,7 @@ static func fish_fov(fov_deg: float, aspect: float, amount: float) -> Vector2:
 func _heading(v: Vector3) -> float:
 	var h := Vector2(v.x, v.z)
 	if h.length() > 0.05:
-		return atan2(h.x, h.y)                               # forward = (sin tr, 0, cos tr), as in the club
+		return atan2(h.x, h.y)                               # forward = (sin tr, 0, cos tr), as in the engine
 	var fwd := subject.global_transform.basis.z if subject_faces_plus_z else -subject.global_transform.basis.z
 	return atan2(fwd.x, fwd.z)
 

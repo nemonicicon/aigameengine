@@ -1,7 +1,7 @@
 class_name ClubWardrobe
 extends Node
-## club_wardrobe.gd -- a club character's WARDROBE in Godot 4: every piece of clothing (and each hairstyle) is its
-## own mesh on the character's one skeleton, tagged in its name exactly as the club engine reads it:
+## club_wardrobe.gd -- a character's WARDROBE in Godot 4: every piece of clothing (and each hairstyle) is its
+## own mesh on the character's one skeleton, tagged in its name exactly as the engine reads it:
 ##
 ##   wear~<slot>~<piece>~<outfit>+<outfit>   a piece, and the outfits it belongs to
 ##   wear~...~<outfits>~h=a,b                the part of a piece that pieces a and b cover (a shirt under a
@@ -18,7 +18,7 @@ extends Node
 ##   print(w.outfits(), w.pieces(), w.worn_pieces())
 ##
 ## Physics rides the skeleton, not the meshes: ClubHair.attach(reva) swings every hair and cloth chain and springs
-## the soft mass, whatever she is wearing. Built for REVA (skate_src/reva902/atelier.py, the club's tailor): any
+## the soft mass, whatever she is wearing. Built for REVA (skate_src/reva902/atelier.py, the engine's tailor): any
 ## character whose builder tags its meshes this way gets the same wardrobe.
 
 signal changed             # what he's wearing changed

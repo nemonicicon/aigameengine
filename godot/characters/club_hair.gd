@@ -5,7 +5,7 @@ class_name ClubHair
 ##   add_child(who)
 ##   ClubHair.attach(who)                  # every hair chain it has, swinging
 ##
-## The chains are found the way the club engine's own solver finds them (crowd_kms.c, H1): a bone whose name
+## The chains are found the way the club engine's own solver finds them (reva_native/engine/load.inc; the solver is chainSim in engine/pack.inc): a bone whose name
 ## says tail / pony / braid / hair / bang / tress / ribbon, whose parent's does not, starts a chain, and the chain
 ## walks its matching children (each matching child of the root is its own chain -- braids come in pairs).
 ## The simulator works in world space (center_from = world origin), so hair swings when the character turns,

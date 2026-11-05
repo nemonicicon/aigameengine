@@ -6,16 +6,32 @@ open the repo can be handed this file and the one brief it needs.)
 ## What this is
 
 A game engine built with an AI in the loop, plus everything around it for making characters move and
-filming them: `reva_native/crowd_kms.c` (one C file, GLES2), animation authoring tools, measuring
-instruments, and references. **No content** (characters, levels, audio) is included. Maps: `README.md`,
-`ANIMATION.md`, `CAMERA.md`. This engine does not run inside another engine — what travels is the
+filming them. The engine is `reva_native/crowd_kms.c`, one translation unit over `reva_native/engine/*.inc`.
+A frame is plain data first, and three things take it: the Vulkan renderer, the engine's own rasterizer
+(no graphics driver, 320 x 240, the same pixels on every machine), and a no-display build that only hashes
+it. The games that prove it are in `reva_native/games/` (one C file each against `engine.h`), and one game
+can be played on two to four machines. Then the animation authoring tools, the checks and the references.
+**No content** (characters, levels, audio) is included; the games need none. The licence is MIT (`LICENSE`),
+and `NOTICES.md` says what in a build is somebody else's. Maps: `README.md` (its Quick start builds and
+plays a game in three lines), `CLAUDE.md` (the build, the switches and the laws), `design/engine_plan.md`,
+`ANIMATION.md`, `CAMERA.md`. This engine does not run inside another engine — what travels to Godot is the
 **animations** (as glTF) and the **camera rigs** (as a spec to port), both prepared for Godot 4 in `godot/`.
+
+## If you are making a game on this engine — start here
+
+| task | read | then |
+|---|---|---|
+| start a game | `reva_native/engine.h` (everything a game sees of the engine), then `reva_native/games/sample/sample.c` (TAG, 3D, one body built by code) or `games/rocks/rocks.c` (2D, no bodies) | a game is a folder in `reva_native/games/` with one C file of the same name: `python .claude/skills/run-reva/driver.py buildvk --game <name>`, then its `play.bat` |
+| know a change broke nothing | `CLAUDE.md`, "The tick, the receipt, the dice, the ladder" | `driver.py check --game sample`: the rules' hashes and the frame's against the blessed ones, no window, seconds. A new game adds its scenarios to `reva_native/anim_bench/hashcheck.py` and blesses them once; after that, `--bless` only when you know why a hash changed |
+| play it across machines | `reva_native/games/rally/rally.c`, and the first comment of `reva_native/club_net.c` | `REVA_NET=host` on one machine, `REVA_NET=join:<address>` on the others. ⛔ A game's tick never reads anything of the session. `python reva_native/anim_bench/netcheck.py` is the check |
+| run it with no graphics driver | `README.md`, Quick start, step 4 | `driver.py buildsoft --game <name>` |
+| hand it to someone | `README.md`, "A game to hand to someone" | `python reva_native/package.py --game <name>` |
 
 ## If you are helping a Godot 4 project — start here
 
 | task | read | then |
 |---|---|---|
-| use a READY character (Clanker the robot, x3d the skater girl: the skate moves on their own skeletons, the board animated) | `godot/characters/README.md` | instance `<name>.glb`, play `z_rm_sk_ride`; a trick = `play("z_rm_sk_kf")` then `queue("z_rm_sk_ride")`; keep the `.import` (the AnimationPlayer's optimizer OFF); hair physics: `ClubHair.attach(instance)` |
+| use a READY character (Clanker the robot, x3d the skater girl, R.E.V.A. 902, the Suit Man: the skate moves on their own skeletons, the board animated) | `godot/characters/README.md` | instance `<name>.glb`, play `z_rm_sk_ride`; a trick = `play("z_rm_sk_kf")` then `queue("z_rm_sk_ride")`; keep the `.import` (the AnimationPlayer's optimizer OFF); hair physics: `ClubHair.attach(instance)`; an outfit, on the two that have a wardrobe: `ClubWardrobe.attach(instance, "<outfit>")` |
 | use our skate moves and body moves | `godot/ANIMATION_IMPORT.md` | import `godot/animations/*.glb`, retarget with a `BoneMap` on `SkeletonProfileHumanoid`, set loop modes from the table, parent the real board under the `skateboard` node |
 | use the cameras (tripod, dolly/crane, track, pan, orbit, the hand-held phone, shake, fisheye, the phone-screen frame) | `godot/CAMERA_PORT.md` — exact math with line numbers into the C | `godot/club_camera.gd` + `godot/club_camera_post.gdshader`, **verified in Godot 4.7.2**: open `godot/` as a project and press F5 (`demo/main.gd` sets every rig up in code); `demo/score_rigs.py` re-measures them |
 | check a result | `godot/CAMERA_PORT.md` §5 | record with Godot's Movie Maker (`--write-movie out.avi --fixed-fps 60`), `ffmpeg -i out.avi out.mp4`, run `skate_src/robot_neko/mp4steps.py`, `heldiff.py`, `scenesheet.py`, `sfxcheck.py` on it — they read any mp4 |
@@ -46,8 +62,10 @@ under her feet; (2) the tripod and the tracking lens; (3) the hand-held phone ri
    mechanism, make its failure LOUD.
 8. **Two rounds on a stubborn pose, then change the staging.** Animation can eat unlimited time; a
    contact that keeps moving is a pose that should change.
-9. **Keep a ledger:** every mistake becomes a one-line rule for next time (`.claude/skills/robot-neko/SKILL.md`
-   is fourteen episodes of them).
+9. **Keep a ledger:** every mistake becomes a one-line rule for next time. The ⛔ lines in `CLAUDE.md` and
+   `design/engine_capabilities.md` (every capability, with the failure that exposed it) are this engine's.
+10. **A check says nothing has changed, not that anything is right.** The receipt's hashes hold a game to
+    what it did yesterday; how the picture looks is still eyes on a full frame.
 
 ## Paste-ready starter (for a chat assistant that cannot read the repo)
 

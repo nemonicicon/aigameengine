@@ -11,7 +11,7 @@ portable source.
 
 ## 1 · Skeletons: any humanoid, by bone name
 
-The engine maps every rig onto a **46-slot canonical rig** at load (`canonOf`, crowd_kms.c ~369):
+The engine maps every rig onto a **46-slot canonical rig** at load (`canonOf`, `reva_native/engine/pack.inc`):
 16 body bones (hips, 3 spine, neck, head, and per side shoulder / upper arm / forearm / thigh / shin) +
 30 finger joints (5 fingers × 3 joints × 2 sides); hands and feet are found through the hierarchy.
 Naming families it knows: **Mixamo** (with or without `mixamorig:`), **Unreal mannequin** (`pelvis`,

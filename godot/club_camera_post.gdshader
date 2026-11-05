@@ -1,7 +1,7 @@
 // club_camera_post.gdshader -- the club engine's post pass, the fisheye and the phone's frame, for Godot 4.
 //
 // Translated from, and verified in Godot 4.7.2 against, the fragment shader in
-// reva_native/crowd_kms.c postInit (lines 2592-2680). Bloom and FXAA are left to Godot (Environment glow,
+// the club engine as it was when this was ported (its own is reva_native/shaders/post.frag now, and has grown since). Bloom and FXAA are left to Godot (Environment glow,
 // Project Settings > Rendering > Anti Aliasing > FXAA); the club's tone knee is kept as an option.
 //
 // Use: a CanvasLayer over the 3D view, with a ColorRect (anchors: full rect) whose material is a

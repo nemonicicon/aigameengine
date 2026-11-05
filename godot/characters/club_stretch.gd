@@ -6,7 +6,7 @@ extends SkeletonModifier3D
 ##
 ## A bone named Stretch_<x> keeps its head where its parent carries it (REVA's elbow), turns to point at the head of
 ## Anchor_<x> (a point on her back, a child of her spine), and STRETCHES along that line by the distance over its rest
-## distance -- the club engine's stretchTick (crowd_kms.c), Blender's Stretch To, the rig the industry uses for a
+## distance -- the club engine's stretchTick (reva_native/engine/pack.inc), Blender's Stretch To, the rig the industry uses for a
 ## drape between two limbs. Its children (the cloth chains hung from it) turn with it and are never scaled. It runs
 ## as the FIRST modifier under the skeleton, so ClubHair's springs swing the chains from where it put them.
 ##

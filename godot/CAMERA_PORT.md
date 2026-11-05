@@ -1,6 +1,6 @@
 # PORTING THE CLUB'S CAMERAS TO GODOT 4 — a brief for a person or an AI
 
-The club engine's camera rigs, specified exactly from `reva_native/crowd_kms.c` (line numbers below), with
+The club engine's camera rigs, specified exactly from the engine's C (`reva_native/engine/scene.inc`, `panic.inc` and `post.inc`; each function is named below), with
 the Godot 4 equivalent of each, an implementation (`club_camera.gd`, `club_camera_post.gdshader`) and a
 definition of done.
 
@@ -24,7 +24,7 @@ or a tripod someone left standing. The lens moves on its own smooth clock even w
 
 ## 1 · The shared parts
 
-**The spring** (`camSpring`, crowd_kms.c 8281) — the exact step of a critically damped spring
+**The spring** (`camSpring`, `engine/scene.inc`) — the exact step of a critically damped spring
 `x'' = w²(xt − x) − 2w·x'`, not an approximation, so it is frame-rate independent:
 ```
 y = x - xt;  e = exp(-w*dt);  j = v + w*y
@@ -39,39 +39,39 @@ measured: at 6 the aim trailed a rolling rider by 1.83 u, at 20 by 0.79). Clamp 
 (`ff = speed * 2 / w` along the body's travel, and the same for its vertical speed), so a critically
 damped lens lands ON a moving subject instead of behind it.
 
-**The ease** (`lensEase`, 8298): smoothstep `t*t*(3-2t)`, t clamped to [0,1].
+**The ease** (`lensEase`, `engine/scene.inc`): smoothstep `t*t*(3-2t)`, t clamped to [0,1].
 
 ## 2 · The rigs
 
 | rig | club key | behaviour (exact) | Godot 4 |
 |---|---|---|---|
 | **tripod** | `cam=ex,ey,ez,ax,ay,az[,fov]` | eye and aim pinned until `cam=off` | a `Camera3D` placed and `look_at`; nothing moves |
-| **move** (dolly / crane / push-in) | `cammove=…` + `camsecs=` | eye, aim and fov eased from the line's `cam=` to the target over `camsecs` with `lensEase`; NO spring — the ease is the smoothing (8308) | tween the three with an ease-in-out (or `lensEase` by hand) |
-| **track** | `camtrack=slot,dist,height,azim,fov[,aimh]` | body at (x,y,z) heading `tr` (radians; forward = (sin tr, 0, cos tr)), speed `vel`. `ff = vel*2/6`. Height `y` through the 20 rad/s spring → `yF`, `fy = yV*2/6`. **aim** = (x + sin(tr)·ff, y + fy + aimh, z + cos(tr)·ff). **eye**: a = tr + azim(°→rad); eye = (x − sin(a)·dist + sin(tr)·ff, y + fy + height (or `height` absolute when given as `=h`), z − cos(a)·dist + cos(tr)·ff). Eye and aim each through the 6 rad/s spring. azim 0 = behind, 90 = the body's front (8327) | a script on `Camera3D` reading the target's global transform and velocity each `_process` |
-| **pan** | `campan=slot[,aimh]` | the eye stays pinned (the tripod); only the aim follows (sprung) — the tripod that has to hold a body wherever it lands (8355) | same script, eye fixed |
+| **move** (dolly / crane / push-in) | `cammove=…` + `camsecs=` | eye, aim and fov eased from the line's `cam=` to the target over `camsecs` with `lensEase`; NO spring — the ease is the smoothing (`camTrackTick`, mode 3) | tween the three with an ease-in-out (or `lensEase` by hand) |
+| **track** | `camtrack=slot,dist,height,azim,fov[,aimh]` | body at (x,y,z) heading `tr` (radians; forward = (sin tr, 0, cos tr)), speed `vel`. `ff = vel*2/6`. Height `y` through the 20 rad/s spring → `yF`, `fy = yV*2/6`. **aim** = (x + sin(tr)·ff, y + fy + aimh, z + cos(tr)·ff). **eye**: a = tr + azim(°→rad); eye = (x − sin(a)·dist + sin(tr)·ff, y + fy + height (or `height` absolute when given as `=h`), z − cos(a)·dist + cos(tr)·ff). Eye and aim each through the 6 rad/s spring. azim 0 = behind, 90 = the body's front (`camTrackTick`, mode 1) | a script on `Camera3D` reading the target's global transform and velocity each `_process` |
+| **pan** | `campan=slot[,aimh]` | the eye stays pinned (the tripod); only the aim follows (sprung) — the tripod that has to hold a body wherever it lands (`camTrackTick`, mode 2) | same script, eye fixed |
 | **orbit** | `camorbit=slot,r,h,deg0,deg1[,fov[,aimh]]` | the CENTRE is the sprung aim (as track); the circle is exact: heading `hd = lerp(deg0, deg1, lensEase(t/T))`; eye = (C.x − sin(hd)·r, C.y − aimh + h (or `=h` absolute), C.z − cos(hd)·r). Heading is where the lens LOOKS: 0 = on the body's −z side looking +z. deg0 = deg1 is a world-fixed follow (the half-pipe lens: a pipe rider reverses at every wall, so a travel-relative lens would whip round) (8356) | same script |
-| **hand-held (the phone)** | `camhold=filmer,subject[,fov[,aimh[,drop]]]` | **hp** = the filmer's grip WRIST (fallback: body pos + 0.25 u along heading, +1.45 u up). **to** = unit(aim − hp). eye = hp + to·0.20 u (the phone sits in front of the fist, toward the subject) + 0.22 u OUTWARD horizontally, away from the filmer's own chest (unit((hp − filmer body).xz)) + (0.04 − drop) u up. ⛔ **THE BOB IS THE SHOT: the EYE is raw, never sprung** — only the AIM goes through the 9 rad/s spring. The filmer's own body is not drawn (8329–8353) | a `BoneAttachment3D` on the filmer's hand bone; the camera script reads its global position as `hp`; hide the filmer's `MeshInstance3D` for this camera (a render layer the camera's `cull_mask` excludes) |
-| **shake** | `camshake=amp[,hz]` | on top of ANY placed lens: t = time·hz (default 1.5 Hz); per channel k (0–2 eye, 3–5 aim): `n = (noise1(t,k) + 0.5·noise1(2.13t + 17, k+6)) / 1.5`; eye += n·amp, aim += n·amp/3. `noise1` is value noise with a QUINTIC fade: `u = u³(u(6u − 15) + 10)`, lerp of hashed lattice values in [−1,1]. White noise reads as a vibrating tripod, not a hand (8366–8385). Never written back into the pinned lens | `FastNoiseLite` (TYPE_VALUE, or TYPE_SIMPLEX_SMOOTH), two octaves, one seed per channel — or port `lensHash` / `lensNoise1` exactly (in `club_camera.gd`) |
+| **hand-held (the phone)** | `camhold=filmer,subject[,fov[,aimh[,drop]]]` | **hp** = the filmer's grip WRIST (fallback: body pos + 0.25 u along heading, +1.45 u up). **to** = unit(aim − hp). eye = hp + to·0.20 u (the phone sits in front of the fist, toward the subject) + 0.22 u OUTWARD horizontally, away from the filmer's own chest (unit((hp − filmer body).xz)) + (0.04 − drop) u up. ⛔ **THE BOB IS THE SHOT: the EYE is raw, never sprung** — only the AIM goes through the 9 rad/s spring. The filmer's own body is not drawn (`camTrackTick`, mode 5) | a `BoneAttachment3D` on the filmer's hand bone; the camera script reads its global position as `hp`; hide the filmer's `MeshInstance3D` for this camera (a render layer the camera's `cull_mask` excludes) |
+| **shake** | `camshake=amp[,hz]` | on top of ANY placed lens: t = time·hz (default 1.5 Hz); per channel k (0–2 eye, 3–5 aim): `n = (noise1(t,k) + 0.5·noise1(2.13t + 17, k+6)) / 1.5`; eye += n·amp, aim += n·amp/3. `noise1` is value noise with a QUINTIC fade: `u = u³(u(6u − 15) + 10)`, lerp of hashed lattice values in [−1,1]. White noise reads as a vibrating tripod, not a hand (`camShakeApply`). Never written back into the pinned lens | `FastNoiseLite` (TYPE_VALUE, or TYPE_SIMPLEX_SMOOTH), two octaves, one seed per channel — or port `lensHash` / `lensNoise1` exactly (in `club_camera.gd`) |
 
-**The conversation lens** (`shot=wide/medium/two/ots/tight/solo`, `camDirector` ~12815) is solved each
+**The conversation lens** (`shot=wide/medium/two/ots/tight/solo`, `camDirector` in `engine/panic.inc`) is solved each
 frame from the bodies' published eye, hand and hip marks — a larger port. Its two rules worth taking:
 - **Head room is a guarantee**: the frame's top edge at the subjects must clear the highest EYE by
   0.36 u (`SCN_HEADTOP`, ≈ 0.21 m) and any RAISED HAND by 0.30 u (`SCN_HANDTOP`, ≈ 0.17 m); if it does not,
-  a two-shot re-aims and every other shot backs the lens off ×1.06 per step until it does (13163–13200).
+  a two-shot re-aims and every other shot backs the lens off ×1.06 per step until it does (in `camDirector`).
   Field-of-view per shot (vertical, degrees): ots 30, tight 22, two 30, wide 40, solo 38, medium 34.
-- **The stop-motion tripod** (13355–13375): when the bodies are stepped (a stop-motion exposure clock) the
+- **The stop-motion tripod** (in `camDirector`): when the bodies are stepped (a stop-motion exposure clock) the
   lens settles for 0.45 s after a cut (eye and aim chase their targets with `k = 1 − exp(−dt/0.20)`), then
   LOCKS while nobody travels (both body speeds < 0.15 u/s). It lets go and eases out only when the frame the
   shot needs has GROWN by more than 0.08 u (a hand went up), and never tightens back in on its own.
 
 ## 3 · The lens and the phone's frame (the post pass)
 
-`club_camera_post.gdshader` is the club's post fragment shader (crowd_kms.c 2592–2680) for a
+`club_camera_post.gdshader` is the club's post fragment shader as it was when this was ported (the engine's own is `reva_native/shaders/post.frag` now, and has grown since) for a
 `ColorRect` covering the viewport:
 
 - **The fisheye is a projection, not a polynomial**: radius on the frame = angle off the axis (`r = f·θ`),
   so the source is sampled at `tan(θ)`. ⛔ **A fisheye is a WIDE lens as well as a bent one**: warping at
-  the authored field moved it six degrees and looked like nothing. `fishFov` (2551) opens the 3D camera's
+  the authored field moved it six degrees and looked like nothing. `fishFov` (`engine/post.inc`) opens the 3D camera's
   field: authored diagonal half-angle `th = atan(d·tan(fov/2))` with `d = sqrt(1 + aspect²)`; target
   `tgt = th + (max(1.05, th) − th)·fish` (1.05 rad = 60° off axis = 120° diagonal), capped at 1.45 rad;
   the camera renders at `fov' = 2·atan(tan(tgt)/d)` (≤ 170°) and the shader gets `tht = tgt`. In Godot:

@@ -2,9 +2,9 @@
 
 *(Porting to Godot 4: `godot/CAMERA_PORT.md` has the exact math for each rig and a reference implementation.)*
 
-All of it lives in `reva_native/crowd_kms.c`. A scene script line (`reva_native/scenes/<name>.txt`,
+All of it lives in `reva_native/engine/scene.inc` (the rigs), `engine/panic.inc` (`camDirector`) and `engine/post.inc` (the lens). A scene script line (`reva_native/scenes/<name>.txt`,
 manual: `design/scene_direction.md`) or a live control line (`anim_bench/lab_ctl.txt`, written by
-`driver.py lab`) sets these keys; `camDirector()` (crowd_kms.c ~12815) decides each frame which lens
+`driver.py lab`) sets these keys; `camDirector()` decides each frame which lens
 wins. The skate look-test rule behind most of it: **every shot is a camera that exists in the place** —
 a phone in somebody's hand, or a tripod somebody left standing.
 

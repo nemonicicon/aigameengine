@@ -8,7 +8,7 @@ Two paths to the same numbers:
   pack --rpack2gltf.py--> .glb --(Blender's glTF importer, Blender's evaluator)--> joint world positions
 Every animation is sampled at up to 8 frames and every joint compared; the report is the worst error in
 metres. A file written with `--mesh` (a character's own body) gets a third path too:
-  pack --(the club engine's skinning, re-done here from crowd_kms.c: bone world x inverse bind x bind x p)
+  pack --(the club engine's skinning, re-done here from reva_native/engine/body.inc: bone world x inverse bind x bind x p)
        --> every vertex of the body, against Blender's deformed mesh (both ways, nearest vertex)
 at rest and at the start, middle and end of every animation. With --render, a Workbench still of the stick figure (and the board) at the chosen frames, from
 a fixed three-quarter view, for a look -- a number that matches can still be a wrong convention shared
@@ -68,7 +68,7 @@ MESH = struct.Struct("<15I")
 
 
 def engine_skin(W):
-    """the body as the club engine draws it: crowd_kms.c's skinning, vertex by vertex -- each position
+    """the body as the club engine draws it: the engine's skinning (engine/body.inc), vertex by vertex -- each position
     through its mesh's bind matrix, then sum over its four bones of weight x (bone world x inverse bind).
     Written from the C, not from rpack2gltf.py, so the two sides of the comparison share no code."""
     out = []

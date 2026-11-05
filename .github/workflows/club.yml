@@ -1,71 +1,40 @@
-# THE CLUB -- the build matrix (2026-09-30).
-# The KMS path rotted for three weeks because nothing built it. Every push now builds every
-# platform variant this runner can, bakes Clanker from godot/characters/, renders one lab frame
-# under Xvfb on llvmpipe and refuses a black one. The sim hash of that frame is in the log:
-# two runners disagreeing on it is a determinism regression, not a flake.
+# THE CLUB -- what a push has to keep true (rewritten 2026-11-05, for the engine as it is since the old renderer left).
+# Every step is a part of .github/ci.sh, so the same lines run on any Linux machine: bash .github/ci.sh
+#
+# What it holds: every way the engine is built off Windows compiles and links; five games' receipts are the blessed
+# ones (the rules' hashes, the frame's, and for the sample three frames of the engine's own rasterizer, whose pixels
+# are the same on every machine); online play's ten cases on this runner's loopback; and the receipt doesn't depend
+# on what was in memory before.
+# What it doesn't: the Vulkan build is compiled and linked and never started (a runner has no driver for it), nothing
+# here looks at a picture, and nothing here is a Raspberry Pi.
+#
+# Every step was run from this repository's own files in a Debian 13 container (gcc 14.2) before this was written.
+# The receipts were blessed with gcc 16.2 on Windows and hold there too. This runner's gcc is another version again:
+# if a hash parts here and nowhere else, that's the first thing to look at, and reva_native/toolchain.lock has the pins.
 name: club
 on: [push, pull_request, workflow_dispatch]
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: deps
+      - name: what the engine links against
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsdl2-dev libgles-dev libegl-dev libstb-dev libdrm-dev libgbm-dev xvfb libgl1-mesa-dri
-          python3 -m pip install --quiet numpy Pillow
-      - name: build sdl (crowd_linux)
-        run: reva_native/build_linux.sh
-      - name: build kms (crowd_kms, compile + link only -- no DRM on a runner)
-        run: reva_native/build_pi.sh kms
-      - name: bake clanker
-        run: |
-          mkdir -p out/packs
-          python3 skate_src/glb2rpack_anim.py godot/characters/clanker/clanker.glb out/packs/v1_clanker.rpack --keepnames | tail -3
-      - name: lab frame (Xvfb, llvmpipe)
-        run: |
-          REVA_SIMHASH=100 python3 .claude/skills/run-reva/linux_lab.py out/packs/v1_clanker.rpack z_rm_sk_ride out/lab 0,2 960x540
-          grep -E '\[simhash\]|GL_RENDERER|reva loaded' out/lab/engine.log | tail -6
-      - name: the receipt does not depend on heap history (MALLOC_PERTURB_ A/B)
-        run: |
-          # two fill bytes for fresh allocations; the sim hashes must agree, or something reads memory it never wrote
-          for P in 85 170; do
-            mkdir -p out/perturb$P
-            MALLOC_PERTURB_=$P REVA_WINDOWED=1 REVA_FIXEDSTEP=30 REVA_AUTOMODE=0 REVA_AUTOPICK=0 REVA_SIMHASH=50 \
-              REVA_SHOT=300 REVA_SHOT_PATH=$PWD/out/perturb$P/f.ppm \
-              timeout 900 xvfb-run -a -s "-screen 0 640x360x24" stdbuf -o0 -e0 \
-              reva_native/crowd_linux 40 $PWD/out/packs select 640x360 > out/perturb$P/engine.log 2>&1 || true
-            grep '\[simhash\]' out/perturb$P/engine.log > out/perturb$P/hash.txt
-            test -s out/perturb$P/hash.txt
-          done
-          diff out/perturb85/hash.txt out/perturb170/hash.txt && echo "receipt: identical across fill bytes"
-          # the receipt itself, for comparing this runner against any other machine's run of the same command
-          cat out/perturb85/hash.txt
-      - name: every door boots and draws (12 modes, headless, no content)
-        run: |
-          # each game mode auto-confirmed, one frame at 400; a door that dies or draws black fails the push
-          fail=0
-          for M in 0 1 2 3 4 5 6 7 8 9 10 11; do
-            mkdir -p out/door$M
-            REVA_TIER=low REVA_WINDOWED=1 REVA_FIXEDSTEP=30 REVA_AUTOMODE=$M REVA_AUTOVAR=0 REVA_AUTOPICK=0 REVA_SIMHASH=200 \
-              REVA_SHOT=400 REVA_SHOT_PATH=$PWD/out/door$M/f.ppm \
-              timeout 600 xvfb-run -a -s "-screen 0 640x360x24" stdbuf -o0 -e0 \
-              reva_native/crowd_linux 40 $PWD/out/packs select 640x360 > out/door$M/engine.log 2>&1; E=$?
-            R=$(python3 reva_native/anim_bench/litcheck.py out/door$M/f.ppm --min 0.005 || true)
-            echo "door $M: exit=$E | $R | $(grep -m1 '^MODE:' out/door$M/engine.log) | $(grep -m1 '(shot)' out/door$M/engine.log)"
-            case "$R" in *OK*) ;; *) fail=1;; esac
-          done
-          exit $fail
-      - name: the lab frame is not black
-        run: |
-          ls out/lab/cam*.png
-          for f in out/lab/cam*.png; do python3 reva_native/anim_bench/litcheck.py "$f"; done
+          sudo apt-get install -y libsdl2-dev libvulkan-dev libstb-dev libdrm-dev
+          gcc --version | head -1
+      - name: every road builds, and every game with no display
+        run: bash .github/ci.sh build
+      - name: the receipts
+        run: bash .github/ci.sh receipts
+      - name: online play, on this machine's loopback
+        run: bash .github/ci.sh online
+      - name: the receipt doesn't depend on what was in memory before
+        run: bash .github/ci.sh memory
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lab-frames
-          path: |
-            out/lab/*.png
-            out/lab/engine.log
-            out/perturb85/hash.txt
+          name: ci-logs
+          path: out/ci/*.log
+          if-no-files-found: ignore

@@ -1,7 +1,7 @@
 ## club_camera.gd -- the club engine's camera rigs for Godot 4.
 ##
-## Translated from reva_native/crowd_kms.c and VERIFIED in Godot 4.7.2 (demo/, demo/score_rigs.py):
-## camSpring (8281), camTrackTick (8301), camShakeApply (8379), fishFov (2551). CAMERA_PORT.md says
+## Translated from the club engine's C (reva_native/engine/scene.inc and post.inc) and VERIFIED in Godot 4.7.2 (demo/, demo/score_rigs.py):
+## camSpring, camTrackTick, camShakeApply, fishFov. CAMERA_PORT.md says
 ## what each rig must do and how to prove it (section 5). Units here are METRES (the club's / 1.75).
 ##
 ## Attach to a Camera3D. For the fisheye / phone frame, add a CanvasLayer with a full-rect ColorRect

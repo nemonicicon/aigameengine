@@ -209,6 +209,9 @@ static void inputTape(double tsec){
         if(q&&q[0]){ g_tapeRep=fopen(q,"r");
             if(g_tapeRep){ char h9[320];
                            for(;;){ int c=fgetc(g_tapeRep); ungetc(c,g_tapeRep); if(c!='#'||!fgets(h9,sizeof h9,g_tapeRep)) break;
+                               /* ⛔ (11-13) A LINE LONGER THAN h9 IS READ TO ITS END. v6's header (11-12) grew to 345 characters, past this buffer: what was left of it was taken for the
+                                * first tick, which it isn't, so the replay ended at frame 1 and played neutral. No tape recorded from 11-12 replayed, a session's among them */
+                               if(!strchr(h9,'\n')){ int c9; while((c9=fgetc(g_tapeRep))!=EOF&&c9!='\n'){} }
                                if(strstr(h9,"tape v7")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=g_tapeV7=1; else if(strstr(h9,"tape v6")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=1; else if(strstr(h9,"tape v5")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=1; else if(strstr(h9,"tape v4")) g_tapeV2=g_tapeV3=g_tapeV4=1; else if(strstr(h9,"tape v3")) g_tapeV2=g_tapeV3=1; else if(strstr(h9,"tape v2")) g_tapeV2=1;
                                char an[24]; unsigned m9[4]; if(sscanf(h9,"# binds %23s %x %x %x %x",an,&m9[0],&m9[1],&m9[2],&m9[3])==5){ int i9=actFind(an); if(i9>=0) memcpy(g_binds[i9].mask,m9,sizeof m9); else printf("[tape] it was recorded with an action this game doesn't have: %s\n",an); } }
                            printf("[tape] REPLAY %s (v%d) -- the pad and keyboard are ignored\n",q,g_tapeV7?7:g_tapeV6?6:g_tapeV5?5:g_tapeV4?4:g_tapeV3?3:g_tapeV2?2:1); }

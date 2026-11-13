@@ -44,6 +44,12 @@ import time
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+# ⛔ (11-13) The stand-in player below speaks the wire by hand, and it said protocol 1 with 17-byte seats until the engine had moved to 4 and 26 (11-12): the host
+# turned it away, the third pad never came, and that case's session never began. Both numbers are read from the engine's own file now. What a seat has gained is
+# at its end and zero means nothing held, so the old seat padded out is a seat.
+_wire = open(os.path.join(ROOT, "club_net.c"), encoding="utf-8", errors="replace").read()
+PROTO = int(_wire.split("#define NET_PROTO", 1)[1].split()[0])
+SEAT = int(_wire.split("#define SEAT_BYTES", 1)[1].split()[0])
 ARGS = {"rally": ["0", "packs"], "rocks": ["0", "packs"], "sample": ["12", "packs", "packs/v1_sample.rpack"], "tower": ["10", "packs", "packs/v1_tower.rpack"]}
 BITS = lambda v: "%08x" % struct.unpack("<I", struct.pack("<f", v))[0]
 ZERO = BITS(0.0)
@@ -214,7 +220,7 @@ def joiner(port, stop, hostlog):
 
     while not stop.is_set() and time.time() - t0 < 60.0:
         if me is None:
-            s.sendto(struct.pack("<IIBBH", M, 0, 1, 255, 36) + struct.pack("<HBBII", 1, 1, 0, 2166136261, nonce) + b"RALLY".ljust(24, b"\0"), to)
+            s.sendto(struct.pack("<IIBBH", M, 0, 1, 255, 36) + struct.pack("<HBBII", PROTO, 1, 0, 2166136261, nonce) + b"RALLY".ljust(24, b"\0"), to)
         try:
             d, _ = s.recvfrom(2000)
         except OSError:
@@ -252,7 +258,7 @@ def joiner(port, stop, hostlog):
             last_tick_at = time.time()
             tick += 1
             # pads a real player would send, so the game goes on, with nonsense on every side of them: every tick the host hasn't said it has, as the engine does
-            mine[tick + delay] = struct.pack("<7hHB", rng.randrange(-32767, 32767), rng.randrange(-32767, 32767), 0, 0, 0, 0, 0, rng.randrange(128), 1)
+            mine[tick + delay] = struct.pack("<7hHB", rng.randrange(-32767, 32767), rng.randrange(-32767, 32767), 0, 0, 0, 0, 0, rng.randrange(128), 1).ljust(SEAT, b"\0")
             first = max(host_has, delay) + 1
             ts = [t for t in range(first, min(first + 30, tick + delay + 1)) if t in mine]
             head = struct.pack("<4IIQI", 0, 0, 0, 0, 0, 0, tick)

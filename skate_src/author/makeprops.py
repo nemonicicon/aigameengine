@@ -4,26 +4,25 @@ meshes do not contain.
 
     python skate_src/author/makeprops.py
 
-⛔ THE GAP. Two coffees, a hammer and the boards Dale never finished are all spoken about
-in SEVENTY-FOUR and none of them exists. There are 143 props in the club and not
-one of them is a mug. The treatment already said this would happen -- *"Must be authored
-(trivial, primitives): a paddling pool, a sun lounger, and the boards"* -- and then the
-film was shot four times without them.
+⛔ THE GAP. Two coffees, a hammer and some boards are all spoken about
+in the film and none of them exists. There are 143 props in the engine and not
+one of them is a mug. The film's treatment already said these had to be authored as
+primitives, and then the film was shot four times without them.
 
 ⭐ AND THEY ARE PRIMITIVES. A mug is a cylinder with a handle. A hammer is a shaft and a
 head. A board is a box. None of this needs Blender, UE, or the artery -- it needs a vertex
 buffer and an index buffer, which is what an rpack already is.
 
-⛔ FLAT-SHADED AND UNTEXTURED, deliberately. The club's shader takes a per-instance TINT
+⛔ FLAT-SHADED AND UNTEXTURED, deliberately. The engine's shader takes a per-instance TINT
 when a prop has no texture (uUse=0), which is exactly the look the town kit already has --
-so these sit in frame with the ZAMNC props instead of next to them.
+so these sit in frame with the zombie prototype's props instead of next to them.
 
 Writes reva_native/props/v1_x_<name>.rpack:
     mug        a coffee, for the porch and the tables
-    hammer     for act V, which has been hammering nothing for four drafts
+    hammer     a hammer
     board      a plank, for the windows
     torch      a hand torch, since town_lantern is a lamppost fitting
-    cigarette  (ROBOT NEKO ep 12) paper, a filter third and a burning tip -- THREE colours in one
+    cigarette  paper, a filter third and a burning tip -- THREE colours in one
                prop, one mesh each: a mesh named `...#rrggbb` takes that colour, one with no colour
                takes the script's tint (the paper: `@F2EFE8`), and `#rrggbb*` is the part that GLOWS
                (the ember -- where a `@light` sits and what brightens on a drag). Authored in metres
@@ -34,7 +33,7 @@ import io, math, os, struct, sys
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                    "reva_native", "props")
-# ⭐ ep 12: --out <dir> writes somewhere else -- a checkout that must not grow a props/ can still test the bake
+# ⭐ --out <dir> writes somewhere else -- a checkout that must not grow a props/ can still test the bake
 if "--out" in sys.argv:
     OUT = sys.argv[sys.argv.index("--out") + 1]
 
@@ -85,7 +84,7 @@ def merge(parts):
 
 
 def cyl(y0, y1, r0, r1=None, seg=14, cap0=False, cap1=False):
-    """⭐ ep 12: a cylinder (or a taper, r0 -> r1) along +Y WITH REAL NORMALS -- radial on the side,
+    """⭐ a cylinder (or a taper, r0 -> r1) along +Y WITH REAL NORMALS -- radial on the side,
     axial on the caps -- so a thin round thing shades round. -> (pos, idx, nrm)"""
     r1 = r0 if r1 is None else r1
     pos, nrm, idx = [], [], []
@@ -122,7 +121,7 @@ def write(name, pos, idx):
 
 
 def write_meshes(name, meshes):
-    """⭐ ep 12: one node, N meshes (name, pos, idx, nrm-or-None), no bones, no texture. The mesh NAME carries
+    """⭐ one node, N meshes (name, pos, idx, nrm-or-None), no bones, no texture. The mesh NAME carries
     its colour (`#rrggbb`, `#rrggbb*` = it glows) -- the engine's drawHeldOne reads it on the tint path.
     One mesh named "mesh" with no normals writes byte-for-byte what write() always wrote."""
     os.makedirs(OUT, exist_ok=True)
@@ -217,7 +216,7 @@ def main():
     write("torch", *merge([tube(0, 0, 0, 0.030, 0.17, 12),
                            tube(0, 0.17, 0, 0.048, 0.055, 12)]))
 
-    # ⭐ ep 12: A CIGARETTE. 84 x 8.4 mm, in metres along +Y, the filter end at the origin (the grip) and
+    # ⭐ A CIGARETTE. 84 x 8.4 mm, in metres along +Y, the filter end at the origin (the grip) and
     # the burning end at the top -- so the engine's FAR TIP (the end of the longest side away from the
     # origin) is where the smoke leaves. From the grip: the cork filter (a third), the paper (no colour
     # of its own -- the script's tint, `@F2EFE8`), the EMBER (`*`: it glows, it is where a `@light` sits
@@ -231,7 +230,7 @@ def main():
         ("cig_ember#FF6A1E*",  *cyl(YP, YE, R * 1.02, R * 0.98)),
         ("cig_ash#6E6863",     *cyl(YE, L, R * 0.98, R * 0.80, cap1=True)),
     ])
-    # a joint (design/pdoom_video.md): a card roach at the lips, the paper swelling toward the burning end
+    # a joint: a card roach at the lips, the paper swelling toward the burning end
     write_meshes("joint", [
         ("jnt_roach#D9C7A2",   *cyl(0.0, 0.016, 0.0030, 0.0032, cap0=True)),
         ("jnt_paper",          *cyl(0.016, 0.078, 0.0032, 0.0056)),

@@ -5,7 +5,7 @@
  * ⭐ THE SAME PIXELS ON EVERY MACHINE. That's the other half of what it's for. The sim's hash is the same on a PC and a Pi, and so is this picture, so a frame's hash
  * is one that crosses machines, which a GPU's pixels never are. What keeps it so:
  *   - on floats, only + - * / and sqrt, each of which IEEE 754 rounds one way, and never contracted into one another (-ffp-contract=off, as every build line has);
- *   - exp, sin, cos and pow are the club's own (club_math.c), never the C library's, and what the pixel loops need of them is tables made from those;
+ *   - exp, sin, cos and pow are the engine's own (club_math.c), never the C library's, and what the pixel loops need of them is tables made from those;
  *   - a triangle's coverage is whole-number arithmetic on positions snapped to a sixteenth of a pixel, with the top-left rule, so no pixel hangs on a rounding;
  *   - colours are mixed as whole numbers;
  *   - a float that isn't a number never reaches a float-to-int conversion, which is where machines differ: f2i and the checks beside it turn it into 0 first;
@@ -16,7 +16,7 @@
  * meshes, a hologram, water as a tinted sheet, the sun, the sky's light and the strongest lamps near each mesh worked out at each vertex, fog, the toon pass's two
  * tones, a sky, particles and effect triangles, smoke, flat decals, lines, glowing points, the HUD, text and sprites, split screen.
  * WHAT IT DOESN'T (it's the budget version): shadows, mirrors and what a glossy floor reflects, pictures drawn off-screen and the screens that show them, beams, the
- * star, an open mouth's hole, fur, materials, the toon pass's line, the post pass and the lens, the lighthouse door's own passes, a frame between two ticks. */
+ * star, an open mouth's hole, fur, materials, the toon pass's line, the post pass and the lens, a menu scene's own passes, a frame between two ticks. */
 #include "gfx.h"
 #include "club_math.h"
 #include <stdio.h>
@@ -167,7 +167,7 @@ void gfxBackBegin(void) {}
 void gfxToonSet(float cel, float rim, float keyFromLens, float roomGradient, float ink, const float *inkRGB) { (void)inkRGB; g_toon.cel = cel; g_toon.rim = rim; g_toon.keyCam = keyFromLens; g_toon.roomG = roomGradient; g_toon.ink = ink; }
 void gfxBackStats(int *calls, int *binds, int *pages, int *stretched) { *calls = g_nCalls; *binds = 0; *pages = 0; *stretched = 0; }
 
-/* ---- tables, made once from the club's own math, so a pixel loop calls nothing ------------------------------------------------------------------------- */
+/* ---- tables, made once from the engine's own math, so a pixel loop calls nothing ------------------------------------------------------------------------- */
 static float g_expLut[1026];      /* exp(-x), x from 0 to 8 in steps of 1/128 */
 static int g_softLut[258];        /* an effect's fade from its middle: exp(-r2 * 3.2) * 256, r2 from 0 to 2 in steps of 1/128 */
 static int g_dotLut[66];          /* a glowing point's fall-off: exp(-d2 * 11) * 256, d2 from 0 to 0.5 in steps of 1/128 */

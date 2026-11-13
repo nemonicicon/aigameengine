@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "skate_src", "author"))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "skate_src", "author", "moves"))
 import gaitlab
 
-CMU = os.environ.get("CLUB_CMU", "cmu-mocap-bvh/data")   # club-engine kit: machine-independent paths
+CMU = os.environ.get("CLUB_CMU", "cmu-mocap-bvh/data")   # machine-independent paths
 BANDS = [("slow walk", 0.0, 0.14), ("walk", 0.14, 0.30), ("fast walk", 0.30, 0.60), ("jog", 0.60, 1.10), ("run", 1.10, 2.20), ("beyond the set", 2.20, 99.0)]
 # Curves that mean the same on any body. Foot pitch folds past 90 degrees in swing, so it stays out; toe-out reads the bones, and they differ.
 CURVES = ["thigh L", "knee L", "thigh R", "knee R", "trunk", "hip turn", "hip drop", "shoulder turn", "arm L", "elbow L", "out L", "arm R", "elbow R", "out R"]

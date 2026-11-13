@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """godot_shader.py -- a Godot spatial shader made into a surface shader the engine runs (11-12, the Godot proof of concept's step 12:
-their Hedge Maze draws its hedges and ground with shaders of its own, and no plain material carries what those draw).
+one of their levels draws its hedges and ground with shaders of its own, and no plain material carries what those draw).
 
 What the engine runs is its own world fragment shader (reva_native/shaders/mesh.frag) built with GODOT_HOOK round the game's code, which this
 file translates. Their code says what each pixel is made of (ALBEDO, NORMAL, ROUGHNESS, METALLIC, SPECULAR, AO, EMISSION, NORMAL_MAP); the

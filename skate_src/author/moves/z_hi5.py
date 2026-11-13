@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_hi5.py -- P7: THE HIGH FIVE. The first move whose target belongs to NEITHER body.
 
-kaeli and reva together: a high five.
+The co-star and reva together: a high five.
 
 Every authored move until now has been one body alone, and every contact has been with
 the floor -- which is easy, because the floor is at a known height and never moves. A
@@ -12,9 +12,9 @@ The resolution is that both halves solve to the same rule rather than to each ot
 
     reach straight forward to REACH_F of your own arm's length,
     at CONTACT_H of your own shoulder height,
-    and let the engine stand you REACH_reva + REACH_kaeli apart.
+    and let the engine stand you REACH_reva + REACH_costar apart.
 
-Each body measures its own proportions, so a tall reva and a shorter kaeli meet in the
+Each body measures its own proportions, so a tall reva and a shorter co-star meet in the
 middle without either score knowing the other's numbers. This script therefore prints
 the WORLD reach it authored (rig reach x the pack's own scale, computed exactly as the
 engine computes it) -- and the sum of the two prints is the `pgap=` the bench sets. The
@@ -86,7 +86,7 @@ def main(pack_path, SCALE=1.0, HEIGHT=2.30, SHOULDER=0.0, ARMW=0.0):
     RM = rig_map(p)
     assert not RM["_missing"], "rig incomplete: %s" % RM["_missing"]
     # PREFER AN AUTHORED STAND. The miner's "idle" election is a name, not a promise:
-    # kaeli's idle opens crouched, and a five performed from a kneel hits the right point
+    # the co-star's idle opens crouched, and a five performed from a kneel hits the right point
     # in the world while looking nothing like a five. z_upright is a stand by
     # construction (see z_upright.py), so take it whenever a body has one.
     names_c = p.clip_names()
@@ -108,7 +108,7 @@ def main(pack_path, SCALE=1.0, HEIGHT=2.30, SHOULDER=0.0, ARMW=0.0):
     hands = find_hands(p, nodes, names, RM["hand_l"], RM["hand_r"])
     paw = HandRig(nodes, base_q, base_t, hands["R"], armR[1]) if "R" in hands and hands["R"]["fingers"] else None
     # THE HAND DIRECTION WITHOUT FINGER BONES. Neither body has a bone past the wrist
-    # (kaeli's RightHand is a leaf; reva2's "HandEnd" was only ever a tail landmark), so
+    # (the co-star's RightHand is a leaf; reva2's "HandEnd" was only ever a tail landmark), so
     # there is no child to aim. But the hand MESH extends along a direction that is
     # FIXED in the hand bone's local space, and in a rest pose with a neutral wrist that
     # direction is simply the forearm axis continued. Measure it at rest, carry it as a
@@ -124,20 +124,20 @@ def main(pack_path, SCALE=1.0, HEIGHT=2.30, SHOULDER=0.0, ARMW=0.0):
     footY = min(wp0[RM["foot_l"]][1], wp0[RM["foot_r"]][1])
     # FORWARD IS +Z IN PACK SPACE. Not derived, because deriving it is what keeps going
     # wrong: a foot->toe vector depends on a toe bone being where its name claims, and on
-    # kaeli it points sideways -- which put her shoulder 0.48u "behind" her pelvis and
+    # the co-star it points sideways -- which put her shoulder 0.48u "behind" her pelvis and
     # collapsed her half of the gap to 0.042u. It is also the same circular trap that
     # shipped reva facing backward.
     #
     # +Z is not an assumption here, it is the engine's contract, checked on pixels for
     # both bodies: the wall's panel 0 is a straight-on front camera at yaw 0, and it
-    # shows reva's face and kaeli's face. Whatever a bone is named, THAT is where these
+    # shows reva's face and the co-star's face. Whatever a bone is named, THAT is where these
     # packs face.
     fwd = [0.0, 0.0, 1.0]
     lat = [1.0, 0.0, 0.0]        # up x fwd; a positive rotation about it leans forward
 
     # THE MEETING POINT. Two bodies of different sizes CANNOT each reach "so far above my
     # own shoulder" and expect to touch: reva's shoulder stands 2.59u off the ground with
-    # a 0.97u arm, kaeli's 1.84u with 0.77u, and aiming by their own proportions put
+    # a 0.97u arm, the co-star's 1.84u with 0.77u, and aiming by their own proportions put
     # their hands 1.14u apart -- 0.74 of that purely in height. A shared contact must be
     # specified in the WORLD they share, so the height comes in as a world number and
     # each body works out its own way to it.
@@ -149,16 +149,16 @@ def main(pack_path, SCALE=1.0, HEIGHT=2.30, SHOULDER=0.0, ARMW=0.0):
     # Shoulder height and arm length come from the ENGINE, not from this script. Both
     # sides must measure "above the ground" from the same datum, and they did not: the
     # engine grounds a body on the lowest bone in its whole cloud, while this score was
-    # using the lowest FOOT joint. On kaeli those differ by 57 rig-units of stray
+    # using the lowest FOOT joint. On the co-star those differ by 57 rig-units of stray
     # skeleton, which read as a 0.9u shoulder here and 1.84u there -- and a contact
     # authored against the wrong datum cannot land however careful the rest of the maths.
     # THE GROUND DATUM, computed exactly as the engine computes it: the lowest BONE in
     # the rest-pose cloud, not the lowest foot joint. Two reasons it must be the rest
     # pose and this script's own base-pose FK on top of it:
-    #   - kaeli's cloud runs far below her feet, so a foot-based datum disagreed with the
+    #   - the co-star's cloud runs far below her feet, so a foot-based datum disagreed with the
     #     engine by 57 rig-units;
     #   - the engine grounds the partner ONCE from her rest pose and never re-clamps, so
-    #     a base pose that crouches (kaeli's idle does) genuinely lowers her in the
+    #     a base pose that crouches (the co-star's idle does) genuinely lowers her in the
     #     world. Measuring the shoulder in the BASE pose against the REST datum is what
     #     makes the score's height agree with where she actually stands.
     wp_rest, _ = fk_world(nodes)

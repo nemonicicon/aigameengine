@@ -1,6 +1,6 @@
 """measure_rootmotion.py -- ground truth for authored gait speed.
 
-The club plays IN-PLACE clips and derives playback rate by measuring how fast the
+The engine plays IN-PLACE clips and derives playback rate by measuring how fast the
 contact foot travels (clipStride in crowd_kms.c). That is an ESTIMATE. MoCap Online
 ships a root-motion sibling of every in-place cycle, and its root displacement over the
 take is the authored speed as a FACT. This prints it so the estimator can be checked
@@ -8,7 +8,7 @@ against it instead of trusted.
 """
 import bpy, os, math
 
-SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
+SRC = os.environ.get("CLUB_FBX", "fbx")   # machine-independent paths
 PAIRS = [
     ("Walk_02_Cheerful",  r"Walks\Root_Motion\Walk_02_Cheerful_Loop.fbx"),
     ("Walk_13_Power",     r"Walks\Root_Motion\Walk_13_Power_Walk_Loop.fbx"),
@@ -16,7 +16,7 @@ PAIRS = [
     ("MOB1_Jog_F",        r"Mobility\Root_Motion\MOB1_Jog_F.fbx"),
     ("MOB1_Run_F",        r"Mobility\Root_Motion\MOB1_Run_F.fbx"),
 ]
-CLUB = 1.75   # club units per metre (3.15u tall body ~ 1.8m); same constant the props use
+CLUB = 1.75   # engine units per metre (3.15u tall body ~ 1.8m); same constant the props use
 
 print("=== AUTHORED GAIT SPEED (root motion, ground truth) ===")
 for name, rel in PAIRS:

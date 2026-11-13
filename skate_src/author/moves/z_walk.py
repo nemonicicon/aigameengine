@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """z_walk.py -- w_walk: a WALK CYCLE in code, solved by two-bone IK on the body's own legs, over REST via
-rig_map -- written for ROBOT NEKO ep 16 so its two code-built bodies can WALK TO A MARK (the engine's
+rig_map -- written so two code-built bodies can WALK TO A MARK (the engine's
 walk election takes the first `w_` clip in a body's bank; without one a body glides).
 
     z_walk.py <pack> [--force] [--stride 0.55] [--bob 0.025]
@@ -62,7 +62,7 @@ def main(argv):
             base[ua_] = aim_bone(nodes, ua_, la_, [math.sin(hd) * sx_, -math.cos(hd), 0.03], base)
             base[la_] = aim_bone(nodes, la_, ha_, [math.sin(hd) * sx_ * 0.8, -math.cos(math.radians(12.0)), math.sin(math.radians(12.0))], base)
         print("w_walk: arms hang %.0f degrees off the body (--hang)" % math.degrees(hd))
-    frames = int(round(DUR * FPS)) + 1          # the last frame IS the first (the club's loops carry it, like z_rm_sk_ride)
+    frames = int(round(DUR * FPS)) + 1          # the last frame IS the first (the engine's loops carry it, like z_rm_sk_ride)
     qs, ts = [], []
     for f in range(frames):
         ph = f / float(frames - 1)

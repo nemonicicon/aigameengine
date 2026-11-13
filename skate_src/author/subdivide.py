@@ -9,7 +9,7 @@ with tools made for it.
 We could rig an unrigged statue (statue2body), grow bones and bind them (fingers),
 shape flesh (morphs), and remove triangles (decimate_glb) -- but nothing could ADD
 geometry, and that was the wall reva's face hit: TWO vertices within a lip-radius of
-her mouth (kaeli has 1385). No morph can open a mouth that has no vertices in it. The
+her mouth (the co-star has 1385). No morph can open a mouth that has no vertices in it. The
 answer is not a cleverer morph, it is more mesh.
 
 This is a local 1-to-4 triangle split around a landmark. Edge midpoints are SHARED

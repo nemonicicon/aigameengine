@@ -1,5 +1,5 @@
 #!/bin/bash
-# build_pi.sh -- THE CLUB on a Raspberry Pi 4 (64-bit OS, dtoverlay=vc4-kms-v3d). Step 18 of the engine plan (11-04) took the old
+# build_pi.sh -- THE ENGINE on a Raspberry Pi 4 (64-bit OS, dtoverlay=vc4-kms-v3d). Step 18 of the engine plan (11-04) took the old
 # renderer and its GBM/EGL route out: the picture is Vulkan, straight into the display card's scanout buffers and flipped through KMS,
 # which is what gives the kernel's flip timestamps on the tube.
 #   vk        crowd_vk        the renderer on the direct road. Console stopped, then:
@@ -19,7 +19,7 @@ WHICH=${1:-vk}
 GAME=${GAME:-games/rvz/rvz.c}
 [ -f "$GAME" ] || GAME=games/sample/sample.c
 ENGINE_FILES="crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c gfx_packet.c gfx_vk.c"
-EXTRA="$EXTRA -I."   # (11-07) a game that includes "engine.h" by name (Bike Lane Bash, made in a folder of its own) finds it here, as driver.py's -I does
+EXTRA="$EXTRA -I."   # (11-07) a game that includes "engine.h" by name (the street game, made in a folder of its own) finds it here, as driver.py's -I does
 if [ "$WHICH" = vk ]; then
   $CC -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_VK -o "$OUTDIR/crowd_vk" $ENGINE_FILES $GAME -I/usr/include/libdrm -ldrm -lSDL2 -lvulkan -lm
   echo "built crowd_vk       (the Vulkan renderer on the direct road; console stopped: REVA_MODE=9 REVA_AUTOVAR=1 REVA_TIER=pi ./crowd_vk 100 packs_rvz packs/v1_Character_17_Female_Police.rpack)"

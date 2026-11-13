@@ -15,7 +15,7 @@ density, cannot be mis-banded by a percentile, and gives the teeth and tongue
 something to ride.
 
 ⛔ THE GOBLIN'S GEOMETRY CANNOT BE COPIED, only its skeleton. Its face bones carry
-ZERO skin weights in the club's bake and the teeth/tongue meshes did not survive the
+ZERO skin weights in the engine's bake and the teeth/tongue meshes did not survive the
 merge, so "there is geometry inside the mouth" is true of the CC source and NOT of the
 pack on disk. Nothing can be lifted from it; what transfers is the LAYOUT, and only in
 BONE space -- its mesh buffer and its bone worlds are in different frames (its head
@@ -27,7 +27,7 @@ pack is nonsense. Bone-to-bone ratios are the only honest thing it has to give:
     tongue root  0.192 span below, tongue tip 0.696 span below and further forward
 
 THE WEIGHT BAND comes from a different pack, because the goblin has none:
-`v1_crowd_rabbit.rpack` is the club's ONLY body with a jaw bone that is actually
+`v1_crowd_rabbit.rpack` is the engine's ONLY body with a jaw bone that is actually
 skinned (jaw_07, 805 vertices). Measured, its band is full out at the far chin, falls
 off toward the hinge and above it, tapers laterally to about a quarter at the head's
 own half-width, and -- the part worth copying -- is 46% GRADIENT. A jaw is a soft band,
@@ -276,7 +276,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN,
     HDR.pack_into(out, 4, *h)
     # THE GATE RUNS BEFORE THE PACK IS REPLACED. Writing first and asserting after
     # leaves the broken pack on disk and the operator has to know to restore the .bak --
-    # exactly what happened here on kaeli's first run. fingers.py now does the same.
+    # exactly what happened here on the co-star's first run. fingers.py now does the same.
     tmp = path + ".tmpjaw"
     save_pack(tmp, bytes(out), like=path)
     try:
@@ -300,7 +300,7 @@ def build(path, report=False, hinge_back=HINGE_BACK_IOD, hinge_up=HINGE_UP_SPAN,
 
 
 def p_scale(p):
-    """the engine's own sizing: every club body is scaled to 3.45 units tall"""
+    """the engine's own sizing: every body in the engine is scaled to 3.45 units tall"""
     nodes = p.nodes()
     wp, _ = fk_world(nodes)
     bones = [i for i in range(len(nodes)) if nodes[i]["kind"] == 1]

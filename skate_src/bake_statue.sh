@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bake_statue.sh -- a GLB statue to a standing club body, NO BLENDER (homecoming H7).
+# bake_statue.sh -- a GLB statue to a standing body in the engine, NO BLENDER (homecoming H7).
 #
 #   bash skate_src/bake_statue.sh <statue.glb> <name> [tris]
 #

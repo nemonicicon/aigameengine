@@ -10,7 +10,7 @@ where a digit gets dropped -- and a mark that is wrong by a digit puts a camera 
 someone's hair without failing.
 
 ⛔ IT REFUSES RATHER THAN GUESSES. face_calibrate returns eyes=None when it cannot find
-a symmetric dark pair (kaeli: her liner defeats the darkest-texel rule), and inventing a
+a symmetric dark pair (the co-star: her liner defeats the darkest-texel rule), and inventing a
 pair from proportions is how the marks silently become fiction. No eyes, no file.
 """
 import os

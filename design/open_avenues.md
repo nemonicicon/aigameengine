@@ -7,31 +7,11 @@ limit I have already measured. Ordered by area, not priority — priority is dec
 
 ---
 
-## A. THE STORY
+## B. BEDDING AND NIGHT CLOTHES
 
-1. **⭐ THE COUNT AND THE TITLE DO NOT ADD UP.** *Confirmed: the count and the
-   title need to change.* The film is SEVENTY-FOUR. The cold open (4am Sat)
-   says **411**. The treatment's Act I (7:15am Sat) says *"there are 406 on this street...
-   there were 411 on Thursday"* — so 411 is **Thursday's** number and the opening line is
-   two days stale. Act III then says *"406 on Thursday, 401 now. Ten people"* — which moves
-   406 back to Thursday **and** miscounts (406−401 = 5). Act V says 391 of 406. Four
-   different numbers, one of them the title, and the arithmetic is wrong in two places.
-   **Decide the canonical ledger first, then fix every line that quotes it.**
-2. **The title number is never spoken.** Whatever the ledger becomes, "four hundred and six"
-   should probably land in the film at least once.
-
-## B. THE FIRST SCENE
-
-3. **⭐ THE NEW OPENING IMAGE.** A still room: reva relaxed, thinking, as she does,
-   kicked back with one leg off the bed and the other stretched out on it; kaeli under the
-   covers on her side, turned away from reva. Plants "have you been sitting there the whole time"
-   before the line asks it. Needs: a reclining/seated pose for reva against the bed, kaeli
-   under the covers **facing away**, and a held beat before the nightmare.
 4. **The covers have to cover her.** We have simulated bedding now, but it is *made* — a
    sheet lying flat on a mattress. A body **under** it is a different problem: the sheet
    must collide with a lying body, not a box.
-5. **They are dressed for a nightclub at 4am.** `v1_kaeli_pj` exists and works; the shot
-   list still names `kmoves`. One line in `skate_src/film/shoot.py`.
 6. **Reva has no night clothes at all.** `makepajamas.py` is general — it measures whatever
    body it is given.
 
@@ -76,7 +56,7 @@ limit I have already measured. Ordered by area, not priority — priority is dec
     never resolved. My own staging notes say how to frame it: lens on ±x at her z.
 19. **⛔ reva2's DQS shoulder balloon** — confirmed, unfixed, `dqs=0` is the stopgap. Her
     weights are 4× asymmetric (2560 left-arm verts against 633 right).
-20. **⛔ Kaeli's clips are rotation-only** — hips pinned, no bounce.
+20. **⛔ The co-star's clips are rotation-only** — hips pinned, no bounce.
 
 ## F. INSTRUMENTS
 
@@ -115,5 +95,5 @@ limit I have already measured. Ordered by area, not priority — priority is dec
 32. ⛔ **The crowd is nondeterministic** run-to-run even with clock, seed, lens and beat
     pinned — ~20% of pixels at the first capturable frame. Unisolated. It is why the doors
     cannot be pixel-diffed.
-33. **PHOSPHOR grade B** — transplant its sim onto club slots.
+33. **PHOSPHOR grade B** — transplant its sim onto the crowd's slots.
 34. ⛔ **The Pi copy is a forked ancestor** — none of this reaches it.

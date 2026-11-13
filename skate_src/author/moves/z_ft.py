@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_ft.py -- FOOT TRANSITIONS: the step that gets a body from standing into its gait and from its gait back to standing,
 solved on the body's OWN idle and cycles, for a game that moves the body itself and plays the gait in place. Written for
-DontGetDropped's alien (11-02): a real walk and run state tree.
+the skate game's alien (11-02): a real walk and run state tree.
 
     z_ft.py <pack> <table.json> [--only z_ft_stop_mid_l] [--force] [--sidecar out.json]
 
@@ -77,7 +77,7 @@ class Body:
         wp, wq = fk_world(self.nodes)
         self.leg_len = sum(math.dist(wp[a], wp[c]) for a, _b, c in self.leg.values()) / 2.0
         # Where the ball of each foot is from its ankle, in the foot's own turn and the world's units. (11-06) The ball's local translation was used for
-        # this, which is the same thing only when nothing over the foot is scaled: Kaeli's UE skeleton is centimetres under a 0.01 root, her toe came
+        # this, which is the same thing only when nothing over the foot is scaled: the co-star's UE skeleton is centimetres under a 0.01 root, her toe came
         # out 12.9 units off, and the step into her walk lifted the foot 7 m to clear it.
         self.toe_off = {s: qrot(qinv(wq[self.leg[s][2]]), sub(wp[self.toe[s]], wp[self.leg[s][2]])) for s in SIDES}
         # Everything hung under the legs follows them; the rest of the body blends.

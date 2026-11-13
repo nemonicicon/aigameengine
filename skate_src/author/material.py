@@ -17,7 +17,7 @@ usage:
   material.py PACK --set "<mesh>=rough,metal[,detail[,depth[,kind]]]" [--set ...]
                                                             <mesh> is a mesh's whole name; a trailing * takes every mesh that starts that way.
                                                             <mesh>@N is the Nth mesh of that name, counted from 1 in the pack's order, for a body whose
-                                                            parts all carry one name (Anima's are all anima_body): --list shows each one's number
+                                                            parts all carry one name (the bought character's are all anima_body): --list shows each one's number
   material.py PACK --clear                                  take the chunk off: the engine's tables by name decide again
 
 A mesh the chunk doesn't name is looked up by the engine in data/materials.txt and then its own short lists, by words in its name.

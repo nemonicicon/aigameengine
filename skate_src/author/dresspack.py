@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""dresspack.py -- put PREMADE clothes on a body that is already a finished PACK. (ep 14, WARDROBE)
+"""dresspack.py -- put PREMADE clothes on a body that is already a finished PACK.
 
-    python skate_src/author/dresspack.py reva_native/packs/v1_anima_outfit.rpack \
+    python skate_src/author/dresspack.py reva_native/packs/v1_<body>.rpack \
         models/Female_cargo_outfit-2e0b443f/glb/converted/female_cargo_outfit.glb \
-        --wear Pants_army:pants --wear Shirt_2:top --tuck anima_boots \
-        --hide anima_bra,anima_panties --out reva_native/packs/v1_kaeli_street.rpack
+        --wear Pants_army:pants --wear Shirt_2:top --tuck <boots mesh> \
+        --hide <mesh>,<mesh> --out reva_native/packs/v1_<body>_dressed.rpack
 
-09-25: clothes for kaeli. She had
-skated, smoked and slammed through thirteen episodes in the bra and panties Anima ships with.
+09-25: clothes for the co-star (a bought character). She had
+worn nothing but the bra and panties the bought character ships with.
 
 WHY NOT dressglb.py: it dresses the body's GLB, and the GLB then has to be BAKED into a new pack.
-A bake starts from the source and drops everything authored on top of the pack since (the ep 6/7
+A bake starts from the source and drops everything authored on top of the pack since (an earlier
 ledger: 0 morphs, no face marks, no jaw, no mouth interior, a face vocabulary that no longer
-resolves) -- and kaeli's pack now carries the ep 10-13 skate clips, the smoking loop, the board
+resolves) -- and the co-star's pack now carries the skate clips, the smoking loop, the board
 channels and her mouth as well. So this tool works on the PACK: every byte of the source is kept,
 and the clothes go on the end of it.
 
@@ -211,7 +211,7 @@ def main():
     ap.add_argument("--report", action="store_true", help="measure and print, write nothing")
     ap.add_argument("--dump", default="", help="write the fitted garments + masked skin as an OBJ for a look")
     a = ap.parse_args()
-    # ⛔ the console is cp1252: a ⛔ in a print killed the first real run AFTER the fit (ep 11 ledger)
+    # ⛔ the console is cp1252: a ⛔ in a print killed the first real run AFTER the fit
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     R = Rpack(a.pack)

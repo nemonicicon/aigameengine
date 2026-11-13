@@ -1,6 +1,6 @@
 # clubcloth: worn cloth, on any skinned character
 
-The club's solver for a whole garment. Plain C, no engine under it: `clubcloth.h` says what it is and why, `clubcloth.c` is all of it. `godot/club_cloth_gde.c` binds it to Godot 4.7 as a GDExtension, on the interface header Godot itself writes (`godot --dump-gdextension-interface`), so there's nothing to fetch and nothing else to build.
+The engine's solver for a whole garment. Plain C, no engine under it: `clubcloth.h` says what it is and why, `clubcloth.c` is all of it. `godot/club_cloth_gde.c` binds it to Godot 4.7 as a GDExtension, on the interface header Godot itself writes (`godot --dump-gdextension-interface`), so there's nothing to fetch and nothing else to build.
 
 Built 11-02 for the alien's clothes, with the collision and clipping work they needed.
 
@@ -16,7 +16,7 @@ Builds and runs `test_clubcloth.c` (does it stay on him) and `bench_clubcloth.c`
 sh build_unix.sh [folder for the library]
 ```
 
-The same on a Mac or on Linux, with the machine's own compiler: a universal `.dylib` for both kinds of Mac, signed ad hoc, or a `.so`. Nobody needs one of those machines for it: the game's `.github/workflows/cloth-library.yml` runs this on GitHub's, loads the result in Godot there with `load_check.gd`, and commits what passes. Built on the oldest Linux GitHub offers, as a library only runs on a C library at least as new as the one it was built on.
+The same on a Mac or on Linux, with the machine's own compiler: a universal `.dylib` for both kinds of Mac, signed ad hoc, or a `.so`. Nobody needs one of those machines for it: the skate game's own workflow, which lives with that game, runs this on GitHub's, loads the result in Godot there with `load_check.gd`, and commits what passes. Built on the oldest Linux GitHub offers, as a library only runs on a C library at least as new as the one it was built on.
 
 ## What a garment needs
 
@@ -25,7 +25,7 @@ Its mesh, skinned as usual (that skinned pose, kept outside the skin, is the tar
 - **How far it may go from the skinned pose.** 0 is the skin's pose itself: collars, shoulders, waistbands. 10 cm at a hem.
 - **How near the skin it may come.** A top over legs asks for more, so it stays out of them.
 
-In a glb they go in `TEXCOORD_1` (`skate_src/author/glb_redress.py` writes it, every material ignores it). `DontGetDropped/tools/anim/alien_dress.py` is the worked example, and its `FREE_BY_HEIGHT` table is all the painting there is.
+In a glb they go in `TEXCOORD_1` (`skate_src/author/glb_redress.py` writes it, every material ignores it). The skate game's own alien-dressing tool is the worked example, and its `FREE_BY_HEIGHT` table is all the painting there is.
 
 And what it's made of, `cc_fabric`: what a square metre weighs, its bending length (the textile lab's number, ASTM D1388), and how hard it is to pull on the bias. Typical values, from general textile knowledge and not from one lab's table: a tee's jersey 0.16 kg/m^2, 2 cm, 3 N/m; a shorts' twill 0.23, 3, 5; a sweatshirt's fleece 0.32, 3, 3; jeans' denim 0.40, 4.5, 8.
 

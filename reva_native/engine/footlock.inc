@@ -41,7 +41,7 @@ static float gaitRate(Pack*P,int clip,float spd){
         if(r2<0.05f) r2=0.05f;
         if(r2>6.f) r2=6.f;
         return r2; }
-    float fpf=clipStrideCached(P,clip);      /* club units the planted foot covers per frame */
+    float fpf=clipStrideCached(P,clip);      /* engine units the planted foot covers per frame */
     if(fpf<0.004f||c->fps<=0.f||!c->frames) return spd*gaitMul();   /* not a gait: keep the old law */
     float r=spd/(c->fps*fpf)*g_servo;   /* the loop closes here */
     if(r<0.05f) r=0.05f;
@@ -52,7 +52,7 @@ static int   g_heroFOK=0;
 static struct { float x,z,t; int side; } g_bc[BC_MAX]; static int g_bcN=0;
 static float g_labSlip=0.f, g_labTravel=0.f;   /* the live foot-skate accumulator */
 static int   g_labCam=0;                       /* live camera angle 0 side 1 front 2 3q 3 top */
-#define LAB_GRID_STEP 2.35f            /* spacing between turntable copies, club units */
+#define LAB_GRID_STEP 2.35f            /* spacing between turntable copies, engine units */
 static float g_labSpeed=-1.f;                  /* live speed override, <0 = the state's own */
 static int   g_labFreeze=0;                    /* hold the pose so every camera shoots the SAME instant */
 static int   g_labGrid=0;                      /* TURNTABLE: N yaws of the same instant, in ONE frame */
@@ -66,7 +66,7 @@ static int   g_labDnC=-1;                      /* P5: ctl clip= found the clip i
 static Pack *g_labDnP=NULL;
 static int   g_labClip=-1;                     /* P0: ctl clip=<name> -- play THIS clip, state tree overridden */
 /* ⭐ THE HERO CAN HOLD A POSE TOO. Same clip@phase as the partner -- reva sitting up
- * in the dark is a POSE, and every clip in the club is a verb. */
+ * in the dark is a POSE, and every clip in the engine is a verb. */
 static float g_heroHold=-1.f;
 static int   g_labWphReset=0;                  /* P0: and start it from frame 0 on the next hero frame */
 /* (step 21) ...or from where its line says: `hclip=name>12.5s` (seconds in) or `name>0.33` (that far through), and plays on from there. With neither, a z_rm_ clip a LINE
@@ -80,7 +80,7 @@ static int   g_rmActive=0;                     /* P5: an rm clip owns the root T
 static double heroStartPh(float fps,unsigned frames){ double p=0.0;
     if(g_heroCueS>=0.f) p=(double)g_heroCueS*fps; else if(g_heroCueF>=0.f) p=(double)g_heroCueF*frames; else if(g_heroStartOff&&g_labRM&&g_clipStartS>0.f) p=(double)g_clipStartS*fps;
     g_heroCueS=g_heroCueF=-1.f; g_heroStartOff=0; if(frames>1&&p>(double)frames-1.0) p=(double)frames-1.0; return p; }
-/* ⭐ ep 10: THE TRICK SCHEDULER. Its state and trickClampEnd sit with the board channel (the samplers read
+/* ⭐ THE TRICK SCHEDULER. Its state and trickClampEnd sit with the board channel (the samplers read
  * them); the firing lives here, after the lab's clip globals it writes. */
 static void trickSaveBase(int s){
     TrickBase*B=&g_trkBase[s];
@@ -169,7 +169,7 @@ static void trickTick(void){
     for(int s=0;s<SCN_MAXCAST;s++){
         if(s==0?!g_heroPk:!g_cast[s].pk) continue;
         if(g_trkOn[s]&&g_trkDone[s]) trickRestore(s,1);
-        /* ⭐ ep 11: a half-pipe air's one-shot (hair=), on the exposure the air is first shown */
+        /* ⭐ a half-pipe air's one-shot (hair=), on the exposure the air is first shown */
         if(g_pipePend[s][0]){ TrickEv T11; snprintf(T11.clip,sizeof T11.clip,"%.31s",g_pipePend[s]); T11.at=t;
             g_pipePend[s][0]=0; trickFire(s,&T11); }
         if(g_trkNext[s]<g_trkN[s]&&t>=g_trk[s][g_trkNext[s]].at) trickFire(s,&g_trk[s][g_trkNext[s]++]); } }

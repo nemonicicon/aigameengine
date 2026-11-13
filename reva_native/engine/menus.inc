@@ -1,6 +1,6 @@
 #ifdef REVA_SDL
 /* ================= CHARACTER SELECT (08-25: reva
- * and kaeli to start with) =============================================================
+ * and the co-star to start with) =============================================================
  * Runs BEFORE the crowd loads: its own scene on the shared GL context, its own little
  * loop, returns the chosen .rpack path (static storage). Windows-only for now -- the Pi
  * copy of this file is a forked ancestor and keeps the plain argv[3] behavior.

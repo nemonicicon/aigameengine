@@ -17,7 +17,7 @@ the filmer, not of the rig.
 Two bugs the Godot run found and fixed: `E` is a Godot shader built-in (the seven-segment flags collided),
 and the engine's own phone chrome drew its timer digits 2.5x too narrow (now square in both orientations).
 
-**Units.** The engine's world is ~1.75x metric ("engine units", which its older notes call club units; heads at
+**Units.** The engine's world is ~1.75x metric ("engine units"; heads at
 y 2.6–3.1). Every distance below is given as `u (≈ metres)`; the metre figure is u ÷ 1.75. Angles in degrees, rates in rad/s.
 **The rule behind all of it:** every shot is a camera that EXISTS in the place — a phone in someone's hand
 or a tripod someone left standing. The lens moves on its own smooth clock even when the bodies step.

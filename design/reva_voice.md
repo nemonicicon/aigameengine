@@ -17,7 +17,7 @@ not on any human's VOICE. Level 2 is the agreed fallback if 3 cannot carry a son
 | Sheet 5: "PERSONALITY: BITTER, WITTY, SUPERIOR"; "I EXIST TO OBSERVE, ASSIST, AND VERBALLY ABUSE." | Deadpan. Phrases fall instead of rising to please; consonants are placed exactly. |
 | `scenes/say_piper.py`: **her accent is Scottish** | Rhotic, a tapped R, one-part FACE and GOAT, a fronted GOOSE that is also FOOT, TRAP = PALM, dark L. Kokoro has no Scottish voice, which is the only reason `bf_alice` ever spoke for her; a voice built from numbers has no such limit. |
 | Bible: "speaks like someone who has read the logs ... trying not to be rude about it. Often fails." "The only organized entity in the room." | Exact pitch, exact time. Never scrambling, never pleading. |
-| `seventy_four.md`: "HER VOICE NEVER CHANGES. What changes is what it means." "She never falters." | One voice for every mood. The direction changes the song, not the throat. Restraint on vibrato. |
+| The film's notes: "HER VOICE NEVER CHANGES. What changes is what it means." "She never falters." | One voice for every mood. The direction changes the song, not the throat. Restraint on vibrato. |
 | Bible: first avatar "self-generated", "fashion that looks chosen, not assigned", "self-authored style" | She chose this voice. It should sound designed, not imitated: the same reason the math route suits her. |
 | Bible: "she preserved their records, their works, their voices -- she could not preserve THEM." | She would not wear a dead person's voice. (If we fall to level 2 that line reads differently, and could be the point: she sings with what she kept.) |
 | Audio bible: "android/violin/processed voice/glitch"; "intimate, mischievous"; "Silence is a major element"; "R.E.V.A. composes in-story; her music reveals her state of mind." | Intimate before grand. Digital black between phrases: no lungs, no breath in. Glitch is seasoning, for later. |
@@ -61,15 +61,15 @@ recovered, not that they sound good.
 The first line came through by ear as a sing-song "you call it a bug, I call it a feature", the second only as something about a crash, and
 the whole sounded like a traditional Irish song. ⛔ The machine scored that song 95% by line; the listener got the first line, misheard the
 second, and half of the third. **A listener's ears are the scale; the machine's number runs well above them** (it knows which words are likely). "Irish" may be my melody as much as her voice: one unaccompanied
-voice, a minor tune and a hall. The song this voice is for is `design/pdoom_video.md`: fast, bright, full of technical words.
+voice, a minor tune and a hall. The song this voice is for is another music video's: fast, bright, full of technical words.
 Practice songs a listener knows: `songs/daisy_bell.sing`, `songs/auld_lang_syne.sing`, with `--band`. ⛔ A song you know flatters the words: judge those for
 singing, not clarity.
 
-## A COVER: PATHOLOGICAL FACADE, by Ghost (11-05)
+## A COVER SONG (11-05)
 From a MIDI and the lyrics: a song often covered with many different vocaloids, and one REVA could stand among.
 `scenes/midi_sing.py` turns them into her song. It reads the MIDI with no library, takes the melody as the top voice of one track, and
-sets a syllable file to it, one syllable a note (`+` splits a note). ⛔ The words are Ghost's: the syllable file, the .sing and the
-takes live on `<data>/sing/pathological_facade/`, never in the repo.
+sets a syllable file to it, one syllable a note (`+` splits a note). ⛔ The words are its writers': the syllable file, the .sing and the
+takes live on `<data>/sing/<song>/`, never in the repo.
 - **The MIDI** is a band arrangement at 120 BPM with no vocal track. The sung line is the top voice of track 1 ("Ragtime Piano"): single
   notes from 41.7 s, with a harmony note under it later. Verse one runs 99 notes with no rest, against 100 syllables, in swung
   sixteenths at about 7 syllables a second, the fastest thing she's sung.
@@ -83,8 +83,8 @@ takes live on `<data>/sing/pathological_facade/`, never in the repo.
   flangers swing at 2.97 Hz; the rate one's delay runs about 0.5 to 6 ms, the pitch one's centres on 183 Hz. Takes in `fx/`. ⛔ The
   tuned one is a ring at nearly one pitch that wobbles three times a second, close to what was disliked in Rei: the ear decides.
 - **The whole song (11-05)**, over its instrumental. `song.syl` (26 sections, 820 sung notes) and
-  `echoes.syl` (six of the seven bracketed echoes; "away on latent aripiprazole" isn't in the MIDI) are set by `midi_sing.py`, sung by
-  `sing_math.py --hall`, and laid on the instrumental by `scenes/sing_mix.py`: `reva_pathological_facade.mp3`, and `_vocal` alone.
+  `echoes.syl` (six of the seven bracketed echoes; the seventh isn't in the MIDI) are set by `midi_sing.py`, sung by
+  `sing_math.py --hall`, and laid on the instrumental by `scenes/sing_mix.py`: `reva_<song>.mp3`, and `_vocal` alone.
   What the MIDI turned out to be: the sung line is the honky-tonk piano's top voice, doubled in octaves in the choruses with chord stabs
   between (so the melody is the higher note of an octave pair), and in the miracle section the grand piano carries it while the
   honky-tonk piano plays the echoes high. Its octave moves between sections; each section is put back into one register for her
@@ -104,13 +104,13 @@ takes live on `<data>/sing/pathological_facade/`, never in the repo.
   instruments (+10, +11), and the riffs between sections are instruments. ⛔ An octave double above her choruses put notes at A5 that
   her first formant, tuned up to the pitch, rang on: a raw peak 8x the lead's, and her breath and hiss (scaled to her loudest voiced
   sound) buried the rest of the part. So the choruses take the MIDI's thirds, filled with a third below in key. Harmony in tune on
-  106 of 107 held notes. `reva_pathological_facade_v2.mp3`. ⛔ Open in her voice: F1 tuning at high notes needs a wider bandwidth
+  106 of 107 held notes. `reva_<song>_v2.mp3`. ⛔ Open in her voice: F1 tuning at high notes needs a wider bandwidth
   before she can sing above about C#5.
 - **Version 3 (11-05), at the WRITTEN PITCH.** v2's fault: in some spots the voice went lower where it should go higher. The big leaps
   are correct and the MIDI needs no fixing, so the song is not transposed; the choice was the written pitch. ⛔ The drops were mine: sections each moved by their own octave (-12 or -24) to keep her low. Now every section is at 0, and
   the only choice is which written octave of a doubled line is hers (`midi_sing.py` `pick_octave`: where a doubled note meets a lone
   one, the octave that joins them closer; the choruses take the pair's lower note, so a doubled G# then a lone C# steps UP a fourth).
-  She sings F4 to D#6. Also in v3: the octave-doubled riff after each "like a god" on one legato "ah" (heard in the original as a higher
+  She sings F4 to D#6. Also in v3: the octave-doubled riff after each chorus hook on one legato "ah" (heard in the original as a higher
   note then a lower note; ⛔ heard as four held notes, and the MIDI has no note over a beat there on any track, so it's my reading, unconfirmed);
   "illusion" on its written notes (not limited to one pitch: it follows the writing, and the fix is making her voice more
   understandable) with a back GOOSE `UU` for "lu" (large-v3 heard her Scottish fronted one as "year"/"version", the back
@@ -125,7 +125,7 @@ takes live on `<data>/sing/pathological_facade/`, never in the repo.
 - **Version 4 (11-05)**: v3 sounded too high pitched. Every section (and the echoes) at -12,
   one octave under the MIDI, the same octave everywhere, so every rise and leap is the MIDI's; the rest is v3's. F3 to D#5. 184 of 185
   held lead notes in tune (the A#4 FLEECE 36 cents flat, as in every version), harmony 106 of 107, raw peak 15, the riff's "ah" the
-  loudest at 4 dB over her median. `reva_pathological_facade_v4.mp3`.
+  loudest at 4 dB over her median. `reva_<song>_v4.mp3`.
 - **Version 5 (11-05)**: v4 sounded better; next, making her more understandable, and whether it is consonants she needs. Measured with
   the stand-in ear (large-v3, word accuracy against the lyric) on verse 1's first four lines and chorus 1's first five, ONE change at a
   time, with the control `no consonants` scoring 0% on both (so the ear isn't guessing from the tune):
@@ -133,14 +133,14 @@ takes live on `<data>/sing/pathological_facade/`, never in the repo.
   82 / 57; an octave lower 67 / 80; F1 tuned to the note 64 / 60; **F1 not tuned 64 / 74**; F2/F3 not widened 64 / 54; presence +3 dB
   53 / 54. So it is NOT mainly consonants: the verses are held back by their speed (about 7 syllables a second) and the choruses by
   pitch, and at pitch the culprit was my own F1 tuning, which turned FLEECE toward DRESS. `f1tune=0` on her voices; the widening stays
-  (it is what stopped the whistle). Peak 13, pitch as v4. `reva_pathological_facade_v5.mp3`. ⛔ Untried for the verses' speed: what
+  (it is what stopped the whistle). Peak 13, pitch as v4. `reva_<song>_v5.mp3`. ⛔ Untried for the verses' speed: what
   the ear's half-tempo score says is that her consonants and transitions need to read in less time.
 - **The verses (11-05)**. All of verse 1 and the first half of verse 2 on the stand-in ear, one change at a
   time: as she is 57 / 54; half tempo (the ceiling) 83 / 85; consonants allowed 75% of a note 59 / 52, only 45% 53 / 31; consonants
   25% shorter 67 / 50; glides 5 ms 57 / 52; glides 18 ms 60 / 58; voiced consonants at half level 59 / 48. ⛔ Chance alone (the render's
   seed, everything else the same) moves verse 1 53-57 and verse 2 44-54, so read nothing under ~10 points from one run. Over three
   seeds, 18 ms glides: verse 1 no different, verse 2 higher on every seed (+4, +10, +21). Rendered as `reva_glide`, a candidate for an
-  A/B by ear (`ab_verses_v5_then_v6.mp3`, `reva_pathological_facade_v6_candidate.mp3`), NOT built in: it touches the transitions where the
+  A/B by ear (`ab_verses_v5_then_v6.mp3`, `reva_<song>_v6_candidate.mp3`), NOT built in: it touches the transitions where the
   bell sound is. What the transcripts point at instead: particular consonants ("a line" heard as "a one": her L read as W, a fault
   the brief already listed; "retold" as "before"). The gap to the ceiling is probably consonant QUALITY, sound by sound, not level
   or length. On the A/B little difference was heard, so the candidate is NOT built in (`reva_glide` removed); v5 stands.
@@ -172,7 +172,7 @@ takes live on `<data>/sing/pathological_facade/`, never in the repo.
   and not after S (`asp_on`, `aspdur_on`, `aspnoise`; `seg(..., onset, after)`), and B/D/G closure voicing low-passed to 450 Hz, a
   real voice bar (`bar`, the `lp` track in `voiced`). Pictures (`onsets_v6.png`): "pan" bright like alba's, "done" a faint low bar,
   "stars" unaspirated after the S, "cat"'s final T as soft as before. v6 = v5 + the brighter L + 18 ms glides + these stops:
-  `ab_stops_v5_then_v6_dry.mp3` (her alone, dry), `reva_pathological_facade_v6.mp3`. Pitch 184/185 as before, peak 13.
+  `ab_stops_v5_then_v6_dry.mp3` (her alone, dry), `reva_<song>_v6.mp3`. Pitch 184/185 as before, peak 13.
 - ⛔⛔ **On that A/B the first was heard as better. v5 stands.** All three of v6's changes are reverted (L back to 1100, glides to 10 ms,
   the stops' new settings removed) and a fresh render is BYTE-IDENTICAL to v5's. Their switches stay in the code, off: `asp_on`,
   `aspdur_on`, `aspnoise`, `bar` (the `lp` track only acts where a bar is set), `fsmooth`. Lessons: the stand-in ear's small gains
@@ -365,7 +365,7 @@ recordings (VocalSet, the stand-in ear) are only the TEST SUITE, and nothing of 
   curves; `reva_talks.py --xray --demo OUT` writes `scenes/reva_xray.scn`: her airway's 40 sections placed in her HEAD BONE's frame
   from her own mesh cut down the middle (her mouth's roof 1.645-1.656 m, its floor 1.611-1.625, her neck's front z 0.013; her model
   has no throat inside its neck, so the throat is drawn where it would be), `shp tract:NN` tracks, her phrases as captions, and a
-  profile lens. The engine half (`tractsec`/`tractnose` records, tracks routed to `tractDraw`, drawn through her with Wan-To's
+  profile lens. The engine half (`tractsec`/`tractnose` records, tracks routed to `tractDraw`, drawn through her with the
   see-through web mode, GFX_FX_WEBX: nothing new in the renderer) is written and compiles in a copy; it waits for the hair helper's
   builds to finish before it touches the engine.
 - **Cold test 4 (11-06): heard as help hell rlll kill tolp rweb fvld shell llll** for nose cat fan rain king top web gold shell moon: 1 of
@@ -836,7 +836,7 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   breath (FINAL_HOLD, cold test 9's fix), her breath ends with the Z's own length, and her voice stops as the Z starts: ~0.1 s of
   hiss no louder than her vowel's own top end. Also reached and not yet heard: her V, DH, ZH and JH open at the back too. Sent, each
   its own file (`step9g/`): 1 before, 2 narrowed only, 3 narrowed with the back opening. Verdict not in.
-- ⭐ **REVA CHAT (11-07): a PC app with a chat box; she says what is typed, animated, on her 3D model.** `reva_native/reva_chat.bat` (`scenes/reva_chat.py`): a chat
+- ⭐ **REVA CHAT (11-07): a PC app with a chat box; she says what is typed, animated, on her 3D model.** Her chat app (kept with her, not in this repository): a chat
   box and her window. Each sentence typed is said in her speaking voice with her face's curves (`speak_math.face`), made by three
   worker processes and said in order, written as a scene by reva_talks.py's writers (her close-up, held an hour past its sound so she
   stays in frame between lines) and played live by the engine, whose mixer plays her voice as her mouth moves. Her engine is its own
@@ -873,8 +873,8 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   kHz [1.8]); H 8.5 dB weak (-13.9 [-5.4]); CH 6 dB weak (rough ruler); L and W 6-8 dB loud (-8.2, -7.7 [-15.8, -14.1]); M and N's
   F2 low (1.3 kHz [1.7, 2.3]). Each round is tried by ear in REVA CHAT (no files: the speaking app is updated instead). The
   desktop has a REVA shortcut with her face (`<data>/chat/reva_chat.ico`).
-- ⛔ **THE BAND'S VOCAL WAS v6 (found 11-08).** `scenes/facade_cut.py` and the band's mix (`band/facade_band_mix_vocal.wav`) carry
-  `reva_pathological_facade_v6_vocal.wav`, the v6 turned down by ear (the first was better): measured, the mix's vocal against v6 r = 1.0000,
+- ⛔ **THE BAND'S VOCAL WAS v6 (found 11-08).** The music video's cut script and the band's mix (`band/<song>_band_mix_vocal.wav`) carry
+  `reva_<song>_v6_vocal.wav`, the v6 turned down by ear (the first was better): measured, the mix's vocal against v6 r = 1.0000,
   against v5 0.92. Every band take since 11-05 sings v6. Not changed yet: the reshoot waits on which vocal goes in.
 - **HER SINGING THROUGH HER AIRWAY (11-08: does the work on her speaking voice since carry over to her singing?).** Her speaking voice is v5's own source and vowels, so the sung notes go through it with one step, `sing_math.layout`
   (floors) then `airway_td.render_td`. `voice_tests/` (the 11-06 passages: verse 1 and the first half of verse 2, dry, seed 1; the
@@ -910,7 +910,7 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   vibrato 12 cents at 5 Hz, notes held level (`even` 0.75), one timbre (rd 1.25, breath .12) at every loudness, on the grid
   bar the consonants' lead.
 - ⭐ **THE VOICE DESK (11-08: knobs and faders to dial in her voice while she sings live, the way synths, Moogs, keyboards,
-  guitar pedals and mixers are dialled).** `reva_native/voice_desk.bat` (`scenes/voice_desk.py`): she sings a phrase on a loop (Facade's fast verse, verse 2's first
+  guitar pedals and mixers are dialled).** The desk (kept with her, not in this repository): she sings a phrase on a loop (the cover song's fast verse, verse 2's first
   half, its first line; babble: one consonant with EE, AH, OO twice each, or every consonant before AH), and every fader move re-sings
   it in the background and crossfades in at the same place in the loop: her formant voice makes 15 s of song in ~2.5 s, babble in
   under one. "Airway (slow)" sings through `airway_td.render_td` (~4x slower than she sings: not live). 21 faders, each a key of her
@@ -954,10 +954,10 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   after an opening P/T/K; its length is `floors`'). On the desk as CONSONANT FIXES; the built-in voice **"babble fixes"** = file 6 +
   quiet 15 ms, crack -8, burst +6, bend 45 ms, breath x1.8 -- MY values, a start for the ear. Drawn again: the hum gone, the crack
   there on G and K; her K's breath still ~40 ms and the bend hard to see: the two to dial by ear.
-- **THE SONG IN THE NEWEST VOICE (11-08: REVA and Kaeli playing Pathological Facade, in the newest voice).** "babble fixes", her three parts (song, harmony, echoes) with the hall, laid on the band's own sound
-  (`band/synth/band.wav`) as 11-05's mix was (harmony and echoes -6 dB, offset -0.035 s): `band/facade_band_mix_babblefixes.wav` and
-  its `_vocal`; `facade_cut.py cut --song --vocal` (new flags; the defaults are still 11-05's v6), the take
-  `band/takes/facade_duo_take2.mp4` (1920x1080, --film). The scratchpad's `facade_build.sh` is the recipe. ✅ Shot 11-08: 8,413
+- **THE SONG IN THE NEWEST VOICE (11-08: REVA and the co-star playing the cover song, in the newest voice).** "babble fixes", her three parts (song, harmony, echoes) with the hall, laid on the band's own sound
+  (`band/synth/band.wav`) as 11-05's mix was (harmony and echoes -6 dB, offset -0.035 s): `band/<song>_band_mix_babblefixes.wav` and
+  its `_vocal`; the cut script's `cut --song --vocal` (new flags; the defaults are still 11-05's v6), the take
+  `band/takes/<take>.mp4` (1920x1080, --film). The take's script is the recipe. ✅ Shot 11-08: 8,413
   frames in 13.6 min, 280.4 s, 36 shots, her real hairs on (`[strands]` in the log); the new vocal on the old clock (0 ms, envelope
   r 0.89 against 11-05's); `_share.mp4` (720p, 27.5 MB) sent.
 - ⭐⭐ **On it (11-08): the right path; she is MUCH more understandable in "babble fixes", still struggles in the faster passages,
@@ -993,7 +993,7 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   (11-06). (Corrected after reading the code: its design doc says its vowels are fitted to Hillenbrand's MALE means, and I
   said so; `vowel_data.rs` fits the female body's twelve English vowels to Hillenbrand's WOMEN.) Its methods and code are usable; a
   woman's numbers stay the women's (her 22, the scans' middle).
-  ⭐ **STUDIED: `design/chimera_study.md`** -- its code read part by part against hers, where each stands by
+  ⭐ **STUDIED** (a study kept with her, not in this repository) -- its code read part by part against hers, where each stands by
   its own ruler (her hisses are nearer women's than its female voice's; it is ahead in everything a tongue gives and in speed), and
   what to take, in order: its closing rule (for her pops), its fast-passage rule (for her fast verses), one airway run not two
   (REVA CHAT's wait), its measuring loop (whole sentences, an aligner, costs in the women's own spread), then a tongue and jaw on
@@ -1001,7 +1001,7 @@ After: 10 3D sound in her airway (GPU), 11 muscles, 12 singing on her new body (
   ⛔ A crypto token calling itself CHIMERA rides its name: nothing to do with the software.
 - ⭐⭐ **HER MOUTH BECOMES A MOUTH (11-10: REVA needs a more complete physics model, known without listening to CHIMERA; CHIMERA is
   clearer).** A jaw, a tongue, lips and a soft palate whose positions
-  make her airway's shape, in place of the fitted tube: its own plan and record, **`design/reva_mouth.md`** (steps T1-T8).
+  make her airway's shape, in place of the fitted tube: its own plan and record (steps T1-T8, kept with her, not in this repository).
   T1-T7 BUILT 11-10: the geometry (`scenes/mouth_model.py`, a port of CHIMERA's, exact against its 114 saved positions); her
   body at the women's middle with a woman's larynx tube and her piriform sinuses joining at its top (`mouth_fit.py`); her 12
   vowels and 24 consonants as positions of the parts (`mouth_cons.py`); the parts on springs, on her own timing, through her own

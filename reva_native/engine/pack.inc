@@ -35,14 +35,14 @@ typedef struct {
      * Wpar[c]: rest world rotation of the bone's parent node; anc[c]: nearest canon
      * ancestor; pre[c]: rest rotation from that ancestor's node to this bone's parent;
      * G: the rig's character frame (X = its own forward). Proven in Python first
-     * (skate_src/author/retarget.py): kaeli and reva hit authored arm targets to 0.1
+     * (skate_src/author/retarget.py): the co-star and reva hit authored arm targets to 0.1
      * degree through this exact algebra. */
     float cbA[NCANON][4], cbW[NCANON][4], cbWpar[NCANON][4], cbPre[NCANON][4];
     int   cbAnc[NCANON]; float cbG[4]; int cbV[NCANON]; int cbOK;
     float cbLeg;                   /* P5: canonical leg length (hip->knee->ankle), rig units */
     int footL, footR;              /* S6: the feet -- first child of each lower leg; the contact test needs them */
-    /* ⭐ WHEELS ARE CONTACTS TOO (ROBOT NEKO ep 9). A skater's deck stands on its wheels, so
-     * grounding a rider by the lowest ANKLE buries the board: Kickflip's bench showed only the
+    /* ⭐ WHEELS ARE CONTACTS TOO. A skater's deck stands on its wheels, so
+     * grounding a rider by the lowest ANKLE buries the board: a wheeled rig's bench showed only the
      * nose and tail poking through the road, 0.58 rig units of it under. Every node named for
      * a wheel is elected at load and counted with the feet wherever a body is grounded. */
     int nWheel, wheel[8]; float wheelYaw;   /* ...and which way its board runs: 0 along rig Z, -pi/2 along X */
@@ -60,7 +60,7 @@ typedef struct {
      * now when a body reaches it. */
     #define CHMAXC 32
     int nCh; short chB[CHMAXC][14]; signed char chN[CHMAXC]; float chLen[CHMAXC][14];
-    int nJg; short jgRoot[4], jgTip[4];   /* ⭐ JIGGLE BONES (kaeli's breasts have jiggle physics) */
+    int nJg; short jgRoot[4], jgTip[4];   /* ⭐ JIGGLE BONES (the co-star's breasts have jiggle physics) */
     /* ⭐ STRETCH BONES (09-29): a garment HELD BETWEEN TWO MOVING PARTS -- REVA's off-shoulder jacket, its body a band
      * from one elbow round her back to the other. Weighted to the arms and the spine by blending, linear-blend
      * skinning put the band half way between where each would carry it: a flap stood out of her back in every pose
@@ -71,11 +71,11 @@ typedef struct {
     int nSt; short stB[8], stA[8]; float stLen[8], stDir[8][3];
 
 /* ⭐ THE MORPH CAP WAS 8, chosen when the only morphs were a breath and a jaw.
- * Anima's HiPoly body arrives with a full ARKit/Character Creator face: 107 shape keys
+ * The bought character's HiPoly body arrives with a full ARKit/Character Creator face: 107 shape keys
  * (six CC visemes, 8 brow shapes, per-eye look and blink, jawOpen, smile/frown). glTF
  * also repeats every target on every PRIMITIVE, and her body splits into 15 by material,
  * so even a curated 28 shapes lands well past 8 once the non-empty pairs are counted. */
-/* (11-11) 256: REVA 902 wears Anima's high-poly face with 92 shapes, and the ARKit set carried onto it from Anima's low-poly model
+/* (11-11) 256: REVA 902 wears the bought character's high-poly face with 92 shapes, and the ARKit set carried onto it from its low-poly model
  * (each side's smile, the cheeks, the upper lip, the dimples, for her laugh and her singing) is 40 more, each
  * counted once per mesh it moves. A cap nobody measured, as the note above says; the arrays it sizes are small */
 #define MORPH_MAX 256
@@ -106,11 +106,11 @@ typedef struct {
     unsigned char*meshOff, *meshKind, *meshPiece; unsigned long long*meshHiders;
     int nPiece; char pieceName[64][32]; unsigned pieceOutfits[64];
     int nOutfit; char outfitName[16][24]; int outfit; unsigned long long worn;
-    /* ⭐ THE TOON PASS (10-18, THE WORLD AT THE END OF TIME): a pack carrying a node named ToonStyle (a zero-weight
+    /* ⭐ THE TOON PASS (10-18, the space series): a pack carrying a node named ToonStyle (a zero-weight
      * bone the people builder adds) is drawn in the show's look -- a cel ramp into a cool shadow tint and an ink
-     * line (an inverted hull). Every other body in the club is untouched. REVA_NOTOON=1 is the control. */
+     * line (an inverted hull). Every other body in the engine is untouched. REVA_NOTOON=1 is the control. */
     int toon;
-    /* ⭐ THE SHIP'S SETS (10-18, THE WORLD AT THE END OF TIME): markers a SET PROP carries (a set's builder ->
+    /* ⭐ A SET'S MARKERS (10-18, the space series): markers a SET PROP carries (a set's builder ->
      * glb2rpack.py --marker). ToonSet: the toon look lit as a ROOM is lit -- from above, every
      * wall in the light, every underside in the shadow tone, cast shadows from the sun's map (toon = 2). Glow: drawn
      * unlit at its own colour (a light panel, a screen, an emitter), no ink. NoCast: never in the sun's shadow map
@@ -125,9 +125,9 @@ typedef struct {
      * (a martini glass): set props were opaque only -- the blend existed for a body's meshes, never a prop's. 0 = opaque */
     float sheer;
     /* ⭐ TRUE SIZE (10-18): a pack carrying a node named TrueScale was built in METRES at its real size, and keeps
-     * it -- the club's 1.75 units a metre -- instead of being normalised to the crowd's 3.15 (which blew THE WORLD
-     * AT THE END OF TIME's five-year-olds up to the height of the twelve-year-old). */
-    int trueScale; float trueH;   /* trueH: its true height in club units (10-22: the gait test of a child) */
+     * it -- the engine's 1.75 units a metre -- instead of being normalised to the crowd's 3.15 (which blew the
+     * space series' five-year-olds up to the height of the twelve-year-old). */
+    int trueScale; float trueH;   /* trueH: its true height in engine units (10-22: the gait test of a child) */
     int hairWhole;   /* (11-11) a node named HairWhole: her simulated locks at the whole length of her haircut (engine/strands.inc, g_hsLen): of REVA's two lengths, 902 has the whole cut and the others the shorter */
     /* ⭐ PER-VERTEX COLLISION (10-18): a pack carrying a node named VertexCollide has its skirts (~skirt~/~cloth
      * meshes) pushed out of its legs and its hair (wear~hair~ meshes) out of its head and neck, EVERY VERTEX (the
@@ -144,7 +144,7 @@ typedef struct {
 static int toonOn(const void*Pv,int toon);
 
 
-/* ⭐ (10-22) MIRRORS: "half the walls on the ship were mirrored to make the rooms seem more spacious" (Pohl) --
+/* ⭐ (10-22) MIRRORS, for a ship's set whose rooms are half walled with them --
  * a set's `mirror x y z yaw w h`; see mirInst */
 typedef struct { float p[3], n[3], w, h, R[16]; } Mirror;
 static Mirror g_mir[4]; static int g_nMir=0, g_mirOff=-1;
@@ -226,9 +226,9 @@ static void qconj(float*r,const float*q){ r[0]=-q[0]; r[1]=-q[1]; r[2]=-q[2]; r[
 static int   g_chainsOn=1;      /* ctl chains=0/1 */
 static float g_chStiff=0.22f;   /* per-frame spring toward the animated pose (at 60fps) */
 static float g_chDamp=0.88f;    /* velocity kept per 1/60 s (see chainSim: it is raised to the step) */
-/* \u2b50 GRAVITY, MEASURED, NOT STYLED. The club is ~1.75x metric -- a 1.75 m woman
- * stands ~3.06 club units -- so one club unit is ~0.572 m and real gravity is
- * 9.81/0.572 = 17.1 club units/s^2. The old constant delivered 8.4x that, which is why
+/* \u2b50 GRAVITY, MEASURED, NOT STYLED. The engine is ~1.75x metric -- a 1.75 m woman
+ * stands ~3.06 engine units -- so one engine unit is ~0.572 m and real gravity is
+ * 9.81/0.572 = 17.1 engine units/s^2. The old constant delivered 8.4x that, which is why
  * a braid thrashed instead of swinging.
  * ctl `chaingrav=` scales it: 1.0 is real, and a dancefloor may want more. */
 static float g_chGrav=1.25f;    /* multiples of real gravity; ctl chaingrav= */
@@ -262,7 +262,7 @@ static void chainPublish(int slot,const float*m){
         memcpy(g_chM[slot][0],g_chM[slot][1],64); g_chMSt[slot][0]=g_chMSt[slot][1]; g_chMSt[slot][1]=g_frameStamp; }
     memcpy(g_chM[slot][1],m,64); }
 static float g_chLagMax=0.f; static double g_chLagAcc=0; static long g_chLagN=0;  /* tip lag telemetry */
-/* ⭐ CLOTH MEETS THE LEGS (10-18, THE WORLD AT THE END OF TIME's robes). A cloth chain (its root named Cloth*)
+/* ⭐ CLOTH MEETS THE LEGS (10-18, the space series' robes). A cloth chain (its root named Cloth*)
  * is pushed out of a capsule round each thigh (hip -> knee) and shin (knee -> ankle), each as thick as the body
  * measured itself (measureBoneR: the mean distance of its own vertices from the bone's segment, x1.15 -- on the
  * skin). The fabrication note that parked REVA 902's coat said exactly this was owed: "the coat's skirt on cloth
@@ -311,7 +311,7 @@ static void stretchTick(void*Pv,M4*W){
             v[0]+=u[0]*dp; v[1]+=u[1]*dp; v[2]+=u[2]*dp; } } }
 static void chainSim(void*Pv,M4*world,int who){
     Pack*P=(Pack*)Pv;
-    /* ⛔ ONE STATE PER CAST SLOT, not per hero/partner (ROBOT NEKO ep 2). With [2] every partner
+    /* ⛔ ONE STATE PER CAST SLOT, not per hero/partner. With [2] every partner
      * passed who=1, so in a three-hander slot 2 reseeded slot 1's braids on every call and
      * neither body's hair ever simulated. Indexed by g_castI; sized to SCN_MAXCAST (asserted). */
     static float sp[CH_SLOTS][CHMAXC][14][3], pp[CH_SLOTS][CHMAXC][14][3];
@@ -327,8 +327,8 @@ static void chainSim(void*Pv,M4*world,int who){
     int adv=(stampOf[who]!=g_frameStamp); stampOf[who]=g_frameStamp;
     static int wOn=-1; if(wOn<0){ const char*e9=getenv("REVA_CHWORLD"); wOn=!(e9&&e9[0]=='0'); }
     /* (11-11) REVA_CHAINWIND=x,y,z: a steady push on every chain, in the world, in multiples of gravity, added to "down". A body held in a pose
-     * of flight has nothing to stream its tie and its coat's tails behind it: with the push, a held leap reads as flung (the Facade video's
-     * chorus, whose tie GHOST draws streaming across the whole frame). Unset: down is down, as ever */
+     * of flight has nothing to stream its tie and its coat's tails behind it: with the push, a held leap reads as flung (the music video's
+     * chorus, whose tie the original video draws streaming across the whole frame). Unset: down is down, as ever */
     static float wnd9[3]; static int wndOn=-1;
     if(wndOn<0){ const char*e9=getenv("REVA_CHAINWIND"); wndOn=(e9&&sscanf(e9,"%f,%f,%f",&wnd9[0],&wnd9[1],&wnd9[2])==3)?1:0;
         if(wndOn) printf("[chains] a steady push on every chain: %.2f, %.2f, %.2f of gravity (REVA_CHAINWIND)\n",wnd9[0],wnd9[1],wnd9[2]); }
@@ -388,7 +388,7 @@ static void chainSim(void*Pv,M4*world,int who){
                 float vel=(sp[who][c][i][k]-pp[who][c][i][k])*dmp;
                 step[k]=vel+(a[i][k]-sp[who][c][i][k])*sKc-gdir[k]*grav; }
             /* \u26d4 CLAMP THE STEP TO THE LINK. gravity alone is ~0.165 rig units per frame
-             * (-2.4/scale * dt^2 * 60) and Anima's braid links are ~0.04, so a node was being
+             * (-2.4/scale * dt^2 * 60) and the bought character's braid links are ~0.04, so a node was being
              * thrown four segment-lengths in one step -- past the point where a distance
              * constraint can recover the SHAPE rather than just the length, which is the
              * difference between hair that swings and hair that snaps somewhere else.
@@ -547,7 +547,7 @@ static int canonOf(const char*raw){
         static const char*FN[5]={"thumb","index","middle","ring","pinky"};
         const char*p=NULL; int fi=-1, side=-1, joint=0;
         for(int f=0;f<5&&fi<0;f++){ const char*q=strstr(n,FN[f]); if(q){ p=q; fi=f; } }
-        if(fi==3&&(strstr(n,"earring")||strstr(n,"string")||strstr(n,"spring"))) fi=-1;   /* ⛔ Anima's earring_01_l is not a ring finger */
+        if(fi==3&&(strstr(n,"earring")||strstr(n,"string")||strstr(n,"spring"))) fi=-1;   /* ⛔ the bought character's earring_01_l is not a ring finger */
         if(fi<0){ const char*q=strstr(n,"mid"); if(q&&(q[3]>='0'&&q[3]<='9')){ p=q; fi=2; } }   /* Daz: l_mid1 */
         if(fi>=0&&p){
             const char*after=p+strlen(fi==2&&!strncmp(p,"mid",3)&&strncmp(p,"middle",6)?"mid":FN[fi]);
@@ -580,7 +580,7 @@ static int canonOf(const char*raw){
         {"hip",0},{"l_collar",6},{"l_upperarm",7},{"l_forearm",8},
         {"r_collar",9},{"r_upperarm",10},{"r_forearm",11},
         {"l_thigh",12},{"l_shin",13},{"r_thigh",14},{"r_shin",15},
-        {"thighl",12},{"shinl",13},{"thighr",14},{"shinr",15},   /* snake_case, side trailing (the DontGetDropped alien): */ {"shoulder_l",6},{"upper_arm_l",7},{"forearm_l",8},{"shoulder_r",9},{"upper_arm_r",10},{"forearm_r",11},{"shin_l",13},{"shin_r",15},{NULL,0}};
+        {"thighl",12},{"shinl",13},{"thighr",14},{"shinr",15},   /* snake_case, side trailing (the skate game's alien): */ {"shoulder_l",6},{"upper_arm_l",7},{"forearm_l",8},{"shoulder_r",9},{"upper_arm_r",10},{"forearm_r",11},{"shin_l",13},{"shin_r",15},{NULL,0}};
     for(int i=0;EX[i].k;i++) if(!strcmp(n,EX[i].k)) return EX[i].c;
     /* UE spine_01/02/03 lost their digits above -- disambiguate by original */
     if(!strncmp(n,"spine_",6)) return 1;

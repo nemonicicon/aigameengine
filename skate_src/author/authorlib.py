@@ -69,7 +69,7 @@ def fk_world(nodes, q_override=None, t_override=None):
     replaced via t_override={idx: t} (that is how authored ROOT MOTION exists: a
     translation track on the pelvis/root is just a t override per frame). Scale is
     applied to the translation of children, matching m4_mul over T*R*S composition for
-    the uniform scales the club's rigs use at rest."""
+    the uniform scales the engine's rigs use at rest."""
     n = len(nodes)
     wq = [None] * n; wp = [None] * n; ws = [None] * n
     for i, nd in enumerate(nodes):
@@ -197,7 +197,7 @@ def quantise4(items):
     zero, and the vertex ends up carrying 256/255 of itself -- which at rest is not the
     identity, so the body MOVES. It takes three real influences and a sliver of a fourth
     (raw parts .586/.687/.687 all round up while the sliver is handed nothing), which is
-    about one vertex in nine thousand: 7 of kaeli's 293,760, off by 0.18 rig units, and
+    about one vertex in nine thousand: 7 of the co-star's 293,760, off by 0.18 rig units, and
     the rest-pose gate rightly refused the whole write.
 
     It takes a FOURTH slot to bite: with three or fewer, two round-ups can gain at most
@@ -570,7 +570,7 @@ def body_dims(p, RM=None):
     Returned about the body's own origin/spine axis:
       rx      torso half-width  (max |x| in the torso band -- bind T-pose arms sit at
               shoulder height, so the band top stays below them)
-      front   chest half-depth  (max +z in the band: +z is club forward = her front)
+      front   chest half-depth  (max +z in the band: +z is the engine's forward = her front)
       back    back half-depth   (|min z|)
       headr   head horizontal radius
       hipY/shY  the band bounds used, for the caller's own banding
@@ -701,10 +701,10 @@ def face_points(p, RM=None):
     front = [q9 for q9 in pts if q9[2] > zmed and abs(q9[0]) < 0.5 * xw]
     assert front, "no front-central face vertices"
     # LEVELS COME FROM THE PROFILE, not from chin->crown fractions: hair owns the crown
-    # (kaeli's updo put "the top of her head" 0.48u above her skull; reva's ponytail
+    # (the co-star's updo put "the top of her head" 0.48u above her skull; reva's ponytail
     # stretched the span until her "mouth" landed under her chin). The NOSE is the one
     # feature no hairstyle owns -- the maximum forward protrusion of the front-central
-    # slice near the skull base -- and both club faces put it 0.4 half-widths above the
+    # slice near the skull base -- and both lead faces put it 0.4 half-widths above the
     # head bone. Everything else is anchored to it in units of the head's half-width.
     wp9, _ = fk_world(nodes)
     hy = wp9[RM["head"]][1]
@@ -781,7 +781,7 @@ def rig_map(p):
             if "idle" in lo and not any(w in lo for w in ("lay", "sleep", "sit", "crouch")):
                 base = nm; break
     m["_base_clip"] = base
-    # A two-joint spine (the DontGetDropped alien: spine, chest) has no third bone to bend: the top one stands in, so a score
+    # A two-joint spine (the skate game's alien: spine, chest) has no third bone to bend: the top one stands in, so a score
     # that asks for spine_03 turns the chest instead of refusing the whole rig (11-02).
     if m["spine_03"] < 0 and m["spine_02"] >= 0: m["spine_03"] = m["spine_02"]
     m["_missing"] = [k for k, v in m.items() if not k.startswith("_") and (v is None or v < 0)]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """cook_game.py -- a game-grade body from a film pack, on the same skeleton (engine plan, Phase 2).
 
-    cook_game.py packs/v1_kaeli_street.rpack packs/v1_kaeli_game.rpack --tris 20000 --atlas 512 --drop anima_panties,anima_bra
+    cook_game.py packs/v1_<body>.rpack packs/v1_<body>_game.rpack --tris 20000 --atlas 512 --drop <mesh>,<mesh>
 
 11-02: same rules and bodies everywhere, and no frame ever drops on the Pi. One film mesh on a game path was 95% of the zombie
 game's frame, and a frame's budget is what holds it, so a game path gets a body cooked to a budget. Pack to pack, never a rebake: the nodes,

@@ -16,7 +16,7 @@ every scene can be checked against both lenses in a second, instead of shooting 
 minutes of film and looking at it afterwards.
 
 It reports, per camera, per mark:
-    dist    how far the mark is from the lens (near plane is 0.8 in club units)
+    dist    how far the mark is from the lens (near plane is 0.8 in engine units)
     off     the angle between the lens axis and the mark, in degrees
     half    half the vertical field of view -- the mark must sit inside it
 and flags OUT when a mark falls outside the cone.
@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import shoot as S
 
 NATIVE = S.NATIVE
-HEAD_Y = 1.55          # a standing head, club units -- what the lens is actually framing
+HEAD_Y = 1.55          # a standing head, engine units -- what the lens is actually framing
 
 
 def marks(scene, stage):
@@ -63,7 +63,7 @@ def marks(scene, stage):
     return out
 
 
-BODY_H = 1.75          # a standing body, club units -- what "big enough to act" is measured against
+BODY_H = 1.75          # a standing body, engine units -- what "big enough to act" is measured against
 MIN_FRAC = 0.12        # below this a face stops being a performance and becomes a silhouette
 
 
@@ -80,8 +80,8 @@ def check(cam, x, z):
         return (0.0, 180.0, fov / 2.0)
     d = (tx * fx + ty * fy + tz * fz) / tl
     off = math.degrees(math.acos(max(-1.0, min(1.0, d))))
-    # ⭐ AND HOW BIG SHE IS IN IT. "In frame" is not "readable": this passed act IV,
-    # which is 112 seconds of a parked pickup with the three leads as specks at the edge.
+    # ⭐ AND HOW BIG SHE IS IN IT. "In frame" is not "readable": this passed the dusk scene,
+    # which was 112 seconds of a parked pickup with the three leads as specks at the edge.
     # A body of BODY_H at distance tl subtends 2*atan(h/2/tl); the frame subtends fov.
     # The ratio is the fraction of picture height she occupies.
     sub = 2.0 * math.degrees(math.atan(BODY_H / 2.0 / max(0.01, tl)))

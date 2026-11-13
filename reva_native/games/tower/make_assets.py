@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """make_assets.py -- the tower game's level, body and sounds, made by code. Run it from anywhere; it writes beside itself: props/tw_level.rpack and the three things the game makes as it runs, packs/v1_tower.rpack, sets/tower.set, scenes/sfx/*.wav. --check says whether what's on disk is what this makes.
-The level is plain boxes and ramps with nothing special about them: the engine works out where a body can walk from their triangles (engine/spans.inc), which is what `climb` in the set asks for. Sizes here are club units, 1.75 a metre."""
+The level is plain boxes and ramps with nothing special about them: the engine works out where a body can walk from their triangles (engine/spans.inc), which is what `climb` in the set asks for. Sizes here are engine units, 1.75 a metre."""
 import importlib.util
 import io
 import math

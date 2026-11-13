@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""package.py -- turn a recorded sketch into an EPISODE of ROBOT NEKO.
+"""package.py -- turn a recorded sketch into an EPISODE of the stop-motion show.
 
-    python skate_src/robot_neko/package.py --ep 2 --title CONTINUITY \
-        --in out/robot_neko/ep02_raw.mp4 --out out/robot_neko/ep02_continuity.mp4
+    python skate_src/robot_neko/package.py --ep 2 --title <TITLE> \
+        --in out/<show>/ep02_raw.mp4 --out out/<show>/ep02.mp4
 
-2026-09-10: the first sketch became an episode of ROBOT NEKO, the kind of cartoon
-that gets better every time. A show has an identity every
+2026-09-10: the first sketch became an episode of the stop-motion show. A show has an identity every
 episode shares, so this is a TOOL rather than a one-off: the same card, the same sting,
 the episode's number and title on it.
 
@@ -189,7 +188,7 @@ def probe_fps(path):
 
 
 def probe_size(path):
-    """the take's own width and height; None if it cannot be read (ROBOT NEKO ep 13)"""
+    """the take's own width and height; None if it cannot be read"""
     fp = shutil.which("ffprobe") or (os.path.join(os.path.dirname(FF), "ffprobe.exe") if FF else None)
     try:
         out = subprocess.run([fp, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
@@ -212,13 +211,13 @@ def main():
     ap.add_argument("--fps", type=int, default=0, help="output rate; default = the take's own")
     a = ap.parse_args()
     assert FF, "no ffmpeg"
-    # ⛔ THE PACKAGE MUST KEEP THE TAKE'S RATE (ROBOT NEKO ep 9). FPS was a constant 24 and the concat
-    # filter forced it, so ep 8 -- the first episode filmed at 60, not at 24 --
-    # was delivered at 24, and so was ep 9's first package (eps 1-7 were shot at 24).
+    # ⛔ THE PACKAGE MUST KEEP THE TAKE'S RATE. FPS was a constant 24 and the concat
+    # filter forced it, so the first episode filmed at 60, not at 24,
+    # was delivered at 24, and so was the next one's first package (the ones before were shot at 24).
     # The cards expose on twelves at any rate (an exposure is 5 frames at 60).
     FPS = a.fps or probe_fps(a.src) or 24
-    # ⛔ AND THE TAKE'S SIZE (ep 13). W/H were 1280x720 constants and the concat filter scaled every take to
-    # them: ep 12 was filmed at 1080p and delivered at 720p in silence, and so was ep 13's first package. The
+    # ⛔ AND THE TAKE'S SIZE. W/H were 1280x720 constants and the concat filter scaled every take to
+    # them: an episode filmed at 1080p was delivered at 720p in silence, and so was the next one's first package. The
     # cards still draw at 1280x720 (their layout is in pixels); ffmpeg scales them up to the take.
     OW, OH = probe_size(a.src) or (W, H)
     print("packaging at %d fps, %dx%d (the take's own rate and size)" % (FPS, OW, OH))

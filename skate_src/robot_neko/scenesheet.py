@@ -16,9 +16,9 @@ number, time and text. --extra adds frames at absolute seconds (a beat with no l
 
 
 
-This is the ROBOT NEKO test-take read: shoot the sketch at 8fps, run this, LOOK, fix, and only
+This is the stop-motion show's test-take read: shoot the sketch at 8fps, run this, LOOK, fix, and only
 
-then spend a 24fps take. On episode 1 it caught a head cut off in every two-shot, a mark that
+then spend a 24fps take. On the first episode it caught a head cut off in every two-shot, a mark that
 
 stood reva inside a bench, a nude body and a blown-out sky before the real take was shot.
 

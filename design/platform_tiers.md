@@ -10,7 +10,7 @@ computer.)*
 Zelda 64: Recompiled gets widescreen, high frame rates and any resolution out of a 1998 game
 without touching its logic, because the game never talks to the GPU: it runs its own fixed tick
 and emits display lists, and a renderer that is free to run at any rate interprets them. Two
-separations, and the club now has the first:
+separations, and the engine now has the first:
 
 1. **The sim runs on whole ticks, one at a time** (`REVA_TICK`, default 60; 11-02: a frame that owes
    k ticks passes through the loop k times and draws on the last). Wall time only decides how many
@@ -26,7 +26,7 @@ two FNV-1a hashes of what the sim decided (the hero's solved pose, her position 
 every crowd slot). **Exact** is the float bits, the regression receipt on one machine; **coarse**
 rounds each float to a thousandth first, what two machines with different libm last bits can
 still agree on. Verified 09-30: two runs, and a run of an unsigned-`char` build (ARM's `char`),
-print identical hashes at every checkpoint. The dice are the club's own LCG now (`REVA_RAND=libc`
+print identical hashes at every checkpoint. The dice are the engine's own LCG now (`REVA_RAND=libc`
 puts the library's back), because glibc and msvcrt roll different sequences from the same seed.
 
 **What the receipt caught on its first day.** A `pi` run and a `high` run of the same show hashed
@@ -71,17 +71,17 @@ byte-identical to before (the diff is the HUD's own wall clock and nothing else)
 | Fill rate, theoretical | 2.4 GPix/s | element14, same page |
 | Memory bandwidth, measured | ~4.6 GiB/s (shared with the CPU) | element14, same page |
 | GL | OpenGL ES 3.1, Mesa `v3d`, renderer "V3D 4.2", 4 render targets max | [mmozeiko's es2_info](https://gist.github.com/mmozeiko/8eb6728197099f8f6722b4808964ef43), [Mesa v3d docs](https://docs.mesa3d.org/drivers/v3d.html) |
-| Extensions the club asks for | depth_texture, texture_float, half_float, packed_depth_stencil, element_index_uint, vertex_array_object, standard_derivatives, frag_depth, shader_texture_lod: **all present** | mmozeiko's es2_info |
+| Extensions the engine asks for | depth_texture, texture_float, half_float, packed_depth_stencil, element_index_uint, vertex_array_object, standard_derivatives, frag_depth, shader_texture_lod: **all present** | mmozeiko's es2_info |
 | glmark2 (64-bit Bookworm, 2023) | ~425 | [Raspberry Pi forums](https://forums.raspberrypi.com/viewtopic.php?t=356102) |
 
 What is NOT known until measured on the board: `MAX_VERTEX_UNIFORM_VECTORS` (the 256-bone palette
 needs 1024 vec4; the engine warns at boot if the hardware cannot carry it), the real shaded fill
-rate for the club's mesh shader (theoretical fill assumes a trivial fragment), and the frame time.
+rate for the engine's mesh shader (theoretical fill assumes a trivial fragment), and the frame time.
 `reva_native/build_pi.sh` then `./crowd_linux 400 packs select 1280x720 bench` prints `work` ms.
 
 ## The budget, and where the rungs come from
 
-A 720p frame is 0.92 MPix. The club draws it three times: the sun's shadow pass (2048² = 4.2 MPix
+A 720p frame is 0.92 MPix. The engine draws it three times: the sun's shadow pass (2048² = 4.2 MPix
 on its own!), the 3D frame, and the post quad. At a practical ~1 GPix/s of shaded fill that is
 already past 30 fps before a single body's skinning is paid for. So the rungs cut the pixels first:
 
@@ -90,7 +90,7 @@ already past 30 fps before a single body's skinning is paid for. So the rungs cu
 | `pi` | 50% (640×360 in the post target) | 512² | off | off | 1 | 0.23 + 0.26 + 0.92 ≈ **1.4 MPix** |
 | `low` | 67% | 1024² | off | on | 2 | 0.41 + 1.0 + 0.92 ≈ 2.4 MPix |
 | `mid` | 85% | 2048² | 0.12 | on | 4 | 0.66 + 4.2 + 0.92 ≈ 5.8 MPix |
-| `high` (default) | 100% | 2048² | 0.12 | on | 4 | 0.92 + 4.2 + 0.92 ≈ 6.1 MPix (today's club) |
+| `high` (default) | 100% | 2048² | 0.12 | on | 4 | 0.92 + 4.2 + 0.92 ≈ 6.1 MPix (today's engine) |
 | `ultra` | 100% | 4096² | 0.12 | on | 8 | 0.92 + 16.8 + 0.92 ≈ 18.6 MPix |
 
 `REVA_TIER=<rung>` picks one. There is no `auto` any more (11-02): automatic cuts that measure

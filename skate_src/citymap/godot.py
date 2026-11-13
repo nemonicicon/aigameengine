@@ -1,5 +1,5 @@
-"""godot.py -- the cooked city as one .glb and a sidecar a Godot 4 game can load (11-11, for the skate game
-`dont get dropped`, which runs in Godot). The cook calls export() at its end when CITYMAP_GODOT names a folder.
+"""godot.py -- the cooked city as one .glb and a sidecar a Godot 4 game can load (11-11, for the skate game,
+which runs in Godot). The cook calls export() at its end when CITYMAP_GODOT names a folder.
 
 What it writes there, in METRES (the engine's units over units_per_metre; x east, y up, z south, which is glTF's and Godot's own handedness):
   <name>.glb         every cell's meshes, gathered by what they are and by blocks of `block` cells, each a node whose NAME says how the skate game's park

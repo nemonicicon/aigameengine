@@ -1,5 +1,5 @@
 ﻿import unreal, os
-OUT = "out/kaeli/mesh"   # club-engine kit: machine-independent paths
+OUT = "out/kaeli/mesh"   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 p = "/Game/TopDown/Models/ZAMN_Cleo/Animation_Walking_withSkin/SkeletalMeshes/Animation_Walking_withSkin"
 asset = unreal.EditorAssetLibrary.load_asset(p)

@@ -1,4 +1,4 @@
-# THE ATELIER — REVA's wardrobe, and the club's tailor
+# THE ATELIER — REVA's wardrobe, and the engine's tailor
 
 > 09-29, from the street sheet: this version of reva, with modular clothing. REVA is also a seamstress who loves making
 > new clothes, so she should actually make and design clothes, stitch by stitch, that work natively in the game and
@@ -45,7 +45,7 @@ face is hidden by a garment only when all its corners are under it. So a worn ga
 it, and taking it off never leaves a hole. REVA's skin splits into 16 such groups (her calves are `skin~h=socks,
 stockings_latex`, her chest `skin~h=bra_latex,sportsbra,tank`, …).
 
-- **Club engine** (`crowd_kms.c`, THE WARDROBE): reads the tags at load; `REVA_OUTFIT=<name>` or the first outfit;
+- **The engine** (`crowd_kms.c`, THE WARDROBE): reads the tags at load; `REVA_OUTFIT=<name>` or the first outfit;
   ctl `outfit=` / `poutfit=` dresses the hero / partner, `wear=+piece,-piece` / `pwear=` one piece at a time. One outfit
   per pack (v1). A `wear~` mesh is clothing — never measured as her body (`meshIsGarment`).
 - **Godot** (`godot/characters/club_wardrobe.gd`): `ClubWardrobe.attach(reva)`, `wear_outfit("street")`,
@@ -54,7 +54,7 @@ stockings_latex`, her chest `skin~h=bra_latex,sportsbra,tank`, …).
 ## Physics: cloth and soft mass, the same in both engines
 
 - **Cloth chains.** A garment's free panel is rigged with bone chains named `Cloth_*` (her jacket's body on five, her
-  bandana on three), weighted down the panel. The club's chain solver (H1, the hair solver: verlet, a spring toward the
+  bandana on three), weighted down the panel. The engine's chain solver (H1, the hair solver: verlet, a spring toward the
   animated pose, world-space inertia and gravity) mines them like a ponytail — the family `cloth` is new — and Godot's
   `ClubHair.attach()` puts them on `SpringBoneSimulator3D` with cloth settings (looser, heavier than hair). The chain
   budget went 8 → 32 per body (a silent cap; loud now).
@@ -79,7 +79,7 @@ In the first film the body read as disconnected and strange. Three lessons, and 
 A hole film checks it: the skate game's `clothes_holes` probe draws everything hidden in one colour, so whatever shows in a frame is somewhere the clothes opened up.
 
 **Dressing a character that came from somewhere else** (no build script of ours, clips we can't re-export): `meshform.py` measures a dress form off a finished rig, `author/glb_redress.py` swaps its meshes inside its glb with the skeleton, bind matrices and every clip byte for byte.
-A mesh can't take a bone's name: Godot's importer keeps node names unique, renames the bone (his `head` became `head_2`), and the clips made for that character elsewhere go on without it, silently. `redress()` refuses one. `sewing.zip_seams()` makes a garment one surface before it's cut low-poly: panels of different resolutions meet vertex to edge, and the cut opened them (a tee with 5 boundary loops, a sweatshirt with 17, slits at the shoulders, a forearm showing at both cuffs). Check a garment's openings against what it was cut with. `DontGetDropped/tools/anim/alien_fab.py` and `alien_dress.py` are the worked example.
+A mesh can't take a bone's name: Godot's importer keeps node names unique, renames the bone (his `head` became `head_2`), and the clips made for that character elsewhere go on without it, silently. `redress()` refuses one. `sewing.zip_seams()` makes a garment one surface before it's cut low-poly: panels of different resolutions meet vertex to edge, and the cut opened them (a tee with 5 boundary loops, a sweatshirt with 17, slits at the shoulders, a forearm showing at both cuffs). Check a garment's openings against what it was cut with. The skate game's `alien_fab.py` and `alien_dress.py` are the worked example.
 
 ## The road to Fabrication Mode (the sheet)
 

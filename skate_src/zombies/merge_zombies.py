@@ -10,11 +10,11 @@ one UE exporter against one skeleton, and MEASURED identical: 90 nodes, same nam
 order, 30fps, T/R/S on all 89 joints in every file. When the rigs are bit-identical the
 merge is JSON surgery -- copy the base's mesh/skin/nodes once, then append each file's
 animation with its node indices used verbatim. It also dodges the FBX import traps
-(merge_mob1's note: the UE scale-compensation convention crushed kaeli's hips to 1e-4).
+(merge_mob1's note: the UE scale-compensation convention crushed the co-star's hips to 1e-4).
 
 WHAT IS KEPT, and why -- measured off the clips, not assumed:
 
-  * ROTATION on every joint. This is what the club's donor transfer actually replays.
+  * ROTATION on every joint. This is what the engine's donor transfer actually replays.
   * PELVIS TRANSLATION. It is the HEIGHT SIGNAL and the bank is useless without it:
     pelvis y is 0.84 standing (Idle_A), 0.82-0.92 walking, and **0.11 on the belly
     crawls and 0.10 laying down**. Drop it and a crawling zombie stands up.
@@ -22,7 +22,7 @@ WHAT IS KEPT, and why -- measured off the clips, not assumed:
     (root travels 0.03 over a whole cycle); the four attacks are not (Attack_A lunges
     z -0.15..1.91). The actor system drives travel with `spd`, so a clip that also
     walks itself forward double-counts.
-  * SCALE IS DROPPED ENTIRELY. The documented trap, from the kaeli bake.
+  * SCALE IS DROPPED ENTIRELY. The documented trap, from the co-star's bake.
   * TRANSLATION ON EVERY OTHER JOINT IS DROPPED. Bones do not stretch; their rest
     translations already live in the node hierarchy.
 
@@ -38,7 +38,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "export")
 OUT = os.path.join(HERE, "zombies.glb")
 
-# UE asset name -> club clip name
+# UE asset name -> engine clip name
 NAME = {
     "anim_Walk_A": "z_walk_a", "anim_Walk_B": "z_walk_b", "anim_Walk_C": "z_walk_c",
     "anim_Run_A": "z_run",
@@ -153,7 +153,7 @@ def main():
             t = c['target']
             path, node = t['path'], t['node']
             if path == 'scale':
-                continue                                  # the kaeli trap
+                continue                                  # the scale trap
             if path == 'translation' and node != pelvis_i:
                 continue                                  # in-place; bones don't stretch
             s = anim['samplers'][c['sampler']]

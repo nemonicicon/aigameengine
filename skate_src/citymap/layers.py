@@ -1,7 +1,7 @@
-"""layers.py -- the map plan's step 6, the game layers (Bike Lane Bash's map plan, "THE MAP: HOW SEATTLE GETS BUILT"): the road graph, the places food
+"""layers.py -- the map plan's step 6, the game layers (the street game's map plan): the road graph, the places food
 is picked up, and the doors it's taken to, written as one text file a game reads, <prefix>_layers.txt.
 
-    units U                                  club units a metre
+    units U                                  engine units a metre
     node K x y z                             a point of the road graph, in the engine's coordinates (the deck's height on a bridge)
     edge A B metres grade class oneway bridge bike | street name
                                              grade: percent, rising from A to B. oneway: 1 only A to B, -1 only B to A, 0 both, for a bicycle.
@@ -257,7 +257,7 @@ def write_layers(ck):
         h = float(ck.field.sample(de, dn))
         out.append("door %d %.3f %.3f %.3f %d %s | %s" % ((nd,) + eng(de, dn, h) + (nearest_node(de, dn, h), kind_at(de, dn), a)))
         nd += 1
-    # ---------------- (11-06) the people at a hot spot (the config's "hotspots", 11-06: a corner where people stand all day, 12th and Jackson for one). Laid
+    # ---------------- (11-06) the people at a hot spot (the config's "hotspots", 11-06: the places a game puts people on the sidewalk). Laid
     # out by rule on the sidewalks within its radius, the same every cook: more by a bus stop, along a fence and near a shop (a corner store most), none
     # on a crossing or a kerb's ramp, fewer further out. A group stands together; someone sitting, kneeling or lying is at the back of the sidewalk,
     # away from the road
@@ -372,9 +372,9 @@ def write_layers(ck):
             x, y, z = eng(e, n, h)
             out_hs.append((x, y, z, math.atan2(fe, -fn), kind, group))
             kinds[kind] = kinds.get(kind, 0) + 1
-        # (11-06, from photos of the corner: what each person is doing, and how they stand. It is a bus stop, and few of them
-        # are waiting for a bus) THE BAND: along the fences on the sidewalk side, a person every step_m, nearest the corner first, in the photos' mix:
-        # against the fence most sit on the ground, then hunched over their hands, standing, crouched, folded, a wheelchair, someone's goods, someone
+        # (11-06, from photos of the corner: what each person is doing, and how they stand)
+        # THE BAND: along the fences on the sidewalk side, a person every step_m, nearest the corner first, in the photos' mix:
+        # against the fence most sit on the ground, then hunched, standing, crouched, folded, a wheelchair, someone's goods, someone
         # lying; a second row in places, hunched, standing, talking. Neighbours are a group and turn to each other; the groups elsewhere keep off it
         band = hs.get("band") or {}
         want_band, n_band = int(band.get("people", 0)), 0
@@ -481,7 +481,7 @@ def write_layers(ck):
                 pe, pn = se + fn_ * (0.7 + 0.8 * j) - fe_ * 0.3, sn - fe_ * (0.7 + 0.8 * j) - fn_ * 0.3
                 put(pe, pn, fe_, fn_, "stand")
                 n_band += 1
-        # a canopy someone sells under, by a stop the config names (12th and Jackson's on Jackson, from a photo): two by it, one behind the table
+        # a canopy, by a stop the config names (the one on Jackson, from a photo): two by it, one behind the table
         for nid, tg in ck.ntags.items():
             if tg.get("highway") != "bus_stop" or str(tg.get("ref")) not in [str(x) for x in hs.get("canopy_stops", [])] or nid not in ck.ne:
                 continue

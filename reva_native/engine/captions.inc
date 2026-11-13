@@ -183,16 +183,16 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
     if(!borrowed9&&(clip<0||(unsigned)clip>=P->nClips)) return 0;
     static float T[1024][3], Q[1024][4], S[1024][3]; static M4 W[1024];
     bodyRest(P,T,Q,S);
-    /* ⛔ A PACK WITH NO CLIPS OF ITS OWN (10-19). Wanda and Amelia own no clip at all -- every move they make is
+    /* ⛔ A PACK WITH NO CLIPS OF ITS OWN (10-19). Two bodies own no clip at all -- every move they make is
      * borrowed from a bank -- and the placeholder below read clips[0] out of an EMPTY table: a segfault the first time
      * either stood in a scene. An empty clip stands in (no tracks: the borrowed pose is all there is). */
     static PClip noClip9;
     PClip*c=P->nClips?&P->clips[(clip>=0&&(unsigned)clip<P->nClips)?clip:0]:&noClip9;   /* borrowed: index 0 is only a placeholder -- donorPoseF overwrites the pose */
-    /* ⭐ ep 9: a TRANSITION plays once in a scene and holds its last frame (clipHoldsEnd) */
+    /* ⭐ a TRANSITION plays once in a scene and holds its last frame (clipHoldsEnd) */
     if(g_scnT>=0.f&&!borrowed9&&clip>=0&&(unsigned)clip<P->nClips&&phase>(double)(c->frames-1)
        &&clipHoldsEnd(P,c,g_castI,packStr(P,c->name)))
         phase=(double)(c->frames-1);
-    /* ⭐ ep 10: a TRICK plays to its last frame and no further; trickTick cuts back on the next exposure */
+    /* ⭐ a TRICK plays to its last frame and no further; trickTick cuts back on the next exposure */
     if(g_scnT>=0.f&&g_castI>=1&&g_castI<SCN_MAXCAST&&g_trkOn[g_castI])
         trickClampEnd(g_castI,&phase,borrowed9?&g_labPDnP->clips[g_labPDnC]:c);
     unsigned f=(unsigned)phase % (c->frames?c->frames:1);
@@ -217,7 +217,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
      * hand-off never pops, and taken from her own pack when she has a walk, otherwise off
      * a bank through the same canonical transfer the zombie clips use. */
     if(g_scnT>=0.f){
-        /* ⭐ ep 9: ONE WALK STATE PER BODY, keyed on its WORLD speed (Loco). These names were
+        /* ⭐ ONE WALK STATE PER BODY, keyed on its WORLD speed (Loco). These names were
          * globals every partner slot shared; for this block they are this slot's own. */
         Loco*Lw9=&g_loco[(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1];
 #define g_partSpd     (Lw9->spd)
@@ -226,7 +226,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
 #define g_partWalkP   (Lw9->walkP)
 #define g_partWalkC   (Lw9->walkC)
         const float WALK_ON=0.22f;                    /* world units/sec worth walking for */
-        float want=(g_partSpd>WALK_ON&&!P->nWheel&&!castRides(g_castI))?1.f:0.f;   /* ⭐ ep 9: a rider rolls */
+        float want=(g_partSpd>WALK_ON&&!P->nWheel&&!castRides(g_castI))?1.f:0.f;   /* ⭐ a rider rolls */
         float stp=animStepS(simStepS());
         g_partWalkMix += (want-g_partWalkMix)*(1.f-expf(-stp/0.18f));
         if(g_partWalkMix>0.02f){
@@ -282,15 +282,15 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
      * DRAGS. She walks whenever the stage mark moves her, so she wants the weight as much
      * as the hero does -- and standing on a porch she still gets the overlap, which is the
      * half of this that answers "reva is just standing there". */
-    /* ⭐ ep 10: A z_rm_ CLIP OWNS HER ROOT in a scene, as it owns the hero's: the Williams bounce and belt
+    /* ⭐ A z_rm_ CLIP OWNS HER ROOT in a scene, as it owns the hero's: the Williams bounce and belt
      * tilt stand down -- an authored arc is exact, and a pelvis bobbing on its stride lifts feet off a deck */
     int rmOwn9=0;
     if(g_scnT>=0.f){ const char*rn9=borrowed9?packStr(g_labPDnP,g_labPDnP->clips[g_labPDnC].name)
                                               :((clip>=0&&(unsigned)clip<P->nClips)?packStr(P,c->name):"");
         rmOwn9=(strncmp(rn9,"z_rm_",5)==0); }
-    if(!g_wmsOff&&!rmOwn9){ /* ⛔ PER CAST SLOT (ROBOT NEKO ep 2). One static state for every partner meant kaeli and mrs
-                    * parsons overwrote each other's drag lags and bounce every frame; on a held
-                    * stop-motion exposure kaeli was posed against the OTHER woman's lag, so she moved
+    if(!g_wmsOff&&!rmOwn9){ /* ⛔ PER CAST SLOT. One static state for every partner meant the two
+                    * partners overwrote each other's drag lags and bounce every frame; on a held
+                    * stop-motion exposure the co-star was posed against the OTHER woman's lag, so she moved
                     * on frames that should repeat (A/B: held pairs 8-9.6% on, 0.15-0.60% off). */
                    static WmsState pw9[SCN_MAXCAST];
                    WmsState*pwp=&pw9[(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1];
@@ -333,12 +333,12 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
                pHipDrop9,g_labPDnP?g_labPDnP->label:"-",g_labPDnC,10);
         fflush(stdout); } }
     model[13]=-P->mny*sc+pHipDrop9*sc;
-    float bdFloor9=castOnBoard(g_castI)?boardAuthoredFloor(g_castI,P,sc):NAN;   /* ⭐ ep 10: a @board rider's authored floor */
+    float bdFloor9=castOnBoard(g_castI)?boardAuthoredFloor(g_castI,P,sc):NAN;   /* ⭐ a @board rider's authored floor */
     if(bdFloor9==bdFloor9) model[13]=-bdFloor9*sc;
     /* ⭐ UNLESS SHE IS ON A MARK. A body on a chair is placed by the FURNITURE, not by the
      * person she is talking to -- world position, world yaw, and a HEIGHT, which is the
-     * thing the ground plane could never give her. This is what lets susan sit in the
-     * chair the script has put her in for two drafts, and kaeli lie on a bed instead of
+     * thing the ground plane could never give her. This is what lets a body sit in the
+     * chair the script has put her in for two drafts, and the co-star lie on a bed instead of
      * through it. `pmark=off` hands her back to the pair relation. */
     { SetMark*MK=markFind(g_castMark[g_castI]);
       if(MK){ locoPublish(); Loco*Lm9=&g_loco[(g_castI>=0&&g_castI<SCN_MAXCAST)?g_castI:1];
@@ -349,19 +349,19 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
               /* \u26d4 THE MARK OVERWRITES HER Y, so the hip drop has to be re-applied
                * here or the one case that needs it most -- a body lying on a bed, placed
                * by the furniture -- is the one case that never gets it. */
-              model[12]=(Lm9->pon||Lm9->phold)?Lm9->px:MK->x; model[14]=(Lm9->pon||Lm9->phold)?Lm9->pz:MK->z;   /* ⭐ ep 9: walking there, or on it */
+              model[12]=(Lm9->pon||Lm9->phold)?Lm9->px:MK->x; model[14]=(Lm9->pon||Lm9->phold)?Lm9->pz:MK->z;   /* ⭐ walking there, or on it */
               model[13]=MK->y-P->mny*sc+pHipDrop9*sc;
               if(bdFloor9==bdFloor9) model[13]=MK->y-bdFloor9*sc;
               /* a `hips` mark pins the PELVIS to the height instead: seated, feet below the seat */
               if(MK->hips&&P->pb[0]>=0) model[13]=MK->y-W[P->pb[0]][13]*sc; }
       g_castFloorY[g_castI]=MK?MK->y:0.f; }
-    /* ⭐ ep 9: on a deck she stands ON it -- and where she was drawn, for the next walk */
+    /* ⭐ on a deck she stands ON it -- and where she was drawn, for the next walk */
     model[13]+=castDeckLift(g_castI);
     g_castAt[g_castI][0]=model[12]; g_castAt[g_castI][1]=model[14]; g_castAt[g_castI][2]=g_partYaw; g_castAtOK[g_castI]=1;
-    /* ⭐ ep 10: THE CARVE -- after the spot is published: a lean must not move where the body is said to stand */
+    /* ⭐ THE CARVE -- after the spot is published: a lean must not move where the body is said to stand */
     { int s10=(g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1;
       if((g_loco[s10].pon||g_loco[s10].phold)&&markFind(g_castMark[s10])) locoLeanModel(model,s10,g_castFloorY[s10]);
-      pipeModel(s10,model,P,sc); rollModel(s10,model); }   /* ⭐ ep 11: on a half-pipe the ride places her, over all of the above; (10-22) the roll over that */
+      pipeModel(s10,model,P,sc); rollModel(s10,model); }   /* ⭐ on a half-pipe the ride places her, over all of the above; (10-22) the roll over that */
     /* THE SHARED GEOMETRY, reported once. Two bodies of different sizes cannot each
      * reach "above my own shoulder" and expect to touch -- the meeting point has to be
      * chosen in the world they share, and only the engine knows both bodies. These are
@@ -437,15 +437,15 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
       if(gb>=0){ ptWorld(W[gb],model,g_castGripW[g_castI]); g_castGripOK[g_castI]=1;
                  m4_mul(g_castGripM[g_castI],(float*)model,W[gb]); }
       attPublish(P,W,model,g_castI);
-      /* ⭐ ep 10: and her board off her clip's channel, at the phase she was sampled at (after any hold) */
+      /* ⭐ and her board off her clip's channel, at the phase she was sampled at (after any hold) */
       boardPublish(g_castI,borrowed9?g_labPDnP:P,borrowed9?g_labPDnC:clip,phase,borrowed9,model);
-      clipAuditBody(P,W,model,g_castI); }   /* ⭐ ep 10: this slot, exactly as drawn */
+      clipAuditBody(P,W,model,g_castI); }   /* ⭐ this slot, exactly as drawn */
     if(P->pb[5]>=0){ float hx=W[P->pb[5]][12],hy=W[P->pb[5]][13],hz=W[P->pb[5]][14];
         g_partHeadW[0]=model[0]*hx+model[4]*hy+model[8]*hz+model[12];
         g_partHeadW[1]=model[1]*hx+model[5]*hy+model[9]*hz+model[13];
         g_partHeadW[2]=model[2]*hx+model[6]*hy+model[10]*hz+model[14];
         g_partHeadOK=1;
-        /* ⭐ ep 12: A MOUTH WITHOUT A FACE. kaeli (anima_outfit) carries no eye marks on purpose -- with them the
+        /* ⭐ A MOUTH WITHOUT A FACE. The co-star (in her dressed pack) carries no eye marks on purpose -- with them the
          * aperture would cut her morph-driven mouth open -- so her exhales left a GUESS 0.054 u behind her lips and
          * no drag ever registered. A lone `face_mouth` (face_marks.py --only face_mouth) is published here for the
          * smoke; the aperture and the gaze still need the full set. */
@@ -469,7 +469,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
     g_vkEye[3]=0.f;
     return 1; }
 static float clipStride(Pack*P,int clip){
-    /* Returns how far the CONTACT foot travels backwards, in club units per clip frame.
+    /* Returns how far the CONTACT foot travels backwards, in engine units per clip frame.
      * Average stride-per-cycle is the wrong quantity for a run: contact is only a third
      * of the cycle, so a clip matched on cycle average still slides while the foot is
      * down. What actually locks a foot is its backward speed WHILE PLANTED equalling the

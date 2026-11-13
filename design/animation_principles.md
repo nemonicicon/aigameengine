@@ -1,10 +1,10 @@
-# THE WILLIAMS LAYER — weight, drag and counteraction on every body in the club
+# THE WILLIAMS LAYER — weight, drag and counteraction on every body in the engine
 
 **Source:** Richard Williams, *The Animator's Survival Kit* — the WALKS chapter and the
 FLEXIBILITY chapter. The book arrived with no other words, which is a note, not
 a reading list.
 
-This is the design home for the club's procedural animation principles. The code is
+This is the design home for the engine's procedural animation principles. The code is
 `wmsApply()` in `reva_native/crowd_kms.c`; the instrument is
 `reva_native/anim_bench/weightcheck.py`.
 
@@ -17,7 +17,7 @@ accurately and it still reads weightless, and the cure is to *exaggerate* the up
 downs, because it is the up-and-down of the masses that reads as weight.
 
 Our case was worse than tracing. `donorPoseF` is **rotation-only** — a retargeted clip
-carries no pelvis translation at all. So every borrowed walk in the club (which is most
+carries no pelvis translation at all. So every borrowed walk in the engine (which is most
 of them: 105 citizens, 32 zombie clips, the whole street) arrived with its vertical
 component *deleted*. Not damped. Deleted.
 
@@ -51,7 +51,7 @@ rig, borrowed or authored, at any playback rate:
     feet together  = passing  ->  the body goes UP
 
 Nothing to keep in sync, no per-clip metadata to author, and it is correct for the great
-majority of the club's clips, which nobody ever labelled.
+majority of the engine's clips, which nobody ever labelled.
 
 The same measurement gives the **amplitude for free**: it follows how fast the feet are
 actually swapping, so an idle does not bob and a walk does. One term, no state machine.

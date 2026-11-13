@@ -1,4 +1,4 @@
-"""ue_dump_materials.py -- print Anima's material -> texture bindings, authoritatively.
+"""ue_dump_materials.py -- print the bought character's material -> texture bindings, authoritatively.
 
 ⭐ WHY: her FBX carries 38 material slots and the recovered texture set has 37 PNGs, and
 MOST line up by name (Body -> T_Body_Diffuse). About ten do NOT: Eyelets, Sole, BucklesGlossy,
@@ -13,9 +13,9 @@ fact we can READ rather than a similarity we infer.
 Also dumps each skeletal mesh's slot order, because the slot NAME is what Blender matches on.
 """
 import unreal
-import os  # club-engine kit: machine-independent paths
+import os  # machine-independent paths
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex", "MATERIALS.txt")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex", "MATERIALS.txt")   # machine-independent paths
 ROOT = "/Game/Anima/Characters"
 
 lines = []

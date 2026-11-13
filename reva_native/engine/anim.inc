@@ -1,11 +1,11 @@
 /* ================= S4b THE DONOR BANK ==============================================
  * The census says the building owns 4 runs, 1 attack, 1 down across 133 packs -- but
- * kaeli's ZAMN ingest carries a whole action set (w_run / x_gunfire / x_down). One
+ * the co-star's zombie-prototype ingest carries a whole action set (w_run / x_gunfire / x_down). One
  * canon-mapped rig DONATES: its clip rotations replay on any other canon-mapped rig
  * as rest-DELTAS (delta = inv(restDonor) * Qdonor, applied on the target's rest --
- * the same local-offset layering the genome uses). Rotation-only: the kaeli lesson. */
+ * the same local-offset layering the genome uses). Rotation-only: the co-star's lesson. */
 /* S4f DONOR BANK v2: role -> (pack, clip), elected by EXACT clip name across the banks
- * in priority order (mob1 mocap first, kaeli second). Walk variety rotates per slot;
+ * in priority order (mob1 mocap first, the co-star second). Walk variety rotates per slot;
  * the scared walks are the panic layer's authored body. */
 static Pack*g_dnGunP=NULL;  static int g_dnGun=-1;
 static Pack*g_dnDownP=NULL; static int g_dnDown=-1;
@@ -41,11 +41,11 @@ static void dnElect(Pack*pk){
  * nothing but the walk and idle it shipped with.
  *
  * bankFind() closes that: name a clip that lives in ANY loaded bank and the actor plays
- * it through the canonical transfer. The zombie ingest is the first customer -- the film
- * says "the zombies ARE the neighbours", and this is that sentence in code: the same
+ * it through the canonical transfer. The zombie ingest is the first customer -- the
+ * zombies ARE the neighbours, and this is that in code: the same
  * citizen body, the same set line, a different clip name. */
 /* ⛔ WAS 4, AND bankAdd DROPPED THE FIFTH IN SILENCE. Adding v1_kmoves as a bank (so the
- * two-body room repertoire reaches any body) made five: mob1, kaeli, moves, kmoves,
+ * two-body room repertoire reaches any body) made five: mob1, the co-star, moves, kmoves,
  * zombies -- and the zombie bank, added last, fell off the end without a word. Same
  * shape as MAXB and MORPH_MAX: a cap nobody measured, failing quietly. */
 #define NBANK 8
@@ -59,12 +59,12 @@ static Pack*bankFind(const char*nm,int*ci){
         for(unsigned c=0;c<p->nClips;c++)
             if(!strcmp(packStr(p,p->clips[c].name),nm)){ *ci=(int)c; return p; } }
     return NULL; }
-/* THE ZOMBIE BANK (v1_zmoves: 32 ZAMN clips on the UE5 mannequin). Held separately from
+/* THE ZOMBIE BANK (v1_zmoves: 32 zombie-prototype clips on the UE5 mannequin). Held separately from
  * the donor roles on purpose -- a neighbour walking to her mailbox must never be handed
  * a shamble. Nothing here is elected; it is only ever asked for by name. */
 static Pack*g_zombP=NULL;
 /* ================= P1.5 THE INTERPOLATING SAMPLER (engine rung E1) ==================
- * Every clip in the club was sampled NEAREST-FRAME -- ((unsigned)phase)%frames, then a
+ * Every clip in the engine was sampled NEAREST-FRAME -- ((unsigned)phase)%frames, then a
  * raw memcpy -- so at an 18fps bake against a ~100fps render every pose was HELD ~5
  * render frames: a systemic stair-step under all 133 packs. Worse, that memcpy loop was
  * copy-pasted at EIGHT sites, because in a file this size rewriting four lines beats
@@ -103,7 +103,7 @@ static void donorPoseF(Pack*dp,int clip,double ph,Pack*tp,float(*Q)[4]){
      *     W_t' = G_t * inv(G_d) * D * A_d * inv(A_t) * W_t
      * locals recovered parents-first through the canon-ancestor linkage. A move now
      * means the same POSE on every body. Proven in Python (retarget.py) before landing
-     * here: kaeli and reva hit authored targets to 0.1 degree. */
+     * here: the co-star and reva hit authored targets to 0.1 degree. */
     if(dp->cbOK&&tp->cbOK&&dp->nNodes<=512){
         static float dq[512][4], dwq[512][4];
         for(unsigned i=0;i<dp->nNodes;i++) memcpy(dq[i],dp->nodes[i].q,16);
@@ -243,7 +243,7 @@ static float donorHipDrop(Pack*dp,int clip,double ph,Pack*tp){
         /* ⛔ NORMALISE BY HIP HEIGHT ABOVE THE FEET, NOT BY ABSOLUTE REST Y. The first
          * version divided by restBoneY alone, which is the pelvis's WORLD rest height --
          * and a rig rooted at its pelvis (kmoves: hip rests at y=0.0099) makes that ratio
-         * 1.89/0.0099 = 191x. A curl-up borrowed onto Anima came back as a drop of
+         * 1.89/0.0099 = 191x. A curl-up borrowed onto the bought character came back as a drop of
          * -16,624 rig units: she vanished underground and the two-head camera followed her
          * into an empty frame. The zombie bank only ever worked because the UE mannequin's
          * pelvis rests at 269. Hip-above-feet is ~1-2 units on every human rig. */
@@ -322,7 +322,7 @@ static int donorOK(Pack*dp,int clip,Pack*tp){
                    dp->label,clip,tp->label);
     return ok; }
 
-/* (11-06) A CLIP MEANT TO BE LOW (a graph state that says `low`: sitting, crouching, kneeling, lying; Bike Lane Bash's people at 12th and Jackson) can't be
+/* (11-06) A CLIP MEANT TO BE LOW (a graph state that says `low`: sitting, crouching, kneeling, lying; the street game's people) can't be
  * held to standing the way donorOK holds a crowd's gaits, so it's held to the donor's own pose: at six places through it, the hips over the lowest foot, as a
  * share of each rig's own rest hip height, within half of the donor's, and the head over the hips wherever the donor's clearly is. The transfer is rotation-only,
  * so the target's hips are at their rest height here, and that measure doesn't care: the drop is paid where it's drawn (donorHipDrop). A transfer that

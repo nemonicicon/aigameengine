@@ -54,7 +54,7 @@ That order is the repo's law: `crowd.exe` is what `dance.bat` and any live windo
 
 ```bash
 $PY $D buildsoft                       # crowd_soft.exe: the engine's own rasterizer, 320 x 240 on the processor, nothing links Vulkan
-$PY $D lab /tmp/a.png --soft --subject r2moves --ctl "face=0 grid=0 dqs=0 set=parsons stage=30,-20,0"   # a picture through it, and NO WINDOW IS OPENED
+$PY $D lab /tmp/a.png --soft --subject r2moves --ctl "face=0 grid=0 dqs=0 set=<street> stage=30,-20,0"   # a picture through it, and NO WINDOW IS OPENED
 $PY reva_native/scenes/everything.py --shoot /tmp/every.png --soft    # the whole test scene, 13 cameras, 40 s
 ```
 
@@ -70,7 +70,7 @@ engine's law is "pixels or it didn't happen"; a clean exit code proves nothing.
 ### 1. Judging a BODY — start here, not with a wide shot
 
 ```bash
-$PY $D bench /tmp/body.png --subject kaeli_pj --clip idle --secs 5 --cols 6
+$PY $D bench /tmp/body.png --subject <body> --clip idle --secs 5 --cols 6
 ```
 
 Four angles (side / front / 3-4 / low) × N time columns, **one body, nothing else in
@@ -91,10 +91,10 @@ control run *before* tuning anything.
 is **not** the subject. `--clip` may name a clip in *any* loaded bank — `bankFind`
 resolves across packs, so a citizen can play a zombie clip.
 
-### 2. The club, the lab, a set
+### 2. The engine, the lab, a set
 
 ```bash
-# THE CLUB — boots mode select -> variant -> character select -> play
+# THE ENGINE — boots mode select -> variant -> character select -> play
 $PY $D shot /tmp/club.png --mode 0 --frame 320
 ```
 
@@ -108,7 +108,7 @@ $PY $D lab /tmp/lab.png --subject r2moves \
 ```bash
 # A SET — the world. Same command; the ctl carries the level, the lighting and the mark.
 $PY $D lab /tmp/street.png --subject r2moves --frame 480 \
-  --ctl "face=0 grid=0 set=parsons stage=30,-20,0 partner=kaeli_pj pclip=idle pgap=1.4 pyaw=150 sun=40,150,1.2,1.0,0.96,0.90 sky=0.44,0.50,0.62"
+  --ctl "face=0 grid=0 set=<street> stage=30,-20,0 partner=<body> pclip=idle pgap=1.4 pyaw=150 sun=40,150,1.2,1.0,0.96,0.90 sky=0.44,0.50,0.62"
 ```
 
 `reva_native/sets/*.set` is the level format — `prop`, `propr`, `actor`, `path`, `cue`,
@@ -142,7 +142,7 @@ reuses or boots ONE live window, grabs every camera (~1.5 s each after the first
 patches per `build`, one bake per batch of builder changes, one scene take per batch of fixes.
 
 ```bash
-$PY $D looks /tmp/ship.png --new --set space_mayflower --metres --light "shadow=0" \
+$PY $D looks /tmp/ship.png --new --set <ship> --metres --light "shadow=0" \
   --cams "q34=160,70,1332.9,0,0,1112.9,40;side=-468,97,1102.9,0,0,1102.9,40"
 ```
 
@@ -153,16 +153,16 @@ $PY $D face /tmp/face.png --subject r2moves --jaw 0.7 --panel mouth --zoom 1.6
 
 ```bash
 # A CONVERSATION SCENE, recorded with its audio muxed in
-$PY $D scene /tmp/talk.mp4 --name porch --seconds 60 --fps 24 --set parsons --stage 30,-20,0
+$PY $D scene /tmp/talk.mp4 --name <scene> --seconds 60 --fps 24 --set <street> --stage 30,-20,0
 # (10-23) THE FILM LOOK: --film = SSAA x2 + the post pass + the engine's grade and vignette + a dip to black at each end
-$PY $D scene /tmp/talk.mp4 --name wateot_2_3 --fps 24 --subject viktor --partner off --set _s2_3 --new --film
+$PY $D scene /tmp/talk.mp4 --name <scene> --fps 24 --subject <body> --partner off --set <set> --new --film
 ```
 A script that says `mix film room=<set> music=<mood>` is voiced by `say_kokoro.py` and compiled as a FILM (48 kHz stereo:
 rooms, the music and room-tone bed, conversation gaps, caption pages) -- design/scene_direction.md "THE FILM MIX".
 
-Scenes live in `reva_native/scenes/` (12 of them: `porch`, `denial`, `coldopen`,
-`the_spot`, `boarding`, `three_lawns`, `it_starts`, `tables`, `dogwalk`, `theleash`,
-`club_night`, `mouthtest`). `<name>.txt` is the script — dialogue, voice direction and
+Scenes live in `reva_native/scenes/`. The ones in the repository are fixtures (`cam_test`,
+`ct_close`, `lt_room`, `rd_slam`, `feed_park`, `pipe_test`, `smoke_test` and the rest); a film's own
+scenes go beside them. `<name>.txt` is the script — dialogue, voice direction and
 **staging**. `say_piper.py` speaks it; `compile_scene.py` mixes one wav and writes the
 `.scn`. `design/scene_direction.md` is the manual. The scene system seats **three**
 speakers (`--partner2`, `p2gap=`/`p2clip=`/…).
@@ -172,12 +172,12 @@ carries its own `shot=` direction should be shot full-frame.
 
 ### 3. The film
 
-`skate_src/film/shoot.py` shoots SEVENTY-FOUR — every scene twice (an A
+`skate_src/film/shoot.py` shoots the film — every scene twice (an A
 conversation lens and a B lens pointed at what the scene is *about*) and cuts to an EDL.
 
 ```bash
 $PY skate_src/film/shoot.py --dry            # what it would do
-$PY skate_src/film/shoot.py --only denial    # one scene, both cameras, cut
+$PY skate_src/film/shoot.py --only <scene>   # one scene, both cameras, cut
 ```
 
 Its checkers: `framecheck.py` (is the camera pointed at them, and are they big enough in
@@ -240,7 +240,7 @@ not the take (it used to spool ~4 GB a minute of scene). `--film`'s fades are ap
 0.35 s, out to black over the last 0.6 s of the SOUND (the picture is cut at the sound's end).
 
 **A take's FOLEY** (10-23, round 4): record the take, then `$PY reva_native/scenes/foley.py <scene.txt> <take.log>
---child viktor,billy,freddy` (footsteps and sits from the take's timed `[walk] t` lines into the script's FOLEY block),
+--child <name>,<name>,<name>` (footsteps and sits from the take's timed `[walk] t` lines into the script's FOLEY block),
 `compile_scene.py <scene.txt>`, and lay the new mix under the same frames: `ffmpeg -i take.mp4 -i
 reva_native/scenes/<scene>.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest out.mp4`.
 
@@ -346,7 +346,7 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
   out of obstacle` (the contact pass moved a body), a `[walk] ... -> mark` with no `arrived`, `[set] actor N ... wears`.
   Then `skate_src/robot_neko/scenesheet.py MP4 SCN OUT.png` -- one frame per line -- and LOOK at every tile;
   `reva_native/scenes/join_chapter.py` joins a chapter's takes in order with an index of where each scene starts
-  (`--take`/`--script`/`--label` name the files by `{n}`; its docstring has chapter 2's whole line).
+  (`--take`/`--script`/`--label` name the files by `{n}`; its docstring has a whole chapter's line).
 - ⛔ **Judge a POSE in profile, at eye level, beside a standing body.** From a high wide I reported seated extras
   as standing and a fix was asked for; a profile lens showed all seven sitting on their stools (10-23).
 - ⛔ **On Windows, `subprocess` resolves the exe from the PARENT's PATH**, not the `env=`
@@ -370,7 +370,7 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
 - ⛔ **`REVA_SCENEFPS` alone fixes only the SCENE clock.** Clip phases still run on `dt`,
   so the picture and wav stay in sync while the *bodies* animate at capture speed. Set
   `REVA_FIXEDSTEP` to the same rate (`driver.py scene` does).
-- ⛔ **A close-up's numbers are in CLUB UNITS** — ~1.75x metric (heads at y 2.62/3.08),
+- ⛔ **A close-up's numbers are in ENGINE UNITS** — ~1.75x metric (heads at y 2.62/3.08),
   near plane 0.8 outside a scene. A lens placed at human-scale close-up distance ends up
   *inside* the head and the frame comes back empty with nothing logged. Derive distances
   from a shot that already works.
@@ -410,13 +410,13 @@ Use `bench`, or a burst: `--env REVA_SHOTN=12 --env REVA_SHOTEVERY=3`.
 ## Where things are
 
 ```
-reva_native/            crowd_kms.c (the engine), packs/ (140+ .rpack bodies),
-                        sets/ (19 .set levels), scenes/ (12, dialogue+wav+.scn),
-                        anim_bench/ (16 instruments), dance.bat / skate.bat
+reva_native/            crowd_kms.c (the engine), packs/ (the .rpack bodies you bake: not in git),
+                        sets/ (.set levels), scenes/ (fixtures: a script and its .scn),
+                        anim_bench/ (the checks), dance.bat / skate.bat
 skate_src/author/       .rpack authoring (marks, jaw, interior, garments, props)
-skate_src/film/         shoot.py (SEVENTY-FOUR) + its checkers
+skate_src/film/         shoot.py (the film) + its checkers
 skate_src/town/         the UE asset artery (bake_town.sh, texaudit.py, propdims.py)
-design/                 one doc per mode + the_set.md, scene_direction.md, faces.md,
-                        skating.md, seventy_four.md, ROADMAP.md
+design/                 engine_plan.md and the manuals: the_set.md, scene_direction.md,
+                        faces.md, skating.md
 CLAUDE.md               the standing laws — read it before changing anything
 ```

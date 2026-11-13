@@ -1,9 +1,9 @@
-# THE CLUB — capability gaps, found by making a film in it
+# aigameengine: what the engine couldn't do, found by making a film in it
 
 *(2026-08-30: the other places the engine's capability needed expanding, found and then
 built.)*
 
-Making SEVENTY-FOUR has been the best engine test the club has had, because a film
+Making the film has been the best engine test the engine has had, because a film
 asks for things a demo never does. This is the running list: what the engine could not do,
 what was done about it, and what is still true.
 
@@ -14,8 +14,8 @@ what was done about it, and what is still true.
 ### 1 · A body can be put on a prop ✅
 **The gap.** Every body stood on the ground plane. The scene pair is placed by `stage=` at
 y=0 and a partner from the hero's matrix, also at y=0. So a chair was a thing you stand
-next to and a bed was a thing you lie **through** — the cold open had to *sink a bed frame*
-to y=−0.34 until its mattress met the woman lying on the floorboards.
+next to and a bed was a thing you lie **through** — a scene had to *sink a bed frame*
+to y=−0.34 until its mattress met the body lying on the floorboards.
 
 **The fix.** Named marks, which is what a level format wants anyway:
 
@@ -45,8 +45,8 @@ published the position — the rotation was being thrown away one line later.
   asset being re-baked to a convention nobody wrote down.
 
 ### 3 · A scene can carry sound ✅
-**The gap.** The film had no sound but voices — and Act V is *entirely* sound design, with
-the last beat of the whole picture being **a knock**, which is a sound and not a line.
+**The gap.** The film had no sound but voices — and a film needs sound design: **a knock**
+is a sound and not a line.
 
 ⭐ **And the engine needed no change at all.** `compile_scene.py` already mixes N line-wavs
 into one track at offsets, and the engine already plays that track and muxes it against the
@@ -58,8 +58,8 @@ Absolute, so re-voicing a line cannot drag the knock somewhere else. `sfxgen.py`
 synthesises the library — knock, hammer, sprinkler, car_alarm, glass, door_close, footstep.
 A knock is a damped impulse through a wooden panel; none of it needs a recording.
 
-⛔ **Screams and moans are deliberately not faked.** They are performances, not waveforms,
-and Act V lives or dies on them. **Real source needed.**
+⛔ **Screams and moans are deliberately not faked.** They are performances, not waveforms.
+**Real source needed.**
 
 ### 4 · The scene system takes more than two people ✅ *(earlier today)*
 The partner globals became slot 1 of a cast array addressed through `#define`, so the
@@ -77,7 +77,7 @@ body walking through a house, a fence or another body. This world is to become a
 swept test in the mover. **This is the biggest one.**
 
 ### B · Nobody can aim an eye
-Reva's eyes are painted; Kaeli's are flat lid shells. The head aims; the eyes never do.
+Reva's eyes are painted; the co-star's are flat lid shells. The head aims; the eyes never do.
 Watching a cut, the eyes were the worst thing on most models.
 Untouched.
 
@@ -105,7 +105,7 @@ avoid anything, or change what it is doing because something happened.
 without the furniture in it occluding anything.
 
 ### H · No coffee, no hammer, no boards
-143 props and not one is a mug. Two coffees, a hammer and the boards Dale never finished
+143 props and not one is a mug. Two coffees, a hammer and some boards
 are all in the film's dialogue and none of them exists. **Artery job, not authoring.**
 
 ### 9 · A post pass, and fog ✅ (09-11)
@@ -144,8 +144,8 @@ hero, cast, actors, up to 32 crowd slots — one frame late like the floor mask 
 (leaves, hair) alpha-test in the pass. Receivers: all four mesh programs, four taps, slope bias,
 sun term only. ctl `shadow=0|1` (default on whenever a sun is up), `REVA_SHADOW=0`.
 
-A/B on parsons at 09:30 from the road: without, the pair stands on a flat beige pavement; with,
-reva, kaeli, the bench, the crate and the bin throw long shadows toward the lens and the tree
+A/B on the town set at 09:30 from the road: without, the pair stands on a flat beige pavement; with,
+reva, the co-star, the bench, the crate and the bin throw long shadows toward the lens and the tree
 dapples the right of frame. ⛔ A single window: a wide whose aim is 40 units from a house does
 not shadow that house — widen `shadowext=` for a wide (2048² over ±90 is still 11 texels a unit),
 or build cascades when a door needs both at once.
@@ -164,7 +164,7 @@ TURNED`) — or the hero is bitten (`wpnHurtHero`). A timed `path` still wins wh
 Bodies keep 0.9 apart and still respect the colliders. `REVA_NAVDBG=1` prints every decision;
 `anim_bench/mindcheck.py` shoots `sets/_mind.set` from overhead N frames apart with the log.
 
-Receipt: parsons' block builds a 198×140 grid (12% blocked); a 40 s run made 48 decisions —
+Receipt: the town set's block builds a 198×140 grid (12% blocked); a 40 s run made 48 decisions —
 18 wanders, 19 flees, 10 hunts, 1 TURNED — and the sheet shows the neighbours spread along the
 pavement while the zombie works the road. ⛔ A shambler never catches a runner: contact needs
 someone who is not looking (a wanderer), which is the film's own rule.
@@ -183,10 +183,10 @@ the resolution and the mask size.
 A/B on the lab floor at fixed step, `clip=w_walk` (mob1, through the bank) with and without
 `over=z_armsup`: same stride at the same frame, arms overhead against arms swinging.
 ⛔ With a set loaded the lab PARKS the hero at z −150 — the first four takes shot `_bench.set`'s
-leftover actor (cast with z_armsup at ep 3) and read as "identical"; shoot the hero on the lab floor.
+leftover actor (cast with z_armsup in an earlier take) and read as "identical"; shoot the hero on the lab floor.
 
 ### 13 · The set culls what the lens cannot see ✅ (09-11)
-**The gap.** "No culling, no batching, no LOD" — all 559 of parsons' props drawn every frame.
+**The gap.** "No culling, no batching, no LOD" — all 559 of the town set's props drawn every frame.
 
 **Measured first.** 10.4 ms a frame in a door on the street, 13.8 on a lab wide (with the sun pass
 and the post pass). A sphere per instance (the pack's XZ radius and rendered height at the
@@ -200,7 +200,7 @@ gone, found by pixel-diffing on against off — the diff must be 0.000%). Batchi
 ### 14 · Rigid bodies ✅ (09-11)
 **The gap.** "Rigid bodies, projectiles, triggers: none. Nothing flies with physics."
 
-**The fix.** A loose object is a sphere with an orientation under club gravity (the hair solver's
+**The fix.** A loose object is a sphere with an orientation under engine gravity (the hair solver's
 derivation), with restitution and friction on the ground (which sees the box's half HEIGHT, not the
 sphere), the set's circle colliders as walls, pairwise contact, spin from the slip, sleep when still;
 drawn as its prop about its own centre, casting a shadow, and a `hit` on every real impact.
@@ -212,16 +212,16 @@ first crates rested a unit in the air on it; `propY0/propY1` now measure the mes
 
 ### 15 · Eyes that aim on a morph rig, and the head layer on borrowed clips ✅ (09-11)
 **The gap (B above).** The eyes were the worst thing on most models. Only bone-eyed
-rigs could aim; Anima's ARKit eye-look shapes were in the pack and unwired.
+rigs could aim; the bought character's ARKit eye-look shapes were in the pack and unwired.
 
 **The fix.** `eyeMorphAim()` drives eyeLookIn/Out/Up/Down Left/Right from the same residual gaze
 `eyeAim()` gives a bone rig (yaw>0 is her right: right eye Out, left eye In). Reva's painted eyes and
-kaeli's lid shells stay as they are and the log says so once. ctl `gaze=yaw,pitch` forces the hero's
-eyes for the bench. A/B on Anima's eye panel at fixed step: right / left / off move the irises
+the co-star's lid shells stay as they are and the log says so once. ctl `gaze=yaw,pitch` forces the hero's
+eyes for the bench. A/B on the bought character's eye panel at fixed step: right / left / off move the irises
 (3,073 / 3,062 px in the eye band; 0 before the fix below).
 
 ⛔ **Found on the way: the head layer never ran on a borrowed clip.** Only the own-clip branch called
-`scnHeadLayer`; a hero on any bank clip (every `x_convo` in the film, Anima on `z_upright`) had no head
+`scnHeadLayer`; a hero on any bank clip (every `x_convo` in the film, the bought character on `z_upright`) had no head
 aim, no gaze and no jaw override. It runs on both branches now.
 
 ### 16 · Cloth: folds, self-collision, the body mesh, premade garments — PARKED (09-11)
@@ -236,7 +236,7 @@ mesh — and then, after two hours, the clothing was taking too long for poor re
   A/B sheets came back identical. 8192 now, and the refusal prints;
 - `skate_src/author/dressglb.py` fits a PREMADE GLB garment to a body (landmarks off the skeleton, mean-radius
   width, a build-time push-out against the body normals, two-nearest-segment weights) and appends it as
-  `<name>~cloth`; `packs/v1_anima_cargo.rpack` = Anima in the Sketchfab cargo pants (`models/Female_cargo_outfit`).
+  `<name>~cloth`; `packs/v1_<body>_cargo.rpack` = the bought character in the Sketchfab cargo pants (`models/Female_cargo_outfit`).
 Last measured, mesh collision on, walking: 5–32 particles inside the skin before the push per frame, all pushed
 clear; fitcheck pelvis −0.007 (capsule metric), calves +0.12 (baggy cargo, real). NOT looked at on a sheet after
 the cap fix. The MetaHuman sweatpants (`models/Basic_Sweatpants…/metahuman/*.mhpkg`, a zip of uassets) want the
@@ -262,14 +262,14 @@ claw arrived open.
 
 **The fix.** Thirty more canonical slots (five fingers × three joints × two sides, `16+side*15+finger*3+joint`),
 parsed before the digit strip in `canonOf` for four rig families (UE `thumb_01_l`, Mixamo `LeftHandThumb1`,
-CC `cc_base_l_thumb1`, Daz G9 `l_thumb1`; metacarpals and tips are not joints; Anima's `earring_01_l` is
+CC `cc_base_l_thumb1`, Daz G9 `l_thumb1`; metacarpals and tips are not joints; the bought character's `earring_01_l` is
 not a ring finger). A finger joint's basis aims at the next joint, the last at its child; the same absolute
 canonical transfer carries them. `[canon] <pack>: 16 body + N finger canon bones carry a basis` at load;
 `REVA_NOFINGERS=1` puts the canon back to 16.
 
-Census: the zombie bank animates fingers in all 32 clips (38 tracks each), `moves` in 3; Anima has 36
+Census: the zombie bank animates fingers in all 32 clips (38 tracks each), `moves` in 3; the bought character has 36
 finger bones (20 with a basis: her fingertips have no child), the Mixamo citizens 40, reva none (a 27-node
-Meshy statue). A/B, Anima on `z_atk_a` at fixed step: fingers on, her hands close into the claw; off, they
+Meshy statue). A/B, the bought character on `z_atk_a` at fixed step: fingers on, her hands close into the claw; off, they
 stay splayed at her hips (0.10% of the sheet, all of it at the hands).
 
 ### 19 · Data-driven doors ✅ (09-11)
@@ -297,9 +297,9 @@ slot (+1, so an old pack reads none) into the material record's spare bytes; the
 space derivatives (`OES_standard_derivatives`; no tangents in the pack, and a flipped V is handled by the
 derivatives). `dressglb.py` carries a garment's normal map too. `REVA_NONORMAL=1` for the A/B.
 
-Receipt: `v1_anima_cargo` (the Sketchfab pants carry one) at a hip close-up, fixed step: 3.08% of the frame
+Receipt: `v1_<body>_cargo` (the Sketchfab pants carry one) at a hip close-up, fixed step: 3.08% of the frame
 differs, all of it on the pants — pocket flaps, seams and wrinkles shade; without, the fabric is flat.
-⛔ Anima's own UE export carries NO normal maps (0 of 35 materials): the artery loses UE materials, so her
+⛔ The bought character's own UE export carries NO normal maps (0 of 35 materials): the artery loses UE materials, so her
 skin gets one only when `ue_export_textures.py` is taught to fetch it. Roughness/metal and PBR are next.
 
 ### 21 · One body type — NOT DONE (09-11), the plan
@@ -347,7 +347,7 @@ REVA_RDDBG (`[rd]` hips / lowest / floor / speed and `[rd:fast]`), REVA_RDFREEZE
 ⛔ The joint limits go FIRST and the lengths have the last word; the other way round `[rd:fast]`
 showed a knee at 13 u/s under a body lying still. ⛔ A flat friction multiplier was glue (97%
 of her speed in one frame) and a speed-scaled one let her crawl for ever. ⛔ A missing toe is
-not a missing body: the four extremities are optional (anima has no toe bones; the first cue
+not a missing body: the four extremities are optional (the bought character has no toe bones; the first cue
 refused her). `g_frameNo` counts rendered frames so a simulation inside the draw steps once
 per frame -- the doll, and the jiggle springs, which had been integrating twice on a two-pass
 draw.
@@ -370,7 +370,7 @@ Receipt: `scenes/feed_test` (the frame bobs with her body and the subject stays 
 a camtrack at the same distance), `feed_park`, then the four cuts.
 
 ### 24 · Lines obey the world — DONE (09-20)
-**The gap.** A path was a spline nothing checked; ep 2's filming line had ten samples up to
+**The gap.** A path was a spline nothing checked; one filming line had ten samples up to
 1.13 u inside a bench. And a stance that crossed the legs drew one thigh through the other.
 
 **The fix.** Every interior path sample is pushed out of the walking distance field at 0.42 u
@@ -380,10 +380,10 @@ leg against right, capsule to capsule at 0.88 of the measured radii, so legs may
 
 ### 25 · The cloud deck, and the T-pose alarm — DONE (09-20)
 A drifting fbm cloud deck in the skybox and the water. And a
-missing partner clip -- a T-pose for the whole line, half of promo ep 3 -- is a boxed notice at
+missing partner clip -- a T-pose for the whole line, half of a promo take -- is a boxed notice at
 the first miss and a count at exit, where `[stage] … NOT FOUND` had said it once and quietly.
 
-## ROBOT NEKO ep 13 — GOT IT (09-25)
+## A FILMER CIRCLES A FALL (09-25)
 
 ### 26 · A route around a body, and a path handed on early — DONE (09-25)
 **The gap.** A path was a list of set marks: a filmer circling a fallen skater needed to know where the slam would
@@ -411,10 +411,10 @@ the take. Residue: the audit still reads her hand 0.39 u into the floor on the i
 `roll` / `pop` / `land` / `slam` in `skate_src/robot_neko/foley.py`: band-limited wheel noise with the four
 wheels ticking a seam, a tail pop, two trucks landing, a body hitting concrete with a slide and a board getting away.
 
-## ROBOT NEKO ep 14 — WARDROBE (09-26)
+## WARDROBE (09-26)
 
 ### 28 · Premade clothes on a finished pack — DONE (09-26)
-**The gap.** Kaeli needed clothes. The only garment path (`dressglb.py`,
+**The gap.** The co-star needed clothes. The only garment path (`dressglb.py`,
 §16) dressed the body's GLB, and a GLB must be BAKED into a pack -- which drops everything authored on the pack
 since (her face and morph vocabulary, every skate clip and board channel). The cloth solver is PARKED.
 **The fix.** `skate_src/author/dresspack.py <pack> <garment.glb> --wear Mesh:kind[:MaterialMesh] ... --out <pack>`:
@@ -429,9 +429,9 @@ that cloth is not an opening -- a boundary edge, or where the garment ends in th
 CAPS (fan discs closing a garment's openings, valence >= 16) are dropped; a garment turned in its Sketchfab scene
 is refused. Engine: a `~worn` mesh is drawn and shadowed like the body and never MEASURED as it
 (`meshIsGarment`: the limb radii, markPick and the cloth collider skip it, as they skip `~cloth`).
-Receipt: `packs/v1_kaeli_street.rpack` (v1_anima_outfit + the Sketchfab camo cargos and green tank):
+Receipt: `packs/v1_<body>.rpack` (the bought character's outfit pack + the Sketchfab camo cargos and green tank):
 43,007 skin verts hidden, bra and panties hidden, `packcheck` clean; four-angle benches in the T-pose and on
-`z_rm_sk_ride`, a front and a rear close-up at full resolution, then ep 14.
+`z_rm_sk_ride`, a front and a rear close-up at full resolution, then a whole take.
 ⛔ Six fitting rounds, each found on pixels: the scene's 45-degree turn, a bib (centroid centring), the caps,
 a fold under the bust (four A/Bs -- skin, normal map, shadow, caps -- before the radial push), holes at a rolled
 hem, cloth between her knees in motion. Open: two small marks at the tank's lower bust, the waistband's lining
@@ -483,7 +483,7 @@ the pack scale; no hair-vs-body collision (the spring keeps it near its pose).
 ## R.E.V.A. 902 (09-29)
 
 ### 31 · A wardrobe: clothes as separate pieces, skin that hides under them -- DONE (09-29)
-**The gap.** REVA's street sheet wanted modular clothing: she is a seamstress, and makes new clothes. Every body in the engine was one fixed set of meshes: a garment was either baked in (a region of
+**The gap.** REVA's street sheet wanted modular clothing. Every body in the engine was one fixed set of meshes: a garment was either baked in (a region of
 the skin) or dresspack'd on with the skin under it REMOVED (§28) -- never taken off again.
 **The fix.** The atelier (`skate_src/atelier/atelier.py`, design: `design/atelier.md`) builds each garment as its own
 mesh on the one skeleton and MEASURES which skin it covers (a ray from every skin vertex along its normal; a face is
@@ -511,13 +511,13 @@ Receipt: the lab log `chains: reva902 x16 lens=[3,...]`, `[jiggle] reva902: 2 ji
 Open: cloth chains do not collide with the body (the spring keeps them near their pose); the per-vertex cloth (§16)
 and a SEWING simulation (panels cut flat and sewn onto the form, stitch by stitch) are the atelier's next backend.
 
-## THE WORLD AT THE END OF TIME (10-18)
+## THE SPACE SERIES: THE TOON LOOK (10-18)
 
 ### 33 · The toon pass: cel shading and ink, per pack -- DONE (10-18)
-The look for the Pohl series (design/wateot_series.md): Atlantis-leaning design, Futurama rendering. A pack
-carrying a node named `ToonStyle` is drawn in it; nothing else in the club changes. In the body fragment shaders
+The look for the space series: Atlantis-leaning design, Futurama rendering. A pack
+carrying a node named `ToonStyle` is drawn in it; nothing else in the engine changes. In the body fragment shaders
 (fsO/fsC): `uCel` cuts the same key light and shadow-map term into TWO tones -- lit, and a cool shadow tint that is
-gentler on dark colours (Wanda's face must read in shadow) -- with the light's brightness capped at 1 (a street's
+gentler on dark colours (a dark face must read in shadow) -- with the light's brightness capped at 1 (a street's
 sky+sun blew a white robe out; hue kept, so dusk still darkens), and a BILINEAR shadow-map test so a cast-shadow
 edge is a contour, not texels. The INK is an inverted hull: each toon mesh drawn again, front faces culled, pushed
 out along its normal by `uInk` -- a share of the viewport's height, in clip space, so the line holds its width at
@@ -525,27 +525,27 @@ any distance (ANGLE here has no depth texture, so edge detection was never an op
 same hull). Hooked at every body draw site (actors, partner, crowd, lab hero, wall, select screen, props), never
 the shadow passes; the face's drawn shapes (`~face~` meshes) get no line. Knobs: `REVA_NOTOON=1` (the control),
 `REVA_TOONCEL=` (where light turns to shadow, 0.30), `REVA_TOONINK=` (0.0020). Receipt: `[toon] cel 0.30 ink
-0.0020`; Amelia's face close-up: one smooth S-curve terminator. ⛔ The staircase down that face was NOT the shadow
+0.0020`; a toon face close-up: one smooth S-curve terminator. ⛔ The staircase down that face was NOT the shadow
 map (shadow=0 kept it): the head's profile table was read with lerp_table, a crease at every row, and a hard cel
 cut turns creases into ledges -- people/person.py now reads it with a monotone cubic (`smooth_table`).
 
 ### 34 · True size -- DONE (10-18)
-Every pack was normalised at load to a 3.15-unit bone span, which suits a crowd of mismatched downloads and made the
-series' five-year-olds as tall as the twelve-year-old. A pack carrying a node named
-`TrueScale` was built in metres at real size and takes the club's 1.75 units a metre instead. Receipt: `[size]
+Every pack was normalised at load to a 3.15-unit bone span, which suits a crowd of mismatched downloads and made a
+five-year-old's body as tall as a twelve-year-old's. A pack carrying a node named
+`TrueScale` was built in metres at real size and takes the engine's 1.75 units a metre instead. Receipt: `[size]
 <pack>: TRUE SIZE ...` per pack; the cast's group shot.
 
 ### 35 · Cloth meets the legs -- DONE (10-18)
 A chain whose root is named `Cloth*` is pushed out of a capsule round each thigh and shin, as thick as the body
 measured itself (`measureBoneR`), then its lengths are re-solved -- the collision §32 left open and the parked
 REVA 902 coat was waiting for. Hair does not collide. `REVA_CHCOLLIDE=0` is the control, `REVA_CHCOLR=` scales the
-capsules, `[chdbg]` counts pushes. Receipt: Amelia's robe in a run, ~6 pushes a second on, 0 off. ⛔ Collision moves
+capsules, `[chdbg]` counts pushes. Receipt: a toon body's robe in a run, ~6 pushes a second on, 0 off. ⛔ Collision moves
 chain NODES only: skin blended between a raised thigh and a hanging chain lands INSIDE the thigh whatever the
 nodes do, so an OPEN robe's front carries no thigh share at all (people/costume.py `thigh=0.0`). Control on REVA
 902's street outfit walking: 40 px of 4.2M differ on a 48-frame sheet -- in scope, and nothing else moved.
 
 ### 36 · Cloth drapes over the legs, hair never sinks into the head -- DONE (10-18, second pass)
-On Amelia's run the leg went through the coat, which did not move aside for the legs, and the hair clipped through
+On a toon body's run the leg went through the coat, which did not move aside for the legs, and the hair clipped through
 the head -- and after my first pass, which I called fixed off a DOWNSCALED contact sheet without really looking, the
 leg still went through the coat and the hair still went through the head. Both were true. The judge for clipping is now FULL-
 RESOLUTION crops of a burst (8 frames x 3 cameras for cloth, 10 x 4 for hair), the control (`REVA_VCOLLIDE=0`) in
@@ -563,7 +563,7 @@ space before the model matrix, so the ink pass follows):
 - HAIR NEVER INWARD (`wear~hair~`). Out of the neck capsule, and never nearer the head's centre (in the measured head
   ellipsoid's normalised frame) than where the vertex sits at REST -- at rest the hair covers the head, ears and all,
   so swinging cannot uncover it. The chain joints get the same rule against the animated pose. Chains whose root is
-  named *Stiff* spring 3x harder (Amelia's bob: `Hair_StiffBob_*`).
+  named *Stiff* spring 3x harder (a bob: `Hair_StiffBob_*`).
 What the first pass got wrong, each found on full-resolution frames:
 ⛔ PUSHING ONLY WHAT IS INSIDE THE LEG. A knee that had gone fully THROUGH a panel left its vertices behind it,
 untouched; triangles between pushed and unpushed vertices stretched and flipped and drew INK.
@@ -576,15 +576,15 @@ outer wall 4 mm away: black bands (gone with REVA_TOONINK=0, which proved it). T
 expansion now; the ink pass has a slope-scaled depth bias (2.5, 4).
 ⛔ THE HEAD ELLIPSOID SITS INSIDE THE SKULL AND LEAVES OUT THE EARS: the swinging bob slid over the ear (a sliver of
 skin and the ear's tip through the curtain, mid-run, side view). Hence the rest-relative rule above.
-Kept from the first pass: hidden SKIN is measured (measureBoneR skipped skin under a worn garment: Amelia's thighs
+Kept from the first pass: hidden SKIN is measured (measureBoneR skipped skin under a worn garment: a robed body's thighs
 measured nothing); skirts 72 x 22 (no knee between vertices); a bob swings only its lower half.
 Knobs: `REVA_VCOLLIDE=0` (control), `REVA_VCOLR=` (scale the capsules: x4 balloons the robe -- the test that the push
 runs at all), `REVA_VCOLDBG=1`. Open: a back-kicking heel fans the coat's back out to the heel; below a raised knee the
 cloth hangs straight down to its own hem (stretched, not shortened); the open front's edges flap around a knee coming
-through the gap; Amelia's side-swept lock flicks up like a horn in a run (inertia, not clipping).
+through the gap; a side-swept lock flicks up like a horn in a run (inertia, not clipping).
 
 ### 38 · Worn cloth on any rig, in plain C: clubcloth -- DONE for Godot (11-02)
-The alien's clothes: worn cloth matters to this engine, and its collision and clipping come with it. `reva_native/clubcloth/`: the hanging cloth's recipe below, made for a body that moves fast and any garment, with no engine under it. `godot/club_cloth_gde.c` binds it as a GDExtension in plain C on Godot's own interface header. Measured on the alien, tee and shorts, 908 points, Ryzen 5 5500: about 0.6 ms a frame on the main thread, two garments on two threads, against 27 ms in GDScript and 2 to 15 ms a tick for Godot's SoftBody3D at 60 Hz.
+The alien's clothes: worn cloth matters to this engine, and its collision and clipping come with it. `reva_native/clubcloth/`: the hanging cloth's recipe below, made for a body that moves fast and any garment, with no engine under it. The cloth library's Godot binding, which lives with the skate game, binds it as a GDExtension in plain C on Godot's own interface header. Measured on the alien, tee and shorts, 908 points, Ryzen 5 5500: about 0.6 ms a frame on the main thread, two garments on two threads, against 27 ms in GDScript and 2 to 15 ms a tick for Godot's SoftBody3D at 60 Hz.
 What it adds to section 37:
 - MAX DISTANCE, painted by the tailor per point: how far from the skinned pose it may go. 0 is a collar or a waistband. It ends cloth that comes away from the body, by construction, whatever the tuning.
 - THE BACKSTOP: each point tied at load to the skin under it (only on its own bones and their parents, or a tee's side ties itself to the arm beside it), and never inside that skin's tangent plane, moved by the skin's weights. A dot product a point, and most of the collision there is. A layer asks for more room with the tailor's second number.
@@ -620,7 +620,7 @@ What broke on the way, each found on film:
 ⛔ A CHECK ON THE FASTEST POINT. "Standing still, it settles" failed at 0.7 m/s and looked like jitter. The mean over the garment was 0.004 m/s: a few points on an inner thigh, bumped as his feet settle. Judge a garment, not its worst point.
 ⛔ THE CLOTHES STOOD UP WITHOUT HIM. Godot's ragdoll simulator moves itself to the end of the skeleton's modifiers when it starts, so in a bail the cloth solved before the limp body's pose: he fell, and his tee and shorts stood there empty, a metre off. Every number the solver reports passed, because its targets were just as wrong as it was. Anything reading a pose goes last again whenever something else goes last, and a check has to compare against the pose the skeleton ends the frame with.
 ⛔ HELD INSIDE HIS SKIN. A limit is around a point's target, and the target's weights aren't the skin's under it. Where a spine bends the limit held the tee up to 6.7 cm inside skin that's drawn, however hard the backstop pushed. What a point's held to is now pushed out of the skin first, and the most any point goes in fell to 0.2 cm.
-⛔ DOTS ON THE SLEEVES. Smooth shaded and low-poly, cloth casting on itself breaks up in dots where the sun's at a glancing angle: normals say lit, facets say not, and the lookup lands on its own surface. Casting from a copy 2 cm in didn't touch it: the shadow's blur reaches further. Godot's LIGHT_VERTEX moves only where a fragment looks up its shadows: 5 cm thinned them, 15 cm took most of them, side by side on the same poses, with his arms still shading his sides. Moving it toward the sun instead was worse every way it was tried: through his body and out the back, or right up against whatever's casting the shadow. The light fades out before it's along the cloth, which takes more (`godot/club_cloth.gdshader`); going by each facet's own normal for that gave a saw-toothed edge to every shade. It moves all the light, not only the sun's, so it goes by how bright the sun is: moonlit, with a torch in his hand, it stays at 3 cm. A thin dashed line can still show along a shadow's edge at a glancing angle: that's the game's shadow filter on any curved surface, and the shadows are the game's to change.
+⛔ DOTS ON THE SLEEVES. Smooth shaded and low-poly, cloth casting on itself breaks up in dots where the sun's at a glancing angle: normals say lit, facets say not, and the lookup lands on its own surface. Casting from a copy 2 cm in didn't touch it: the shadow's blur reaches further. Godot's LIGHT_VERTEX moves only where a fragment looks up its shadows: 5 cm thinned them, 15 cm took most of them, side by side on the same poses, with his arms still shading his sides. Moving it toward the sun instead was worse every way it was tried: through his body and out the back, or right up against whatever's casting the shadow. The light fades out before it's along the cloth, which takes more (in the skate game's cloth shader); going by each facet's own normal for that gave a saw-toothed edge to every shade. It moves all the light, not only the sun's, so it goes by how bright the sun is: moonlit, with a torch in his hand, it stays at 3 cm. A thin dashed line can still show along a shadow's edge at a glancing angle: that's the game's shadow filter on any curved surface, and the shadows are the game's to change.
 ⛔ PATCHES WHEN THE CAMERA FADED HIM. Squeezed against a wall the game fades its rider out, which draws everything with no depth, and skin under the clothes painted over them. The look writes depth even when it's see-through.
 ⛔ HEMS THAT LOOKED TORN. A free edge of big triangles zigzags when it folds hard. Two things, neither of them more points to solve: a rod along each free edge, as a sewn hem is folded double, and what's drawn is one level of Loop subdivision of what's solved, so a fold and a silhouette read as cloth. It costs about one more pass over the points, 0.15 ms a frame for both garments.
 ⛔ A RIDGE THROUGH THE TOP. A top's points stay outside what's under it, but its triangles are big, and a ridge comes out between three of them. What the top covers at rest is tucked under it as drawn, and eases back as a hem lifts off: it's out of sight there, so it can go anywhere. Only what's drawn: the solver and the top never see it, or the two would chase each other.
@@ -669,14 +669,14 @@ shoulders. The correction never becomes speed off the surface now.
 ⛔ footL IS THE TOE on these rigs (the lowest bone under the knee): the shin was drawn to it and the foot had no capsule,
 so the heel went through the back of the coat. The ankle is the knee's own child on the way down.
 ⛔ THE SKIN LAYER OVER THE WHOLE BODY balled the front panel up in the hip crease (the underside of the belly and the top
-of the raised thigh as planes) and balled Viktor's tight shift up standing STILL (the inner thighs across the crotch:
+of the raised thigh as planes) and balled a tight shift up standing STILL (the inner thighs across the crotch:
 6 cm "inside" one, then the other). Back-facing skin only, and a contact deeper than three clearances is a wrong plane.
 ⛔ THE ARMS' SKIN: the rest pose hangs the arms at the hips, so "skin from the hem to the waist" took in the hands.
 ⛔ FRICTION 0.6: a rising thigh carried the front panel up into a wad at the hip.
 Verified: the run, 8 frames x 3 cameras, the new coat above the control (`REVA_SKIRTSIM=0`) at 1:1
 (`coat_NEW_*`, `coat_NEW_vs_OLD_*`: every TILE labelled NEW/OLD at a size readable at 25% -- twice the control row of a sheet was cropped for the new one, its row labels 5 px on screen); the rest pose against the cut (1.9% of pixels differ -- the lit
-band is wavier, the cloth settles into faint folds); all five of the cast walking (Viktor's and the boys' freezer
-shifts, Wanda's tunic skirt). crowd_new.exe only.
+band is wavier, the cloth settles into faint folds); all five of the cast walking (three
+shifts and a tunic skirt). crowd_new.exe only.
 
 **Second round, the same day** -- three crops (her hand hanging at her hip, its lower half INSIDE the coat:
 located by template match in the new back-quarter sheet, frames 520 and 536), a screenshot of my own "still not right"
@@ -691,26 +691,26 @@ list, and, mid-way, the kids' clothes riding up in a way physics does not work. 
 - 16 SUBSTEPS (1/960 s) and bend compliance 1e-7: the front panel swings as a broad sheet instead of balling up at the
   hip when the knee is highest.
 - THE LEGS AS THEY ARE: capsules at the measured radius (x1.0, not x1.06), off it a garment's ease where the leg's skin
-  is hidden in this outfit (Amelia, Wanda: 10 mm) and a hair where it is bare (Viktor, the boys: 6 mm).
-⛔ THE BOYS' SHIFTS RODE UP TO THEIR HIPS. Two causes, both mine: the leg capsules were ~60% fatter than a child's leg
+  is hidden in this outfit (the coat, the tunic: 10 mm) and a hair where it is bare (the shifts: 6 mm).
+⛔ THE CHILDREN'S SHIFTS RODE UP TO THEIR HIPS. Two causes, both mine: the leg capsules were ~60% fatter than a child's leg
 (measured radius, already 15% outside the skin, x1.06, + 1.2 cm), so a tight shift could not go round both legs in a
 stride and was pushed up; and the back-skin layer tested the shift's FRONT -- pulled back between the legs, its nearest
 skin was the backs of the thighs, facing away, and it was shoved 35 mm back through the leg every substep (stretch
 x8). At 8 substeps the cloth stretched instead and hid both. Now: legs as they are; only cloth cut on the back half
 meets the back skin; a contact deeper than 1.5 clearances is a wrong plane.
-Verified: Amelia's run 8 frames x 3 cameras (`coat_NEW_*`, `coat_NEW_vs_OLD_*`, `coat_hands_your_crops_before_vs_now`),
-Freddy and Billy walking a full stride x 3 cameras (`freddy_shift_NEW_*`, `billy_shift_NEW_*`: hem at the knee every
+Verified: the coat's run 8 frames x 3 cameras (`coat_NEW_*`, `coat_NEW_vs_OLD_*`, `coat_hands_your_crops_before_vs_now`),
+two children walking a full stride x 3 cameras (each one's `_shift_NEW_*` sheets: hem at the knee every
 frame), the cast walking, the rest pose (1.4% of pixels differ). Knobs: `REVA_SKIRTSIM=0`, `REVA_SKIRTDBG=1|2|3`,
 `REVA_SKBEND`, `REVA_SKSUB`, `REVA_SKDRAG`, `REVA_SKAIR=0`, `REVA_SKHANDS=0`, `REVA_SKLEGM`, `REVA_SKLEGR`,
-`REVA_SKMU=s[,k]`, `REVA_SKARMS`, `REVA_SKSKIN=0`, `REVA_SKCONE=0`, `REVA_VCOLR`. Bench `sets/_wateot_kid.set` (Freddy).
+`REVA_SKMU=s[,k]`, `REVA_SKARMS`, `REVA_SKSKIN=0`, `REVA_SKCONE=0`, `REVA_VCOLR`. Bench: a set with one child's body.
 Open: a sprint still folds the front panel at the hip for a few frames when the knee is highest and the air presses it
-back; the coat's worst single edge reads ~1.3-1.5x where a hand presses it in beside the pinned waistband; on the boys
+back; the coat's worst single edge reads ~1.3-1.5x where a hand presses it in beside the pinned waistband; on the children
 ~1.4x (the hem round both legs in a stride); the cost is 16 substeps a frame per garment (fine on this machine, not
 measured on the Pi); Godot still swings the chains.
 
 ### 38 · The ship's sets: a set prop in the show's look -- DONE (10-18)
-First the sick bay set for scene 2.1, in a Star Trek style: the warming pans, the bath, the boys' pan of milky
-fluid. The set is built by code (`skate_src/ship/build_sickbay.py`, numpy + PIL, no Blender) and drawn by four
+First a sick bay set, in a Star Trek style: warming pans, a bath, a pan of milky
+fluid. The set is built by code (numpy + PIL, no Blender) and drawn by four
 MARKER nodes a set prop can now carry (`skate_src/glb2rpack.py --marker NAME`, read in loadPack):
 - `ToonSet`: the toon pass (§33) lit as a ROOM is lit -- the cel cut taken on the surface's facing UP (0.5 + 0.5 N.y)
   times the sun's shadow, not on the sun's direction. Every wall in the light, every underside (the ceiling, a
@@ -734,19 +734,19 @@ the shadow tone FOR it (the ceiling's base is yellowish, so it lands on a neutra
 ⛔ A pan of milk read as a TABLE TOP until the bowl's wall was darker than its floor and the milk was cream
 (so a glint can be brighter than it); two glasses with a pale band at the brim read as PINTS (cocoa to a finger under
 the rim, and steam).
-Scope: the committed engine and this build shot the same frames of `_wateot_cast` (the toon cast walking, simulated
-cloth) and `parsons` (the town) at REVA_FIXEDSTEP=60, each twice: 0.000% of pixels differ run to run AND build to
+Scope: the committed engine and this build shot the same frames of a set of the toon cast walking (simulated
+cloth) and of the town set at REVA_FIXEDSTEP=60, each twice: 0.000% of pixels differ run to run AND build to
 build. Only a pack carrying a marker changes. crowd_new.exe only.
 
 ### 39 · Bodies that lie down: a set actor asleep in a warming pan -- DONE (10-18)
-With the sick bay right, next came the boys' huddle in the milk and Viktor waking in the pan. Two
+With the sick bay right, next came two children huddled in the milk and a body waking in a pan. Two
 moves, authored by code against the set they lie in (`skate_src/people/moves/`: `lying.py` -- the body, the bowl's
-profile, the milk, mesh-against-mesh depth; `wake.py` -> `z_rm_wake` on v1_viktor, 9 s, played once; `huddle.py` ->
-`z_rm_huddle` on v1_billy and v1_freddy, a 6 s loop; `bake.py` restores each pack from its CLIPLESS base before the
+profile, the milk, mesh-against-mesh depth; `wake.py` -> `z_rm_wake` on one body, 9 s, played once; `huddle.py` ->
+`z_rm_huddle` on two children's bodies, a 6 s loop; `bake.py` restores each pack from its CLIPLESS base before the
 clips go on). They are played by SET ACTORS, which until now had only stood, walked, ridden and fallen:
 - A `z_rm_` CLIP OWNS ITS ROOT ON A SET ACTOR, as it already did on the hero and the scene cast: no push out of the
   set's colliders (a boy in a pan is INSIDE the pan's collider), no foot plant, no Williams layer.
-- A `z_rm_` TRANSITION PLAYS ONCE AND HOLDS its last frame (clipHoldsEnd): Viktor wakes once, he does not fall asleep and
+- A `z_rm_` TRANSITION PLAYS ONCE AND HOLDS its last frame (clipHoldsEnd): a body wakes once; it does not fall asleep and
   wake again every nine seconds. A `z_rm_` loop (the huddle) still loops.
 - A `z_rm_` clip STARTS AT ITS FIRST FRAME, and under a capture it WAITS for the shot as the set clock does -- a burst
   opens on a boy asleep, not one already awake, and two bodies posed TOGETHER (an arm across the other's chest) play in
@@ -764,7 +764,7 @@ And the eyes: `skate_src/people/eyelids.py` (Blender) gives every cast member `b
 COORDINATES (person.face_xyz inverted): the eye's interior squashes onto the lower lid, the upper lid's ink slides down
 by the opening. `--redo 1` rebuilds them.
 What broke, each on full-resolution frames:
-⛔ VIKTOR'S SHIFT BALLED UP AT HIS WAIST and threw a spike to the edge of the frame: his body sank into the pan floor
+⛔ A SHIFT BALLED UP AT THE WAIST and threw a spike to the edge of the frame: his body sank into the pan floor
 while the cloth's floor was checked last, so the two fought every substep (9,200 contacts) and a point went to
 infinity. The skin under the shift now rests a cloth's thickness (12 mm) over the floor, the floor goes first, and a
 non-finite point is reported.
@@ -777,165 +777,159 @@ there is room for neither, and no collision pass can make room. They now lie PAL
 the hand 30), 7 cm out, 5 cm clear of the thigh; the rest solve and the timeline lay the arm the SAME way (one pole,
 from rest -- they disagreed about the elbow, and turned PALM DOWN first, the relaxed curl drove his fingertips 3.8 cm
 into the pan: measured, refused).
-⛔ "RUBBING HIS STINGING EYES" WAS FISTS AT HIS CHEEKS: it is the KNUCKLES on the eyes (the wrist aimed so the middle
+⛔ RUBBING THE EYES WAS FISTS AT THE CHEEKS: it is the KNUCKLES on the eyes (the wrist aimed so the middle
 knuckle lands on the eye), and the hands travel the straight line from the eyes to the chest (an IK blend between the
 two poses swung the arms out through his sides).
 ⛔ HIS FEET WERE BACKWARDS: the relax (toes away from the head, 38 degrees) was added to the foot's OWN rotation,
 and the rest pose lays the legs five times while it is solved -- the IK sets only the hip and the knee, so the foot
 turned 190 degrees. Every re-laid limb now starts its foot from rest.
-⛔ THE BOYS LAY ON THE MILK. A level lens on the boys alone (`sets/_huddle_bare.set`, `_huddle_milk.set`) proved the
+⛔ THE CHILDREN LAY ON THE MILK. A level lens on the two of them alone (two bench sets, with the milk and without) proved the
 engine had them exactly where the score put them: the milk (11.5 cm) was shallower than they were (knees bent up to
 20 cm). The legs now lie nearly straight, laid down from the hip until a calf or a heel touches, and the milk is 13 cm
-(build_sickbay `FLUID_Y` 0.67): faces, the tops of the chests, the arms and the toes break its surface. 15 cm was
+(the set builder's fluid height, 0.67): faces, the tops of the chests, the arms and the toes break its surface. 15 cm was
 measured first and refused: lying back, a boy's eyes reach 14.2 cm at most before his head goes into the bowl's wall.
-⛔ BILLY'S SHUT EYES READ OPEN from across the room: the lid ink was picked by its distance from the lid, and his low,
+⛔ A CHILD'S SHUT EYES READ OPEN from across the room: the lid ink was picked by its distance from the lid, and his low,
 heavy brow is within half an opening of it -- its lower edge slid down onto the shut lid as a dark wedge. Lid inks and
 brows are told apart by OFFSET now (0.0015 vs 0.0016 out); all five rebuilt (60 lid-ink points an eye on every face).
-⛔ BILLY'S HAND "ON HIS TUMMY" LAY IN THE MILK BESIDE HIM: a bone's +y runs ALONG a lying body, so "2 cm up spine_01" was
+⛔ A HAND "ON THE TUMMY" LAY IN THE MILK BESIDE THE BODY: a bone's +y runs ALONG a lying body, so "2 cm up spine_01" was
 a point by his back. The target is the top of his tummy straight over the spine.
-⛔ A "TINY RANDOM TWITCH" OF A QUARTER OF A FIST stood Freddy's fingers straight up at Billy's chin (two at once: 0.96).
+⛔ A "TINY RANDOM TWITCH" OF A QUARTER OF A FIST stood one child's fingers straight up at the other's chin (two at once: 0.96).
 Finger twitches are a flicker (0.08-0.16) and never stack on one hand.
-Verified on the engine's own frames (REVA_FIXEDSTEP=30, every frame): Viktor 9.5 s from three lenses (close on his
-near hand, three-quarter, overhead) and his face; the boys 6.5 s from the room, a mid lens over both faces and hands,
-and overhead; the near hand with the triangle pass on and off; his feet old vs new; Billy's lids with the blink forced
-off (`viktor_wake_*.mp4`, `boys_huddle_*.mp4`, the strips, and the OLD/NEW sheets, every tile bannered). Measured in the score: every vertex of both moves over the bowl within 6 mm (Viktor's
-heel; the boys' backs 4 mm; Freddy's inner upper arm, holding Billy's hand under the milk, 10 mm), both boys' lower eyes
+Verified on the engine's own frames (REVA_FIXEDSTEP=30, every frame): the waking body 9.5 s from three lenses (close on its
+near hand, three-quarter, overhead) and its face; the two children 6.5 s from the room, a mid lens over both faces and hands,
+and overhead; the near hand with the triangle pass on and off; the feet old vs new; a child's lids with the blink forced
+off (the takes, the strips, and the OLD/NEW sheets, every tile bannered). Measured in the score: every vertex of both moves over the bowl within 6 mm (the waking body's
+heel; the children's backs 4 mm; one child's inner upper arm, holding the other's hand under the milk, 10 mm), both children's lower eyes
 12 mm over the milk, their bodies 0 mm into each other.
-Scope: the committed engine (3b18059) and this build shot the same frames of `_wateot_cast` (the toon cast walking,
-simulated cloth) and `parsons` (the town) at REVA_FIXEDSTEP=60, each twice: 0.000% of pixels differ run to run AND
+Scope: the committed engine (3b18059) and this build shot the same frames of a set of the toon cast walking
+(simulated cloth) and of the town set at REVA_FIXEDSTEP=60, each twice: 0.000% of pixels differ run to run AND
 build to build. Only a set actor playing a `z_rm_` clip, a set actor with morph tracks, and lying cloth change.
 crowd_new.exe only.
 Open: the sun's shadow map is 28 units across at 2048 -- a fold's shadow on a gown is a staircase in a close-up
-(`shadowext=` smaller for the shot); Freddy's inner upper arm sinks 1 cm into the pan's floor under the milk, where
-nobody sees it; the doctors still have no move. The huddle is finished as it stands (the least science-fiction element
-here, and worth little more time). The lying hand-vs-triangle pass
-moves the boys' skirts where their held hands lie under the milk (0.9% of a mid lens: a sliver of thigh above the
-milk at Billy's hem) -- left as it is, with the kids done.
+(`shadowext=` smaller for the shot); one child's inner upper arm sinks 1 cm into the pan's floor under the milk, where
+nobody sees it; the set's other bodies still have no move. The huddle is finished as it stands. The lying hand-vs-triangle pass
+moves the children's shifts where their held hands lie under the milk (0.9% of a mid lens: a sliver of thigh above the
+milk at one hem) -- left as it is.
 
 ### 40 · The cast talks: toon mouths, three faces in one scene, and a clipless body in a scene -- DONE (10-19)
-First the mouths, and a rough cut of scene 2.1 on temporary voices (Piper's, the ones picked).
-The rough cut is `scenes/wateot_2_1.txt` on `sets/_scene21.set` -- all 34 slots of the adaptation's scene 2.1 word for
-word, Viktor (hero), Wanda (slot 1), Amelia (slot 2) and the narrator (the voice slot), 208.5 s. What it needed:
+First the mouths, and a rough cut of a scene on temporary voices (Piper's, the ones picked):
+34 lines, three speakers (the hero, slot 1 and slot 2) and a narrator (the voice slot), 208.5 s. What it needed:
 - MOUTHS (`skate_src/people/mouths.py`, Blender): the scene opens a speaker's mouth through the morph NAMED `jaw` (a
   body with a jaw bone takes the bone). A toon face draws its mouth as one ink line a hair off the skin, so `jaw` opens
   that line into a dark lens -- its lower edge drops by the opening (deepest mid-mouth, nothing at the corners, the
   widest 0.085 head heights for a 17-degree mouth), its upper edge lifts a fifth; the lower lip's shadow stroke and
-  Wanda's filled lips ride with it. Found by OFFSET and face coordinates, as the lids are. It also adds `blink` (both
-  lids under the scene's own blink clock's name). Bench: `sets/_wateot_faces.set` (the five faces in a row) with
+  a face's filled lips ride with it. Found by OFFSET and face coordinates, as the lids are. It also adds `blink` (both
+  lids under the scene's own blink clock's name). Bench: a set of the five faces in a row, with
   `REVA_MORPHFORCE=jaw=1` / `blink=1` against `jaw=0`.
 - EVERY BODY IN A SCENE HAS ITS OWN FACE: one morph-weight array had served every slot after the hero, read through
   each slot's own morph table, so a third speaker's jaw went to whichever slot the draw loop touched last and slots 2-3
   never blinked. `g_castMorphW[SCN_MAXCAST][MORPH_MAX]` (g_partMorphW is the current slot's row); the speaker's OWN slot
   opens; every body blinks on its own clock.
 - ⛔ A PACK WITH NO CLIPS OF ITS OWN CRASHED THE SCENE. labDrawPartner sampled its own clip 0 as a placeholder under a
-  borrowed clip -- and Wanda and Amelia own no clip at all: clips[0] of an empty table, a segfault the first time either
+  borrowed clip -- and two of the speakers own no clip at all: clips[0] of an empty table, a segfault the first time either
   stood in a scene (gdb on a -O1 -g build named the line). An empty clip stands in.
 - `z_rm_sleep` (a 3.6 s breathing loop whose frame 0 is the wake's) and the wake in TWO HALVES (`z_rm_wake_up`,
-  `z_rm_wake_rub`, cut at 4.5 s), so a line can hold him asleep under the narration and put the rub on the line that
-  says it instead of on "Mom?" (bake.py; the 9 s `z_rm_wake` stays for the set bench).
+  `z_rm_wake_rub`, cut at 4.5 s), so a line can hold the body asleep under the narration and put the rub on the line that
+  says it instead of on another (bake.py; the 9 s `z_rm_wake` stays for the set bench).
 - TEMPORARY VOICES, Piper (`say_piper.py`): a multi-speaker model's ONE voice is `speaker=` in PEOPLE. The only installed
   model with men in it is LibriTTS (904 speakers); the four were picked by measured pitch and pace off one line said by
   113 of them (men 99-152 Hz, women 170-255).
 ⛔ THE SHOT LADDER FRAMES A PAIR FACING EACH OTHER. Three people in a cluster by a dispenser got one identical frame for
 fifteen lines, the backs of two heads in it; every lens of the conversation is placed (`cam=`) -- over-the-shoulder pairs
-for Viktor/Amelia, then Viktor/Wanda once he turns to her.
+for the hero and one speaker, then the hero and the other once he turns to her.
 ⛔ A REVIEW SHEET'S CAPTION ON THE FRAME HID THE FACES: a 50 px bar over a 288 px tile covers a close-up's eyes, and the
 first sheet read as a face cut off. Captions go above the frame.
-Scope: the committed engine (f0d6f59) and this build recorded the same 6 s of a TWO-person scene (`porch`, reva and
-kaeli on parsons) twice each: 0.000% of pixels differ run to run and build to build -- a two-hander's faces are slots
+Scope: the committed engine (f0d6f59) and this build recorded the same 6 s of a TWO-person scene (reva and
+the co-star on the town set) twice each: 0.000% of pixels differ run to run and build to build -- a two-hander's faces are slots
 0 and 1 exactly as before. crowd_new.exe only.
 
 ### 41 · Deep space: a star sky, a ship at her true size, a glowing volume, and a scene that cuts to another set -- DONE (10-22)
-On the New Mayflower: where the book is exact, the build is exact to it, and the show's style fills in what it doesn't
-specify. The ship is built by code (`skate_src/ship/build_mayflower.py`, every book fact in its docstring with
-its page) and stands in `sets/space_mayflower.set` 2000 u out along +z (nothing parked at the lab's origin reaches a lens
+A spaceship at its true size. The ship is built by code
+and stands in `sets/<ship>.set` 2000 u out along +z (nothing parked at the lab's origin reaches a lens
 framed on her). What the engine had to learn:
 - SPACE. A set that says `space` draws a BLACK sky with its stars at infinity (`spaceSkyDraw`): procedural, on the cube's six
-  faces (no pole pinch), most faint, "hues from firebox red to sapphire and white" (p23); `milkyway nx ny nz strength` is a
+  faces (no pole pinch), most faint, in hues from red to blue and white; `milkyway nx ny nz strength` is a
   pale haze with a dense field of fainter stars along the great circle round that pole; `star dx dy dz r g b size_deg [halo]`
-  is one of up to 8 NAMED stars, a core and a glow (the flare star, blue-white, 30 degrees off her course; the yellower
-  destination "right under that bright one", p24). ⛔ NOT the day sky with its colours turned down: that sky has a CLOUD
+  is one of up to 8 NAMED stars, a core and a glow (a blue-white flare star, and a yellower
+  one beside it). ⛔ NOT the day sky with its colours turned down: that sky has a CLOUD
   DECK, and the first blockout floated in grey clouds.
 - REACH. `far <u>`: a ship at her true size outruns a placed lens's 900 u (the scene's 140), so a set may push every far
   plane out (`fmaxf(..., g_setFar)`); `sun elev azim I [r g b]` and `sky r g b` in a set are its OWN light, applied as it
   loads -- the ctl line's own `sun=`/`sky=` still win (re-applied after the load).
-- BEAMS: `beam x y z dx dy dz length r0 r1 r g b k [fade [thin]]` (u), up to 8 -- a glowing VOLUME along a line: the drive's
-  ion haze that "fuzzed everything. Including the star they were heading for" (p24), a light shaft, a projector's throw. A
+- BEAMS: `beam x y z dx dy dz length r0 r1 r g b k [fade [thin]]` (u), up to 8 -- a glowing VOLUME along a line: a drive's
+  ion haze, a light shaft, a projector's throw. A
   gaussian tube whose radius runs r0 -> r1, thinned as it spreads ((r0/r)^thin; 2 = the same flux through a wider tube) and
   faded along its length ((1-s/L)^fade); drawn ADDITIVE after every opaque thing (it lights what is behind it, never darkens
   it). Each pixel INTEGRATES the density along its own ray, so it reads as a volume from any side -- and a lens looking DOWN
-  the plume sees it gather into its vanishing point, which is the book's shot. The bound is a box drawn by its back faces,
+  the plume sees it gather into its vanishing point, which is the shot that was wanted. The bound is a box drawn by its back faces,
   so a lens inside the plume still sees it. ⛔ 40 EVEN STEPS across a bound sized for the plume's far end came back as a
   string of beads at the nozzle (3.5 u across, a step of 70): each step is now 0.4 of the plume's radius where it is, and a
   sphere-traced stride outside it. ⛔ A solid thing INSIDE the box hides all of the beam along its rays, the part in front
   of it too (no OES_depth_texture here to stop the march at the surface).
-- A LINE ON ANOTHER SET. `set=<name>` on a scene line plays THAT line on another set -- a cutaway, the ship outside the sick
-  bay -- and the next line without one is HOME again: the set the scene was staged on, its light put back exactly as the
+- A LINE ON ANOTHER SET. `set=<name>` on a scene line plays THAT line on another set -- a cutaway, the ship outside a
+  room -- and the next line without one is HOME again: the set the scene was staged on, its light put back exactly as the
   scene left it (a cutaway set brings its own). Not sticky (compile_scene.py checks the set exists). The cast keeps its
   places while it is away -- a set with no marks says nothing and moves nobody -- and its marks resolve again on the way
   home; the home set's actors and props reload (packs are cached: "from 16 packs" the second time).
 - AN ORBIT ROUND A POINT. `camat=x,y,z` makes a line's `camorbit=` circle that WORLD point instead of a body -- a ship has no
   spot to follow; the aim is the point itself unless the orbit says aimh. It rides with the orbit in the compiler (carried
   while the orbit is, dropped with it).
-Scene 2.1's rough cut uses all of it: the narration's ship is the New Mayflower outside (2.1-10's middle sentence, 2.1-33's
-crane onto the screen's lens, 2.1-34's tilt up to the flare star). Bench: `scenes/_mf_orbit.txt` (14 s round her).
+The rough cut uses all of it: cutaways to the ship outside, a crane onto a screen's lens, a tilt
+up to the flare star. Bench: a 14 s orbit round her.
 ⛔ The sail's two faces (silver toward the light, gold behind) 4 cm apart FOUGHT in the depth buffer past ~300 m -- gold
 speckled through the silver; 25 cm each side holds at any distance she is shot from.
-Scope: the committed engine (ecedda6) and this build recorded the same 6 s of a scene that uses none of it (`porch` on
-parsons): frames 3-143 bit-identical; frames 0-2 differ by at most 0.013% of pixels -- and this build differs from
+Scope: the committed engine (ecedda6) and this build recorded the same 6 s of a scene that uses none of it (a two-person
+scene on the town set): frames 3-143 bit-identical; frames 0-2 differ by at most 0.013% of pixels -- and this build differs from
 ITSELF at exactly those three frames on a second take (start-up noise, not the change). crowd_new.exe only.
 
-### 42 · Wan-To's star: a star you can cut open, and a set that is only space -- DONE (10-22)
-Chapter 1 (scenes 1.1-1.3) may be the most important in the book, since it sets the scene. It is the
-narrator alone over the inside of a star, and Wan-To has no body, so the whole cost was the star. Set lines (u):
+### 42 · A star you can cut open, and a set that is only space -- DONE (10-22)
+A narrator alone over the inside of a star, with no body in the scene, so the whole cost was the star. Set lines (u):
 `starbody x y z radius [tempK] [cutdeg] [cutaz] [seed]`, `starspot lat lon size_deg` (16), `starloop lat1 lon1 lat2 lon2
-height [thick]` (24), `starweb nodes [seed] [xray]` (`starDraw`, drawn in the lab frame after the opaque). Every fact the
-book gives is built: a medium-sized G-3 star just under a million miles across, 6,000-7,000 K and "just a touch variable"
+height [thick]` (24), `starweb nodes [seed] [xray]` (`starDraw`, drawn in the lab frame after the opaque). Every fact asked
+for is built: a medium-sized G-3 star just under a million miles across, 6,000-7,000 K and a touch variable
 (a slow breath in its light), its core at fifteen million degrees, RADIATION for the first four-fifths of a photon's way out
-(the radiative zone's specks jump cell to cell -- "a ball in a pinball machine") and CONVECTION in the outer fifth (rolling
+(the radiative zone's specks jump cell to cell) and CONVECTION in the outer fifth (rolling
 cells, hot gas rising and cooled gas falling back), its poles turning slower than its equator, magnetic field lines that
-twist (three strands wound round every loop) and loop above the surface over sunspots, a sunspot only "a couple of thousand
-Kelvin" cooler, the corona "thrillingly diffuse" and the spicules at the limb (p2-p7, p47-p49). Wan-To is "the network of
-neutrinos that served him for neurons" (p6): pieces of him through the star, cyan, a pulse running down every thread, drawn
+twist (three strands wound round every loop) and loop above the surface over sunspots, a sunspot only a couple of thousand
+Kelvin cooler, a diffuse corona and the spicules at the limb. A web of neutrinos runs through the star (`starweb`):
+cyan, a pulse running down every thread, drawn
 THROUGH the star (xray) because neutrinos pass through everything. OUR fill: the core's size (a quarter of the radius), the
-warm grade on the true temperatures, the granules' scale, the loops' pink, his cyan. The surface: two scales of cellular
+warm grade on the true temperatures, the granules' scale, the loops' pink, the web's cyan. The surface: two scales of cellular
 noise whose feature points wander (the cells boil), black-body colour from the temperature, limb darkening; the cutaway
 (cutdeg) discards a wedge pole to pole and draws its two faces as the layers, with ink between them (the diagram's lines).
-Sets `wanto_star` (closed), `wanto_him` (+ his web), `wanto_cut` (open, + web); the inserts `wanto_martini` (1.1-08: "a very
-dry Martini indeed") and `wanto_tv` (1.2-04: "a wall of sets, each tuned to a different channel") by
-`skate_src/wanto/build_inserts.py`; the rough cut `scenes/wateot_1.txt` (all 21 slots, 629 s).
+Three sets (the star closed, with its web, and cut open with its web); two inserts built by code (a glass, and a wall of
+screens); the rough cut (all 21 slots, 629 s).
 - ⛔ A SET THAT IS ONLY SPACE WAS NO SET: drawSet (and its sky) ran only for a set with props, so the star hung in the lab's
   grey with the lab's HUD and stage lights over it. `g_setSpace` now counts as a world everywhere the lab asks "is a set up".
 - ⛔ sh() DIES on a compile error: the star's passes compile through their own path that logs and draws nothing instead.
 - ⛔ 0.006 rad/s carried a sunspot a third of the way round in the minutes of one take; a star turns in weeks (0.0006).
-- SHEER SET PROPS: a marker node `AlphaNN` draws a prop NN% opaque, blended, not depth-writing (the martini's glass and its
-  gin) -- props were opaque only; the blend existed for a body's meshes. List a sheer prop AFTER what it should show.
+- SHEER SET PROPS: a marker node `AlphaNN` draws a prop NN% opaque, blended, not depth-writing (a glass and what's
+  in it) -- props were opaque only; the blend existed for a body's meshes. List a sheer prop AFTER what it should show.
 
 ### 43 · A body carried round a drum, and a scene's room that changes -- DONE (10-22)
-Scene 2.2 is the treadmill drum: "the huge rotating barrel that was the ship's treadmill, spun at nine revolutions a minute"
-(p11), a mile "a little more than twenty-five times around" it (p17) -- a running floor 64 m round, radius 10.18 m (and at
-nine turns a minute, 0.92 g: "enough of normal Earth gravity"); "Wanda was hanging at the hub of the wheel, talking to him as
-he ran". `skate_src/ship/build_drum.py` builds it (unlit: in a drum every surface is a floor facing the hub, so a room's
+A ship's treadmill drum: a rotating barrel spun at nine revolutions a minute,
+a running floor 64 m round, radius 10.18 m (and at
+nine turns a minute, 0.92 g), with a second body at its hub talking to the runner.
+It is built by code (unlit: in a drum every surface is a floor facing the hub, so a room's
 light from world-up would shadow its whole top half). What the engine had to learn:
 - THE ROLL: `hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0]` turns a body's whole placement -- after its mark,
   walk, lean and half-pipe -- about an axis at a rate (sticky; `off` hands it back; a new spec starts it on the cut, the same
-  one carried on keeps it running). Viktor runs in place on the drum floor's mark and the roll carries him round its axis,
+  one carried on keeps it running). The runner runs in place on the drum floor's mark and the roll carries him round its axis,
   head always to the hub; the lens rides in the DRUM'S frame (the drum holds still) and sees him go up the wall and over the
   top. His spot for the tracking lenses (locoWhere) is rolled with him, so a `campan` follows him round.
-- `home=<set>` (sticky): the scene's home set changes from that line on, its light the old home's. 2.1 starts drained with
-  no boys in any pan and changes home to `_scene21b` at 2.1-12 -- the boys and the milk in HIS pan, "the warming pan he had
-  awakened in. Two little kids ... were in it now" (p30). Shared marks: `_scene21_marks.set`.
-- `houtfit= poutfit= p2outfit= p3outfit=` (sticky): a body dressed on the cut, from its own pack's outfits -- Viktor into his
-  tunic and shorts at 2.1-14 (with the sick bay's own glass in his hand, `hprop=sb_glass@0.34@0@hand`), and runs the
-  wheel in them -- an outfit the pack already had, one key.
-Scope (sections 41-43 together): the committed engine (ecedda6) and this build recorded the same 6 s of `porch` on parsons:
+- `home=<set>` (sticky): the scene's home set changes from that line on, its light the old home's. A scene can start in an
+  empty room and change home part-way to a copy of the room with bodies and milk in a pan. The two share their marks from one set file.
+- `houtfit= poutfit= p2outfit= p3outfit=` (sticky): a body dressed on the cut, from its own pack's outfits -- a body into a
+  tunic and shorts part-way through (with a glass in his hand, `hprop=<glass>@0.34@0@hand`), and runs the
+  drum in them -- an outfit the pack already had, one key.
+Scope (sections 41-43 together): the committed engine (ecedda6) and this build recorded the same 6 s of a two-person scene on the town set:
 frames 3-143 bit-identical, frames 0-2 the known start-up noise. crowd_new.exe only.
 
 ### 44 · MIRRORS -- DONE (10-22)
-"Half the walls on the ship were mirrored to make the rooms seem more spacious" (p18-19), and scene 2.9 turns on one:
-Marie-Claude "catching a glimpse of herself in the wall mirror". The engine had no mirror of any kind.
+A ship's rooms with mirrored walls, and a scene that needs a body seen in one.
+The engine had no mirror of any kind.
 - A set line `mirror x y z yaw w h` (u; yaw the way the glass FACES, into the room; 4 at most). The room is built with an
-  OPENING there (skate_src/ship/build_rooms.py: a frame, a sheer glass `Alpha18`, and behind it a silvered backing marked
+  OPENING there (the room builder: a frame, a sheer glass `Alpha18`, and behind it a silvered backing marked
   `MirrorOnly`), and every body and prop in front of the glass is drawn a SECOND time through the glass's plane, right
   after its own draw, from the pose already solved (`mirInst`: the model matrix read back from the program, reflected,
   the winding flipped so the ink hull stays outside). The old game-engine mirror: the reflected room stands behind the
@@ -950,7 +944,7 @@ Marie-Claude "catching a glimpse of herself in the wall mirror". The engine had 
 - One bounce: a mirror seen in a mirror shows its silvered backing (drawn only in reflections), never an opening onto
   nothing. A set's room must be CLOSED: whatever stands behind a mirror wall shows through it.
 - Hooked at four draws: drawProp (props, culling back faces so the mirror wall's own reflection, coplanar with it and facing
-  away, drops out), actorDraw, labDrawPartner and the hero; not the club crowd, the floor or the lab's multi-cam wall.
+  away, drops out), actorDraw, labDrawPartner and the hero; not the dance floor's crowd, the floor or the lab's multi-cam wall.
   `REVA_NOMIRROR=1` is the control; `REVA_MIRDBG=1` prints the first 40 instances (program, model, distance in front).
 - ⛔ AND A ROOM BUILT BY CODE IS NOT FURNITURE. The contact pass (limbs pushed out of bodies, furniture and the floor)
   decides "solid" by a prop's NAME, and `rm_cabin_shell` -- floor, walls and ceiling as one prop -- is no name it knows to
@@ -961,60 +955,58 @@ Marie-Claude "catching a glimpse of herself in the wall mirror". The engine had 
 
 ### 45 · THE TICK, THE RECEIPT, THE DICE, THE TAPE: twelve commits merged (10-22)
 Twelve commits on two branches (09-30 .. 10-05) were merged in: the TICK (the sim moves by whole ticks, REVA_TICK), the RECEIPT
-(REVA_SIMHASH), the DICE (rand() is the club's own LCG; REVA_RAND=libc for the library's), the LADDER (REVA_TIER), the
+(REVA_SIMHASH), the DICE (rand() is the engine's own LCG; REVA_RAND=libc for the library's), the LADDER (REVA_TIER), the
 TAPE (REVA_RECORD / REVA_REPLAY), the HUD on a 1280-wide canvas, the SPLIT (club_math.c, club_audio.c, club_save.c behind
 club.h), the Linux and Pi 4 builds, .dae/.brres import and T-posing any body (skate_src/tpose.py, design/tpose_import.md),
-and ep 16's gestures and walk for code-built bodies (author/moves/z_gest.py, z_walk.py). Merged 3-way, file by file, with
+and gestures and a walk for code-built bodies (author/moves/z_gest.py, z_walk.py). Merged 3-way, file by file, with
 the 09-27 cut as the base: 4 conflicts in 48 files (the engine's one: door 11 reached into the mixer, which
 the split had moved behind club.h -- it now asks the mixer through four calls, sfxBankPCM / sfxVoiceGain / sfxSetMaster /
-sfxReady). Scope: under REVA_RAND=libc the merged build recorded porch, 2.1, 2.2 and chapter 1 identical to the build
+sfxReady). Scope: under REVA_RAND=libc the merged build recorded four scenes identical to the build
 before it from frame 1 on (frame 0 is the known start-up noise). The merged gestures and walk start from the body's REST;
-our people rest in an A-pose, so both take `--hang DEG` (arms hanging, elbows soft) -- Bu's first walk held them out.
+our people rest in an A-pose, so both take `--hang DEG` (arms hanging, elbows soft) -- the first walk held them out.
 
 ### 46 · The particle rack: a star pulled out of shape -- BUILT, verify on pixels (10-22)
 
-Chapter 3 (3.3-13): "If you flooded a target star with the right particles you could pull it right out of shape ... When
-stretched on the particle rack, the core bubbled and fountained like a geyser." A `starbody` line may end
+A star pulled out of shape by a flood of particles, its core bubbling. A `starbody` line may end
 `stretch k rise [delay]`: from `delay` s after the set loads the star is drawn out along x to k times its radius over
 `rise` s (smoothstep), thinned the other two ways by 1/sqrt so it keeps its volume, and it HEAVES as it goes (two slow
 sines on the long axis, one on y) -- the bubbling. The vertex shader scales the unit sphere by `uS` before the radius,
-and the surface keeps its own coordinates, so its granules and spots stretch with it. `sets/ch3_zap.set` racks a star
+and the surface keeps its own coordinates, so its granules and spots stretch with it. A bench set racks a star
 x2.6 over 9 s from +1.5 s between two particle beams.
 
-A note on the same night: **a child's gait.** The boys' walk was refused at boot ("REJECT walk clip 'w_walk' on billy:
+A note on the same night: **a child's gait.** Two children's walk was refused at boot ("REJECT walk clip 'w_walk' on <pack>:
 not an upright gait") and they glided to every mark. `clipUpright` asks the hips to stand 30% of `effH` above the lowest
 foot, and `effH` is a 3.15-unit FLOOR -- an adult crowd body's height. A TrueScale pack now keeps its true height
 (`trueH`) and the test is a share of THAT: a five-year-old is 1.61-1.84 units tall with his hips ~0.9 over his toe.
 
 And **a sitter is not standing.** The contact pass slides a STANDING body whose legs are inside furniture along the floor
 to the nearest free side (a woman standing inside a bench), and "standing" was both feet near the floor -- which a
-SEATED body has too, with its thighs on the seat. Chapter 2's logs said `standing body out of obstacle by 0.17-0.67 u`
-in 19 scenes of 27: every sitter was shoved off his chair, and 2.12's singles of Viktor framed the empty end of the
+SEATED body has too, with its thighs on the seat. A chapter's logs said `standing body out of obstacle by 0.17-0.67 u`
+in 19 scenes of 27: every sitter was shoved off his chair, and one scene's singles framed the empty end of the
 table. Standing now also asks the thigh's top to stand above its knee by half a thigh; a sitter's limbs still come out of
-the seat one by one. Proof: Viktor at 2.12's table with the pass on lands where `REVA_NOCONTACT=1` puts him.
+the seat one by one. Proof: a sitter at that table with the pass on lands where `REVA_NOCONTACT=1` puts him.
 
 And **a walk that cannot get there is placed, loudly.** When the router finds no way round the furniture (`the furniture
 closes every way to the mark -- walking straight`) or the start is off its grid (a body outside a room's shut doors), the
 walk goes straight -- and colResolve, which collides against the set's real triangles, held the walker against the first
-thing in the way for the rest of the scene: Viktor sat on the floor at the corner of the breakfast table for all of 2.12,
-Wanda stood 0.26 m outside the freezatorium's shut thermal doors and was never seen calling him (2.24), and walks in 2.3
-and 2.14 never arrived. A walker that moves less than a third of its step for 0.6 s of walking is STUCK: it is placed on
+thing in the way for the rest of the scene: one body sat on the floor at the corner of a table for a whole scene,
+another stood 0.26 m outside a room's shut doors and was never seen, and walks in two more scenes
+never arrived. A walker that moves less than a third of its step for 0.6 s of walking is STUCK: it is placed on
 its mark, facing the mark's way, and the log says `[walk] slot N STUCK x.xxu short of '<mark>' ... PLACED on the mark`.
 The scene generator places the walks it knows cannot be walked (through a shut door, round a crowded cabin) with
 `snap=1` on the cut instead.
 
-And **an extra wears what its line says** (10-23). The refectory's seated extras were to be fixed because
-I had reported them standing; profile shots at eye level in 2.29's room showed all seven sitting on their stools,
+And **an extra wears what its line says** (10-23). A room's seated extras were to be fixed because
+I had reported them standing; profile shots at eye level in that room showed all seven sitting on their stools,
 thighs level and shins down -- I had misread two high, cramped frames. What those shots DID show: an `actor` line had
-no outfit, so every extra wore its pack's first one -- Werner and Marie-Claude barefoot in freezer shifts at the
-farewell dinner, Amelia in her robe, Billy in his shift beside Freddy in day clothes. `outfit=<name>` on an actor line
+no outfit, so every extra wore its pack's first one, whatever the scene had them in. `outfit=<name>` on an actor line
 (design/the_set.md) is now what that actor wears: the token is taken out before the positional read (an 11th token is
 the board's name), each actor keeps its own worn-pieces mask, and the mask goes on the pack as the actor is drawn.
-Proof: 2.29's table before/after with the same lens; `[set] actor N (<pack>) wears '<outfit>'` in the log.
+Proof: the table before/after with the same lens; `[set] actor N (<pack>) wears '<outfit>'` in the log.
 
 ### 47 · THE FILM PASS: captions that read, the take's look, glossy floors -- BUILT (10-23)
 
-After chapters 1-3's rough cuts: better voices, more readable captions, a little music and atmosphere, a general
+After the space series' first rough cuts: better voices, more readable captions, a little music and atmosphere, a general
 shader and reflections pass, and overall more refinement, a better look and better pacing. The sound and the pacing are the scene tools' (scene_direction.md "THE FILM MIX");
 the engine's part:
 
@@ -1028,7 +1020,7 @@ shortest. What it shows is the line's PAGE for that moment: compile_scene.py cut
 (~84 characters) at sentence ends and then the strongest stop, timed off the voice's own sentence timings, and writes
 them as `cap t0 t1 text` records under the line. A line without pages (an old .scn) is wrapped whole. The off-screen
 voice (slot 4) is italic with no name; an on-screen speaker's name sits over the box's corner in the slot's colour.
-UTF-8: Latin-1 and the book's punctuation (dashes, curly quotes, the ellipsis) are in the atlas. The scene's limits grew
+UTF-8: Latin-1 and a book's punctuation (dashes, curly quotes, the ellipsis) are in the atlas. The scene's limits grew
 with it: `SCN_MAXL` 64 -> 256 lines (a narration is said as its sentences), `SCN_MAXE` 512 -> 2048 envelope frames (68 s),
 a line's text 192 -> 1536, the .scn reader's record 8192 -> 32768. `REVA_OLDCAPS=1` is the control.
 
@@ -1052,8 +1044,8 @@ frame only): its own colour plus the reflection under it times a Fresnel term --
 room's reflection under every floor pixel; one bounce (the floor seen in a wall mirror is drawn opaque, no ink on the
 floor's own pass). The ship's rooms and the sick bay carry `gloss 0 0.16 0.50 5.0` (setkit.walls(floor=), build_rooms,
 build_sickbay). `REVA_NOGLOSS=1` is the control; a set with no `gloss` line, or no `Floor` pack, is drawn as it always was.
-Proof: the cabin at F0 0.6 (a wet mirror: the bunks, Viktor's legs and the stools reflected in the right geometry), then at
-the show's 0.16 beside the control with the same lens; the caption, SSAA and rim A/B on 2.3's first shot
+Proof: the cabin at F0 0.6 (a wet mirror: the bunks, a body's legs and the stools reflected in the right geometry), then at
+the show's 0.16 beside the control with the same lens; the caption, SSAA and rim A/B on a scene's first shot
 (REVA_OLDCAPS=1 REVA_NOGLOSS=1 REVA_TOONRIM=0, no SSAA, no post).
 
 **ROUND 2** (the first sample could be better). Looked at a frame a line, the take's faults were in the
@@ -1066,16 +1058,16 @@ light and the lenses, not in the pass:
   the floor and lift 3% at the ceiling -- a wall is no longer one flat value from floor to ceiling.
 - The speaker's name sits OVER the caption box (0.66 of the caption's size), not on its edge.
 The lens half is the blocker's (scene_direction.md "THE LENS IS TESTED FOR WHAT ELSE IS IN IT"). Proof: V1|V2 sheets of
-2.3 and 2.4 -- the same moment of each chosen line in the sent take and the new one.
+two scenes -- the same moment of each chosen line in the sent take and the new one.
 
 ### 48 · THE PERFORMANCE LAYER: heads that find who is talking, speakers who move with their words -- BUILT (10-23)
 
 After the film pass's second sample: not yet, keep refining the sample first. No note on what -- so the take was
-MEASURED (`anim_bench/stillcheck.py`: per shot, how much of the picture changes): 68% of 2.4's frames and 43% of 2.3's
+MEASURED (`anim_bench/stillcheck.py`: per shot, how much of the picture changes): 68% of one scene's frames and 43% of another's
 did not change at all. In a single only the mouth moved. The head layer under it (scnHeadLayer, built when the first
 film's heads did not move) drifted 3 degrees over 20 s -- under a pixel a frame -- and its look-at had never run for this
 show: `lookTarget` wants FACE MARKS, which no code-built person carries (person.py makes none), and it knew two bodies,
-so every partner that could look aimed at the HERO -- in 2.4 a boy lurking unseen at the door. And it decided who was
+so every partner that could look aimed at the HERO -- in one scene a body standing unseen at the door. And it decided who was
 speaking with `who`, which is 1 for every partner: slot 3's jaw opened on slot 1's words.
 
 `perfLayer`, per scene SLOT, on top of the clip:
@@ -1084,13 +1076,13 @@ speaking with `who`, which is 1 for every partner: slot 3's jaw opened on slot 1
   nearest body -- and under-turns to 0.72, the eyes finishing it (eyeAim / eyeMorphAim, on a rig that has eyes).
   `hlook=0`/`plook=0` still refuse. Head to head: the eye marks where a body has them, the HEAD BONE where it does not.
 - THE LOOK IS ABSOLUTE. An offset on the clip's head is not a look: the sitting clips hold the head down at the console,
-  and "look at Marie" came out as a look at Marie's lap. Where the CLIP's head faces -- its rotations carried root to
+  and a look at a seated neighbour came out as a look at her lap. Where the CLIP's head faces -- its rotations carried root to
   head (perfHeadFwd), low-passed over 1.2 s so the clip's own nods still play -- is corrected to the target, at most 40
   degrees of turn and 20 of pitch (two people side by side at consoles turn 40 and let the eyes do the rest).
 - ON AN OFF-SCREEN VOICE'S LINE, OR AN ACTION'S, A BODY LOOKS ABOUT: a new place every 3-5 s by slot, a third of the
   time back to what it was doing. A turn is a critically damped SPRING (~0.45 s) on the scene clock, never a snap.
 - THE SPEAKER MOVES WITH ITS WORDS: a nod on each strong stress -- the rise of its own voice's envelope over 0.1 s,
-  convolved with a 0.4-s half sine, past 1.7 (the 80th percentile of 2.4's; the median is 1.0: every syllable rises,
+  convolved with a 0.4-s half sine, past 1.7 (the 80th percentile of one scene's; the median is 1.0: every syllable rises,
   only the stresses rise that far), ~4 degrees -- and a turn and a small tilt that drift with its voice and settle in
   its pauses; the chest turns a fifth of the head's drift with it.
 - A LISTENER NODS as the speaker finishes a line (half the lines, chosen by slot and line).
@@ -1103,11 +1095,11 @@ no rand(), so [simhash] holds, and a held stop-motion exposure replays the latch
 the clip's head direction, the correction asked and where the head is.
 ⛔ `g_scnNCast` ("how many bodies the scene has") was declared 2 and never set: the blink loop stopped at slot 1, so the
 third and fourth people of every scene never blinked. Slots are now in the scene when they have a body.
-Proof: 2.4 went from 68% still to 9% (`stillcheck.py`), 2.3 43% -> 18%, chapter 3's opening 47% -> 41% (the measure undercounts a sparse star field: a flare every few seconds and a slow zoom are on its frames); frames of every
+Proof: one scene went from 68% still to 9% (`stillcheck.py`), another 43% -> 18%, a star field's opening 47% -> 41% (the measure undercounts a sparse star field: a flare every few seconds and a slow zoom are on its frames); frames of every
 line beside the second sample's.
 
 **Round 4 (the same note again).** Two additions. CHEAT TO THE LENS: a body looking about at nothing in particular looks
 to the CAMERA's side of the room (its random turn takes the camera's side, and a quarter of the way toward it), as an
 actor cheats out -- not into the lens -- unless the lens is behind it: a look about turned away from a close lens gave a
-close-up of the back of Viktor's head at his mirror. And the WALK LOG IS TIMED: a walk's start, its arrival and a STUCK
-placing print the scene time (`[walk] t <s> slot <n> -> mark ...`), which is what scenes/foley.py times footsteps off.
+close-up of the back of a body's head at a mirror. And the WALK LOG IS TIMED: a walk's start, its arrival and a STUCK
+placing print the scene time (`[walk] t <s> slot <n> -> mark ...`), which is what the scene tools time footsteps off.

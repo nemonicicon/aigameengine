@@ -8,7 +8,7 @@ hundred wall, roof, door and window modules to make the rest out of. So a street
 generated, not placed by hand -- which is also what makes it a level format rather than
 one drawing.
 
-THE GRID, measured off the exported GLBs at club scale (1.75 units per metre):
+THE GRID, measured off the exported GLBs at the engine's scale (1.75 units per metre):
 
     ground tiles   28 x 28,  origin at a corner: x 0..28,  z -28..0
     sidewalk        7 x 7,   origin at a corner: x 0..7,   z 0..7
@@ -17,7 +17,7 @@ THE GRID, measured off the exported GLBs at club scale (1.75 units per metre):
     fence           7.3 long, 2.9 tall
     mailbox 2.5 tall · utility pole 14 · tree_02 21.8
 
-Yaw follows the club's convention (forward is +z), so a wall placed at yaw=90 runs along
+Yaw follows the engine's convention (forward is +z), so a wall placed at yaw=90 runs along
 -X from its origin instead of -Z. That one fact is most of the house builder.
 
 The street runs along +X. The road is one tile row centred on z=0; sidewalks, lawns and
@@ -231,7 +231,7 @@ def main():
                 # legend) and did NOT fix the sedan or the SUV, whose layout must want a
                 # sheet the export never found. Until it is, a driveway gets a van or a
                 # pickup; a car wearing a picture of a colour chart was parked beside the
-                # porch in every act III close-up.
+                # porch in every close-up of one scene.
                 v = rng.choice(["veh_pickup_01", "veh_van_01"])
                 # ⛔ THE DRIVEWAY IS BETWEEN THE SIDEWALK AND THE HOUSE, NOT INSIDE IT.
                 # `yz + 5*side` is z = -26 on the near side, which is EXACTLY the front

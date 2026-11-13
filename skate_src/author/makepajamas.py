@@ -3,11 +3,11 @@
 
     python skate_src/author/makepajamas.py
 
-Pyjamas for kaeli, who had too little on to be standing
-out on the street at 7am.
+Pyjamas for the co-star, who had too little on for the
+scene she stood in.
 
 ⛔ AND autoweights.py COULD NOT DO IT. The house binder is the right tool and it takes a
-GLB -- Kaeli exists only as an rpack, and there is no rpack -> GLB path. So the garment is
+GLB -- the co-star exists only as an rpack, and there is no rpack -> GLB path. So the garment is
 built and skinned here, directly against the pack's own rest skeleton, which the file
 already carries.
 
@@ -21,7 +21,7 @@ garment vertex takes the two nearest bone SEGMENTS by distance, inverse-squared.
 garment does not need four influences and does not need the gate, because unlike a hand
 near a hip it is never near a bone it is not on top of.
 
-⛔ IT WRITES A NEW PACK. v1_kaeli_pj.rpack -- kmoves is 39MB and is the body every other
+⛔ IT WRITES A NEW PACK. v1_<body>_pj.rpack -- kmoves is 39MB and is the body every other
 scene in the film uses; a bad append would take all of them down. The original is not
 touched.
 """
@@ -30,9 +30,9 @@ import io, math, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rpack import Rpack, HDR
 
-# ⭐ IT WAS NEVER KAELI-SPECIFIC. The generator measures whatever body it is handed -- that
+# ⭐ IT WAS NEVER SPECIFIC TO ONE BODY. The generator measures whatever body it is handed -- that
 # is the whole design -- and only the two filenames were nailed down. Everyone who has to be
-# dressed at four in the morning can be.
+# dressed can be.
 #     python skate_src/author/makepajamas.py [srcStem] [dstStem] [#rrggbb]
 SRC = "reva_native/packs/v1_%s.rpack" % (sys.argv[1] if len(sys.argv) > 1 else "kmoves")
 DST = "reva_native/packs/v1_%s.rpack" % (sys.argv[2] if len(sys.argv) > 2 else "kaeli_pj")
@@ -51,7 +51,7 @@ COL = sys.argv[3] if len(sys.argv) > 3 else "5A6E9E"
 # the same body on a clip where the elbow BENDS.
 # ⛔ "spine_03"/"spine02"/"chest" matched nothing here either -- this rig calls them
 # Spine1 and Spine2 -- so the whole chest was riding on `Spine`.
-# ⛔ AND A THIRD FAMILY, WHERE ONE TOKEN NAMES THE OPPOSITE BONE. Hina is VRoid-ish:
+# ⛔ AND A THIRD FAMILY, WHERE ONE TOKEN NAMES THE OPPOSITE BONE. A bought model is VRoid-ish:
 # Left_arm / Left_elbow / Left_leg / Left_knee, with a numeric suffix. Note what that means:
 # in the MIXAMO family `LeftLeg` is the LOWER leg and the upper is `LeftUpLeg`; in THIS family
 # `Left_leg` is the UPPER leg and the lower is `Left_knee`. Normalising the punctuation away
@@ -480,7 +480,7 @@ def main():
     t_lo = lhi - tspan * 0.055
     t_hi = thi - tspan * 0.07
     # ⛔ THE COMPASS. shell() places at cos(a)->X, sin(a)->Z, so angle 0 is +X -- and
-    # CLUB FORWARD IS +Z. Centring the "front" panel on angle 0 put it on her RIGHT SIDE,
+    # THE ENGINE'S FORWARD IS +Z. Centring the "front" panel on angle 0 put it on her RIGHT SIDE,
     # the "back" panel on her left, and both ARMHOLE GAPS on her chest and her spine. She
     # rendered bare-chested with blue at the flanks, and the piece dump insisted the shirt
     # was present and correctly centred -- it was; it was just rotated 90 degrees.
@@ -703,8 +703,8 @@ def main():
 
     total = len(buf)
     # ⛔ FIELD 14 IS THE MORPH TABLE (rpack.py calls it reserved). This wrote 0 there, so dressing
-    # any pack with a face -- kaeli's 92 shapes -- would have dropped every morph in silence. Kept.
-    # (found ep 14 while writing dresspack.py, which keeps it too)
+    # any pack with a face -- the co-star's 92 shapes -- would have dropped every morph in silence. Kept.
+    # (found while writing dresspack.py, which keeps it too)
     morphs = struct.unpack_from("<I", R.buf, 4 + 14 * 4)[0]
     hdr = b"RPK1" + HDR.pack(R.ver, R.nNodes, R.nMeshes + 1, R.nMats, R.nClips, R.nTex,
                              R.offNodes, offMeshes, R.offMats, R.offClips,

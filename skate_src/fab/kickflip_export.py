@@ -1,14 +1,14 @@
 """KICKFLIP (Fab: "Kickflip", Dude.fbx) -> GLB with his textures and fifteen clean clips.
 
-ROBOT NEKO ep 9. Kickflip is a character in the episode, and his animation isn't used
-for reva or kaeli. He plays his OWN bank and nobody else's.
+A bought model, and his animation isn't used
+for reva or the co-star. He plays his OWN bank and nobody else's.
 
 MEASURED FIRST (see README): the FBX carries 35 armature actions that collapse to 20 distinct
 motions; this keeps the 15 that are real body motion, under neutral names a scene script can carry
 (the compiler splits a line on its FIRST '|', so 'KLIENT.ARMATURE.001|Kickflip' cannot survive a
 script) that avoid every role-miner substring (walk/run/idle/stand).
 Every one of them is ON THE BOARD, and the board (Plane.001) is skinned to his skeleton -- there is
-no animation of him on the ground at all. That is the episode.
+no animation of him on the ground at all.
 
 The FBX resolves neither texture, so they are wired in here from OPAQUE copies: the engine discards
 texels with alpha under 0.4 (Luzer.UV.png had 20% of them, Skate.png 25%).

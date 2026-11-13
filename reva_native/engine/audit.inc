@@ -1,5 +1,5 @@
-/* ================= THE CLIPPING AUDIT (ROBOT NEKO ep 10) ============================
- * Nothing may clip through anything (ep 10). A `room` is never a
+/* ================= THE CLIPPING AUDIT ============================
+ * Nothing may clip through anything. A `room` is never a
  * collider on purpose (a scan is a place), so nothing stopped a body going through a ledge
  * or a pillar -- and nothing SAID so either. This makes it a number, per line and per body.
  *   REVA_CLIPAUDIT=1 or ctl clipaudit=1      REVA_CLIPAUDIT_OUT=<csv> every bad sample
@@ -98,7 +98,7 @@ static unsigned caGridMesh(CaGrid*G,const float*M,const float*pos,unsigned nv,co
     free(wv); return used; }
 /* ⛔ A SOLID PROP IS STAMPED, NOT SAMPLED INTO THE ROOM. The room's floor runs on UNDER a prop,
  * so the flood from the open floor starts inside a hollow prop and never fills it: the harness
- * on the real Undercroft showed the CRT as a ring with open floor in the middle and a body
+ * on the real skatepark set showed the CRT as a ring with open floor in the middle and a body
  * standing in the cabinet scored clean. Each prop is solidified on its own little grid, flooded
  * from ITS border, and its footprint raised into the world grid before the world is finished. */
 typedef struct { float M[16]; const float*pos; unsigned nv; const unsigned*idx; unsigned ni; } CaMesh;
@@ -203,7 +203,7 @@ static void caGridFinish(CaGrid*G,int*nOb,int*nFill,int*nOh,int*nFloor,float*p5,
  * obstacle depth is the shortest way out -- up (or down) to the surface, or sideways to the
  * nearest open cell -- plus the flesh, less ONE CELL for the grid's own rasterization.
  * ⛔ IT USED TO SCORE 0 ANYWHERE WITHIN A CELL OF AN EDGE, and only joint centres were tested. On
- * the ep 10 fixture reva stood with both shins through the CRT's cabinet (0.66 u deep) and scored
+ * a skatepark fixture reva stood with both shins through the CRT's cabinet (0.66 u deep) and scored
  * CLEAN: her ankles were within a cell of its face and her knees were level with its top.
  * *kind: 0 floor, 1 obstacle. No grid: the floor is y 0. */
 static float caGridDepth(const CaGrid*G,float x,float y,float z,float rad,int*kind){
@@ -255,7 +255,7 @@ typedef struct {
     int nsm; float sm[CA_MAXSMP][4]; const char*smn[CA_MAXSMP];   /* limb samples: x y z + flesh radius */
     int lf,lb; float lw,lt,lp[3]; char lwhat[28], linto[12];        /* this line */
     int tf,tb,tl; float tw,tt,tp[3]; char twhat[28], tinto[12];     /* this scene */
-    /* ⭐ ep 12: WHAT THE BODY RESTS ON -- the furniture under its raised mark, this frame (caSupport) */
+    /* ⭐ WHAT THE BODY RESTS ON -- the furniture under its raised mark, this frame (caSupport) */
     int nsup; float sup[6][4]; char supNm[6][12]; float supY;          /* x0 z0 x1 z1 footprints; the mark's height */
 } CaSlot;
 typedef struct { int slot; char what[28]; float p[3]; } CaAtt;
@@ -268,8 +268,8 @@ static CaRest g_caRest[16]; static int g_caNRest=0;
 static int g_caInScene=0, g_caLine=-1, g_caScenes=0; static float g_caLastT=0.f;
 /* ⛔ A FRAME BELONGS TO THE LINE IT WAS DRAWN UNDER. The loop draws the bodies, THEN advances the
  * scene clock (which lands the next line's marks for the NEXT draw), THEN this tests -- so reading
- * the line at test time filed the last frame at the old spot under the NEW line (the ep 10 fixture:
- * one bad frame "at the pillar" on line 3, one "inside kaeli" on line 5). The first body or point
+ * the line at test time filed the last frame at the old spot under the NEW line (the skatepark fixture:
+ * one bad frame "at the pillar" on line 3, one "inside the co-star" on line 5). The first body or point
  * fed in a frame latches the line and the time the picture was actually drawn at. */
 static int g_caFed=0, g_caFLine=-1; static float g_caFT=0.f, g_caT=0.f;
 static void caLatch(void){ if(!g_caFed){ g_caFed=1; g_caFLine=scnStageLine(); g_caFT=g_scnT; } }
@@ -298,7 +298,7 @@ static int caVeg(const char*s){
     static const char*V[]={"tree","bush","hedge","plant","flower","foliage","leaf","leaves","vine","ivy",NULL};
     for(int i=0;V[i];i++) if(strstr(s,V[i])) return 1;
     return 0; }
-/* ⭐ ep 12: EVERY SOLID PROP'S WORLD BOX (x0 y0 z0 x1 y1 z1), measured with the grid -- what caSupport
+/* ⭐ EVERY SOLID PROP'S WORLD BOX (x0 y0 z0 x1 y1 z1), measured with the grid -- what caSupport
  * asks "is this under her mark". Walls, rooms and vegetation keep an empty box: they are never furniture. */
 static float (*g_caIBox)[6]=NULL; static int g_caNIBox=0;
 static void caGridBuild(void){
@@ -400,7 +400,7 @@ static CaRest*caRestOf(Pack*P){
         float h=(P->wheel[w]>=0&&(unsigned)P->wheel[w]<P->nNodes)?caRestY(P,P->wheel[w])-P->mny:0.f;
         R->whH[w]=(h>0.f)?h:0.f; }
     return R; }
-/* ⭐ ep 12: THE FURNITURE UNDER A BODY'S MARK IS ITS FLOOR. kaeli lies on the bed by a `mark` with a
+/* ⭐ THE FURNITURE UNDER A BODY'S MARK IS ITS FLOOR. The co-star lies on the bed by a `mark` with a
  * height, and the bed is a solid prop -- stamped into the grid as an obstacle up to its mattress top -- so
  * every sample of a woman lying IN the bedding (the mark is 0.12 under the duvet on purpose) read as a limb
  * through the bed, every frame of every bed take.

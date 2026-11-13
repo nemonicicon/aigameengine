@@ -17,8 +17,8 @@
  * HEIGHT, which is the whole point: a body sent to a mark sits ON the chair rather than
  * beside it, and lies ON the bed rather than through it. It carries a YAW too, because a
  * chair faces a direction and a body in it has no choice about that. */
-/* ⛔ ep 10: this was 24, and the 25th mark onward was DROPPED IN SILENCE -- southbank.set carries 29, so
- * ep 9's own test marks b1/r2/r3/k2/kb never existed and a partner sent to k2 stood inside the hero. */
+/* ⛔ this was 24, and the 25th mark onward was DROPPED IN SILENCE -- a skatepark's set carries 29, so
+ * an earlier scene's own test marks b1/r2/r3/k2/kb never existed and a partner sent to k2 stood inside the hero. */
 #define SET_MAXMARK 256
 /* ⭐ CONTACT (09-11). A mark's height is where the body TOUCHES the furniture, and what
  * touches depends on the pose: a lying or standing body meets it with its lowest point
@@ -29,15 +29,15 @@ static SetMark g_setMk[SET_MAXMARK]; static int g_setNMk=0;
 static SetMark* markFind(const char*nm){
     if(!nm||!nm[0]||!strcmp(nm,"off")) return NULL;
     for(int i=0;i<g_setNMk;i++) if(!strcmp(g_setMk[i].name,nm)) return &g_setMk[i];
-    /* ⛔ ep 10: an unknown mark was silent -- the body just kept standing wherever it was. Say it, once a name. */
+    /* ⛔ an unknown mark was silent -- the body just kept standing wherever it was. Say it, once a name. */
     if(g_setNMk>0){ static char miss9[32][32]; static int nMiss9=0; int seen9=0;
         for(int k=0;k<nMiss9;k++) if(!strcmp(miss9[k],nm)){ seen9=1; break; }
         if(!seen9){ if(nMiss9<32) snprintf(miss9[nMiss9++],32,"%s",nm);
             printf("[mark] '%s' NOT FOUND among the set's %d marks -- the body keeps its old placement\n",nm,g_setNMk); fflush(stdout); } }
     return NULL; }
 
-typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; float wash,fade; int pic; float sway,swayPh; } SetInst;   /* room: ep 9, draws self-lit. From the timeline (step 21): wash, how much of tint goes over its own texture or colour, 0..1; fade, how far gone it is, 0 solid to 1 not there; pic, which picture of its sheet, counted from 1, and 0 is its own texture */
-static float g_roomLit=1.0f;   /* ⭐ ep 9: a room's photographed light, as a gain (ctl roomlit=, REVA_ROOMLIT) */
+typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; float wash,fade; int pic; float sway,swayPh; } SetInst;   /* room: draws self-lit. From the timeline (step 21): wash, how much of tint goes over its own texture or colour, 0..1; fade, how far gone it is, 0 solid to 1 not there; pic, which picture of its sheet, counted from 1, and 0 is its own texture */
+static float g_roomLit=1.0f;   /* ⭐ a room's photographed light, as a gain (ctl roomlit=, REVA_ROOMLIT) */
 static Pack g_setPk[SET_MAXP]; static char g_setNm[SET_MAXP][64]; static int g_setNP=0; static int g_setFree[SET_MAXP],g_setNFree=0;   /* places in the table that something's given back */
 static SetInst g_setI[SET_MAXI]; static int g_setNI=0;
 /* ⭐ LEVEL OF DETAIL (queue step 24). A prop can have lighter copies beside it: props/<stem>~lod1.rpack, ~lod2, and ~far, which is a picture of it on two crossed
@@ -67,7 +67,7 @@ static int g_stkNC=0,g_stkNP=0; static float g_stkCam[9],g_stkPost[12];   /* (st
 static int g_stkNK=0; static float g_stkLook[STK_LOOKS][4];             /* x y z and whether it's on, by scene slot */
 /* (11-11) A SCENE'S BODY WASHED WITH A MOVER'S COLOUR: a set line `slotwash <slot> <mover> <amount>` (slot 0 the hero, 1.. the cast; the mover by its
  * number in the timeline). Each frame that body is drawn mixed <amount> of the way toward the colour the timeline gives that mover, so a body before a
- * card that changes colour on the beat changes with it. The Facade video's chorus */
+ * card that changes colour on the beat changes with it. The music video's chorus */
 #define SLOTWASH_N 8
 #define SLOTWASH_MOV 64
 static int g_slotWashOn=0, g_slotWashM[SLOTWASH_N]; static float g_slotWashA[SLOTWASH_N], g_stkMovCol[SLOTWASH_MOV][3];
@@ -85,7 +85,7 @@ static void setInstLook(const SetInst*I){
     else { g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }
     g_instFade=I->fade; g_instTex=0;
     if(I->pic>0) for(int s=0;s<g_stkNSheet;s++) if(g_stkSheet[s].pk==I->pk){ g_instTex=g_stkSheet[s].tex[(I->pic-1)%g_stkSheet[s].n]; break; } }
-static void setInstLookOff(void){ g_instFade=0.f; g_instTex=0; g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }   /* (11-11) its colour too: a held prop drawn after the set was drawn in the last washed mover's colour (the Facade chorus's jar went the columns' colours on the beat) */
+static void setInstLookOff(void){ g_instFade=0.f; g_instTex=0; g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }   /* (11-11) its colour too: a held prop drawn after the set was drawn in the last washed mover's colour (the music video's chorus jar went the columns' colours on the beat) */
 
 /* ================= RUNTIME COLLISION ==========================================
  * ⭐ The set already knows the shape of the world: every instance has a matrix and every
@@ -144,9 +144,9 @@ static float colResolve(float*x,float*z,float mr){
     float mx=*x-ox, mz=*z-oz;
     return sqrtf(mx*mx+mz*mz)+obj9; }
 static char g_setCur[64]={0};
-/* (11-12, the Godot proof of concept's step 14) NO SET AT ALL, as the club's own room asks it: its starfield, dance floor, lamps, lasers and dark
+/* (11-12, the Godot proof of concept's step 14) NO SET AT ALL, as the default room asks it: its starfield, dance floor, lamps, lasers and dark
  * clear colour are drawn where nothing else is. For a game a loaded set is a set even with no props of its own (Create a Map's: the whole world
- * is the game's objects), and the club's room isn't drawn in it. The lab and film keep the old rule: a set of only actors is still the club's room */
+ * is the game's objects), and the default room isn't drawn in it. The lab and film keep the old rule: a set of only actors is still the default room */
 #define SET_NONE (!g_setNI&&!(GAME_ON&&g_setCur[0]))
 /* ---- ACTORS: a body, a clip, a place in the world, and somewhere to be going ------ */
 #define SET_MAXA 128
@@ -158,7 +158,7 @@ typedef struct { float t; char clip[32]; } SetCue;
 typedef struct { float t, x, y, z; } SetWp;
 /* ⭐ (11-12) A SET ACTOR PUT SOMEWHERE AT A TIME, with no walk between: `place <t> <x> <y> <z> [yaw]` after her line. The last place whose
  * time has passed is where she stands, her line's own place before the first. A path walks her there (it turns her the way she goes and paces
- * her clip to the speed); a place doesn't: the Facade video's copies hop one column on every beat, a cut on the beat, as GHOST's strip of
+ * her clip to the speed); a place doesn't: the music video's copies hop one column on every beat, a cut on the beat, as the original video's strip of
  * faces slides. On the scene's clock when her clip is (`sceneclock`), else the set's. */
 typedef struct { float t, x, y, z, yaw; int hasYaw; } SetPlace;
 #define SET_MAXPLACE 96
@@ -441,40 +441,40 @@ static float g_heroStageSpd=0.f;
 static float g_setLp[NLIGHT*3]={0,-99,0, 0,-99,0, 0,-99,0, 0,-99,0, 0,-99,0, 0,-99,0};
 static float g_setLc[NLIGHT*3]={0};
 static int g_setNL=0;
-/* (11-12) A SET'S LIGHTS PAST THE OLD FIVE (the Godot proof of concept's step 12: their Hedge Maze has 19 lanterns, and 14 were dropped). The first
+/* (11-12) A SET'S LIGHTS PAST THE OLD FIVE (the Godot proof of concept's step 12: one of their levels has 19 lanterns, and 14 were dropped). The first
  * five stay in the practicals' slots above, as they always were, so a set with five or fewer is lit exactly as before; the rest go straight into
  * the frame's lights, which the renderer clusters by the hundred */
 #define SETL_MORE 250
 static float g_setLpX[SETL_MORE*3], g_setLcX[SETL_MORE*3], g_setLkX[SETL_MORE], g_setLrX[SETL_MORE]; static int g_setNLX=0;
-/* ⭐ ep 12: A LAMP HAS A REACH. Every light in the club fell off as 1/(1+dd*0.055) -- half brightness at
+/* ⭐ A LAMP HAS A REACH. Every light in the engine fell off as 1/(1+dd*0.055) -- half brightness at
  * 4.26 u for a streetlight and a night light alike -- so a lamp bright enough to find two faces on a
  * pillow lit the far wall of the bedroom to cream (ONE AM: too bright in the room as well).
- * `light x y z r g b [power] [reach]`: REACH is where that lamp is at HALF brightness, in club units.
- * Stored as EXTRA falloff over the club's 0.055, so a lamp nobody gave a reach to is unchanged. */
+ * `light x y z r g b [power] [reach]`: REACH is where that lamp is at HALF brightness, in engine units.
+ * Stored as EXTRA falloff over the engine's 0.055, so a lamp nobody gave a reach to is unchanged. */
 static float g_setLk[NLIGHT];
 static float g_setLr[NLIGHT];   /* (11-12) a light's END: where it has faded to nothing (GfxLight.reach), the 9th number of a `light` line; 0 goes on as it always did.
-                                 * The 8th, the lamp's reach (ep 12), is where it's at HALF: a Godot light's range is where it ends, and written as the 8th its
-                                 * lanterns still gave a fifth of their light at twice that (the Hedge Maze's start was lit evenly by lanterns 30 units off) */
+                                 * The 8th, the lamp's reach, is where it's at HALF: a Godot light's range is where it ends, and written as the 8th its
+                                 * lanterns still gave a fifth of their light at twice that (that level's start was lit evenly by lanterns 30 units off) */
 static float lightReachK(float reach){
     if(reach<=0.f) return 0.f;
     float k=1.f/(reach*reach)-0.055f; if(k<-0.054f) k=-0.054f;
     return k; }
 static float lightReachOf(float k){ return 1.f/sqrtf(0.055f+k); }
-/* ⭐ ctl `lamps=<scale>` -- THE SHOT DIALS THE SET'S OWN PRACTICALS (ROBOT NEKO ep 5).
+/* ⭐ ctl `lamps=<scale>` -- THE SHOT DIALS THE SET'S OWN PRACTICALS.
  * Every other lighting quantity is a ctl key -- sun=, sky=, tod=, tone=, fog=, shadow= --
  * and the practicals alone were welded into the .set file, so a set could only ever be lit
- * for the hour it was authored at. other_side.set was written for ep 4 at `tod=10.0`, where
+ * for the hour it was authored at. a street set was written for one scene at `tod=10.0`, where
  * its porch light (power 7.0, against the manual's "a lamp you are standing next to is about
- * 1.5") is a warm bounce nobody notices under a sky ambient of 0.42. Shot at ep 5's
+ * 1.5") is a warm bounce nobody notices under a sky ambient of 0.42. Shot at the next scene's
  * `tod=21.5` the sky ambient is 0.038 and the SAME lamp delivers ~1.2 at nine units away --
  * THIRTY TIMES the ambient. The street came back in full daylight and sun=/tod= read as
  * having no effect at all, because next to an unscaled practical they have almost none.
- * Forking the set per episode is the wrong answer: a set is a place, and what time it is
+ * Forking the set per scene is the wrong answer: a set is a place, and what time it is
  * belongs to the shot. 1.0 is exactly today's behaviour, so every existing take is
  * bit-identical. ⛔ It scales the SET's lamps only -- a held light already carries its own
  * power in the script (`light:<power>`), which is per-shot by construction. */
 static float g_lampScale=1.f;
-/* THE SUN. w is intensity and 0 means off -- the club's dark-room rig is the default and
+/* THE SUN. w is intensity and 0 means off -- the engine's dark-room rig is the default and
  * stays exactly as it was. */
 /* g_sun / g_sunC / g_sky are declared up by clearOverride; seeded in main(). */
 static int   g_camOn=0;
@@ -502,7 +502,7 @@ static int setPack(const char*stem){
  * every cue afterwards, so a name means the same thing whenever it is said: the body's own
  * clip if it has one, otherwise borrowed off a bank through the canonical transfer, and
  * `zombie` is a casting note that picks a variant by actor index. */
-static Pack *g_movesPk;   /* tentative: defined with the lab's globals (P5); an actor borrows from it too (ep 11) */
+static Pack *g_movesPk;   /* tentative: defined with the lab's globals (P5); an actor borrows from it too */
 static void actorClip(SetActor*A,Pack*AP,const char*nm,int idx,int moving){
     char acr[64]; snprintf(acr,sizeof acr,"%s",nm);
     if(!strcmp(nm,"zombie"))
@@ -513,7 +513,7 @@ static void actorClip(SetActor*A,Pack*AP,const char*nm,int idx,int moving){
     for(unsigned c=0;c<AP->nClips;c++)
         if(!strcmp(packStr(AP,AP->clips[c].name),acr)){ A->clip=(int)c; return; }
     int bc=-1; Pack*bp=bankFind(acr,&bc);
-    /* ⭐ ep 11: ...and the AUTHORED-MOVES pack, which the lab's clip= and every hero could already borrow from
+    /* ⭐ ...and the AUTHORED-MOVES pack, which the lab's clip= and every hero could already borrow from
      * (P5) but a set actor could not: a crowd asked for w_cheer and 18 bodies stood in T-pose, NOT FOUND. */
     if(!bp&&g_movesPk&&g_movesPk!=AP)
         for(unsigned c=0;c<g_movesPk->nClips;c++)

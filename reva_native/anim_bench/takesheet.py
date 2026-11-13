@@ -13,7 +13,7 @@
 import glob, os, subprocess, sys, tempfile
 from PIL import Image, ImageDraw, ImageFont
 
-FF = __import__("shutil").which("ffmpeg") or sorted(glob.glob(__import__("os").path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg*\ffmpeg*\bin\ffmpeg.exe")))[0]   # club-engine kit: machine-independent paths
+FF = __import__("shutil").which("ffmpeg") or sorted(glob.glob(__import__("os").path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg*\ffmpeg*\bin\ffmpeg.exe")))[0]   # machine-independent paths
 FP = FF[:-len("ffmpeg.exe")] + "ffprobe.exe"
 TMP = tempfile.mkdtemp(prefix="vsheet_")
 

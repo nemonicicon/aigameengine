@@ -170,7 +170,7 @@ def compare(ref, cur):
 
 LIVE_MIN_CONTRAST = 0.020   # a flat frame has none; a real one measured 0.10-0.19
 LIVE_MIN_LIT      = 0.020   # fraction of pixels above background; real ones ran 0.20+
-LIVE_MIN_COLOUR   = 0.002   # some saturated pixels: the club is not greyscale
+LIVE_MIN_COLOUR   = 0.002   # some saturated pixels: the dance floor is not greyscale
 
 
 def liveness(png):
@@ -252,7 +252,7 @@ def signature(png):
 
 
 # ⛔ ONLY THE FIRST FOUR TERMS ARE JUDGED. The six hue bins are recorded because they
-# are useful to read, but they are NOT phase-invariant: the club's coloured lasers sweep,
+# are useful to read, but they are NOT phase-invariant: the dance floor's coloured lasers sweep,
 # so which bin they land in swings wildly between two honest runs -- hue-mag moved 33.7%
 # on a known-good sweep, and a test that fails a known-good is a bad threshold, not a bad
 # build (this bench's own rule). The four kept terms describe whether the WORLD IS BEING

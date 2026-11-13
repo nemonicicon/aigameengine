@@ -3,12 +3,12 @@
 # as in a game about capturing clips of the people you skate with.
 # THE ONE QUESTION: does `camhold=` put the lens on the filmer's hand and keep the subject in the frame, with
 # the filmer's own motion left IN the picture?
-# PASS: the log says `camhold: slot 0 is filming slot 1`; kaeli is in frame through the whole line; the frame
+# PASS: the log says `camhold: slot 0 is filming slot 1`; the co-star is in frame through the whole line; the frame
 #   moves with reva's body (it bobs and swings as she rolls) instead of gliding like a dolly.
 # FAIL: an empty frame (the hand was never published), a locked-off frame (the bob was sprung away), or a lens
 #   that drifts off the subject.
 # CONTROL: the same line as a camtrack at the same distance -- smooth, and obviously not hand-held.
-# Both of them roll: reva films kaeli while riding beside her, which is how skate footage is actually shot.
+# Both of them roll: reva films the co-star while riding beside her, which is how skate footage is actually shot.
 cast 0=reva 1=kaeli
 
 0 dur=0.4 step=0 tod=12 tone=0.66 snap=1 hmark=s1 pmark=s2 hclip=z_rm_sk_ride pclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pprop=skateboard@1.4@0@board hlook=0 plook=0 cam=-7.0,2.0,6.0,0.0,1.2,6.0,50 |

@@ -1,4 +1,4 @@
-/* clubcloth -- WORN CLOTH, on any skinned character, in plain C with no engine under it. The club's solver for a whole garment: the hanging cloth's recipe (design/engine_capabilities.md 37) made
+/* clubcloth -- WORN CLOTH, on any skinned character, in plain C with no engine under it. The engine's solver for a whole garment: the hanging cloth's recipe (design/engine_capabilities.md 37) made
  * for a body that moves fast and a garment that isn't a skirt. Built 11-02 for the alien's clothes, with the collision and clipping work they needed.
  *
  * A garment is its mesh, skinned to the body as usual: that skinned pose is the TARGET. The cloth is simulated in the skeleton's own space, so the body's speed through the world can't fling it and a

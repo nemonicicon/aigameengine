@@ -2,7 +2,7 @@
  * The audit: "Rigid bodies, projectiles, triggers: none. Nothing flies with physics." A
  * thrown crate, a dropped mug, a grenade's arc, a bin knocked over -- every one wanted a
  * body with mass under gravity that bounces off the ground, the world's colliders and each
- * other. This is that layer: a sphere with an orientation, integrated at club gravity (the
+ * other. This is that layer: a sphere with an orientation, integrated at the engine's gravity (the
  * hair solver's own derivation: 9.81 m/s^2 at 1.75 units a metre), restitution and
  * friction on the ground, the set's circle colliders as walls, pairwise sphere contact,
  * spin from the tangential slip, sleep when still. Drawn as its prop, rotating about its

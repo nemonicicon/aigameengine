@@ -1,4 +1,4 @@
-"""ue_export_town.py -- UE headless: AssetsvilleTown -> GLB, for SEVENTY-FOUR.
+"""ue_export_town.py -- UE headless: AssetsvilleTown -> GLB, for the film.
 
     UnrealEditor-Cmd.exe GunExport.uproject -run=pythonscript -script=ue_export_town.py
         -stdout -FullStdOutLogOutput -unattended -nosplash -nullrhi
@@ -6,7 +6,7 @@
 Same artery as skate_src/guns/ue_export_guns.py (which proved the shim-project pattern
 on 16 weapons in ~40s), pointed at the rest of the town: the ground the street is made
 of, the tile kit the houses are built from, the yard and street dressing, the trees, the
-cars, and enough interior for the night the windows get boarded.
+cars, and enough interior for the house scenes.
 
 ⭐ AND THE PALETTE. The gun run learned that UE materials do not survive the GLTF export
 -- 0 images in the GLBs -- and every weapon ended up wearing an engine tint. That would
@@ -17,7 +17,7 @@ low-poly way: every mesh in it UVs into ONE shared 2048 colour palette
 """
 import unreal, os
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/AssetsvilleTown/Meshes/"
 

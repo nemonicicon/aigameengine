@@ -3,7 +3,7 @@
 
     modelcheck.py --bless        shoot every model and adopt it as the reference
     modelcheck.py                shoot every model and diff against the reference
-    modelcheck.py --only vampire,anima
+    modelcheck.py --only vampire,<subject>
 
 Models are regressed on the anim bench, not by running the dance floor or the skate mode.
 
@@ -32,7 +32,7 @@ back, which the log showed plainly: "reframed 7% -> 7%" after moving the lens fr
 Every "touches the frame edge" failure was the lawn. The backdrop is now LEARNED from the
 frame's own border, which needs no knowledge of the set.
 
-⛔ A CLIP THAT IS NOT ON THE PACK IS A SILENT FALLBACK. kaeli came back crouched mid-crawl and
+⛔ A CLIP THAT IS NOT ON THE PACK IS A SILENT FALLBACK. the co-star came back crouched mid-crawl and
 reva2 in a default idle because `z_upright` is an 8-frame ANIMATION, not a pose, and neither
 pack had anything static. Ask the pack first, prefer a 1-frame clip, and refuse rather than
 shoot a pose that will not repeat. (restclip.py is how a pack gets one.)

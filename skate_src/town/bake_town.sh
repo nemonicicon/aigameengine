@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bake_town.sh -- AssetsvilleTown -> prop rpacks, for SEVENTY-FOUR.
+# bake_town.sh -- AssetsvilleTown -> prop rpacks, for the film.
 #
 #   bash skate_src/town/bake_town.sh [--reexport]
 #
@@ -7,7 +7,7 @@
 # 2. glb2rpack.py bakes each into a prop rpack the set renderer loads on demand
 #
 # SCALE. The meshes come out in real-world METRES -- measured off the GLBs: a mailbox is
-# 1.42 tall, a wall module 3.00 x 4.00, a sedan 5.40 long, a road tile 16 x 16. The club
+# 1.42 tall, a wall module 3.00 x 4.00, a sedan 5.40 long, a road tile 16 x 16. The engine
 # runs 3.15 units per 1.8m body, so --scale 1.75 lands the whole town at true size beside
 # reva. No --center and no --ground: these are kit pieces and their authored origins are
 # the snapping points.
@@ -18,7 +18,7 @@
 # palette. Exporting that single image and passing it to --tex colours all 112 meshes
 # correctly. The road tiles are the exception: they UV into their own T_roadSet sheet.
 #
-# ⛔ AND THE ALPHA IS NOT OPACITY. The club's mesh shader alpha-tests
+# ⛔ AND THE ALPHA IS NOT OPACITY. The engine's mesh shader alpha-tests
 # (`if(useTex>0.5 && tx.a<0.4) discard`), and this kit uses the palette's alpha
 # channel as a MASK for something else entirely -- 59% of its 2048x2048 pixels sit
 # below that threshold. Handed over as exported, the palette does not tint the town,
@@ -75,7 +75,7 @@ for g in "$T"/export/*.glb; do
     # against what UE actually reports and prints every disagreement; these are the ones
     # where UE named a SINGLE sheet and the pattern rule was simply wrong:
     #   SM_floor_01     uses T_planks_01 ONLY -- it is floorboards, and it was wearing
-    #                   the colour palette, which is why the Act V floor was a flat tint
+    #                   the colour palette, which is why one scene's floor was a flat tint
     #   SM_road_sign_*  and SM_road_cone are PALETTE props that the "SM_road_*" pattern
     #                   was handing the tarmac sheet
     #   the trees each have their own leaf sheet; tree_01 is not tree_02

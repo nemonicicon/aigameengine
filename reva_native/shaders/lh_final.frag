@@ -1,5 +1,5 @@
 #version 450
-// The last lighthouse's picture and its two blooms: a filmic curve, the corners falling away, and a touch of grain so a black this deep doesn't band.
+// The menu scene's picture and its two blooms: a filmic curve, the corners falling away, and a touch of grain so a black this deep doesn't band.
 layout(set = 0, binding = 0) uniform sampler2D tb;
 layout(set = 0, binding = 1) uniform sampler2D bl;
 layout(set = 0, binding = 3) uniform sampler2D bl2;

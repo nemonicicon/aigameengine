@@ -1,5 +1,5 @@
 /* club_save.c -- THE SAVE FILE's key/value store (09-01). Split out of crowd_kms.c 2026-09-30 (stage 3).
- * One text file, key=value per line, loaded at boot, flushed by the club on a record / a mode change /
+ * One text file, key=value per line, loaded at boot, flushed by the engine on a record / a mode change /
  * exit; temp + rename so a crash mid-write leaves last night's file. REVA_NOSAVE=1 makes it blind. */
 #include "club.h"
 #include <dirent.h>

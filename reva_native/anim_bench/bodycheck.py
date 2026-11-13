@@ -223,7 +223,7 @@ def fold(S, bust_y, apex_x, fwd):
         if best is None or ys[k] < best[0]:
             best = (float(ys[k]), float(front[:3].max() - front[k]))
     # ⛔ The tape doesn't lie IN the fold. Right there a breast's underside overhangs, and the girth changes a centimetre for every millimetre of height
-    # (71.7 cm at one level, 78.0 six millimetres up, on Anima). It lies on the ribs just under it, 6 mm down, where a millimetre is worth a tenth of that
+    # (71.7 cm at one level, 78.0 six millimetres up, on the bought character). It lies on the ribs just under it, 6 mm down, where a millimetre is worth a tenth of that
     return best[0] - 0.006, best[1]
 
 

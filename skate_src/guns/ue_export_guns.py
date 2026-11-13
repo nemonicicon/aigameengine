@@ -10,7 +10,7 @@ engine draws with drawProp() at whatever matrix the hand bone gives it.
 """
 import unreal, os
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "guns")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "guns")   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 
 NAMES = [

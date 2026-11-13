@@ -19,21 +19,21 @@
  * lens is doing, and what each body is playing -- so that is what a line carries.
  * SHOT_* is the framing; the values are eased toward, never snapped to, which is what
  * makes `pyaw=46` read as a woman turning her back rather than a body teleporting. */
-/* ⭐ SHOT_MEDIUM IS APPENDED, NOT INSERTED (ROBOT NEKO ep 4). The size LADDER runs
+/* ⭐ SHOT_MEDIUM IS APPENDED, NOT INSERTED. The size LADDER runs
  * wide -> medium -> two -> ots -> tight/solo, but the enum's numbers are printed by
  * [scncam] and read by shotgrammar.py's own table, so a new size goes on the END and the
  * ladder lives in the grammar tool. SHOT_N is the count, for anyone sizing a table. */
 enum { SHOT_OTS=0, SHOT_TIGHT, SHOT_TWO, SHOT_WIDE, SHOT_SOLO, SHOT_MEDIUM, SHOT_N };
-/* A LENS PER SHOT. The club renders at 42 deg vertical -- a wide angle, chosen to hold
+/* A LENS PER SHOT. The engine renders at 42 deg vertical -- a wide angle, chosen to hold
  * a whole dancefloor -- and on a conversation it is the wrong glass: faces come out
  * small, the near shoulder in an over-the-shoulder comes out vast beside them, and two
  * people a metre apart sit in a lake of black. These are the focal lengths a scene is
  * actually shot on, and every distance below is derived from the one above it:
- * frame height = 2*D*tan(fov/2), a head is ~0.45 club units, so D = 0.45 / (frac * that). */
+ * frame height = 2*D*tan(fov/2), a head is ~0.45 engine units, so D = 0.45 / (frac * that). */
 /* ⛔ EIGHT LONG, NOT FIVE. Every read of this table is SHOT_FOV[shot&7] -- the mask was
  * there to keep a bad index in range and the table was five entries long, so 5, 6 and 7 read
  * off the end of it. Nothing had ever written a 5 until medium existed.
- * ⭐ SOLO IS 38 NOW (ep 4). It used to be 30 and it used to be a two-shot with the
+ * ⭐ SOLO IS 38 NOW. It used to be 30 and it used to be a two-shot with the
  * listener's profile filling half the frame; it is the listener's POINT OF VIEW now, taken
  * from her own eye mark, which stands the lens about a pair-gap from the speaker -- and at
  * 30 deg from 1.3 units a head does not fit with head room. 38 is the glass that holds it,
@@ -44,16 +44,16 @@ enum { SHOT_OTS=0, SHOT_TIGHT, SHOT_TWO, SHOT_WIDE, SHOT_SOLO, SHOT_MEDIUM, SHOT
 static const float SHOT_FOV[8]={ 30.f, 22.f, 30.f, 40.f, 38.f, 34.f, 30.f, 30.f };
 static const char*SHOT_NAME[8]={ "ots","tight","two","wide","solo","medium","?","?" };
 /* From the EYE mark to a clear frame line above the head: half a ~0.45-unit head plus a
- * hand of air. Club units (~1.75x metric), like every other lens number here. */
+ * hand of air. Engine units (~1.75x metric), like every other lens number here. */
 #define SCN_HEADTOP 0.36f
-/* ⭐ AND ABOVE A RAISED HAND (ROBOT NEKO ep 3): the wrist mark, plus the fingers and a margin. */
+/* ⭐ AND ABOVE A RAISED HAND: the wrist mark, plus the fingers and a margin. */
 #define SCN_HANDTOP 0.30f
 static float g_scnWant=-1e9f;   /* the frame top a two/wide needs THIS frame; the tripod reads it */
 /* ⛔ THE FRAME'S OWN SHAPE WAS NEVER PUBLISHED. A lens that has to GUARANTEE both bodies
  * fit ACROSS needs the aspect ratio, and W/H are locals in main(). Set where the projection
  * is built; 16:9 until the first frame has been through it. */
 static float g_aspect=1.7778f;
-/* ⭐ reverse= (ROBOT NEKO ep 4): mirror the lens to the OTHER side of the pair's axis.
+/* ⭐ reverse= -- mirror the lens to the OTHER side of the pair's axis.
  * Crossing the line is the gag, so this is not a bug being fixed -- it is one flip of the
  * side sign, which moves the camera, the looking room and the key/rim light together. */
 static int g_scnRev=0;
@@ -64,8 +64,8 @@ static int g_scnRev=0;
  * line; `auto` hands it back. -1 = auto. */
 static int g_shotForce=-1, g_revForce=-1;
 static int scnRevNow(void){ return (g_revForce>=0)?g_revForce:g_scnRev; }
-/* ⭐ jawgain= (ep 4): how far the PUPPET jaw opens in `mouth hinge` mode. 1.0 is what
- * every scene shot so far used; ep 4 runs about 0.5. Sticky per line, and a ctl key. */
+/* ⭐ jawgain= -- how far the PUPPET jaw opens in `mouth hinge` mode. 1.0 is what
+ * every scene shot so far used; one show runs about 0.5. Sticky per line, and a ctl key. */
 static float g_jawGain=1.f, g_jawGainCtl=1.f;
 typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned char env[SCN_MAXE]; int nEnv;   /* ⭐ (10-23) 192 -> 1536, and its caption pages */
                  unsigned char vis[SCN_MAXE]; int nVis;   /* the jaw SHAPE, walked off the text */
@@ -74,17 +74,17 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
                  /* slot 2's blocking. Additive: nothing that exists changes, and they are
                   * STICKY like every other stage key, so a scene sets them once. */
                  float p2gap,p2yaw,p2side,p2brow; int p2look, p2has; char p2clip[32];
-                 float p3gap,p3yaw,p3side; int p3has; char p3clip[32];   /* ⭐ ep 7: the fourth body */
-                 float scr[7]; int scrHas;                               /* ⭐ ep 8: the screen's transform */
-                 float cam[7]; int camHas;                               /* ⭐ ep 8: THE FREE CAMERA. 0 none, 1 place, 2 off */
+                 float p3gap,p3yaw,p3side; int p3has; char p3clip[32];   /* ⭐ the fourth body */
+                 float scr[7]; int scrHas;                               /* ⭐ the screen's transform */
+                 float cam[7]; int camHas;                               /* ⭐ THE FREE CAMERA. 0 none, 1 place, 2 off */
                  /* ⭐ WHAT THEY ARE HOLDING. Sticky, and `off` clears it -- a woman has to
                   * be able to put a coffee down. */
                  /* ⛔ 64, NOT 32. `v1_town_lantern@0.42@0@lhand@FFD9A0@light:6` is 44
-                  * characters: the spec grew a colour in ep 2 and a light in ep 4, and a
+                  * characters: the spec grew a colour and then a light, and a
                   * 32-byte field truncated the tail SILENTLY -- the light simply never
                   * happened and nothing said why. */
                  char hprop[PROP_SPEC], pprop[PROP_SPEC], p2prop[PROP_SPEC];
-                 /* ⭐ THE SECOND HAND (ep 5). Same spec, same parser, same 64 bytes -- the
+                 /* ⭐ THE SECOND HAND. Same spec, same parser, same 64 bytes -- the
                   * truncation note above applies word for word. */
                  char hprop2[PROP_SPEC], pprop2[PROP_SPEC], p2prop2[PROP_SPEC];
                  /* ⭐ ON A PROP. A named mark in the set, which overrides the pair
@@ -92,42 +92,42 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
                   * person-relative, and the two cannot both be true. */
                  char pmark[32], p2mark[32], p3mark[32];
                  /* ⭐ AND THE HERO ON ONE (09-11). Only the partner slots could take a mark,
-                  * so reva could not sit on a bed -- the cold open was blocked on it. */
+                  * so reva could not sit on a bed -- a bed scene was blocked on it. */
                  char hmark[32];
-                 /* ⭐ ep 10: PATHS. path[slot] = "mark,mark,..." off hpath/ppath/p2path/p3path, rolled AROUND the
+                 /* ⭐ PATHS. path[slot] = "mark,mark,..." off hpath/ppath/p2path/p3path, rolled AROUND the
                   * set, or `@route`; spd[slot] off hspd/pspd/p2spd/p3spd, u/s, <0 = unset; loop[slot] off
                   * hloop/ploop/p2loop/p3loop, <0 = unset. 512: a planner's 28-mark loop is ~230 chars.
                   * pseg/pnext (filled after the load): the line this path's RUN of identical values starts on,
                   * and the line the next path's run starts on (-1: none -- a line drops the path first). */
                  char path[4][512]; float spd[4]; int loop[4], pseg[4], pnext[4];
-                 /* ⭐ ep 11: THE HALF-PIPE. pipe[slot] off hpipe/ppipe/p2pipe/p3pipe ("<name>[,<air>]", "off", or ""
+                 /* ⭐ THE HALF-PIPE. pipe[slot] off hpipe/ppipe/p2pipe/p3pipe ("<name>[,<air>]", "off", or ""
                   * = none in force); pipeAir[slot] off hair/pair/p2air/p3air (the air one-shots, "clip,clip"). */
                  char pipe[4][48], pipeAir[4][128];
-                 /* ⭐ ep 10: THE TRACKING LENS. camtrack=slot,dist,height,azim,fov[,aimh] and campan=slot[,aimh];
+                 /* ⭐ THE TRACKING LENS. camtrack=slot,dist,height,azim,fov[,aimh] and campan=slot[,aimh];
                   * trkN/panN = how many numbers came, trkHas/panHas 0 none, 1 set, 2 off. */
                  float trk[6], pan[2]; int trkN, trkHas, panN, panHas;
                  float hld[5]; int hldN, hldHas;   /* ⭐ camhold=filmer,subject[,fov[,aimh[,drop]]] */
-                 /* ⭐ ep 11: THE MOVING LENSES. cammove=ex,ey,ez,ax,ay,az[,fov] is the END of a move whose START is
+                 /* ⭐ THE MOVING LENSES. cammove=ex,ey,ez,ax,ay,az[,fov] is the END of a move whose START is
                   * the line's cam= (movHas 1); camorbit=slot,radius,height,deg0,deg1[,fov[,aimh]] (orbN numbers,
                   * orbHas 0 none, 1 set, 2 off); secs = camsecs=, either one's travel time (<0: the line's whole
                   * span); camshake=amp[,hz] (shkHas 1 said). A height written `=h` is ABSOLUTE world y (trkAbs for
                   * camtrack, orbAbs for camorbit), not a height above the body. */
                  float mov[7], orb[7], secs, shk[2]; int movHas, orbN, orbHas, orbAbs, trkAbs, shkHas;
                  float camRoll, shut, sepia, grain; char focusSaid[24];   /* (step 25) camroll= shutter= sepia= grain= (under -9000: not said) and focus= as it was written */
-                 int silent;            /* ⭐ ep 10: an ACTION line -- nothing said, so no subtitle and no mouth */
+                 int silent;            /* ⭐ an ACTION line -- nothing said, so no subtitle and no mouth */
                  float hbrow,pbrow;     /* -1..1; -9 = leave it to the reactive brow */
                  char face[SCN_BODIES][256];  /* (11-11) hface= pface= p2face= p3face=: face shapes HELD through this line, by name (256: a laugh in ARKit names is ~150),
                                                * `name:weight,name:weight` (a laugh: blink:1,smile:0.7); '' none. Not sticky */
                  float hgt;             /* camera height off the eyeline: -low +high */
                  float step;            /* ⭐ STOP MOTION: exposures/sec from this line on; <0 = unset */
                  float tod, tone;       /* ⭐ time of day and the highlight knee, on the cut; <0 = unset */
-                 float feed, fish;      /* ⭐ ep 2: her camera's frame and her camera's lens; <0 = unset */
+                 float feed, fish;      /* ⭐ her camera's frame and her camera's lens; <0 = unset */
                  int snap;              /* ⭐ NOT sticky: this line's marks LAND on the cut (a jump cut) */
-                 int reverse;           /* ⭐ (ep 4) mirror the lens across the pair's axis; sticky */
-                 float jawgain;         /* ⭐ (ep 4) the hinge jaw's opening scale; <0 = unset */
+                 int reverse;           /* ⭐ mirror the lens across the pair's axis; sticky */
+                 float jawgain;         /* ⭐ the hinge jaw's opening scale; <0 = unset */
                  char hclip[32],pclip[32];
-                 char htrick[96],ptrick[96],p2trick[96],p3trick[96];   /* ⭐ ep 10: clip@sec[,clip@sec] one-shots; NOT sticky */
-                 char hpuff[64],ppuff[64],p2puff[64],p3puff[64];       /* ⭐ ep 12: sec[,sec] exhales off the mouth; NOT sticky */
+                 char htrick[96],ptrick[96],p2trick[96],p3trick[96];   /* ⭐ clip@sec[,clip@sec] one-shots; NOT sticky */
+                 char hpuff[64],ppuff[64],p2puff[64],p3puff[64];       /* ⭐ sec[,sec] exhales off the mouth; NOT sticky */
                  char hdoll[16],pdoll[16],p2doll[16],p3doll[16];       /* ⭐ THE RAGDOLL: sec into the line she goes LIMP, or `off`; NOT sticky */
                  char hover[32],pover[32],p2over[32];   /* ⭐ upper-body layers (09-11); sticky, `off` clears */
                  char set[48];          /* ⭐ 10-22: this line plays on ANOTHER set (a cutaway); NOT sticky -- home after */
@@ -146,7 +146,7 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
 static int numAt(const char*p){ if(!p) return 0;
     if(*p=='-'||*p=='+') p++;
     return (*p>='0'&&*p<='9')||*p=='.'; }
-/* ⭐ ep 11: A LENS KEY'S NUMBERS, comma-separated, into v[] (fields that do not come keep the caller's defaults).
+/* ⭐ A LENS KEY'S NUMBERS, comma-separated, into v[] (fields that do not come keep the caller's defaults).
  * Field `absAt` may be written `=h` -- an ABSOLUTE world height -- and *abs says whether it was. sscanf's
  * "%f,%f,..." stops dead at that `=`, which is why camtrack's parse no longer uses it. Returns the count. */
 static int lensNums(const char*q,float*v,int maxn,int absAt,int*abs){
@@ -182,7 +182,7 @@ static short g_scnShpV[SCN_SHPPOOL];
  * line, each section's area 30 a second (`shp tract:NN`, cm2; tract:nose her soft palate's port, tract:glot her glottis, tract:buzz her
  * folds buzzing 0..1, tract:press the air pressing in her mouth 0..1). scnShapes hands those to trTake instead of her face; the cast's
  * draw (engine/captions.inc) calls tractDraw after her body, which carries the airway on the bone, puts the moving side (her tongue's,
- * her jaw's) as far in from the wall as each area says, and draws it THROUGH her, as Wan-To's web is drawn through his star
+ * her jaw's) as far in from the wall as each area says, and draws it THROUGH her, as the star creature's web is drawn through its star
  * (GFX_FX_WEBX): the air blue, going red as it presses behind a closure in her mouth; her tongue and the flesh under it pink; the wall
  * bone-white; her nose's passage while her soft palate's open; her folds across the bottom, apart by her glottis and shaking while
  * they buzz. A section's depth across the midline from its area: A = 1.8 d^1.4 (cm), as midsagittal MRI relates them; her lips a slot
@@ -279,10 +279,10 @@ static char  g_scnHome[64], g_scnAway[64]; static int g_scnHomeOK=0;   /* ⭐ 10
                                                                        * cutaway (set=) it is on now, "" at home */
 static float g_scnHomeSun[4], g_scnHomeSunC[3], g_scnHomeSky[3];
 /* WHO IS IN THIS SCENE, for the caption. Speaker indices are POSITIONAL -- 0 is the hero
- * the lab loaded -- so a name cannot be keyed on them, and four of this film's seven
- * scenes are between the two people who are not reva. */
+ * the lab loaded -- so a name cannot be keyed on them, and a scene may well be
+ * between two people who are not reva. */
 static char  g_scnWho[SCN_MAXCAST][16]={"REVA","KAELI","SUSAN","ARCHIVE","-"};
-/* ⭐ EVERY BODY IN A SCENE HAS ITS OWN FACE (10-18, THE WORLD AT THE END OF TIME 2.1: Viktor, Wanda and Amelia). One
+/* ⭐ EVERY BODY IN A SCENE HAS ITS OWN FACE (10-18, a scene with three speakers). One
  * array served every slot after the hero, read through each slot's own morph table: a third speaker's jaw went to
  * whichever slot the draw loop had touched last, and slots 2-3 never blinked. Row 0 is unused (the hero keeps
  * g_heroMorphW); g_partMorphW is the CURRENT slot's row, so every per-draw use below reads its own body's face. */
@@ -300,9 +300,9 @@ static float g_heroMouthW[3]={0,0,0}, g_heroEyeW[3]={0,0,0};
  * every frame, which is what lets coverage match across bodies built to different
  * proportions. IOD_NOM is the value the shot distances above were tuned against. */
 static float g_heroIOD=0.f;
-#define IOD_NOM 0.151f   /* measured off the rig: kaeli 0.151, reva 0.131 */
+#define IOD_NOM 0.151f   /* measured off the rig: the co-star 0.151, reva 0.131 */
 /* THE FACE'S OWN FORWARD, from the eye marks -- not the body's heading. A head yaws
- * inside its idle, so a lens pointed along the BODY put kaeli's mouth 20-odd pixels
+ * inside its idle, so a lens pointed along the BODY put the co-star's mouth 20-odd pixels
  * off centre in the mouth panel and every lateral calibration inherited the error
  * (worse: the error changed with the clip, so two passes disagreed). The eye line is
  * anatomy carried by FK, so the cross of it with world up is where the face looks. */
@@ -333,20 +333,20 @@ static int   g_scnPrevSpk=1;   /* who the speaker is answering: the last person 
  * has to read down a sightline. A deliberate stop: this film needs things CARRIED. */
 #define HELD_MAX 8
 typedef struct { char stem[32]; int pk; float ext, loY, hgt; float lo[3], hi[3]; float deckY;
-                 /* ⭐ ep 12: the ends of its longest side (mesh space) -- `tip` the one AWAY from the grip (the
+                 /* ⭐ the ends of its longest side (mesh space) -- `tip` the one AWAY from the grip (the
                   * origin), where a cigarette burns, `nearP` the one in the fingers (the filter at the lips) --
                   * and its GLOW: the mesh whose name carries `#rrggbb*` (the ember), its colour and centre */
-                 float tip[3], nearP[3]; int glow; float glowC[3], glowP[3]; } HeldProp;   /* deckY (ep 10): the highest point over the middle 40% of the long axis -- a board's flat deck top, not its kick tips */   /* ext: the mesh's longest side, measured; lo/hi its box (ep 10: the board's fit) */
+                 float tip[3], nearP[3]; int glow; float glowC[3], glowP[3]; } HeldProp;   /* deckY: the highest point over the middle 40% of the long axis -- a board's flat deck top, not its kick tips */   /* ext: the mesh's longest side, measured; lo/hi its box (the board's fit) */
 static HeldProp g_held[HELD_MAX]; static int g_nHeld=0;
-static int heldFind(const char*stem);   /* ⭐ ep 12: the light collector asks it for the ember (defined below) */
+static int heldFind(const char*stem);   /* ⭐ the light collector asks it for the ember (defined below) */
 static const HeldProp*heldPropOf(int pk){ for(int h=0;h<g_nHeld;h++) if(g_held[h].pk==pk&&pk>=0) return &g_held[h]; return NULL; }
-/* ⭐ ep 12: WHERE EACH HELD PROP WAS DRAWN -- the matrix drawHeldOne built, per body per hand, and the
+/* ⭐ WHERE EACH HELD PROP WAS DRAWN -- the matrix drawHeldOne built, per body per hand, and the
  * frame it was built on. The wisp leaves from here and the ember's light sits here: one matrix, so the
  * smoke cannot come off a different place than the cigarette is drawn. */
 static float    g_heldM[SCN_MAXCAST][2][16];
 static unsigned g_heldMSt[SCN_MAXCAST][2];
 static int      g_heldMPk[SCN_MAXCAST][2];
-/* ⭐ ep 12: THE DRAG. 0..1 per body per hand, eased on the exposure clock while the thing in that hand is
+/* ⭐ THE DRAG. 0..1 per body per hand, eased on the exposure clock while the thing in that hand is
  * at the mouth (smokeTick); the ember's light and glow run at 1 + 2 x its ease -- about 3x on a pull. */
 static float    g_heldDrag[SCN_MAXCAST][2];
 static float heldDragK(int i,int which){
@@ -354,17 +354,17 @@ static float heldDragK(int i,int which){
     float u=g_heldDrag[i][which]; if(u<0.f) u=0.f; if(u>1.f) u=1.f;
     return 1.f+2.f*u*u*(3.f-2.f*u); }
 /* ⛔ 64, WITH THE ScnLine FIELD. `v1_town_lantern@0.42@0@lhand@FFD9A0@light:6` is 42
- * characters -- the spec grew a colour in ep 2 and a light in ep 4. */
+ * characters -- the spec grew a colour and then a light. */
 static char  g_castProp[SCN_MAXCAST][PROP_SPEC];        /* what each body is holding, by slot */
-/* ⭐ AND THE OTHER HAND (ROBOT NEKO ep 5). A body could hold exactly ONE thing, so a
+/* ⭐ AND THE OTHER HAND. A body could hold exactly ONE thing, so a
  * torch and a mug were mutually exclusive and a character who needed both had to put one
  * down between shots. A SECOND slot per body, parsed by the same heldParse, drawn by the
  * same drawHeldOne and lit by the same heldLightOne -- `hprop2=`/`pprop2=`/`p2prop2=`.
- * ⛔ NOT a second parser and NOT a second draw path: ep 4's note above says why. */
+ * ⛔ NOT a second parser and NOT a second draw path: the note above says why. */
 static char  g_castProp2[SCN_MAXCAST][PROP_SPEC];       /* ...and what is in the other hand */
 static char  g_castMark[SCN_MAXCAST][32];        /* ...and which set mark she is ON, if any */
 static SetMark*g_heroMk=NULL;                    /* slot 0's resolved mark this frame (09-11), or NULL */
-/* ⭐ ep 9: WHERE EACH BODY WAS LAST DRAWN (world x, z, facing in radians) -- a walk to a new
+/* ⭐ WHERE EACH BODY WAS LAST DRAWN (world x, z, facing in radians) -- a walk to a new
  * mark starts from here -- and the floor height its placement used, for a board under it. */
 static float g_castAt[SCN_MAXCAST][3]; static int g_castAtOK[SCN_MAXCAST];
 static float g_castFloorY[SCN_MAXCAST];
@@ -378,10 +378,10 @@ static float g_castGripM[SCN_MAXCAST][16];
  * FOUR, not arbitrary: copying every bone's world matrix per body per frame to make one
  * addressable is a lot of work for a feature whose whole use is "on a person somewhere
  * obvious", and these are the four things actually hang off. A fifth is one line. */
-enum { ATT_HAND=0, ATT_HEAD, ATT_CHEST, ATT_HIP, ATT_LHAND, ATT_DECK, ATT_MARK, ATT_BOARD, ATT_BONE, ATT_BONE2, ATT_N };   /* ⭐ ep 9: DECK under a rider, MARK on the set; ep 10: BOARD off the clip's board channel */
+enum { ATT_HAND=0, ATT_HEAD, ATT_CHEST, ATT_HIP, ATT_LHAND, ATT_DECK, ATT_MARK, ATT_BOARD, ATT_BONE, ATT_BONE2, ATT_N };   /* ⭐ DECK under a rider, MARK on the set; BOARD off the clip's board channel */
 static float g_castAttM[SCN_MAXCAST][ATT_N][16];
 static int   g_castAttOK[SCN_MAXCAST][ATT_N];
-/* ⭐ ep 12: A PROP ON ANY BONE. `@hand` is the wrist on a UE rig (anima's gripNode is hand_r), and a
+/* ⭐ A PROP ON ANY BONE. `@hand` is the wrist on a UE rig (the bought character's gripNode is hand_r), and a
  * cigarette is held between two FINGERS -- 0.21 u from where the wrist is, which is the whole distance
  * between a drag and a hand across her face. So `where` may name a bone of the body holding the thing
  * (`@middle_01_r`): heldAttach asks for it here, attPublish finds it on whatever pack that slot is
@@ -398,12 +398,12 @@ static int attOf(const char*nm){
     if(!strcmp(nm,"hip"))   return ATT_HIP;
     if(!strcmp(nm,"lhand")) return ATT_LHAND;
     if(!strcmp(nm,"deck"))  return ATT_DECK;
-    if(!strcmp(nm,"board")) return ATT_BOARD;   /* ⭐ ep 10: published by boardPublish, never by attPublish */
+    if(!strcmp(nm,"board")) return ATT_BOARD;   /* ⭐ published by boardPublish, never by attPublish */
     return ATT_HAND; }
 /* publish all four for whichever body is being drawn */
 static void attPublish(Pack*P9,M4*W9,const float*model,int slot){
     int chest=-1; for(int c=3;c>=1;c--) if(P9->pb[c]>=0){ chest=P9->pb[c]; break; }
-    /* ⭐ AND THE OTHER HAND (ROBOT NEKO ep 2). Every held prop rode the RIGHT hand, and on a
+    /* ⭐ AND THE OTHER HAND. Every held prop rode the RIGHT hand, and on a
      * pair staged so the lens sits on their left, that hand is on the far side of the body:
      * reva's coffee was drawn every frame at (33.93,1.65,-18.38) and hidden behind her for the
      * whole take. gripL was already elected by the same code as gripNode -- it only needed
@@ -415,7 +415,7 @@ static void attPublish(Pack*P9,M4*W9,const float*model,int slot){
         if(nodes[k]<0) continue;
         m4_mul(g_castAttM[slot][k],(float*)model,W9[nodes[k]]);
         g_castAttOK[slot][k]=1; }
-    for(int w9=0;w9<2;w9++){   /* ⭐ ep 12: a bone a held prop asked for by name */
+    for(int w9=0;w9<2;w9++){   /* ⭐ a bone a held prop asked for by name */
         g_castAttOK[slot][ATT_BONE+w9]=0;
         const char*rq9=g_castBoneReq[slot][w9]; if(!rq9[0]) continue;
         if(g_castBonePk[slot][w9]!=P9||strcmp(g_castBoneHas[slot][w9],rq9)){
@@ -432,7 +432,7 @@ static void attPublish(Pack*P9,M4*W9,const float*model,int slot){
         int nd9=g_castBoneNd[slot][w9]; if(nd9<0) continue;
         m4_mul(g_castAttM[slot][ATT_BONE+w9],(float*)model,W9[nd9]);
         g_castAttOK[slot][ATT_BONE+w9]=1; }
-    /* ⭐ THE DECK (ROBOT NEKO ep 9): a board under a rider. NOT hung off the feet -- a push lifts
+    /* ⭐ THE DECK: a board under a rider. NOT hung off the feet -- a push lifts
      * one of them, and a board that followed their midpoint would climb the pushing leg. It is
      * the body's own ROOT on the floor its placement used, its long axis ACROSS the body (a
      * skater stands sideways on the deck), and the authored stance puts both feet over it. */
@@ -449,7 +449,7 @@ static int   g_castGripOK[SCN_MAXCAST];
 /* ⭐ (11-11) A SET ACTOR HOLDS A PROP. Her line's `prop=`/`prop2=` are a scene prop's spec. As she is drawn she publishes her grip and her attach
  * points into the voice slot (SCN_VOICE: the cast slot that has no body, so its held-prop places were always empty), and drawHeld copies her
  * spec there: the same parser, resolver and draw as a scene body's prop, a frame old like every held prop. One actor at a time, the first that
- * asks. The Facade video's chorus 3a: "a tiny whole copy of her holding a dripping heart", the copy a set actor. */
+ * asks. The music video's chorus: a tiny whole copy of her holding a prop, the copy a set actor. */
 static void actorHeldPublish(Pack*P,M4*W,const float*mdl){
     const int s=SCN_VOICE; int gb=(P->gripNode>=0)?P->gripNode:P->pb[11];
     if(gb>=0){ ptWorld(W[gb],mdl,g_castGripW[s]); g_castGripOK[s]=1; m4_mul(g_castGripM[s],(float*)mdl,W[gb]); }
@@ -461,13 +461,13 @@ static void actorHeldSync(void){
     memcpy(g_castProp[s],g_setA[who].prop,PROP_SPEC); memcpy(g_castProp2[s],g_setA[who].prop2,PROP_SPEC);
     static int said9=0; if(more&&!said9){ said9=1; printf("[held] more than one set actor holds a prop: only actor %d's are drawn (one at a time, through the voice slot)\n",who); fflush(stdout); } }
 
-/* ⭐ A HELD PROP THAT IS A LIGHT (ROBOT NEKO ep 4) --------------------------------------
+/* ⭐ A HELD PROP THAT IS A LIGHT --------------------------------------
  *     stem@size@pitch@where@RRGGBB@light        (or @light:6 for the power)
  * The sixth field turns the thing in her hand into a PRACTICAL: a point light at the exact
  * world position drawHeld puts the mesh, coloured by the prop's own tint, lighting the
  * bodies, the set, the actors and the faces like any other practical -- and the prop draws
  * EMISSIVE, so it reads as the source instead of as a dark lump held by someone lit by it.
- * (ep 2's lesson, one rung up: a prop the audience must watch gets a colour. A prop the
+ * (an earlier lesson, one rung up: a prop the audience must watch gets a colour. A prop the
  * audience must watch AT NIGHT has to make its own.)
  *
  * ⛔ THE SHADER HAS SIX PRACTICALS AND A SET COULD CLAIM ALL SIX. A set may now take
@@ -478,7 +478,7 @@ static void actorHeldSync(void){
  * ONE PARSER. drawHeld used to pick the string apart inline; the light needs the same
  * fields, and two parsers of one string is how a light ends up in the other hand. */
 #define HELD_LIGHT_POW 5.f
-/* ⭐ ep 12: AND IT CAN SMOKE. `@smoke` (or `@smoke:<rate>`, 1 = a cigarette) makes the prop's FAR TIP
+/* ⭐ AND IT CAN SMOKE. `@smoke` (or `@smoke:<rate>`, 1 = a cigarette) makes the prop's FAR TIP
  * -- the end of its longest side away from the grip -- give off a wisp (smokeTick). The fields after
  * the colour are KEYWORDS, in either order: `@light:0.5@smoke` and `@smoke@light:0.5` are one prop. */
 static void specTooLong(const char*v){
@@ -498,7 +498,7 @@ static int heldParse(const char*s,HeldSpec*H){
             case 0: snprintf(H->stem,32,"%.31s",f); break;
             case 1: H->size=(float)atof(f); break;
             case 2: H->pitch=(float)atof(f)*0.0174533f; break;
-            /* ⭐ ep 12: `where:0.3` -- the hand holds the prop 30% of the way from its grip end to its far tip,
+            /* ⭐ `where:0.3` -- the hand holds the prop 30% of the way from its grip end to its far tip,
              * instead of by the end. A cigarette is held a third of the way along with the filter out on the palm
              * side; held by its end, the filter sat IN the knuckle and the drag put her knuckles on her face. */
             case 3: { char*c9=strchr(f,':'); if(c9){ *c9=0; H->along=(float)atof(c9+1);
@@ -510,8 +510,8 @@ static int heldParse(const char*s,HeldSpec*H){
                           H->tint[1]=((hx9>>8)&255)/255.f; H->tint[2]=(hx9&255)/255.f; } } break;
             default: if(!strncmp(f,"light",5)){ H->lpow=(f[5]==':')?(float)atof(f+6):HELD_LIGHT_POW;
                         if(H->lpow<0.f) H->lpow=0.f;
-                        { const char*r9=(f[5]==':')?strchr(f+6,':'):NULL; H->lreach=r9?(float)atof(r9+1):0.f; } }   /* ⭐ ep 12: light:<power>:<reach> */
-                    else if(!strncmp(f,"smoke",5)){ H->smoke=(f[5]==':')?(float)atof(f+6):1.f;   /* ⭐ ep 12 */
+                        { const char*r9=(f[5]==':')?strchr(f+6,':'):NULL; H->lreach=r9?(float)atof(r9+1):0.f; } }   /* ⭐ light:<power>:<reach> */
+                    else if(!strncmp(f,"smoke",5)){ H->smoke=(f[5]==':')?(float)atof(f+6):1.f;
                         if(H->smoke<0.f) H->smoke=0.f; }
                     else if(f[0]){ static char said9[PROP_SPEC]={0};
                         if(strcmp(said9,s)){ snprintf(said9,PROP_SPEC,"%s",s);
@@ -538,7 +538,7 @@ static int heldAtt1(int i){
     return a; }
 /* ⭐ ONE ATTACH RESOLVER for both slots and for both the mesh and the light -- the same
  * reason there is ONE parser: a torch whose light and whose mesh disagreed about which
- * hand it was in is the exact bug ep 4's comment warns about, and a second slot doubles
+ * hand it was in is the exact bug an earlier comment warns about, and a second slot doubles
  * the chances of it.
  * ⛔ AN UNSPECIFIED SECOND PROP MUST NOT LAND IN THE FIRST ONE'S FIST. attOf("") is
  * ATT_HAND, so a script that said `hprop2=` and no `@where` would have drawn both things
@@ -553,7 +553,7 @@ static int heldAttach(int i,const HeldSpec*H,int which,int*collide){
     if(H->where[0])   att=attOf(H->where);              /* the script said where: obey it */
     else if(which==0) att=ATT_HAND;                     /* the old default, unchanged */
     else              att=(a1==ATT_HAND)?ATT_LHAND:ATT_HAND;
-    /* ⭐ A PROP CAN REST ON A MARK (ROBOT NEKO ep 9). A `where` that names no part of a body is
+    /* ⭐ A PROP CAN REST ON A MARK. A `where` that names no part of a body is
      * looked up as a SET MARK, and the thing lies there -- at the mark's height, turned to its
      * yaw. It is how a skateboard is on the ground until someone bends down and picks it up:
      * `@m_board` on one line, `@hand` on the next, cut on the action. */
@@ -565,7 +565,7 @@ static int heldAttach(int i,const HeldSpec*H,int which,int*collide){
             D[12]=MK9->x; D[13]=MK9->y; D[14]=MK9->z; D[15]=1.f;
             g_castAttOK[i][ATT_MARK]=1; att=ATT_MARK; }
         else if(i>=0&&i<SCN_MAXCAST&&which>=0&&which<2){
-            /* ⭐ ep 12: not a mark -- ask the body for a BONE of that name (attPublish answers, and says so once) */
+            /* ⭐ not a mark -- ask the body for a BONE of that name (attPublish answers, and says so once) */
             if(strcmp(g_castBoneReq[i][which],H->where)) snprintf(g_castBoneReq[i][which],32,"%s",H->where);
             if(g_castAttOK[i][ATT_BONE+which]) return ATT_BONE+which;
             if(g_castBonePk[i][which]&&g_castBoneNd[i][which]<0&&!strcmp(g_castBoneHas[i][which],H->where)){
@@ -586,12 +586,12 @@ static int heldAttach(int i,const HeldSpec*H,int which,int*collide){
  * (One frame old, like the props themselves -- drawHeld runs before the hero is drawn.)
  * ⛔ TWO PER BODY NOW. This array was SCN_MAXCAST long because a body could only hold one
  * thing; the second slot doubles what the loop can collect, and a cap that does not move
- * with the thing feeding it is precisely how ep 4 shipped a set that uploaded 3 of its
+ * with the thing feeding it is precisely how one scene shipped a set that uploaded 3 of its
  * lamps. It is a guard as well as a size -- the collector refuses past it, loudly. */
 #define HELD_LIGHT_MAX (SCN_MAXCAST*2)
 static float g_hlP[HELD_LIGHT_MAX][3], g_hlC[HELD_LIGHT_MAX][3];
-static float g_hlK[HELD_LIGHT_MAX];      /* ⭐ ep 12: each held light's reach, as extra falloff (lightReachK) */
-static int   g_hlEmber[HELD_LIGHT_MAX];   /* ⭐ ep 12: this held light is a smoking prop's coal -- the smoke takes it up close */
+static float g_hlK[HELD_LIGHT_MAX];      /* ⭐ each held light's reach, as extra falloff (lightReachK) */
+static int   g_hlEmber[HELD_LIGHT_MAX];   /* ⭐ this held light is a smoking prop's coal -- the smoke takes it up close */
 static int   g_nHL=0;
 /* ONE COLLECTOR, called once per slot per body. Inlining this twice is how the two hands
  * drift apart one fix at a time. */
@@ -611,9 +611,9 @@ static void heldLightOne(int i,const char*spec,int which,char*said){
             printf("[held] more than %d held lights in one frame -- the rest stay dark (HELD_LIGHT_MAX)%c",HELD_LIGHT_MAX,10); fflush(stdout); }
         return; }
     /* ⛔ A HELD PRACTICAL IS MEASURED AGAINST THE SKY IT WILL BE SEEN UNDER, like a set's
-     * lamps. The falloff is 1/(1+dd*0.055): HALF BRIGHTNESS AT 4.26 CLUB UNITS and no range
+     * lamps. The falloff is 1/(1+dd*0.055): HALF BRIGHTNESS AT 4.26 ENGINE UNITS and no range
      * at all, so a power that looks right on a face at arm's length is a floodlight on a
-     * house nine units away. ROBOT NEKO ep 5 wrote `light:6` for a TORCH and it lit an entire
+     * house nine units away. The stop-motion show wrote `light:6` for a TORCH and it lit an entire
      * clapboard wall to white -- at tod=21.5 the sky ambient is 0.038 and that torch is ~80x
      * it. `design/the_set.md` has said "a lamp you are standing next to is about 1.5, not 6"
      * since Z6; nothing ever checked, so both light-authoring surfaces ignored it. */
@@ -624,7 +624,7 @@ static void heldLightOne(int i,const char*spec,int which,char*said){
         if(ratio9>8.f) printf("[held]   WARNING: that will SWAMP this sky -- the frame will read "
                               "as daylight however dark sun=/tod= is set. A sane practical is ~1.5.%c",10);
         fflush(stdout); }
-    /* ⭐ ep 12: A PROP WITH A GLOW MESH (the ember) LIGHTS FROM THE GLOW, IN THE GLOW'S COLOUR. A lit
+    /* ⭐ A PROP WITH A GLOW MESH (the ember) LIGHTS FROM THE GLOW, IN THE GLOW'S COLOUR. A lit
      * cigarette in F2EFE8 paper was a white lamp in her fist; the light is the coal at its tip, orange,
      * where drawHeldOne last put it. And a smoking prop's light rises with the DRAG (heldDragK). */
     float lp9[3], lc9[3]={H.tint[0],H.tint[1],H.tint[2]}, pw9=H.lpow;
@@ -655,7 +655,7 @@ static void heldLightsTick(void){
  * `used` is how many slots the caller filled from 0 up; the held ones fill from the top
  * down and stop at `used`, loudly. Every site that uploads lp/lc calls this, which is what
  * makes a held light light EVERYTHING rather than only whatever was patched last. */
-static float g_stampK[NLIGHT];   /* ⭐ ep 12: the reach (extra falloff) of each slot lightsStamp just filled; 0 = the club's */
+static float g_stampK[NLIGHT];   /* ⭐ the reach (extra falloff) of each slot lightsStamp just filled; 0 = the engine's */
 static void lightsStamp(float*lp,float*lc,int used){
     memset(g_stampK,0,sizeof g_stampK);
     heldLightsTick();
@@ -693,7 +693,7 @@ static int heldFind(const char*stem){
                      if(c>hi[k]) hi[k]=c; } }
              for(int k=0;k<3;k++) if(hi[k]-lo[k]>ext9) ext9=hi[k]-lo[k];
              loY9=lo[1]; hiY9=hi[1]; memcpy(lo9,lo,12); memcpy(hi9,hi,12);
-             /* ⭐ ep 10: a board's DECK TOP is the highest point over the MIDDLE of its long axis -- its kicks rise past it */
+             /* ⭐ a board's DECK TOP is the highest point over the MIDDLE of its long axis -- its kicks rise past it */
              { int lx9=(hi[0]-lo[0])>=(hi[2]-lo[2]); float c9=lx9?0.5f*(lo[0]+hi[0]):0.5f*(lo[2]+hi[2]);
                float w9=0.2f*(lx9?(hi[0]-lo[0]):(hi[2]-lo[2]));
                /* ...and over the middle of its WIDTH: a deck is CONCAVE, its rails stand ~0.01 u above where a foot rests */
@@ -703,7 +703,7 @@ static int heldFind(const char*stem){
                        if(fabsf(a9-c9)<=w9&&fabsf(b9-cc9)<=cw9&&vp[v*3+1]>deckY9) deckY9=vp[v*3+1]; } } } }
            printf("[prop] held '%s' loaded as pack %d (%u meshes), longest side %.3f%c",stem,idx,g_setPk[idx].nMeshes,ext9,10); }
     else printf("[prop] held '%s' NOT FOUND (props/%s.rpack)%c",stem,stem,10);
-    /* ⭐ ep 12: THE TWO ENDS AND THE GLOW. The far tip is the end of the longest side farther from the
+    /* ⭐ THE TWO ENDS AND THE GLOW. The far tip is the end of the longest side farther from the
      * origin (the grip); a mesh named `...#rrggbb*` is the part that glows -- its vertex centroid is where
      * the ember is, and its colour is the light's. */
     { HeldProp*HQ=&g_held[g_nHeld]; float c9[3]; int ax9=0;
@@ -733,7 +733,7 @@ static int heldFind(const char*stem){
     fflush(stdout);
     return idx; }
 
-/* ⭐ THE BOARD CHANNEL (ROBOT NEKO ep 10) --------------------------------------------------------
+/* ⭐ THE BOARD CHANNEL --------------------------------------------------------
  *     stem@size@pitch@board
  * `@deck` put a board under a rider's ROOT and could never flip, pop or leave the floor: the board
  * is where the body is, not where the move says. `@board` hangs it off the CLIP instead. For the
@@ -813,7 +813,7 @@ static int boardChanSample(Pack*P,PClip*c,double ph,int frac,float T[3],float Q[
             for(int k=0;k<3;k++) T[k]=a[k]+(b[k]-a[k])*ft;
             got|=1; } }
     return got==3; }
-/* ⭐ ep 10: WHERE A @board RIDER'S FLOOR IS, in the rig's own units. The skate clips were authored on their own
+/* ⭐ WHERE A @board RIDER'S FLOOR IS, in the rig's own units. The skate clips were authored on their own
  * floor (the stand's lowest sole vertex) and a rig's bind mesh can reach below it -- reva's does, by 0.038 u, so
  * placing her by P->mny sank her board into the scan. The ride channel knows the answer exactly: in
  * z_rm_sk_ride_bd's first frame the board is flat with its wheels ON the authored floor. NAN when there is no
@@ -866,7 +866,7 @@ static void boardPublish(int slot,Pack*cp,int ci,double ph,int frac,const float*
         if(!said9[slot]){ said9[slot]=1;
             printf("[board] slot %d: no channel pose yet -- the board lies on the floor under the root until a clip carries one\n",slot); fflush(stdout); } }
     g_castAttOK[slot][ATT_BOARD]=1; }
-/* ⭐ FOR THE CLIPPING AUDIT (ep 10): the eight world corners of the board slot `slot` drew this frame
+/* ⭐ FOR THE CLIPPING AUDIT: the eight world corners of the board slot `slot` drew this frame
  * or the last -- out[0..3] its mesh box's TOP ring (max Y: the deck), out[4..7] its BOTTOM ring (min
  * Y: the wheels), each ring (lo x,lo z) (hi x,lo z) (hi x,hi z) (lo x,hi z) in the mesh's own axes.
  * Returns 0 when that slot drew no board. */
@@ -878,7 +878,7 @@ static int boardCornersW(int slot,float out[8][3]){
         for(int a=0;a<3;a++) out[k][a]=M[a]*p[0]+M[4+a]*p[1]+M[8+a]*p[2]+M[12+a]; }
     return 1; }
 
-/* ⭐ ONE-SHOT TRICKS INSIDE A LINE (ROBOT NEKO ep 10) -------------------------------------------
+/* ⭐ ONE-SHOT TRICKS INSIDE A LINE -------------------------------------------
  *     htrick=clip@sec[,clip@sec...]   ptrick=  p2trick=  p3trick=
  * `sec` after the line's staging applied, on an EXPOSURE, the slot's body cuts to the clip at phase
  * 0 and plays it ONCE -- no loop, no hold -- then cuts back to the clip the line gave it, at phase 0.
@@ -903,7 +903,7 @@ static void trickClampEnd(int slot,double*ph,const PClip*c){
     if(!c||c->frames<1) return;
     if(*ph>=(double)(c->frames-1)){ *ph=(double)(c->frames-1); g_trkDone[slot]=1; } }
 
-/* ⭐ A BODY ON A DECK STANDS ON IT (ROBOT NEKO ep 9). Lifted by the board's own measured height
+/* ⭐ A BODY ON A DECK STANDS ON IT. Lifted by the board's own measured height
  * at its held size, so the soles land on the deck and the wheels stay on the floor. 0 when
  * neither prop slot is `@deck`. */
 static float castDeckLift(int slot){
@@ -915,10 +915,10 @@ static float castDeckLift(int slot){
             float k9=(g_held[h9].ext>1e-5f)?(H.size/g_held[h9].ext):H.size;
             return g_held[h9].hgt*k9; } }
     return 0.f; }
-#define castRides(s) (castDeckLift(s)>0.f||castOnBoard(s))   /* ⭐ ep 10: on its @board channel a body rides too -- with NO lift */
+#define castRides(s) (castDeckLift(s)>0.f||castOnBoard(s))   /* ⭐ on its @board channel a body rides too -- with NO lift */
 
-/* ⭐ EVERY BODY WALKS WHERE IT GOES (ROBOT NEKO ep 9) ---------------------------------------
- * In ep 8 reva and kaeli slid about together without walking. Two causes, both
+/* ⭐ EVERY BODY WALKS WHERE IT GOES ---------------------------------------
+ * In one scene reva and the co-star slid about together without walking. Two causes, both
  * read out of this file rather than guessed:
  *  1. the partner's gait was keyed on g_partSpd -- how fast her GAP and SIDE change, i.e. her
  *     offset from the hero. When the PAIR walks that offset is constant, so she read as
@@ -928,7 +928,7 @@ static float castDeckLift(int slot){
  *     walk state. A body sent to a new mark now WALKS there -- turns to face the line, goes,
  *     comes to rest on the mark, turns onto its yaw -- with a walk state of its own.
  *     `snap=1` still lands on the cut.
- * A body with wheels (Kickflip), or standing on a `@deck`, ROLLS: the same travel, no gait.
+ * A body with wheels (a wheeled rig), or standing on a `@deck`, ROLLS: the same travel, no gait.
  * Travel advances on the EXPOSURE clock, so a stop-motion puppet is moved between exposures. */
 typedef struct {
     int    on;                  /* travelling to (or turning onto) its mark */
@@ -936,8 +936,8 @@ typedef struct {
     float  wx, wz; int winit;   /* last exposure's DRAWN spot, for the measured speed */
     float  spd;                 /* measured world speed, eased -- what the gait keys on */
     float  walkMix; double walkPh; Pack*walkP; int walkC;
-    float  px, pz, pyaw; int pon;   /* PUBLISHED on the exposure -- what every draw reads (ep 9) */
-    /* ⭐ ep 10: A PATH. `hold` = stopped where a path ended, facing its last tangent: the draw keeps that
+    float  px, pz, pyaw; int pon;   /* PUBLISHED on the exposure -- what every draw reads */
+    /* ⭐ A PATH. `hold` = stopped where a path ended, facing its last tangent: the draw keeps that
      * spot and facing instead of snapping onto the mark's yaw. trav is the travel heading (atan2(dx,dz),
      * the yaw convention); bank is the carve, + tipping the top toward (cos trav, -sin trav). The p-
      * forms are published with px/pz, on the exposure. */
@@ -953,22 +953,22 @@ typedef struct {
 static int wrrtRoute(int slot,float sx,float sz,float tx,float tz,float*ox,float*oz,int max);   /* defined after the audit grid */
 static Loco  g_loco[SCN_MAXCAST];
 static float g_stageV9=0.f;     /* the pair's own walk speed, when a line carries hx/hz */
-/* ⭐ PLACE AND POSE CHANGE ON THE SAME FRAME (ep 9). The scene tick that advances a walk runs after
+/* ⭐ PLACE AND POSE CHANGE ON THE SAME FRAME. The scene tick that advances a walk runs after
  * the draw, so a travelling body used to change pose on the exposure and position one frame later --
  * two changing frames per exposure at 60fps. The draws read this, refreshed once per frame and only
  * on an exposure. */
-static void pipePublishAll(void);   /* ⭐ ep 11: a half-pipe ride publishes on the same exposure (below) */
+static void pipePublishAll(void);   /* ⭐ a half-pipe ride publishes on the same exposure (below) */
 static void locoPublish(void){
     static unsigned stamp9=0xffffffffu;
     if(stamp9==g_frameStamp) return;
     stamp9=g_frameStamp;
     if(g_stepFps>0.f&&g_stepHeld) return;      /* a held exposure shows the spot it already showed */
     for(int s=0;s<SCN_MAXCAST;s++){ Loco*L=&g_loco[s]; L->px=L->x; L->pz=L->z; L->pyaw=L->yaw; L->pon=L->on;
-        L->ptrav=L->trav; L->pbank=L->bank; L->phold=L->hold; }   /* ⭐ ep 10: the carve and a path's end ride the same exposure */
+        L->ptrav=L->trav; L->pbank=L->bank; L->phold=L->hold; }   /* ⭐ the carve and a path's end ride the same exposure */
     pipePublishAll(); }
 #define LOCO_CRUISE 2.10f       /* u/s -- 1.2 m/s at 1.75 u/m: a stroll across a set */
 #define LOCO_TURN   4.5f        /* rad/s the facing swings while walking */
-#define LOCO_RIDE   1.50f       /* u/s -- z_board_push's planted foot sweeps the floor at ~1.5 (reva 1.48, kaeli 1.60) */
+#define LOCO_RIDE   1.50f       /* u/s -- z_board_push's planted foot sweeps the floor at ~1.5 (reva 1.48, the co-star 1.60) */
 
 /* The speed a walking body should have at the next exposure.
  *   v     its speed now, u/s          left  distance still to go along the line, u
@@ -976,7 +976,7 @@ static void locoPublish(void){
  *   cruise the pace it is heading for, u/s: LOCO_CRUISE on foot, LOCO_RIDE on a board
  * Used by a mark walk AND by the pair walk (hx/hz). The caller clamps the step to `left`,
  * so this cannot overshoot the mark -- what it decides is how getting there FEELS. */
-/* ⭐ ep 10: the trapezoid with its two rates named, so a path can say its own (3.0 up, 2.5 down) */
+/* ⭐ the trapezoid with its two rates named, so a path can say its own (3.0 up, 2.5 down) */
 static float locoProfile(float v,float left,float dt,float cruise,float acc,float brk){
     float up=v+acc*dt; if(up>cruise) up=cruise;
     float stopV=sqrtf(2.f*brk*(left>0.f?left:0.f));   /* the fastest that still stops in `left` */
@@ -984,7 +984,7 @@ static float locoProfile(float v,float left,float dt,float cruise,float acc,floa
     if(w<0.25f&&left>0.03f) w=0.25f;                  /* never stall short: a coarse step rounds the last cm away */
     return w; }
 static float locoSpeed(float v,float left,float dt,float cruise){
-    /* ⭐ A TRAPEZOID, NOT A DRAG (ep 9). Build toward cruise at a measured acceleration, never
+    /* ⭐ A TRAPEZOID, NOT A DRAG. Build toward cruise at a measured acceleration, never
      * faster than the speed that can still brake to zero in the ground left -- which is what
      * puts the stop ON the mark. A board builds and brakes gentler than feet: it coasts. */
     int ride9=(cruise<=LOCO_RIDE+0.01f);
@@ -992,8 +992,8 @@ static float locoSpeed(float v,float left,float dt,float cruise){
     const float B9=ride9?1.6f:3.4f;          /* u/s^2: braking; ~0.65 u from walking pace */
     return locoProfile(v,left,dt,cruise,A9,B9); }
 
-/* ⭐ ep 10: RIDERS GO AROUND THE PARK, NOT MARK TO MARK ----------------------------------------------------
- * ep 10 is skated AROUND the Southbank Undercroft, and a mark walk is a straight line. A PATH is
+/* ⭐ RIDERS GO AROUND THE PARK, NOT MARK TO MARK ----------------------------------------------------
+ * A skate scene goes AROUND a skatepark, and a mark walk is a straight line. A PATH is
  * `hpath=a,b,c` on a scene line (ppath/p2path/p3path for the other slots): a CENTRIPETAL CATMULL-ROM
  * (alpha 0.5, the Barry-Goldman pyramid) through
  *      C0 = where the body stands now, then the marks in order, with both ends duplicated
@@ -1015,7 +1015,7 @@ static float locoSpeed(float v,float left,float dt,float cruise){
 #define LOCO_PSPD    3.0f        /* u/s: a path's cruise unless the line says hspd= */
 #define LOCO_PACC    3.0f        /* u/s^2 */
 #define LOCO_PBRK    2.5f        /* u/s^2 */
-#define LOCO_G       17.15f      /* g in club units/s^2 (9.8 m/s^2 x 1.75 u/m) */
+#define LOCO_G       17.15f      /* g in engine units/s^2 (9.8 m/s^2 x 1.75 u/m) */
 #define LOCO_BANKMAX 0.3141593f  /* 18 degrees */
 typedef struct { int n, closed; float ds, len; float x[LOCO_PU], z[LOCO_PU], h[LOCO_PU], k[LOCO_PU]; char end[32]; char spec[512]; } LocoPath;
 static LocoPath g_lpath[SCN_MAXCAST];
@@ -1024,38 +1024,38 @@ static float g_castSpd[SCN_MAXCAST];         /* its speed, u/s; 0 = LOCO_PSPD */
 static int   g_castLoop[SCN_MAXCAST];        /* hloop=1: keep circling a CLOSED route */
 static int   g_castPathSeg[SCN_MAXCAST];     /* the staged line's path RUN (its first line), -1 = none */
 static int   g_locoSeg[SCN_MAXCAST]={-1,-1,-1,-1,-1};   /* the run each slot last STARTED; a run starts once, in order */
-static int   g_locoEarly[SCN_MAXCAST]={-1,-1,-1,-1,-1}; /* ⭐ ep 13: the run a slot was HANDED ON TO early (its line not staged yet), or -1 */
+static int   g_locoEarly[SCN_MAXCAST]={-1,-1,-1,-1,-1}; /* ⭐ the run a slot was HANDED ON TO early (its line not staged yet), or -1 */
 static int   g_locoPathReset=0;              /* scnLoad: a replayed scene rolls its paths again */
 static int   g_leanOff=0;                    /* ctl lean=0: no carve */
-/* ⭐ ep 10: THE TRACKING LENS's state (camTrackTick, below locoTick). Declared here because scnLoad clears it. */
+/* ⭐ THE TRACKING LENS's state (camTrackTick, below locoTick). Declared here because scnLoad clears it. */
 typedef struct {
     int   mode;                         /* 0 off, 1 camtrack, 2 campan, 3 cammove, 4 camorbit, 5 camhold (the filmer's own camera) */
     int   holder;                       /* camhold: the slot whose hand the camera is in */
     float drop;                         /* camhold: u below the hand -- the phone dropped toward the ground */
     int   slot, snap, line;
-    int   habs;                         /* ep 11: `height` is ABSOLUTE world y (`=h`), not a height above the body */
+    int   habs;                         /* `height` is ABSOLUTE world y (`=h`), not a height above the body */
     float dist, height, azim, fov, aimh;   /* camorbit: dist is its radius */
     float eye[3];                       /* campan: the pinned eye */
     float eS[3], eV[3], aS[3], aV[3];   /* the spring: eye and aim, and their velocities */
-    float yF, yV;                       /* ep 11: the body's height through a fast pre-filter; yV = its vertical speed */
-    float mA[7], mB[7];                 /* ep 11: cammove's start and end -- eye, aim, fov */
-    float d0, d1;                       /* ep 11: camorbit's world headings, degrees */
-    float mt, mT;                       /* ep 11: lens seconds into the move/sweep, and its length */
+    float yF, yV;                       /* the body's height through a fast pre-filter; yV = its vertical speed */
+    float mA[7], mB[7];                 /* cammove's start and end -- eye, aim, fov */
+    float d0, d1;                       /* camorbit's world headings, degrees */
+    float mt, mT;                       /* lens seconds into the move/sweep, and its length */
     int   wc; float wcP[3];             /* ⭐ 10-22: camorbit round a WORLD point (camat=), not a body */
 } CamTrk;
 static CamTrk g_camTrk;
 #define CAMTRK_W 6.0f                   /* rad/s: the lens spring, critically damped */
 #define CAMHOLD_W 9.0f                  /* rad/s: a hand-held camera's AIM -- quicker than a dolly, still late */
-#define CAMTRK_WY 20.0f                 /* rad/s: ep 11, the height pre-filter. MEASURED (scratch harness, a rider rolling
+#define CAMTRK_WY 20.0f                 /* rad/s: the height pre-filter. MEASURED (scratch harness, a rider rolling
                                          * 0 -> 5 u -> 0 every 2.4 s, lens at 60): the aim trails her by 1.83 u with no lead,
                                          * 1.38 at 8 rad/s, 0.93 at 15, 0.79 at 20, 0.64 at 30 -- and a height stepped at
                                          * 12/s adds 0.0012 u of ripple at 20 (0.0025 at 30). 20 is the knee. */
-/* ⭐ ep 11: camshake -- amp (u, the most the eye strays) and rate (Hz). Sticky; 0 = off. Its own clock is the lens's. */
+/* ⭐ camshake -- amp (u, the most the eye strays) and rate (Hz). Sticky; 0 = off. Its own clock is the lens's. */
 static float g_camShk[2]={0.f,1.5f};
 static float g_camShkT=0.f;
 
 static float locoWrap(float a){ while(a>3.14159265f) a-=6.28318531f; while(a<-3.14159265f) a+=6.28318531f; return a; }
-/* ⭐ A RIDER TRAVELS ALONG ITS BOARD, not along its chest (ep 9) -- ONE rule for the mark walk, the paths
+/* ⭐ A RIDER TRAVELS ALONG ITS BOARD, not along its chest -- ONE rule for the mark walk, the paths
  * and the lens: @deck runs the board across the body, so it faces -90 off its travel with its LEFT side
  * leading (regular); a wheeled rig says which way its own board runs (wheelYaw, measured at load). */
 static int locoIsRider(int s){
@@ -1066,7 +1066,7 @@ static float locoRideOff(int s){
     if(rp&&rp->nWheel) return rp->wheelYaw;
     return castRides(s)?-1.5707963f:0.f; }
 
-/* ⭐ ep 11: RIDING A HALF-PIPE ------------------------------------------------------------------------------
+/* ⭐ RIDING A HALF-PIPE ------------------------------------------------------------------------------
  *     hpipe=<name>[,<air>]   ppipe=  p2pipe=  p3pipe=     air: u above the coping at the apex (2.0); `off` stops
  *     hair=<clip>[,<clip>...]   pair=  p2air=  p3air=      a one-shot at the START of each air, cycling the list
  * A slot on a pipe runs the VERT CYCLE in its cross-section, at the station along the axis nearest where it
@@ -1080,7 +1080,7 @@ static float locoRideOff(int s){
  * surface normal on the ramp (0 on the flat, 90 into the vert) and an air only takes the pitch to 0 and back
  * while the yaw turns (frontside, then backside). The stance is the rider convention (locoRideOff: the board
  * along the travel, LEFT side leading); only an air turns it, so a stall at the lip rides back down fakie.
- * Place + pose are PUBLISHED on the exposure with the loco's (ep 9), and the body's AUTHORED floor
+ * Place + pose are PUBLISHED on the exposure with the loco's, and the body's AUTHORED floor
  * (boardAuthoredFloor) is what touches the surface, so a @board rider's board follows by construction. */
 #define PIPE_DROP   0.40f      /* s: tipping over the coping before the fall */
 #define PIPE_PUMP   6.0f       /* u/s^2: the most pumping may add along the travel */
@@ -1304,7 +1304,7 @@ static void crPoint(const float*P0,const float*P1,const float*P2,const float*P3,
  * (zero parametric speed), and a curvature taken over those millimetres is float noise the carve would show. */
 /* ⭐ (10-22) THE ROLL. A body's whole placement -- after its mark, its walk, its lean and its half-pipe -- turned about
  * an axis through a point, by an angle that runs at a rate: hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0]
- * (sticky; `off` hands it back). Viktor "trotted around the barrel like a veteran" (scene 2.2): he runs in place on the
+ * (sticky; `off` hands it back). A body running round the inside of a turning drum: he runs in place on the
  * mark at the drum's floor and the roll carries him round its axis at his own speed over its radius, head always to the
  * hub -- the lens, still in the drum's frame, sees him go up the wall and over the top. The rotation is applied to the
  * matrix the body is DRAWN with, and to its spot for the tracking lenses (locoWhere): a pan follows him round. */
@@ -1335,7 +1335,7 @@ static int locoPathBuild(int s,const char*spec,int haveC0,float c0x,float c0z,fl
     LP->n=0; LP->closed=0; LP->ds=0.f; LP->len=0.f; LP->end[0]=0; *len=0.f; *placed=0;
     const char*list=spec;
     if(!strncmp(spec,"@around:",8)){
-        /* ⭐ ep 13: A ROUTE AROUND A BODY. `@around:<slot>[,<radius>[,<points>]]` -- a closed circle of marks round
+        /* ⭐ A ROUTE AROUND A BODY. `@around:<slot>[,<radius>[,<points>]]` -- a closed circle of marks round
          * where that slot IS right now (its hips, when it is a ragdoll on the floor), entered at the point nearest
          * this body and run the way it is already travelling. Rebuilt every lap from LP->spec, so it re-centres on a
          * body that moves. Built for the filmer circling her fallen friend: a fixed route has to know where a slam
@@ -1505,7 +1505,7 @@ static void locoPathStart(int s,Loco*L,int snap,char*wasMark,const char*spec,int
     L->path=1; L->ps=0.f; L->plen=len; L->hold=0; L->on=1; L->lapping=0; L->laps=0; L->loopSaid=0; L->seg=seg;
     if(snap||len<0.03f){ locoPathLand(s,L,snap); return; }   /* snap=1 (or nowhere to go): LAND on the last mark */
     /* a body standing still is published AT ONCE, like a changed mark: it starts where it was drawn. A rolling
-     * one is NOT -- its own spot runs an exposure ahead of what is drawn, and ep 9's law is that place and pose
+     * one is NOT -- its own spot runs an exposure ahead of what is drawn, and the law is that place and pose
      * change on the same frame, so it publishes on its next exposure like every other step. */
     if(!live){ L->px=L->x; L->pz=L->z; L->pyaw=L->yaw; L->pon=L->on; L->ptrav=L->trav; L->pbank=L->bank; L->phold=L->hold; } }
 /* ⭐ hloop: a lap of a closed route is over. The same route is built again from where the body is -- its first
@@ -1566,13 +1566,13 @@ static void locoTick(float st8,int snap){
     static char was[SCN_MAXCAST][32];
     if(g_locoPathReset){ g_locoPathReset=0;
         for(int s=0;s<SCN_MAXCAST;s++){ Loco*L=&g_loco[s]; g_locoSeg[s]=-1; g_locoEarly[s]=-1; L->path=L->hold=L->phold=L->lapping=0; L->seg=-1; L->bank=L->pbank=0.f;
-            g_prd[s].on=g_prd[s].pon=0; g_pipePend[s][0]=0; } }   /* ⭐ ep 11: and drops in again */
+            g_prd[s].on=g_prd[s].pon=0; g_pipePend[s][0]=0; } }   /* ⭐ and drops in again */
     for(int s=0;s<SCN_MAXCAST;s++){
         if(s>0&&!g_cast[s].pk) continue;
         Loco*L=&g_loco[s];
         if(rdActive(s)){ snprintf(was[s],32,"%.31s",g_castMark[s]); g_locoSeg[s]=g_castPathSeg[s];
                          L->on=0; L->path=0; L->hold=1; L->spd=0.f; continue; }   /* ⛔ she is on the floor; nothing moves her */
-        /* 0. ⭐ ep 10: the script gave this body a PATH. A new RUN of values starts it from where the body stands;
+        /* 0. ⭐ the script gave this body a PATH. A new RUN of values starts it from where the body stands;
          *    the same value carried onto the next line is the same run and does not restart it. Runs start in
          *    order and once -- one already handed on early is not started again. Before the mark check,
          *    because it moves the body's mark to the path's last one. */
@@ -1583,7 +1583,7 @@ static void locoTick(float st8,int snap){
         if(strcmp(was[s],g_castMark[s])){
             snprintf(was[s],32,"%.31s",g_castMark[s]);
             SetMark*MK=markFind(g_castMark[s]);
-            L->on=0; L->path=0; L->hold=0; L->lapping=0; L->rn=0; L->ri=0; L->stuck=0.f;   /* ⭐ ep 10: a new mark ends a path, and lets go of where one stopped */
+            L->on=0; L->path=0; L->hold=0; L->lapping=0; L->rn=0; L->ri=0; L->stuck=0.f;   /* ⭐ a new mark ends a path, and lets go of where one stopped */
             if(MK&&!snap&&g_castAtOK[s]){
                 float dx=MK->x-g_castAt[s][0], dz=MK->z-g_castAt[s][1], d=sqrtf(dx*dx+dz*dz);
                 if(d>30.f){ printf("[walk] slot %d: %.1fu to '%s' is not a walk -- placed\n",s,d,MK->name); fflush(stdout); }
@@ -1594,7 +1594,7 @@ static void locoTick(float st8,int snap){
             /* a changed mark publishes AT ONCE: a walk starts where the body already stands, and a
              * placed mark lands on the cut -- neither may wait for the next exposure */
             L->px=L->x; L->pz=L->z; L->pyaw=L->yaw; L->pon=L->on; L->ptrav=L->trav; L->phold=L->hold; }
-        /* 2. walk it (⭐ ep 10: a path rolls in 2b instead) */
+        /* 2. walk it (⭐ a path rolls in 2b instead) */
         if(L->on&&!L->path&&st8>1e-6f){
             SetMark*MK=markFind(g_castMark[s]);
             if(!MK) L->on=0;
@@ -1612,8 +1612,8 @@ static void locoTick(float st8,int snap){
                 int ride9=locoIsRider(s);
                 /* ⭐ A RIDER TRAVELS ALONG ITS BOARD, not along its chest -- a skater stands sideways.
                  * @deck runs the board across the body (-90); a wheeled rig says which way its own
-                 * board runs (wheelYaw, measured at load: Kickflip's is along his Z, so 0). */
-                float off9=locoRideOff(s);   /* ⭐ ep 10: the one rule, shared with the paths and the lens */
+                 * board runs (wheelYaw, measured at load: a wheeled rig's is along its Z, so 0). */
+                float off9=locoRideOff(s);   /* ⭐ the one rule, shared with the paths and the lens */
                 float want=(left>0.03f)?(atan2f(dx,dz)+off9):MK->yaw*0.0174533f;
                 float dy=want-L->yaw;
                 while(dy> 3.14159265f) dy-=6.28318531f;
@@ -1632,8 +1632,8 @@ static void locoTick(float st8,int snap){
                            { float mx9=MK->x-L->x, mz9=MK->z-L->z; if(mx9*mx9+mz9*mz9>0.64f) colResolve(&L->x,&L->z,0.34f); }
                            /* ⭐ (10-22) A WALK THAT CANNOT GET THERE IS PLACED, LOUDLY. With no way round the furniture
                             * the walk goes straight, and the collider holds the walker against the first thing in the
-                            * way for the rest of the scene (Wanda outside the freezatorium's shut doors, Viktor at the
-                            * corner of the breakfast table). A third of the step for 0.6 s of walking is stuck. */
+                            * way for the rest of the scene (one body outside a room's shut doors, another at the
+                            * corner of a table). A third of the step for 0.6 s of walking is stuck. */
                            { float mv9=sqrtf((L->x-bx9)*(L->x-bx9)+(L->z-bz9)*(L->z-bz9));
                              if(stp>1e-4f&&mv9<0.33f*stp) L->stuck+=st8; else L->stuck=0.f;
                              if(L->stuck>0.6f){
@@ -1643,13 +1643,13 @@ static void locoTick(float st8,int snap){
                                  L->x=MK->x; L->z=MK->z; L->yaw=MK->yaw*0.0174533f; L->v=0.f; L->on=0; L->rn=0; L->ri=0; L->stuck=0.f; } } } }
                 else { L->x=MK->x; L->z=MK->z; L->v=0.f;
                        if(fabsf(dy)<0.02f){ L->on=0; printf("[walk] t %.2f slot %d arrived on '%s'\n",g_scnT,s,MK->name);   /* (10-23) timed: foley.py */ fflush(stdout); } } } }
-        /* 2b. ⭐ ep 10: ROLL IT ALONG ITS PATH, by arc length -- or land it, on a snap=1 line */
+        /* 2b. ⭐ ROLL IT ALONG ITS PATH, by arc length -- or land it, on a snap=1 line */
         if(L->on&&L->path&&snap) locoPathLand(s,L,1);
         else if(L->on&&L->path&&st8>1e-6f){
             float over=locoPathRoll(s,L,st8);
             int nx=(over>=0.f&&s<4&&L->seg>=0&&L->seg<g_scnN)?g_scnL[L->seg].pnext[s]:-1;
             if(nx>=0){   /* ⭐ it ran out before the next path's line: hand it straight on, at speed */
-                /* ⭐ ep 13: A PATH HANDED ON EARLY IS THAT LINE'S PATH -- its speed, its loop, its run. Started at the
+                /* ⭐ A PATH HANDED ON EARLY IS THAT LINE'S PATH -- its speed, its loop, its run. Started at the
                  * old run's speed under the old line's loop flag, the filmer's 2.4 u/s orbit began at 6.4, was not "in
                  * force" until its own line was staged, STOPPED after one lap -- and a stopped run with the same value
                  * never restarts. The next line's spd/loop are adopted here and PINNED (g_locoEarly) against the lines
@@ -1663,7 +1663,7 @@ static void locoTick(float st8,int snap){
                 locoPathStart(s,L,0,was[s],NL->path[s],nx);
                 if(L->on&&L->path&&over>0.f){ float x9,z9,h9,k9; L->ps=(over<L->plen)?over:L->plen;
                     locoPathAt(s,L->ps,&x9,&z9,&h9,&k9); L->x=x9; L->z=z9; L->trav=h9; } } }
-        /* 2c. ⭐ ep 10: THE CARVE. A rider on a path banks into the curve -- atan2(v^2 k, g), clamped to 18
+        /* 2c. ⭐ THE CARVE. A rider on a path banks into the curve -- atan2(v^2 k, g), clamped to 18
          *     degrees, eased with a 0.15 s time constant -- and comes back upright once it stops. */
         if(st8>1e-6f){ float bt=0.f;
             if(!g_leanOff&&L->on&&L->path&&locoIsRider(s)){ float x9,z9,h9,k9; locoPathAt(s,L->ps,&x9,&z9,&h9,&k9);
@@ -1677,12 +1677,12 @@ static void locoTick(float st8,int snap){
             if(v>12.f) v=0.f;                                  /* a jump is not a walk */
             L->wx=x; L->wz=z;
             L->spd+=(v-L->spd)*(1.f-expf(-st8/0.12f)); }
-        /* 4. ⭐ ep 11: A HALF-PIPE RIDE -- the draw's pipeModel() places the body over whatever 1-3 decided */
+        /* 4. ⭐ A HALF-PIPE RIDE -- the draw's pipeModel() places the body over whatever 1-3 decided */
         if(s<4) pipeTickSlot(s,st8); }
     g_heroStageSpd=g_loco[0].spd;
     { float m=0.f; for(int s=1;s<SCN_MAXCAST;s++) if(g_loco[s].spd>m) m=g_loco[s].spd; g_partSpd=m; } }
 
-/* ⭐ ep 10: A LENS THAT RIDES WITH A BODY -----------------------------------------------------------------
+/* ⭐ A LENS THAT RIDES WITH A BODY -----------------------------------------------------------------
  * camtrack: eye = P + Ry(azim)(-travel) dist + (0,height,0), aim = P + (0,aimh,0). P is the slot's
  * CONTINUOUS spot (locoWhere: the loco's own, never held back for publishing, so the lens glides while the
  * puppet steps) and travel is the way it is rolling, or leads when it stands. azim 0 chases, 180 leads
@@ -1692,7 +1692,7 @@ static void locoTick(float st8,int snap){
 static int rdHipsWorld(int slot,float*o);   /* defined with the ragdoll, below */
 static int locoWhere(int s,float*x,float*y,float*z,float*trav,float*vel){
     if(s<0||s>=SCN_BODIES) return 0;
-    if(pipeWhere(s,x,y,z,trav,vel)) return 1;   /* ⭐ ep 11: a pipe rider is where the ride has her, up the wall included */
+    if(pipeWhere(s,x,y,z,trav,vel)) return 1;   /* ⭐ a pipe rider is where the ride has her, up the wall included */
     { float hp[3]; if(rdHipsWorld(s,hp)){ *x=hp[0]; *y=hp[1]; *z=hp[2]; *trav=g_loco[s].trav; *vel=0.f; return 1; } }
     Loco*L=&g_loco[s];
     if(L->on||L->hold){ *x=L->x; *z=L->z; *trav=L->trav; *vel=L->on?L->v:0.f; }
@@ -1708,7 +1708,7 @@ static void camSpring(float*x,float*v,float xt,float w,float dt){   /* exact ste
     float y=*x-xt, e=expf(-w*dt), j=*v+w*y;
     *x=xt+(y+j*dt)*e;
     *v=(*v-w*j*dt)*e; }
-/* ⭐ ep 11: MOVING LENSES -----------------------------------------------------------------------------------
+/* ⭐ MOVING LENSES -----------------------------------------------------------------------------------
  * cammove (mode 3): eye, aim and fov eased (smoothstep) from the line's cam= to cammove= over mT lens seconds.
  * camorbit (mode 4): the lens circles a body. Its CENTRE is the tracking lens's aim -- the same continuous spot,
  * led and sprung -- but the circle itself is exact: eye = C - radius*(sin h, 0, cos h), the heading h eased from
@@ -1731,7 +1731,7 @@ static void camTrackTick(float dt){
     if(dt<0.f) dt=0.f;
     if(dt>0.25f) dt=0.25f;
     static int dbg=-1, dbgN=0; if(dbg<0){ const char*e=getenv("REVA_LENSDBG"); dbg=(e&&e[0]!='0'); }
-    if(T->mode==3){   /* ep 11: CAMMOVE -- no body, no spring: the ease IS the smoothing */
+    if(T->mode==3){   /* CAMMOVE -- no body, no spring: the ease IS the smoothing */
         T->mt+=dt;
         float e=lensEase((T->mT>1e-4f)?T->mt/T->mT:1.f);
         for(int k=0;k<3;k++){ g_camPos[k]=T->mA[k]+(T->mB[k]-T->mA[k])*e; g_camAim[k]=T->mA[3+k]+(T->mB[3+k]-T->mA[3+k])*e; }
@@ -1749,7 +1749,7 @@ static void camTrackTick(float dt){
     float dx=sinf(tr), dz=cosf(tr), ff=vel*2.f/CAMTRK_W;
     if(T->snap){ T->yF=y; T->yV=0.f; }
     else camSpring(&T->yF,&T->yV,y,CAMTRK_WY,dt);
-    float fy=T->yV*2.f/CAMTRK_W;   /* ep 11: the height's lead, as ff is the roll's */
+    float fy=T->yV*2.f/CAMTRK_W;   /* the height's lead, as ff is the roll's */
     float aim[3]={x+dx*ff, y+fy+T->aimh, z+dz*ff}, eye[3];
     if(T->mode==1){ float a=tr+T->azim*0.0174533f;
         eye[0]=x-sinf(a)*T->dist+dx*ff; eye[1]=T->habs?T->height:(y+fy+T->height); eye[2]=z-cosf(a)*T->dist+dz*ff; }
@@ -1780,7 +1780,7 @@ static void camTrackTick(float dt){
         for(int k=0;k<3;k++) camSpring(&T->aS[k],&T->aV[k],aim[k],CAMHOLD_W,dt); }
     else for(int k=0;k<3;k++){ camSpring(&T->eS[k],&T->eV[k],eye[k],CAMTRK_W,dt); camSpring(&T->aS[k],&T->aV[k],aim[k],CAMTRK_W,dt); }
     if(T->mode==2){ memcpy(T->eS,T->eye,12); memset(T->eV,0,12); }   /* a pan never moves its eye */
-    if(T->mode==4){   /* ep 11: the circle, exact, round the sprung centre */
+    if(T->mode==4){   /* the circle, exact, round the sprung centre */
         float h=(T->d0+(T->d1-T->d0)*lensEase((T->mT>1e-4f)?T->mt/T->mT:1.f))*0.0174533f;
         T->eS[0]=T->aS[0]-sinf(h)*T->dist;
         T->eS[1]=T->habs?T->height:(T->aS[1]-T->aimh+T->height);
@@ -1790,7 +1790,7 @@ static void camTrackTick(float dt){
     if((T->mode==1||T->mode==4||T->mode==5)&&T->fov>0.f) g_camFov=T->fov;
     if(dbg&&(++dbgN%30)==0){ printf("[lens] dbg mode %d slot %d body y %.2f vy %.2f eye %.2f,%.2f,%.2f aim %.2f,%.2f,%.2f\n",
             T->mode,T->slot,y,T->yV,g_camPos[0],g_camPos[1],g_camPos[2],g_camAim[0],g_camAim[1],g_camAim[2]); fflush(stdout); } }
-/* ⭐ ep 11: camshake's noise -- smooth VALUE noise (a lattice of hashed values, eased between with a quintic so the
+/* ⭐ camshake's noise -- smooth VALUE noise (a lattice of hashed values, eased between with a quintic so the
  * hand has no kinks), two octaves, per channel. White noise would be a vibrating tripod, not a person holding it. */
 static float lensHash(int i,int ch){
     unsigned h=(unsigned)i*374761393u+(unsigned)ch*668265263u;
@@ -1811,7 +1811,7 @@ static void camShakeApply(float dt,float*eye,float*ctr){
         float n=(lensNoise1(t,k)+0.5f*lensNoise1(t*2.13f+17.f,k+6))*(1.f/1.5f);
         if(k<3) eye[k]+=n*A; else ctr[k-3]+=n*A*(1.f/3.f); } }
 
-/* ⭐ ep 10: THE CARVE, APPLIED. Roll a body's model matrix about its travel axis through the ground contact
+/* ⭐ THE CARVE, APPLIED. Roll a body's model matrix about its travel axis through the ground contact
  * (x, floor, z) by the bank the loco PUBLISHED on this exposure, so the lean steps with the place and the
  * pose. BOTH draws call it, and whatever is built off the model after it -- the grips, the attach points,
  * a board hung off the body -- leans with the body. R turns up toward p = (cos trav, 0, -sin trav) by
@@ -1837,10 +1837,10 @@ static void locoLeanModel(float*model,int slot,float floorY){
  * and one of them would be missed. */
 static void drawHeldOne(int i,const char*spec,int which){
         const char*w9=which?" prop2":"";
-        /* ⭐ A REFUSAL IS SAID OUT LOUD (ROBOT NEKO ep 2). Every skip below was silent, so a script
+        /* ⭐ A REFUSAL IS SAID OUT LOUD. Every skip below was silent, so a script
          * put a coffee in two women's hands and a torch in one, the take came back with nothing
          * in anyone's hand, and the log did not say a word. Once per slot per prop string. */
-        /* ⭐ ep 10: A BOARD IS DRAWN IN ITS OWN PASS (drawBoards, after the cast has been posed), everything
+        /* ⭐ A BOARD IS DRAWN IN ITS OWN PASS (drawBoards, after the cast has been posed), everything
          * else here where it always was -- and it never falls back to the hand while its rider has not
          * published a board frame yet. Before the said9 latch, so the pass that skips does not eat the log. */
         { HeldSpec Hb9; int isB9=heldParse(spec,&Hb9)&&!strcmp(Hb9.where,"board");
@@ -1854,7 +1854,7 @@ static void drawHeldOne(int i,const char*spec,int which){
             if(tell9){ printf("[held] slot %d%s '%s' REFUSED: that body never published a grip%c",i,w9,spec,10); fflush(stdout); }
             return; }
         /* ⛔ A TOWN PROP IS SIZED FOR A STREET, NOT A HAND. v1_town_lantern went into
-         * susan's fist at lamppost scale and read as furniture. `stem@scale` sizes it;
+         * a body's fist at lamppost scale and read as furniture. `stem@scale` sizes it;
          * without one, 0.30, which is about the difference between a thing on a post and
          * a thing you carry. */
         /* stem@scale@pitch -- ⛔ THE HAND'S AXES ARE NOT THE PROP'S. A UE forearm runs
@@ -1889,7 +1889,7 @@ static void drawHeldOne(int i,const char*spec,int which){
          * held size on top of that would have shrunk every prop by the body's scale
          * factor and left a torch the size of a grain of rice. Take the basis, drop its
          * length, then apply the held scale. */
-        /* ⭐ A HELD SIZE IS A WORLD SIZE -- the longest side of the thing, in club units. The
+        /* ⭐ A HELD SIZE IS A WORLD SIZE -- the longest side of the thing, in engine units. The
          * film's scripts were written to exactly that contract (mug 0.21, torch 0.42, hammer 0.58,
          * board 2.45 = metres x 1.75) and this multiplied the MESH by it instead: the props are
          * authored in metres, so the coffee came out a tenth of its size and was never seen in
@@ -1908,9 +1908,9 @@ static void drawHeldOne(int i,const char*spec,int which){
         m[12]=g_castAttM[i][att9][12];
         m[13]=g_castAttM[i][att9][13];
         m[14]=g_castAttM[i][att9][14];
-        /* ⭐ ep 9: ON THE FLOOR, the prop's lowest point rests on it, wherever its origin is */
+        /* ⭐ ON THE FLOOR, the prop's lowest point rests on it, wherever its origin is */
         if(att9==ATT_DECK||att9==ATT_MARK){ for(int h9=0;h9<g_nHeld;h9++) if(g_held[h9].pk==pk){ m[13]-=g_held[h9].loY*k9; break; } }
-        /* ⭐ ep 10: ON ITS CHANNEL, THE FIT. The board frame's origin is the deck top's centre and its +X the
+        /* ⭐ ON ITS CHANNEL, THE FIT. The board frame's origin is the deck top's centre and its +X the
          * nose, so the MESH is mapped onto that: its longest HORIZONTAL side onto +X, the centre of its top
          * (max Y) onto the origin, scaled uniformly so its longest side is the spec's size in WORLD units --
          * g was normalised above, so the rider's own scale (kmoves 0.018) is already out of it. The pitch
@@ -1920,7 +1920,7 @@ static void drawHeldOne(int i,const char*spec,int which){
             float dk9=-1e9f;
             for(int h9=0;h9<g_nHeld;h9++) if(g_held[h9].pk==pk){ memcpy(lo9,g_held[h9].lo,12); memcpy(hi9,g_held[h9].hi,12); dk9=g_held[h9].deckY; break; }
             for(int a9=0;a9<3;a9++) if(hi9[a9]<lo9[a9]){ lo9[a9]=0.f; hi9[a9]=0.f; }
-            /* ⛔ ep 10: the channel's origin is the FLAT deck top. The mesh's max Y is the kick tips -- 0.223 u against
+            /* ⛔ the channel's origin is the FLAT deck top. The mesh's max Y is the kick tips -- 0.223 u against
              * a 0.161 u deck at size 1.4 -- and seating that at the origin sank the board 0.06 u under every foot. */
             float cx9=0.5f*(lo9[0]+hi9[0]), cy9=(dk9>-1e8f&&dk9<=hi9[1])?dk9:hi9[1], cz9=0.5f*(lo9[2]+hi9[2]);
             M4 fit9; memset(fit9,0,64); fit9[15]=1.f;
@@ -1932,7 +1932,7 @@ static void drawHeldOne(int i,const char*spec,int which){
             m4_mul(m,g,fit9);                      /* g still carries the board frame's world origin */
             memcpy(g_boardM[i],m,64); memcpy(g_boardLo[i],lo9,12); memcpy(g_boardHi[i],hi9,12);
             g_boardStamp[i]=g_frameStamp; g_boardDrawn[i]=1;
-            /* ⭐ ep 10: the board is audited like a body (B1's matrix, C's hook) -- by the points a board actually
+            /* ⭐ the board is audited like a body (B1's matrix, C's hook) -- by the points a board actually
              * has, not its box: four wheels (trucks ~0.30 of the length either side, 0.35 of the width out) and
              * the two tips just under the kick top. The box's lower corners hang below the kicks, so every tail
              * strike read as 0.19 u into the floor on the first take of THE FLOOR. */
@@ -1962,7 +1962,7 @@ static void drawHeldOne(int i,const char*spec,int which){
         { Pack*HP=&g_setPk[pk];
           if(lpow9>0.f||HP->nTex==0){   }
           else                      {   } }
-        /* ⭐ ep 12: HELD PART-WAY ALONG (`where:0.3`). The point `along` of the way from the prop's grip end (nearP)
+        /* ⭐ HELD PART-WAY ALONG (`where:0.3`). The point `along` of the way from the prop's grip end (nearP)
          * to its far tip goes to the attach point, instead of its origin -- so everything downstream (the ember's
          * light, the tip's smoke, the drag's filter-to-mouth test) reads the prop where it is actually held. */
         if(HS9.along>=0.f&&att9!=ATT_BOARD){ const HeldProp*HA9=heldPropOf(pk);
@@ -1978,7 +1978,7 @@ static void drawHeldOne(int i,const char*spec,int which){
                    printf("[held] slot %d%s '%s' -> pack %d on the %s at (%.2f,%.2f,%.2f), size %.2f%c",
                           i,w9,stem9,pk,ATTN9[att9],m[12],m[13],m[14],hs,10);
                    printf("[held]   mesh longest side %.3f -> scaled x%.2f%c",ext9,k9,10); fflush(stdout); }
-        /* ⭐ ep 12: EACH MESH MAY NAME ITS OWN COLOUR (`#rrggbb` in its name), and `#rrggbb*` marks the part that glows: the ember, not the
+        /* ⭐ EACH MESH MAY NAME ITS OWN COLOUR (`#rrggbb` in its name), and `#rrggbb*` marks the part that glows: the ember, not the
          * paper. vkMesh reads the name. (The old renderer also dimmed the ember with the drag, heldDragK: not carried across yet.) */
         drawProp(&g_setPk[pk],m);
         memcpy(g_heldM[i][which],m,64); g_heldMSt[i][which]=g_frameStamp; g_heldMPk[i][which]=pk; }
@@ -1989,7 +1989,7 @@ static void drawHeld(void){
         drawHeldOne(i,g_castProp [i],0);
         drawHeldOne(i,g_castProp2[i],1); } }
 
-/* ⭐ THE BOARDS (ROBOT NEKO ep 10), drawn after the cast in the frame the riders were posed in.
+/* ⭐ THE BOARDS, drawn after the cast in the frame the riders were posed in.
  * drawHeld runs in the set pass BEFORE any body is drawn, so everything it hangs is one frame old --
  * invisible on a mug, and on a stop-motion exposure a kickflip's board a whole exposure behind the
  * feet on the frame it lands. Same drawHeldOne, same parser, same resolver: only the pass differs.

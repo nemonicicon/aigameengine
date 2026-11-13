@@ -8,7 +8,7 @@
 binary: a name table, an import table, an export table, and each export's tagged properties.
 Blueprint graphs are in there too, because an editor package keeps its K2Nodes and their pins.
 
-Written for what ZAMNC's UE 5.7 saved (file version UE5 1018, UE4 522), and it REFUSES what it
+Written for what the zombie prototype's UE 5.7 saved (file version UE5 1018, UE4 522), and it REFUSES what it
 cannot walk instead of guessing: every property has a size in its tag, so a value that does not
 land exactly on its tag's end is counted in Package.misses, and a node whose pins do not land on
 the end of its export is counted in Package.pin_misses. Both are the receipt that the read is

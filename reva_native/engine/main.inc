@@ -90,7 +90,7 @@ __attribute__((unused)) static void vkFlip(unsigned sec,unsigned usec){ ledgerMa
 #ifdef REVA_HEADLESS
 static void g_win_headless_note(void){ printf("[headless] no display, no GPU, no vsync: the sim only\n"); fflush(stdout); }
 #endif
-/* ⭐ (11-07) THE HERO'S LIGHTER COPY, for the Pi's performance in a bigger game. Bike Lane Bash's Kaeli is 1.06 million triangles,
+/* ⭐ (11-07) THE HERO'S LIGHTER COPY, for the Pi's performance in a bigger game. The street game's co-star is 1.06 million triangles,
  * drawn twice a frame with her shadow: on the Pi that held the game to 7 frames a second (the tower game's body as the rider: 34). A body can have lighter copies beside
  * its pack, <pack>~lod1.rpack and ~lod2 (skate_src/author/lod.py --body, as a set actor's: the same skeleton, the same meshes by name, fewer triangles), and where the
  * machine's `lod` setting is its lowest (0, the Pi's rung) the hero is drawn from the lightest one, on her own pose, her shadow too. What a copy hasn't got: a face that
@@ -185,7 +185,7 @@ int main(int argc,char**argv){
     clockInit();                 /* before srand: the seed rule depends on it */
     scrLoad();                   /* what setup learned about this screen, before the first mode is picked */
     tierInit();                  /* ⭐ the ladder: before the sun map is allocated */
-    sunInit();                   /* the sun starts OFF: the club is a dark room */
+    sunInit();                   /* the sun starts OFF: the dance floor is a dark room */
     if(g_fixedStepMs>0.0) g_bench=1;
     /* REVA_SEED (11-02): the same dice under the real clock, with no finish in the frame. A replay takes the seed its tape was recorded with. */
     { unsigned seed9=getenv("REVA_SEED")?(unsigned)atol(getenv("REVA_SEED")):g_bench?12345u:(unsigned)time(NULL);
@@ -329,7 +329,7 @@ int main(int argc,char**argv){
      * only; on the Pi the argv behavior is unchanged and REVA_MODE/REVA_SKATE pick modes. */
 #ifdef REVA_SDL
     g_mode=modeSelect(W,H);
-    saveLoad(); atexit(saveFlush);   /* the club remembers: see THE SAVE FILE above */
+    saveLoad(); atexit(saveFlush);   /* the engine remembers: see THE SAVE FILE above */
     saveSetI("last.mode",g_mode); saveSetI("last.variant",g_modeVariant); saveSetI("nights",saveGetI("nights",0)+1);
     /* ⭐ 10-12: door 11 is its own program from the first frame -- no packs, no crowd.
      * EXIT GAME comes back to the doors; under REVA_MODE it ends the run. */
@@ -343,7 +343,7 @@ int main(int argc,char**argv){
      * film is shot on, and "walk the player into a house" could not be tested in the one
      * mode that has a player. The world becoming a playable space starts here. */
     { const char*es=getenv("REVA_SET");
-      /* ⭐ REVA VS ZOMBIES: the door itself plays on the street (rules' `street`; `none` is v0's yard) */
+      /* ⭐ THE ZOMBIE GAME: the door itself plays on the street (rules' `street`; `none` is v0's yard) */
       if(g_mode==MODE_GAME){ apiInit(); netBoot(); if(g_game->video) g_videoWant=vmOf(g_game->video); }   /* (step 29) a session's players gather here: the game's known, and nothing of it is loaded */
       else if(getenv("REVA_NET")&&getenv("REVA_NET")[0]){ printf("[net] online play is a game's, and this door isn't one: REVA_NET is left alone\n"); fflush(stdout); }
       int game9=GAME_ON;
@@ -352,8 +352,8 @@ int main(int argc,char**argv){
         if((!es||!es[0])&&strcmp(st9,"none")){ char p9[96]; snprintf(p9,sizeof p9,"sets/%s.set",st9); FILE*f9=fopen(p9,"rb");
             if(f9){ fclose(f9); es=st9; } else printf("[rvz] no %s here: the door plays in the yard\n",p9); } }
       if(es&&es[0]){ setLoad(es);
-        /* ⛔ A SET WITHOUT A DAY IS LIT BY THE CLUB. Nothing outside the lab applies sun=/sky=,
-         * so the first door on the street stood under the dark-room rig with the club sky's
+        /* ⛔ A SET WITHOUT A DAY IS LIT BY THE DANCE FLOOR. Nothing outside the lab applies sun=/sky=,
+         * so the first door on the street stood under the dark-room rig with the dance floor sky's
          * magenta ground band painted under the road. A set brings its hour: REVA_TOD=<h>,
          * default noon, through the same fourteen-keyframe curve tod= uses. */
         const char*et=getenv("REVA_TOD"); g_tod=(et&&et[0])?(float)atof(et):(game9?g_game->tod():12.0f); if(g_tod>=0.f) todApply(g_tod);   /* (11-12) a game's hour under 0: the set's own sun and sky light it */
@@ -372,8 +372,8 @@ int main(int argc,char**argv){
     DIR*dd=opendir(dir); struct dirent*de;
     /* ⛔ ".rpack" as a SUBSTRING also matched every backup the authoring tools leave
      * beside a pack -- v1_kmoves.rpack.marks.bak and .tex.bak were both being loaded
-     * as crowd members, so the club carried stale twins of any body I had edited (two
-     * extra copies of kaeli's 294k-vertex mesh among them) and a fix could appear
+     * as crowd members, so the engine carried stale twins of any body I had edited (two
+     * extra copies of the co-star's 294k-vertex mesh among them) and a fix could appear
      * unapplied because the ghost was standing next to her. It must be the SUFFIX. */
     int movesI9=-1;
     /* ⭐ THE PACKS IN A SET ORDER (11-02). readdir gives the filesystem's order: alphabetical on NTFS, hashed on the Pi's ext4. So
@@ -399,7 +399,7 @@ int main(int argc,char**argv){
       printf("[load] %d packs from %s in %.1f s%s\n",NP,dir,(wall_ms()-lt0)/1000.0,skipped9?" (REVA_PACKS: the rest left out)":""); if(skipped9) printf("[load] REVA_PACKS left out %d packs\n",skipped9); fflush(stdout); }
     if(dd) closedir(dd);
     if(!NP&&!WORLD_OFF) die("no packs");
-    /* ⛔ ep 11: THE MOVES PACK IS FOUND BY ITS FILE NAME. The exact-LABEL match ("v1 moves") had stopped matching --
+    /* ⛔ THE MOVES PACK IS FOUND BY ITS FILE NAME. The exact-LABEL match ("v1 moves") had stopped matching --
      * the boot said "123 packs loaded" with no "(moves pack found)" -- so P5's donor was gone for every body and a
      * set crowd's w_cheer came back NOT FOUND x52, with nothing louder than that absence. */
     if(movesI9>=0) g_movesPk=&packs[movesI9];
@@ -413,7 +413,7 @@ int main(int argc,char**argv){
             for(int c9=0;c9<packs[i9].nCh&&lp<80;c9++)
                 lp+=snprintf(lens+lp,(size_t)(96-lp),"%s%d",c9?",":"",packs[i9].chN[c9]);
             /* ⛔ EVERY LENGTH, NOT THE FIRST. "first len 2" said nothing about
-             * whether anima's seven-bone braids were mined -- and before the branching
+             * whether the bought character's seven-bone braids were mined -- and before the branching
              * fix the first was 2 as well, so the summary never moved while the chains
              * that matter were missing entirely. */
             printf("  chains: %s x%d lens=[%s]\n",packs[i9].label,packs[i9].nCh,lens); } }
@@ -508,7 +508,7 @@ int main(int argc,char**argv){
         g_rvRide=g_rvSki;
         printf("reva loco: walk %d fly %d ski %d trick %d (%.2fs), %d dances\n",
                g_rvWalk,g_rvFly,g_rvSki,g_rvTrick,g_rvTrickDur,g_rvNDance);
-        /* S4.5: the kaeli hip-bounce debt. Her retarget is rotation-only (hips pinned by the
+        /* S4.5: the co-star's hip-bounce debt. Her retarget is rotation-only (hips pinned by the
          * 1e-4 scale collapse), so no clip ever moves her root. Detect that honestly: scan
          * every hero clip for a translation track on the hips bone; none found -> the model
          * matrix gets a beat-locked bounce back. */
@@ -540,7 +540,7 @@ int main(int argc,char**argv){
 
     /* programs (opaque + cutout) */
     /* DARKER, we are in space -- key light dimmer, ambient floor way down; the color now
-     * comes from the CLUB: 3 nearest colored point lights (orbs / lamps / snake / reva) per dancer */
+     * comes from the DANCE FLOOR: 3 nearest colored point lights (orbs / lamps / snake / reva) per dancer */
 
     unsigned floorVbo; { float fq[12]={-FLOOR_X,FLOOR_ZN, FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,FLOOR_ZN, FLOOR_X,0.5f, -FLOOR_X,0.5f};
         floorVbo = gfxBufferNew();  gfxBufferData(floorVbo, sizeof fq, fq, 0); }
@@ -607,7 +607,7 @@ int main(int argc,char**argv){
     /* MORE SHADOWS: everyone inside the mask window casts -- reva + the showcased npc +
      * neighbors within 6u. Up to 8 mesh entries stashed per frame (each remembers its pack+model). */
     /* ELECTRIC ORBS -- 6 plasma balls wandering
-     * the whole floor in 3D; they are the club's COLORED LIGHT SOURCES: every dancer is lit by its
+     * the whole floor in 3D; they are the dance floor's COLORED LIGHT SOURCES: every dancer is lit by its
      * 3 nearest lights, the floor pools color under the nearest 4 */
     #define NORB 6
     static float orbP[NORB][3], orbC[NORB][3];
@@ -690,7 +690,7 @@ int main(int argc,char**argv){
     g_slots=slots; g_NS=NS; g_packs=packs; g_packN=NP; g_packBoot=NP;   /* the weapon layer's file-scope view of the floor */
     g_api.bodies=slots; g_api.nBodies=NS;   /* and a game's */
     /* S4f: two standing donors -- the MOB1 mocap bank (CivicDefenseV2 Source/FBX, baked
-     * via skate_src/mob1/merge_mob1.py) first, kaeli's ZAMN set second. Authored clips
+     * via skate_src/mob1/merge_mob1.py) first, the co-star's zombie-prototype set second. Authored clips
      * reach the whole crowd by joining either pack. REVA_NODONOR=1 disables. */
     if(!getenv("REVA_NODONOR")){
         static Pack dn1,dn2; FILE*df;
@@ -699,20 +699,20 @@ int main(int argc,char**argv){
         bankAdd(&dn1); bankAdd(&dn2);
         /* ⛔ AND THE MOVES PACK WAS NEVER IN THE BANK. v1_moves carries 37 clips --
          * a_convo, a_convo2, w_look, w_text, w_cheer, w_music, z_greet, z_bow, z_hello --
-         * and bankFind only ever walked mob1, kaeli and the zombies. No scene has ever
+         * and bankFind only ever walked mob1, the co-star and the zombies. No scene has ever
          * been able to ask for any of them by name, which is most of the reason the film
          * has no business in it. */
         if(g_movesPk) bankAdd(g_movesPk);
         /* ⛔ AND NEITHER WAS THE TWO-BODY ROOM REPERTOIRE. The z_rm_* clips -- the
          * curl-up under the covers, and everything authored beside it -- live ONLY in
-         * v1_kmoves and v1_kaeli_pj, and the bank loads v1_kaeli. So a scene could ask
-         * for z_rm_curlsleep and get it if and only if kaeli's own pack was playing the
+         * v1_kmoves and v1_<body>_pj, and the bank loads v1_<body>. So a scene could ask
+         * for z_rm_curlsleep and get it if and only if the co-star's own pack was playing the
          * part. Cast anybody else and the clip came back NOT FOUND, the partner fell
          * back to z_rest, and a woman who is supposed to be asleep under the covers
          * stood on the bed IN A T-POSE.
          * Exactly the fault the comment above describes for v1_moves, one pack later.
          * Added LAST so it shadows nothing: bankFind returns the first pack that has
-         * the name, so mob1, kaeli and moves keep their claims. */
+         * the name, so mob1, the co-star and moves keep their claims. */
         { static Pack dn3; FILE*rf;
           if((rf=fopen("packs/v1_kmoves.rpack","rb"))){ fclose(rf);
               dn3=loadPack("packs/v1_kmoves.rpack"); bankAdd(&dn3); } }
@@ -869,7 +869,7 @@ int main(int argc,char**argv){
         else camDirector(tsec,dt,NS,slots,eye,ctr);
         if(g_gameLens.shakeT>0.f){ float a9=g_gameLens.shake*g_gameLens.shakeT/g_gameLens.shakeLen, t9=(float)g_tickTotal;   /* from the tick, so it's the same every run and no dice are spent */
             eye[0]+=a9*sinf(t9*1.7f); eye[1]+=a9*sinf(t9*2.3f+1.f)*0.6f; ctr[0]+=a9*sinf(t9*1.1f+2.f)*0.5f; g_gameLens.shakeT-=simStepS(); }
-        /* REVA_CAMLOCK=1 -- A MEASUREMENT LENS. The club runs a self-directing show, so
+        /* REVA_CAMLOCK=1 -- A MEASUREMENT LENS. The dance floor runs a self-directing show, so
          * two runs of the same frame come back from different points in the cut cycle
          * and 83% of the pixels differ even with the clock and the seed pinned. That
          * makes a door impossible to regression-test on its picture: it is not the
@@ -884,7 +884,7 @@ int main(int argc,char**argv){
                     ctr[0]=g_rvx;      ctr[1]=1.5f; ctr[2]=g_rvz; } }
         lensNow(eye,ctr);   /* (step 25) this frame's lens and look; the set's timeline may have the lens */
         M4 proj,view,vp;
-        g_aspect=VIEW_ASPECT(W,H);   /* ⭐ (ep 4) the medium's lateral guarantee needs the frame's SHAPE, and W/H are locals in here */
+        g_aspect=VIEW_ASPECT(W,H);   /* ⭐ the medium's lateral guarantee needs the frame's SHAPE, and W/H are locals in here */
         if(g_lensNow.camOn&&g_lensNow.fov>0.f){ float fv9=fishFov(g_lensNow.fov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* the timeline's lens */
         else if(g_fpvNow){ float fv9=fishFov(68.0f,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
         else if(GAME_ON&&g_tune.firstPerson){ m4_persp(proj,g_tune.lensFov>0.f?g_tune.lensFov:68.0f,VIEW_ASPECT(W,H),0.12f,fmaxf(520.0f,g_setFar)); }   /* (11-06) a game's first person: its lens at her eyes, the near plane in close */
@@ -894,7 +894,7 @@ int main(int argc,char**argv){
         m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
         if(g_lensNow.roll!=0.f){ const float a9=g_lensNow.roll*0.0174532925f, c9=cosf(a9), s9=sinf(a9); M4 r9,t9; memset(r9,0,64); r9[0]=c9; r9[1]=s9; r9[4]=-s9; r9[5]=c9; r9[10]=1.f; r9[15]=1.f; m4_mul(t9,r9,view); memcpy(view,t9,64); }   /* (step 25) the lens rolled about its own line */
         /* the lens's own position, for anything later in the frame that has to face it
-         * (ep 8: a billboarded screen). Stamped here because this is where it is decided. */
+         * (a billboarded screen). Stamped here because this is where it is decided. */
         g_camEye[0]=eye[0]; g_camEye[1]=eye[1]; g_camEye[2]=eye[2];
         m4_mul(vp,proj,view);
         /* (11-11) A HEADSET (engine/xr.inc): the lens is where its space is anchored, and each eye is drawn where it is. vp becomes a view round both, for the cull */
@@ -949,16 +949,16 @@ int main(int argc,char**argv){
             if(g_labFreeze){ g_lx=g_ly=0.f; }              /* frozen: every lens sees one instant */
             if(GM.stage==LAB_AIR) g_manAlt=2.2f; }
         else if(DOOR_OFF_THE_PAD){ g_manual=0; }
-        /* ⛔ M0 (11-01): that line took the ZAMN cab too. The policy above set g_manual=1 for it ("a run-around game") and this
+        /* ⛔ M0 (11-01): that line took the zombie cab too. The policy above set g_manual=1 for it ("a run-around game") and this
          * line undid it every frame, so no stick or key ever drove her in the cab -- the DANCE host walked her about. The
-         * beat lane and RIFT RAVAGERS still keep the host; the zombie cab is the pad's. */
+         * beat lane and another old door still keep the host; the zombie cab is the pad's. */
         { static double lastIn=-1e9;   /* M0: the zombie cab's attract host gives way to ANY live input -- pad, keys or a tape -- for 30 s */
           if(fabsf(g_lx)>0.3f||fabsf(g_ly)>0.3f||g_btnA||g_btnB||g_btnX||padsOthersTouched()) lastIn=tsec;
           g_cabAttract=GAME_ON&&(tsec-lastIn>30.0); }
         /* ================= THE START MENU =============================================
          * Start toggles it anywhere; while it is up the pad belongs to the menu (the
-         * game sees a neutral controller) and the game-layer clock stops -- the club
-         * itself keeps dancing behind it, because the club never stops.
+         * game sees a neutral controller) and the game-layer clock stops -- the dance floor
+         * itself keeps dancing behind it, because the dance floor never stops.
          * REVA_AUTOPAUSE=<frame> opens it headlessly for the shot instruments. */
         { static long apF=-2, fcnt=0;
           if(apF==-2){ const char*e=getenv("REVA_AUTOPAUSE"); apF=e?atol(e):-1; }
@@ -1010,7 +1010,7 @@ int main(int argc,char**argv){
           memcpy(g_shvp,svp,64);
           /* the head, off-screen, before the venue's own passes; it restores fbo+viewport */
           { static double ht=0; ht+=1.0/60.0;
-            /* ⭐ AND HE FINALLY GETS A MOUTH (ep 8). `g_holly_open` has been written
+            /* ⭐ AND HE FINALLY GETS A MOUTH. `g_holly_open` has been written
              * exactly nowhere since he was built -- a head with a working jaw, rendering
              * on screens, frozen at 0.45 for the life of the project. The scene has been
              * producing a 30 Hz envelope the whole time; when the speaker is the VOICE
@@ -1224,13 +1224,13 @@ int main(int argc,char**argv){
            }
         /* LAVA LAMPS: warm blobs rising in glass columns at the floor
          * edges -- streamed points through the sky points' big-soft-nebula branch.
-         * A SCENE TAKES THE SET DOWN. The club's dressing -- lamps, orbs, the flame
+         * A SCENE TAKES THE SET DOWN. The dance floor's dressing -- lamps, orbs, the flame
          * snake, the arcs -- floats at head height and crosses both faces; against a
          * conversation it reads as debris. Two lit bodies in black is the stage this
          * wants, and it is the dark stage the choreography doc is already asking for. */
         /* ⭐ ...AND A SET DOES TOO. Two soft orbs hung over the road in every frame of
          * the first day sheet. Not the sky-layer flyers -- REVA_NOSKY left them exactly
-         * where they were -- but the club's own lamp sprites, light orbs and flame snake,
+         * where they were -- but the dance floor's own lamp sprites, light orbs and flame snake,
          * which a scene already switches off because a conversation wants a dark stage.
          * A street wants it for the same reason. */
         if(g_scnT<0.f&&SET_NONE&&!g_setSpace){
@@ -1297,7 +1297,7 @@ int main(int argc,char**argv){
               pl[2][r2]=vp[r2*4+3]+vp[r2*4+1]; pl[3][r2]=vp[r2*4+3]-vp[r2*4+1];
               pl[4][r2]=vp[r2*4+3]+vp[r2*4+2]; pl[5][r2]=vp[r2*4+3]-vp[r2*4+2]; }
           /* ⭐ (11-07) TOO SMALL TO SEE (E->tune->farPx, for the Pi's performance): a body shorter than that many of the picture's lines isn't drawn, posed or
-           * shadowed. Bike Lane Bash's 84 people at 12th and Jackson were drawn from the camp half a kilometre off, each under a line tall, and they were 72% of the Pi's
+           * shadowed. The street game's 84 people were drawn from half a kilometre off, each under a line tall, and they were 72% of the Pi's
            * main pass. Its height in lines is its height over its depth times the lens's own scale (the length of the projection's y row) and half the picture's lines.
            * One that was cut comes back a quarter bigger than the cut, so a body at the edge doesn't flicker. One picture only: split screen draws them all */
           static unsigned char*farOut=NULL; static int farOutN=0;
@@ -1404,7 +1404,7 @@ int main(int argc,char**argv){
                 POSE_CLIP(bhvDnP,bhvDnClip,c,(double)bhvU*(double)(c->frames-1),0); }
             else if(walking){
                 /* S4e LOCOMOTION LADDER: idle-walk-run is a SPEED ladder for every canon rig.
-                 * Own clips first; a pack with neither strides on kaeli's through the donor
+                 * Own clips first; a pack with neither strides on the co-star's through the donor
                  * bank -- the 116 walkless packs used to SLIDE across the floor. */
                 Pack*sp=P; int ci=-1;
                 if(zDead&&(ci=zombLoco(si,sl->spd,P))>=0) sp=g_zombP;   /* M0: the dead walk the Z4 bank, not the crowd's gait */
@@ -1627,8 +1627,8 @@ int main(int argc,char**argv){
             float tint[3]={0.55f+0.4f*((si*37%100)/100.f),0.5f+0.3f*((si*61%100)/100.f),0.6f+0.4f*((si*13%100)/100.f)};
             if(g_slotTeam[si]==1){ tint[0]=0.25f; tint[1]=0.55f; tint[2]=1.45f; }        /* game layer: blue army */
             else if(g_slotTeam[si]==2){ tint[0]=1.45f; tint[1]=0.30f; tint[2]=0.25f; }   /* red army / hunters */
-            else if(g_slotTeam[si]==3){ tint[0]=0.35f; tint[1]=1.25f; tint[2]=0.30f; }   /* zamn: the zombies, sickly green */
-            else if(g_slotTeam[si]==4){ tint[0]=1.35f; tint[1]=1.15f; tint[2]=0.40f; }   /* zamn: the neighbors, warm yellow */
+            else if(g_slotTeam[si]==3){ tint[0]=0.35f; tint[1]=1.25f; tint[2]=0.30f; }   /* the zombie cab: the zombies, sickly green */
+            else if(g_slotTeam[si]==4){ tint[0]=1.35f; tint[1]=1.15f; tint[2]=0.40f; }   /* the zombie cab: the neighbors, warm yellow */
             if(g_slotSel[si]){ float pu2=0.8f+0.2f*sinf((float)tsec*9.f); tint[0]*=pu2*1.4f; tint[1]*=pu2*1.4f; tint[2]*=pu2*1.4f; }
             if(si==g_lockTgt){ float pu=0.65f+0.35f*sinf((float)tsec*12.f);   /* lock-on: the chosen one pulses magenta */
                 tint[0]=1.2f*pu; tint[1]=0.25f; tint[2]=1.0f*pu; }
@@ -1636,7 +1636,7 @@ int main(int argc,char**argv){
                 tint[0]=st; tint[1]=st*0.5f; tint[2]=st; }
             /* this dancer's 3 nearest colored lights (orbs/lamps/snake/reva) */
             float lpv[NLIGHT*3]={0},lcv[NLIGHT*3]={0};
-            int labLight=(g_mode==MODE_ANIM);   /* THE LAB'S OWN RIG: the club's coloured movers
+            int labLight=(g_mode==MODE_ANIM);   /* THE LAB'S OWN RIG: the dance floor's coloured movers
                  * lit the SAME pose magenta from the front and blue from the side -- a review
                  * plate has to be neutral, fixed, and identical from every angle. Three white
                  * lamps around the subject: key, fill, rim. */
@@ -1647,7 +1647,7 @@ int main(int argc,char**argv){
               for(int k4=0;k4<3;k4++){ int li2=pick[k4];
                   if(li2<0){ lpv[k4*3]=0; lpv[k4*3+1]=-99; lpv[k4*3+2]=0; lcv[k4*3]=lcv[k4*3+1]=lcv[k4*3+2]=0; }
                   else { memcpy(lpv+k4*3,liteP[li2],12); memcpy(lcv+k4*3,liteC[li2],12); } } }
-            lightsStamp(lpv,lcv,3);   /* ⭐ (ep 4) a torch in someone's hand lights the crowd too */
+            lightsStamp(lpv,lcv,3);   /* ⭐ a torch in someone's hand lights the crowd too */
             int nearRv=hypotf(sl->x-g_rvx,sl->z-g_rvz)<6.0f||si==CAMD.tgt;
             if(g_slotHide[si]) continue;   /* squid-convicted: invisible until relaunch */
             if(si<1024&&g_bodyUnseen[si]&&!g_shadowPass) continue;   /* (11-11) not on this machine's picture (E->bodyUnseen): its shadow still is */
@@ -1727,14 +1727,14 @@ int main(int argc,char**argv){
          * the jumbotrons are venue dressing and the lab is a clean plate, but a screen a
          * SET asked for is a thing in the story. ⛔ T * Ry * Rx * S: the jumbotron matrix
          * above is yaw-only and a telly face-down in the dirt is the gag. Steady amplitude
-         * too -- the club's beat pulse has no business on a driveway. */
-        /* PLACED SCREENS (ep 8), drawn by scrDrawPlaced (ep 9). HERE only when no set is loaded: a
+         * too -- the dance floor's beat pulse has no business on a driveway. */
+        /* PLACED SCREENS, drawn by scrDrawPlaced. HERE only when no set is loaded: a
          * set paints its sky first in drawSet with no depth test, which wiped this quad every frame
          * while its depth kept the room out -- Holly's blank screen. With a set, the world pass draws
          * them after the world. */
         if(!g_setNI&&!g_setSpace) scrDrawPlaced();
 
-        /* CLUB LASERS — 7-beam fan from above the back of the stage, hue-cycling, beat-pulsed */
+        /* THE DANCE FLOOR'S LASERS — 7-beam fan from above the back of the stage, hue-cycling, beat-pulsed */
         if(g_mode!=MODE_ANIM&&SET_NONE&&!g_setSpace){ double bp=beatPhase(); float pulse=0.8f+0.4f*powf(1.0f-(float)(bp-floor(bp)),2.0f);
           float sw=0.55f+0.25f*sinf((float)tsec*0.21f);
           for(int li=0;li<14;li++){ float ph=(li%7)/7.f; int rig=li/7;   /* TWO rigs -- it's a rave */
@@ -1896,7 +1896,7 @@ int main(int argc,char**argv){
                 if(rvTgt!=lastP){ lastP=rvTgt; pickT=tsec; di=(di+7)%(g_rvNDance?g_rvNDance:1); }   /* fresh dance for every guest (the spotlight's dances were repetitive) */
                 if(tsec-pickT>22.0){ pickT=tsec; di=(di+7)%(g_rvNDance?g_rvNDance:1); }
                 want=g_rvNDance?g_rvDance[di]:0; }
-            /* ⭐ ep 10: ONE-SHOT TRICKS fire and end here, on an exposure, before any body's clip is chosen or advanced */
+            /* ⭐ ONE-SHOT TRICKS fire and end here, on an exposure, before any body's clip is chosen or advanced */
             if(g_mode==MODE_ANIM) trickTick();
             /* P0: ctl clip=<name> plays ANY clip by name -- the authoring loop's playback
              * path. Overrides the state tree (the state still drives travel speed and the
@@ -1916,7 +1916,7 @@ int main(int argc,char**argv){
                 else { want=g_labClip; hdP=NULL; hdC=-1; rate=1.0f; skHold=-1.f;
                        if(g_labWphReset){ rvWph=heroStartPh(P->clips[g_labClip].fps,P->clips[g_labClip].frames); g_labWphReset=0; } } }
             /* P5: the authored move found in the MOVES pack -- played on THIS body
-             * through the canonical donor transfer. kaeli inherits every score. */
+             * through the canonical donor transfer. The co-star inherits every score. */
             else if(g_mode==MODE_ANIM&&g_labDnC>=0&&(g_labDnP?g_labDnP:g_movesPk)&&
                     (unsigned)g_labDnC<(g_labDnP?g_labDnP:g_movesPk)->nClips){
                 Pack*dnp9=g_labDnP?g_labDnP:g_movesPk;
@@ -1928,13 +1928,13 @@ int main(int argc,char**argv){
             /* ⭐ A GAIT UNDER THE STAGE MOVE. Same hook the hero already uses to borrow
              * a run she does not own: point hdP/hdC at the bank's walk and let gaitRate()
              * pick the stride for the speed the mark is actually carrying her at. */
-            if((g_stageOn||g_heroMk)&&g_loco[0].spd>0.22f&&!P->nWheel&&!castRides(0)&&P->cbOK&&P->pbOK>=10){   /* ⭐ ep 9: world speed; a rider rolls */
+            if((g_stageOn||g_heroMk)&&g_loco[0].spd>0.22f&&!P->nWheel&&!castRides(0)&&P->cbOK&&P->pbOK>=10){   /* ⭐ world speed; a rider rolls */
                 int bc9=-1; Pack*bp9=bankFind("w_walk",&bc9);
                 if(bp9){ hdP=bp9; hdC=bc9; want=-1;
                          rate=gaitRate(bp9,bc9,g_loco[0].spd); } }
             if(GAME_ON&&g_agHero.on){ agTick(P,(float)dt,&want,&rate,&skHold); if(g_agG[g_agHero.g].on){ hdP=NULL; hdC=-1; hdMaskArms=0; } }   /* a game with an animation graph: it picks the clip and says how far through */
             { int key=(hdC>=0)?(9000+hdC):want; if(key!=rvCM){ rvCM=key; rvXf=pInit?0.f:1.f; } }
-            if(g_trkFresh[0]) rvXf=1.f;   /* ⭐ ep 10: a trick is a CUT, going and coming back -- no crossfade */
+            if(g_trkFresh[0]) rvXf=1.f;   /* ⭐ a trick is a CUT, going and coming back -- no crossfade */
             g_rvClipNow=want; g_rvRateNow=rate;   /* the lab HUD reads these */
             /* P7: the partner runs on the HERO'S clock. A two-body move is one
              * performance -- give her a clock of her own and the five drifts out of
@@ -1949,13 +1949,13 @@ int main(int argc,char**argv){
                     if(g_labWphReset) g_labPPhase=0.0;
                     /* ⛔ A HELD POSE DOES NOT ADVANCE. Without this the clip walks off the
                      * frame that was chosen and the pose is only correct for one instant. */
-                    else if(!g_labFreeze&&g_labPHold<0.f&&!g_trkFresh[g_castI]) g_labPPhase+=dt*g_labPartner->clips[g_labPClip].fps*rate; }   /* ⭐ ep 10: a trick's cut exposure is its frame 0 */
+                    else if(!g_labFreeze&&g_labPHold<0.f&&!g_trkFresh[g_castI]) g_labPPhase+=dt*g_labPartner->clips[g_labPClip].fps*rate; }   /* ⭐ a trick's cut exposure is its frame 0 */
               g_castI=sv7; }
             bodyRest(P,T,Q,S);
             if(hdC>=0&&hdP){   /* S6: donor clip on the hero's rig, rest-delta like the crowd */
                 PClip*c=&hdP->clips[hdC];
                 if(g_heroHold>=0.f) rvWph=(double)c->frames*g_heroHold;
-                else if(!g_labFreeze&&!g_trkFresh[0]) rvWph+=dt*c->fps*rate;   /* ⭐ ep 10: a trick's cut exposure is its frame 0 */
+                else if(!g_labFreeze&&!g_trkFresh[0]) rvWph+=dt*c->fps*rate;   /* ⭐ a trick's cut exposure is its frame 0 */
                 if(g_trkOn[0]&&hdP==(g_labDnP?g_labDnP:g_movesPk)&&hdC==g_labDnC) trickClampEnd(0,&rvWph,c);
                 donorPoseF(hdP,hdC,rvWph,P,Q);   /* P1.5: fractional */
                 /* P5: authored ROOT MOTION crosses rigs too -- the donor's pelvis
@@ -1995,12 +1995,12 @@ int main(int argc,char**argv){
                     if(b9>=0) memcpy(Q[b9],P->nodes[b9].q,16); }
                 /* ⛔ THE HEAD LAYER NEVER RAN ON A BORROWED CLIP (09-11). Only the own-clip
                  * branch called scnHeadLayer, so a hero on a bank clip -- every x_convo in the
-                 * film, anima on z_upright in the lab -- got no head aim, no gaze, no jaw
+                 * film, the bought character on z_upright in the lab -- got no head aim, no gaze, no jaw
                  * bench override. Found by the eyes: gaze=0.6 changed 0 pixels. */
                 scnHeadLayer(P,Q,0); }
             else if(P->nClips&&want>=0){ PClip*c=&P->clips[want];
                 if(skHold>=0.f) rvWph=(double)c->frames*skHold;
-                else if(!g_labFreeze&&!g_trkFresh[0]) rvWph+=dt*c->fps*rate;   /* ⭐ ep 10: a trick's cut exposure is its frame 0 */
+                else if(!g_labFreeze&&!g_trkFresh[0]) rvWph+=dt*c->fps*rate;   /* ⭐ a trick's cut exposure is its frame 0 */
                 if(g_trkOn[0]&&g_mode==MODE_ANIM&&want==g_labClip) trickClampEnd(0,&rvWph,c);
                 /* H6: clip-driven morph weights. A SCENE owns the face while it runs --
                  * without this guard the pose sampler zeroed the weights the scene had
@@ -2008,7 +2008,7 @@ int main(int argc,char**argv){
                 if(g_scnT<0.f){ for(int m9=0;m9<MORPH_MAX;m9++) g_heroMorphW[m9]=0.f;
                     g_morphSink=g_heroMorphW; g_morphSinkN=P->nMorph; }
                 else if(P->nMorph){ memset(g_clipMorphW[0],0,sizeof g_clipMorphW[0]); g_morphSink=g_clipMorphW[0]; g_morphSinkN=P->nMorph; }   /* (11-11) in a scene, her clip's face beside the scene's */
-                /* ⭐ ep 9: a TRANSITION plays once in a scene and holds its last frame (clipHoldsEnd) */
+                /* ⭐ a TRANSITION plays once in a scene and holds its last frame (clipHoldsEnd) */
                 if(g_scnT>=0.f&&rvWph>(double)(c->frames-1)&&clipHoldsEnd(P,c,0,packStr(P,c->name))) rvWph=(double)(c->frames-1);
                 clipSampleF(P,c,rvWph,T,Q,S);   /* P1.5: fractional */
                 g_morphSink=0;
@@ -2016,7 +2016,7 @@ int main(int argc,char**argv){
             /* ⭐ THE UPPER-BODY LAYER (09-11): a second clip on the spine and up, on its own clock */
             if(g_overClip[0][0]) poseOverlay(P,Q,g_overClip[0],overPhase(P,g_overClip[0],tsec),g_overW[0]);
             /* CROSSFADE from last frame's pose (~0.35s): state/clip switches never pop */
-            g_boardXfKeep[0]=0.f;   /* ⭐ ep 10: the board channel crossfades with the body (boardPublish) */
+            g_boardXfKeep[0]=0.f;   /* ⭐ the board channel crossfades with the body (boardPublish) */
             if(pInit&&rvXf<1.f){ float e5=rvXf*rvXf*(3-2*rvXf); g_boardXfKeep[0]=1.f-e5;
                 for(unsigned i=0;i<P->nNodes&&i<160;i++){ qnlerp(Q[i],pQ[i],Q[i],e5);
                     for(int k5=0;k5<3;k5++) T[i][k5]=pT[i][k5]*(1-e5)+T[i][k5]*e5; }
@@ -2056,7 +2056,7 @@ int main(int argc,char**argv){
             }
             /* ---- S4.5 HERO STRIKE + GUNFIRE: the swing was neon-only; now the body commits.
              * Melee: one-shot arm arc + torso twist over whatever clip is playing (BR + ARPG
-             * share the GM.tA swing window). Firing: kaeli's two-hand stance via the donor
+             * share the GM.tA swing window). Firing: the co-star's two-hand stance via the donor
              * bank for the first beat of the gun's cooldown. */
             if((DOOR_SWINGS||g_mode==MODE_ANIM)&&GM.tA>0.f&&P->pbOK>0){
                 float u9=1.f-fminf(1.f,GM.tA/0.25f); float sw9=sinf(u9*3.14159f);
@@ -2174,7 +2174,7 @@ int main(int argc,char**argv){
              * (contact vs passing is a distance between the feet), overlay, then let the
              * FK below run on the corrected pose -- and chainSim after that, so her hair
              * swings with the bounce instead of against it. */
-            if(!g_wmsOff&&!(g_mode==MODE_ANIM&&g_scnT>=0.f&&g_labRM&&(g_labClip>=0||g_labDnC>=0))){ static WmsState hw;   /* ⭐ ep 10: a scene's z_rm_ clip owns the root -- no bounce on it */
+            if(!g_wmsOff&&!(g_mode==MODE_ANIM&&g_scnT>=0.f&&g_labRM&&(g_labClip>=0||g_labDnC>=0))){ static WmsState hw;   /* ⭐ a scene's z_rm_ clip owns the root -- no bounce on it */
                 bodyFK(P,T,Q,S,world);
                 wmsApply(P,T,Q,world,&hw,(float)g_chDt,g_wms); }
             /* a face is picture, not rules, and her pose is in the receipt: so it goes on after the receipt's had the pose without it */
@@ -2492,7 +2492,7 @@ int main(int argc,char**argv){
                     g_boltT=0.95f; g_boltVictim=g_lockTgt;
                     g_boltTo[0]=slots[g_boltVictim].x; g_boltTo[1]=g_slotAlt[g_boltVictim]+1.5f; g_boltTo[2]=slots[g_boltVictim].z; }
                 g_btnBPrev=g_btnB;
-                /* ⭐ SNAP (ZAMNC, 11-02): no ease in the zombie cab -- she is at speed the frame the stick moves and stopped the frame it
+                /* ⭐ SNAP (the zombie prototype, 11-02): no ease in the zombie cab -- she is at speed the frame the stick moves and stopped the frame it
                  * lets go, and she goes where the stick says NOW while her body catches up at hero_turn. Dead, she stands. */
                 int snap9=GAME_ON&&g_tune.heroSnap>0.f;
                 if(GAME_ON&&GM.stage==3) mag=0.f;
@@ -2527,8 +2527,8 @@ int main(int argc,char**argv){
                 rvRoll+=(-(GAME_ON?0.f:lxn)*0.30f*(g_manAlt>0.4f?1.f:0.3f)-rvRoll)*fminf(1,(float)dt*3.f);
                 if(g_heroFaceOn){ g_heroFaceOn=0; const float dh9=fmodf(g_heroFaceY-rvH+9.42477f,6.28318f)-3.14159f; rvH+=dh9*fminf(1,(float)dt*10.f); }   /* E->heroFace */
                 rvHW=rvH; g_rvCarve=0; g_rvTravel=0; g_rvArrived=1; g_rvHead=rvH; g_rvAlt=rvAlt;
-            } else if(GAME_ON){   /* ⭐ REVA VS ZOMBIES M0 (11-01): THE CAB'S ATTRACT HOST. Every door runs itself until the pad
-                 * is taken, and this door's host was still the DANCE host -- she walked toward whoever the club's director
+            } else if(GAME_ON){   /* ⭐ THE ZOMBIE GAME'S M0 (11-01): THE CAB'S ATTRACT HOST. Every door runs itself until the pad
+                 * is taken, and this door's host was still the DANCE host -- she walked toward whoever the dance floor's director
                  * was filming and stood pinned in the yard's corner. Now she plays the cab: the dead inside 7 u are faced and
                  * squirted (g_cabFire, pulled by the cab's A), otherwise she walks -- runs past 18 u -- to the nearest
                  * neighbour still standing. Same speed and clip ladder as a thumb on the stick (g_manSpd). */
@@ -2593,7 +2593,7 @@ int main(int argc,char**argv){
                 if(g_rvx>PB)g_rvx=PB;
                 if(g_rvz<-PB)g_rvz=-PB;
                 if(g_rvz>PB)g_rvz=PB; }
-            /* ⛔ THE DANCE FLOOR FENCED EVERY MODE. These clamps are the club's own bounds, and
+            /* ⛔ THE DANCE FLOOR FENCED EVERY MODE. These clamps are the dance floor's own bounds, and
              * they ran in every door with a 300-unit street loaded -- the player walked to
              * z=2.0 and stopped at the edge of a floor that was not there. With a set loaded
              * the WORLD is the bound: its colliders (colResolve, below) and its ground apron. */
@@ -2622,12 +2622,12 @@ int main(int argc,char**argv){
               (void)hmMiss;
               g_heroMk=HM;
               locoPublish();
-              if(HM){ if(g_loco[0].pon||g_loco[0].phold){ g_rvx=g_loco[0].px; g_rvz=g_loco[0].pz; g_rvHead=g_loco[0].pyaw; }   /* ⭐ ep 9: walking there, on the exposure */
+              if(HM){ if(g_loco[0].pon||g_loco[0].phold){ g_rvx=g_loco[0].px; g_rvz=g_loco[0].pz; g_rvHead=g_loco[0].pyaw; }   /* ⭐ walking there, on the exposure */
                       else { g_rvx=HM->x; g_rvz=HM->z; g_rvHead=HM->yaw*0.0174532925f; } }
               g_castFloorY[0]=HM?HM->y:0.f; }
             g_castAt[0][0]=g_rvx; g_castAt[0][1]=g_rvz; g_castAt[0][2]=g_rvHead; g_castAtOK[0]=1;
             /* ⭐ THE PLAYER COLLIDES. The colliders have existed since Z2 (`solid` props ->
-             * circles, 640 of them on parsons) and only SET ACTORS ever called colResolve --
+             * circles, 640 of them on one street set) and only SET ACTORS ever called colResolve --
              * the hero walked through houses, fences and mailboxes. design/engine_capabilities.md
              * called this "the biggest one"; the 09-01 audit ranked it second only to unifying
              * the body systems. Same radius the actors use. NOT while staged: a scene places her
@@ -2701,9 +2701,9 @@ int main(int argc,char**argv){
                   for(int k2=2;k2<4;k2++) if(trBone[k2]>=0){ float y=world[trBone[k2]][13]; if(y<pf)pf=y; }
                   /* capture from THIS frame's stand pose, before the clip's first posed frame */
                   g_rmY=(pf<1e8f)?(0.02f+0.12f-pf*sc):revaGround;
-                  /* ⭐ ep 10: a rider on its @board channel stands the way a partner does -- its rest mesh's lowest point
+                  /* ⭐ a rider on its @board channel stands the way a partner does -- its rest mesh's lowest point
                    * on the floor, which is the floor the skate clips were authored on. The ankle guess above put
-                   * reva's board 0.048 u into the floor on the first board test (kaeli, placed by mny, was right). */
+                   * reva's board 0.048 u into the floor on the first board test (the co-star, placed by mny, was right). */
                   if(castOnBoard(0)) g_rmY=(g_heroMk?g_heroMk->y:0.f)-P->mny*sc; }
               for(int k2=2;k2<4;k2++) if(trBone[k2]>=0){ float y=world[trBone[k2]][13]; if(y<fmn)fmn=y; }
               if(rmOwn) model[13]=g_rmY+rvAlt+g_feet.y;
@@ -2722,7 +2722,7 @@ int main(int argc,char**argv){
               int onMk=(g_heroMk!=NULL);
               if(onMk){ float hd=(hdP&&hdC>=0)?donorHipDrop(hdP,hdC,rvWph,P):0.f;
                   model[13]=g_heroMk->y-P->mny*sc+hd*sc;
-                  { float af9=castOnBoard(0)?boardAuthoredFloor(0,P,sc):NAN; if(af9==af9) model[13]=g_heroMk->y-af9*sc; }   /* ⭐ ep 10 */
+                  { float af9=castOnBoard(0)?boardAuthoredFloor(0,P,sc):NAN; if(af9==af9) model[13]=g_heroMk->y-af9*sc; }
                   if(g_heroMk->hips&&P->pb[0]>=0) model[13]=g_heroMk->y-world[P->pb[0]][13]*sc; }
               if(!onMk&&!rmOwn&&!g_rvHipTrans&&!g_skate&&rvAlt<0.15f&&!DOOR_PLAT)   /* S4.5: rotation-only heroes bounce again */
                   model[13]+=powf(fabsf(sinf((float)(btF*3.14159))),1.5f)*0.09f;
@@ -2739,10 +2739,10 @@ int main(int argc,char**argv){
                * reva's measured stride 4.95u -> 2.40u by changing which frames read as
                * contacts, and a metric that shifts under an unrelated fix is a fix that
                * reached too far. Widen it when a gait is measured sinking, not before. */
-              /* ⭐ ep 9: A RIDER IS PLACED BY ITS DECK, NOT ITS ANKLES -- the partner's rest-pose grounding,
+              /* ⭐ A RIDER IS PLACED BY ITS DECK, NOT ITS ANKLES -- the partner's rest-pose grounding,
                * so a pushing foot authored below the rig floor reaches the real one */
               if(castRides(0)&&!onMk){ float af9=castOnBoard(0)?boardAuthoredFloor(0,P,sc):NAN;
-                  model[13]=(af9==af9)?-af9*sc:-P->mny*sc; }   /* ⭐ ep 10: a @board rider on the floor its clips were authored on */
+                  model[13]=(af9==af9)?-af9*sc:-P->mny*sc; }   /* ⭐ a @board rider on the floor its clips were authored on */
               if(!onMk&&!rmOwn&&!g_skate&&!castRides(0)&&g_manSpd<0.35f&&rvAlt<0.15f&&P->footL>=0&&P->footR>=0){
                   float tmn=1e9f;
                   for(int k2=0;k2<2;k2++){ int b2=k2?P->footR:P->footL;
@@ -2750,7 +2750,7 @@ int main(int argc,char**argv){
                       float wy=model[1]*hx+model[5]*hy+model[9]*hz+model[13];
                       if(wy<tmn) tmn=wy; }
                   if(tmn<0.02f&&tmn>-3.f) model[13]+=0.02f-tmn; }
-              model[13]+=castDeckLift(0);   /* ⭐ ep 9: on a deck she stands ON it */
+              model[13]+=castDeckLift(0);   /* ⭐ on a deck she stands ON it */
               { /* GROUNDED Y RATE-CLAMP (S4d, posecheck finding): the grounding offset (per-clip
                  * lowest-joint) SNAPS at clip switches while the pose crossfades -- a 1.9u root
                  * teleport. On the ground, ease vertical settles at <=0.28u/frame; in the air
@@ -2851,10 +2851,10 @@ int main(int argc,char**argv){
                 model[12] -= model[0]*ox + model[8]*oz;
                 model[14] -= model[2]*ox + model[10]*oz;
             }
-            /* ⭐ ep 10: THE CARVE -- a rider on a path leans into the curve, about its travel axis through the
+            /* ⭐ THE CARVE -- a rider on a path leans into the curve, about its travel axis through the
              * ground contact. After every placement above; before the grips and the attach points. */
             if(!g_skate&&g_heroMk&&(g_loco[0].pon||g_loco[0].phold)) locoLeanModel(model,0,g_castFloorY[0]);
-            /* ⭐ ep 11: ON A HALF-PIPE the ride places her -- contact, the surface's up, the air's turn -- over all of the above */
+            /* ⭐ ON A HALF-PIPE the ride places her -- contact, the surface's up, the air's turn -- over all of the above */
             if(!g_skate&&g_mode==MODE_ANIM){ pipeModel(0,model,P,sc); rollModel(0,model); }   /* (10-22) and the roll */
             /* HER REAL TEXTURE. The hologram (GFX_HOLO) is a deliberate look for the venue --
              * fresnel, scanlines, additive -- but it throws her texture away: her atlas has skin
@@ -2863,7 +2863,7 @@ int main(int argc,char**argv){
              * solid. REVA_HOLO=1 puts the hologram back. */
             static int holoMode=-1;
             if(holoMode<0){ const char*e=getenv("REVA_HOLO"); holoMode=(e&&e[0]=='1')?1:0; }
-            /* ⭐ M0 (11-01): in the zombie cab she is REVA VS ZOMBIES' Reva -- an android with a body on a street, not the
+            /* ⭐ M0 (11-01): in the zombie cab she is the zombie game's Reva -- an android with a body on a street, not the
              * venue's apparition -- so the cab draws her solid, as skate mode does. REVA_HOLO=1 still puts the hologram back. */
             int skSolid = (g_mode==MODE_ANIM) ? 1 : ((g_skate||GAME_ON) && !holoMode);   /* the lab is never a hologram */   /* the lab shows a SOLID body: a translucent hologram hides the very pops being hunted */
             if(skSolid){
@@ -2872,13 +2872,13 @@ int main(int argc,char**argv){
                  * pack's texture and lets the neutral rig shade it, so an arm can be told
                  * from a leg. */
                          /* SHE NEEDS HER OWN LIGHT. The venue's light is deliberately dark and
-                          * comes from the three nearest club lights, which are aimed at the
+                          * comes from the three nearest of the dance floor's lights, which are aimed at the
                           * dancefloor -- a solid body there was lit by nothing but the 0.13
                           * ambient floor, so her texture showed up almost black. A key over her
                           * shoulder, a cool fill opposite, and a low warm bounce. */
                          /* A SCENE GETS LIT FOR THE SCENE. The rig above is aimed at
                           * one body standing on a runway; a two-hander needs the pair
-                          * lit as a pair, and it needs a RIM -- once the club's dressing
+                          * lit as a pair, and it needs a RIM -- once the dance floor's dressing
                           * is off, an unrimmed head is a dark shape on a dark ground and
                           * every jaw and blink the face rig can do is invisible. Key
                           * warm off the camera side, rim cool from behind-opposite,
@@ -2890,7 +2890,7 @@ int main(int argc,char**argv){
                            float al=sqrtf(ax*ax+az*az); if(al<1e-3f){ ax=0.f; az=1.f; al=1.f; }
                            ax/=al; az/=al;
                            float px=-az, pz=ax, sg=g_scnSide;
-                           /* ⭐ AND THE KEY CROSSES WITH IT (ep 4). The camera always sits at +p
+                           /* ⭐ AND THE KEY CROSSES WITH IT. The camera always sits at +p
                             * (that is what one side of the eyeline means) and the key is written
                             * from the camera side, so a reversed lens needs the rig mirrored too
                             * -- otherwise the reverse is lit from behind. */
@@ -2915,7 +2915,7 @@ int main(int argc,char**argv){
                                           mx  -px*3.60f+ax*1.00f*sg, my +1.80f,    mz  -pz*3.60f+az*1.00f*sg,
                                           mx,                        my -2.40f,    mz , 0,-99,0, 0,-99,0, 0,-99,0 };
                            float lc3[NLIGHT*3]={ 2.55f,2.28f,2.02f,   1.60f,1.90f,2.65f,   0.50f,0.38f,0.32f , 0,0,0, 0,0,0, 0,0,0 };
-                           lightsStamp(lp3,lc3,3);   /* ⭐ (ep 4) the held light is the fourth lamp on the pair */
+                           lightsStamp(lp3,lc3,3);   /* ⭐ the held light is the fourth lamp on the pair */
                          } else { float kx=sinf(SK.head), kz=cosf(SK.head);
                            float lp3[NLIGHT*3]={ SK.x-kx*2.2f+kz*1.8f, SK.y+3.4f, SK.z-kz*2.2f-kx*1.8f,
                                           SK.x+kx*3.0f-kz*2.2f, SK.y+2.6f, SK.z+kz*3.0f+kx*2.2f,
@@ -2932,11 +2932,11 @@ int main(int argc,char**argv){
              * state machine, the tracer ribbons and the lightning sit outside this loop and
              * must tick exactly once per frame. */
             /* ⭐ (11-07) A GAME DRAWS THE FEED ONLY WHEN THE WALLS SHOW IT. The feed is read by the venue's jumbos and nothing else, and in a game with no jumbos it
-             * went nowhere: Bike Lane Bash drew Kaeli twice a frame, her 37 meshes 74 draws, and on the Pi a second pass of her. The doors and the lab keep both
+             * went nowhere: the street game drew its co-star twice a frame, her 37 meshes 74 draws, and on the Pi a second pass of her. The doors and the lab keep both
              * passes as they were: the lab steps its jiggle and its contact solve once a pass, and film's takes were made that way */
             const int feed9=!GAME_ON||(holly_fbo_texture()&&g_mode!=MODE_ANIM);
             /* ⭐ (11-12) IN THE LAB THE FEED IS NEVER SHOWN (the jumbos above aren't drawn in MODE_ANIM), yet the GPU rendered the whole frame into it, and
-             * the pass's hero and cast went into the picture's own list as well: every scene body drawn twice where it's seen (chorus 3b: 14 M of 31.7 M
+             * the pass's hero and cast went into the picture's own list as well: every scene body drawn twice where it's seen (a music video chorus: 14 M of 31.7 M
              * indices). Its pass still runs for its CPU steps, which film's takes were made with, but nothing of it is drawn (g_vkPassDark) and no feed is
              * rendered. REVA_LABFEED=1: as before */
             static int labFeed9=-1; if(labFeed9<0){ const char*e9=getenv("REVA_LABFEED"); labFeed9=(e9&&e9[0]=='1'); }
@@ -2976,17 +2976,17 @@ int main(int argc,char**argv){
                     actorsDraw(pal);
                     leadsCollect(); }
                 passMark("actors");
-                /* ⭐ A HELD PROP OUTSIDE A SCENE (ep 4). This was gated on a loaded .scn, so
+                /* ⭐ A HELD PROP OUTSIDE A SCENE. This was gated on a loaded .scn, so
                  * the lab could not put anything in a hand and look at it -- which is where a
                  * held LIGHT has to be judged before it is cast. */
                 /* ⭐ (11-12) IN THE FILM'S LAB EVERY HELD PROP IS DRAWN AFTER THE CAST (drawBoards' pass, in the frame its holder was posed in).
-                 * From here everything it hangs was placed from last frame's attach points: on the frame the Facade video's chest door swaps
+                 * From here everything it hangs was placed from last frame's attach points: on the frame the music video's chest door swaps
                  * shut to open, the clip moves her in one frame, and the open door was drawn at last frame's chest, its leaf across the black
                  * card for that frame. Elsewhere (a game, the doors) as before: they have no pass after the cast. REVA_HELDLATE=0: the old pass */
                 { static int hl9=-1; if(hl9<0){ const char*e9=getenv("REVA_HELDLATE"); hl9=!(e9&&e9[0]=='0'); } g_heldLate=hl9&&g_mode==MODE_ANIM&&skSolid; }
                 if(g_scnN>0||heldAny())
                     drawHeld();
-                /* ⭐ ep 9: THE PLACED SCREENS, AFTER THE WORLD -- drawSet's sky would wipe them otherwise */
+                /* ⭐ THE PLACED SCREENS, AFTER THE WORLD -- drawSet's sky would wipe them otherwise */
                 if(g_setNI) scrDrawPlaced();
                 artWorld(vp);   /* (11-11) the set's drawings that hang behind the world or lie on a plane in it (setart.inc) */
             }
@@ -3034,7 +3034,7 @@ int main(int argc,char**argv){
                   if(gb0>=0){ ptWorld(world[gb0],model,g_castGripW[0]); g_castGripOK[0]=1;
                               m4_mul(g_castGripM[0],(float*)model,world[gb0]); }
                   attPublish(P,world,model,0);
-                  /* ⭐ ep 10: her board off her clip's channel, at the phase she was sampled at (after any hold) */
+                  /* ⭐ her board off her clip's channel, at the phase she was sampled at (after any hold) */
                   if(hdC>=0&&hdP) boardPublish(0,hdP,hdC,rvWph,1,model);
                   else if(want>=0&&(unsigned)want<P->nClips) boardPublish(0,P,want,rvWph,1,model);
                   else boardPublish(0,NULL,-1,0.0,1,model); }
@@ -3042,7 +3042,7 @@ int main(int argc,char**argv){
                 g_heroHeadW[1]=model[1]*hx+model[5]*hy+model[9]*hz+model[13];
                 g_heroHeadW[2]=model[2]*hx+model[6]*hy+model[10]*hz+model[14];
                 g_heroHeadOK=1;
-                clipAuditBody(P,world,model,0);   /* ⭐ ep 10: the hero, exactly as drawn */
+                clipAuditBody(P,world,model,0);   /* ⭐ the hero, exactly as drawn */
                 if(P->fmMouth>=0&&P->fmEyeL>=0&&P->fmEyeR>=0){
                     ptWorld(world[P->fmMouth],model,g_heroMouthW);
                     float el[3],er[3];
@@ -3109,7 +3109,7 @@ int main(int argc,char**argv){
                     if(g_labPartner&&(g_labPClip>=0||g_labPDnP)){
                         slotWashFor(g_castI); labDrawPartner(g_labPartner,g_labPClip,g_labPPhase,model,pal); g_bodyWash[3]=0.f; }
                 g_castI=sv8;
-                /* ⭐ ep 10: THE BOARDS, in the frame their riders were just posed in (every rider has published) */
+                /* ⭐ THE BOARDS, in the frame their riders were just posed in (every rider has published) */
                 if(g_scnN>0||heldAny()){ drawBoards();
                      } }
             if(g_mode==MODE_ANIM&&g_labGrid>1&&skSolid){
@@ -3145,7 +3145,7 @@ int main(int argc,char**argv){
                     else { int k=gi-nWall; pw2=W-3*pw; ph2=H/4;
                         vx=3*pw; vy=H-(k+1)*ph2; }
                     /* P5: a root-motion clip displaces the MESH away from the body's
-                     * origin -- the wall was orbiting empty air while kaeli crawled out
+                     * origin -- the wall was orbiting empty air while the co-star crawled out
                      * of frame (caught on the grid). Aim at the actual pelvis. */
                     float bx=g_rmActive?g_rmEndW[0]:g_rvx, bz=g_rmActive?g_rmEndW[1]:g_rvz;
                     float by=g_rmActive?(g_rmEndW[2]*0.85f+0.35f):(1.55f+g_rvAlt*0.8f);
@@ -3161,7 +3161,7 @@ int main(int argc,char**argv){
                          *   8    the MOUTH   9  the EYES
                          * The head position is the measured one published by the
                          * draw. The mouth and eye offsets are world constants: every
-                         * club body is scaled to the same 3.45u height, so a face
+                         * body in the engine is scaled to the same 3.45u height, so a face
                          * occupies the same handful of centimetres on all of them. */
                         const float*HD=g_heroHeadW; int ok=g_heroHeadOK;
                         float fw=g_rvHead;
@@ -3317,7 +3317,7 @@ int main(int argc,char**argv){
             }   /* end vcPass: feed target, then the frame */
             g_vkPassDark=0;
             passMark("hero");
-            /* ⭐ ep 12: THE SMOKE -- after every opaque thing in the real frame (the set, the actors, the cast, the
+            /* ⭐ THE SMOKE -- after every opaque thing in the real frame (the set, the actors, the cast, the
              * boards, the park), into the frame, far to near */
             if(g_mode==MODE_ANIM){ starDraw(); beamDraw(); smokeTick(); smokeDraw();
                 ptStepAll((float)g_animDtS); ptDrawAll(view); dcStepAll((float)g_animDtS); dcDrawAll(); }   /* (step 24) a set's emitters, on the exposure clock: a held exposure holds them */
@@ -3482,7 +3482,7 @@ int main(int argc,char**argv){
                       if(la8>=0) held8=la8;
                       if(held8>=0){ ScnLine*S8=&g_scnL[held8];
                         g_scnLook[0]=S8->hlook; g_scnLook[1]=S8->plook;
-                        g_scnShot=(g_shotForce>=0)?g_shotForce:S8->shot;   /* ⭐ (ep 4) the ctl may override the size */
+                        g_scnShot=(g_shotForce>=0)?g_shotForce:S8->shot;   /* ⭐ the ctl may override the size */
                         /* the KEY and the RIM sit relative to the camera, so they flip
                          * with it -- which is exactly what re-lighting for the reverse
                          * is, and it happens on the cut where nobody can see it. */
@@ -3516,7 +3516,7 @@ int main(int argc,char**argv){
                                   snprintf(g_scnAway,sizeof g_scnAway,"%s",strcmp(want12,g_scnHome)?want12:"");
                                   if(!strcmp(want12,g_scnHome)){ memcpy(g_sun,g_scnHomeSun,16); memcpy(g_sunC,g_scnHomeSunC,12); memcpy(g_sky,g_scnHomeSky,12); }
                                   printf("[scene] line %d: set %s%s\n",held8,want12,strcmp(want12,g_scnHome)?" -- a cutaway":" -- home"); fflush(stdout); } }
-                            /* ⭐ 10-22: DRESSED ON THE CUT -- houtfit= etc., each slot's own pack (Viktor into his tunic) */
+                            /* ⭐ 10-22: DRESSED ON THE CUT -- houtfit= etc., each slot's own pack (a man into his tunic) */
                             { static char wore12[4][24];
                               for(int o12=0;o12<4;o12++){ const char*of=S8->outfit[o12]; if(!of[0]||!strcmp(of,wore12[o12])) continue;
                                   Pack*pk12=(o12==0)?g_heroPk:g_cast[o12].pk;
@@ -3539,8 +3539,8 @@ int main(int argc,char**argv){
                               CR->rate=v12[6]*0.0174533f; CR->a0=v12[7]*0.0174533f; CR->t0=scnBodyT(); CR->on=1;
                               printf("[roll] line %d: slot %d turns round (%.1f,%.1f,%.1f)+(%.2f,%.2f,%.2f) at %.1f deg/s from %.0f\n",
                                      held8,o12,v12[0],v12[1],v12[2],CR->d[0],CR->d[1],CR->d[2],v12[6],v12[7]); fflush(stdout); }
-                            trickArm(held8);   /* ⭐ ep 10: last line's tricks hand their bodies back; this line's are armed */
-                            puffArm(held8);    /* ⭐ ep 12: this line's exhales */
+                            trickArm(held8);   /* ⭐ last line's tricks hand their bodies back; this line's are armed */
+                            puffArm(held8);    /* ⭐ this line's exhales */
                             dollArm(held8);    /* ⭐ this line's falls */
                             /* ⭐ THE EXPOSURE RATE CHANGES ON THE CUT, like the lens and the clips. */
                             if(S8->feed>=0.f&&S8->feed!=g_tape){ g_tape=S8->feed; if(g_tape>0.f&&g_post<=0) g_post=1;
@@ -3597,7 +3597,7 @@ int main(int argc,char**argv){
                                 int f8=-1; for(unsigned c8=0;c8<g_heroPk->nClips;c8++)
                                     if(!strcmp(packStr(g_heroPk,g_heroPk->clips[c8].name),hcl)){ f8=(int)c8; break; }
                                 if(f8>=0&&f8!=g_labClip){ g_labClip=f8; g_labDnC=-1; g_labWphReset=1;
-                                    g_labRM=(strncmp(hcl,"z_rm_",5)==0); g_rmY=-999.f; }   /* ⭐ ep 9: a scene's z_rm_ clip owns Y too */
+                                    g_labRM=(strncmp(hcl,"z_rm_",5)==0); g_rmY=-999.f; }   /* ⭐ a scene's z_rm_ clip owns Y too */
                                 else if(f8<0){ int bc=-1; Pack*bp=bankFind(hcl,&bc);
                                     if(bp&&g_heroPk->cbOK&&g_heroPk->pbOK>=10){
                                         g_labDnP=bp; g_labDnC=bc; g_labClip=-1; g_labWphReset=1;
@@ -3618,7 +3618,7 @@ int main(int argc,char**argv){
                                   int k=0; while(ov[s9][k]&&ov[s9]+k!=at&&k<31){ g_overClip[s9][k]=ov[s9][k]; k++; } g_overClip[s9][k]=0;
                                   g_overW[s9]=at?(float)atof(at+1):1.f;
                                   printf("[over] line %d: slot %d layer '%s' w %.2f\n",held8,s9,g_overClip[s9],g_overW[s9]); } }
-                            /* ⭐ ep 8: THE SCREEN MOVES ON THE CUT. No ease -- a telly does not
+                            /* ⭐ THE SCREEN MOVES ON THE CUT. No ease -- a telly does not
                              * rotate itself upright over 1.4 seconds, an animator picks it up
                              * between exposures. Sticky, like every other staging key. */
                             /* ⭐ THE AUTHORED LENS. Placed on the line, cleared on the
@@ -3643,11 +3643,11 @@ int main(int argc,char**argv){
                             if(S8->pmark[0])  snprintf(g_castMark[1],32,"%s",S8->pmark);
                             if(S8->p2mark[0]) snprintf(g_castMark[2],32,"%s",S8->p2mark);
                             if(S8->p3mark[0]) snprintf(g_castMark[3],32,"%s",S8->p3mark);
-                            /* ⭐ ep 10: PATHS. The compiler carries a path on every line while it is in force, so a
+                            /* ⭐ PATHS. The compiler carries a path on every line while it is in force, so a
                              * record WITHOUT one means none is (a body mid-roll still finishes). A path STARTS when
                              * its run's first line is staged (pseg) -- or earlier, handed on by the path before it. */
                             for(int s10=0;s10<4;s10++){
-                                /* ⭐ ep 13: a run handed on EARLY keeps its own line's path, speed and loop until that
+                                /* ⭐ a run handed on EARLY keeps its own line's path, speed and loop until that
                                  * line (or a later one, or an `off`) is staged -- the lines between carry the run that
                                  * already ran out, and re-applying them braked the filmer's orbit after one lap */
                                 if(g_locoEarly[s10]>=0){
@@ -3656,17 +3656,17 @@ int main(int argc,char**argv){
                                 snprintf(g_castPath[s10],sizeof g_castPath[s10],"%s",S8->path[s10]);
                                 g_castLoop[s10]=(S8->loop[s10]>0); g_castPathSeg[s10]=S8->pseg[s10];
                                 if(S8->spd[s10]>0.f) g_castSpd[s10]=S8->spd[s10]; }
-                            /* ⭐ ep 11: THE HALF-PIPE. Carried by the compiler while in force, like a path: a record
+                            /* ⭐ THE HALF-PIPE. Carried by the compiler while in force, like a path: a record
                              * without one means none is, and the ride (locoTick) ends. The same name rides on; a new
                              * one drops in again. */
                             for(int s11=0;s11<4;s11++){
                                 snprintf(g_castPipe[s11],sizeof g_castPipe[s11],"%s",S8->pipe[s11]);
                                 snprintf(g_castPipeAir[s11],sizeof g_castPipeAir[s11],"%s",S8->pipeAir[s11]); }
-                            /* ⭐ ep 10: THE TRACKING LENS. camtrack follows a body's CONTINUOUS spot from a distance,
+                            /* ⭐ THE TRACKING LENS. camtrack follows a body's CONTINUOUS spot from a distance,
                              * height and azimuth off its travel; campan keeps the pinned cam= eye and turns the aim
                              * onto the body. Sticky (the compiler carries them) until camtrack=off / campan=off or
                              * a line with cam=. A NEW framing is a cut; the same one carried onto a line is held. */
-                            /* ⭐ ep 11: AND THE MOVING LENSES, in the same hand-over. cammove eases the line's cam= to its
+                            /* ⭐ AND THE MOVING LENSES, in the same hand-over. cammove eases the line's cam= to its
                              * own pose (an event: the compiler carries its END on as the next line's cam=, so the lens
                              * stays where the move put it); camorbit is sticky like camtrack; camshake rides on top of
                              * whichever placed lens is up. One lens mode per line -- the compiler refuses two. */
@@ -3722,7 +3722,7 @@ int main(int argc,char**argv){
                                   g_camOn=1; g_camMoveOn=0;
                                   printf("[lens] line %d campan slot %d aimh %.2f eye %.2f,%.2f,%.2f %s\n",
                                          held8,sl10,ah10,e10[0],e10[1],e10[2],same10?"(held)":"(cut)"); fflush(stdout); }
-                              else if(S8->orbHas==1){   /* ⭐ ep 11: THE REPLAY ORBIT */
+                              else if(S8->orbHas==1){   /* ⭐ THE REPLAY ORBIT */
                                   int sl11=(int)S8->orb[0]; if(sl11<0) sl11=0; if(sl11>SCN_BODIES-1) sl11=SCN_BODIES-1;
                                   float r11=(S8->orb[1]<0.5f)?0.5f:S8->orb[1];
                                   /* ⭐ 10-22: round a WORLD point (camat=) the aim is the point itself unless aimh says */
@@ -3742,7 +3742,7 @@ int main(int argc,char**argv){
                                   printf("[lens] line %d camorbit slot %d radius %.2f height %s%.2f heading %.0f -> %.0f over %.2f s fov %.0f aimh %.2f %s\n",
                                          held8,sl11,r11,T10->habs?"=":"",T10->height,T10->d0,T10->d1,T10->mT,fv11,ah11,
                                          same11?"(held)":(cont11?"(carried on)":"(cut)")); fflush(stdout); }
-                              else if(S8->movHas==1){   /* ⭐ ep 11: THE DOLLY / CRANE / PUSH-IN */
+                              else if(S8->movHas==1){   /* ⭐ THE DOLLY / CRANE / PUSH-IN */
                                   float A11[7];
                                   if(S8->camHas==1) memcpy(A11,S8->cam,sizeof A11);
                                   else { memcpy(A11,g_camOn?g_camPos:g_lastE,12); memcpy(A11+3,g_camOn?g_camAim:g_lastC,12);
@@ -3764,7 +3764,7 @@ int main(int argc,char**argv){
                                   printf("[lens] line %d: %s %s -- %s\n",held8,LNM11[(was10>0&&was10<5)?was10:0],end11?"done":"off",
                                          end11?"the lens holds where the move put it":(S8->camHas==1?"the line's cam= takes the lens":
                                          (g_camOn?"the lens holds where it was":"back to the shot ladder"))); fflush(stdout); }
-                              /* ⭐ ep 11: camshake, sticky -- said again with the same numbers it is not news */
+                              /* ⭐ camshake, sticky -- said again with the same numbers it is not news */
                               if(S8->shkHas){
                                   float a11=(S8->shk[0]>0.f)?S8->shk[0]:0.f, h11=(S8->shk[1]>0.f)?S8->shk[1]:1.5f;
                                   if(a11!=g_camShk[0]||h11!=g_camShk[1]){ g_camShk[0]=a11; g_camShk[1]=h11;
@@ -3775,13 +3775,13 @@ int main(int argc,char**argv){
                             if(S8->hprop[0])  snprintf(g_castProp[0],PROP_SPEC,"%s",S8->hprop);
                             if(S8->pprop[0])  snprintf(g_castProp[1],PROP_SPEC,"%s",S8->pprop);
                             if(S8->p2prop[0]) snprintf(g_castProp[2],PROP_SPEC,"%s",S8->p2prop);
-                            /* ⭐ and the other hand (ep 5), sticky the same way, `off` clears it */
+                            /* ⭐ and the other hand, sticky the same way, `off` clears it */
                             if(S8->hprop2[0])  snprintf(g_castProp2[0],PROP_SPEC,"%s",S8->hprop2);
                             if(S8->pprop2[0])  snprintf(g_castProp2[1],PROP_SPEC,"%s",S8->pprop2);
                             if(S8->p2prop2[0]) snprintf(g_castProp2[2],PROP_SPEC,"%s",S8->p2prop2);
                             /* ⭐ (11-11) slots 2 and 3 read a clip's `@` hold and `>` cue as the partner's does. They matched the WHOLE string against
-                             * the clip names, so the Facade run's riders (`p2clip=z_rm_fv_rider>5.58s`) found nothing, said nothing, and stood in
-                             * z_rest across the pourer. ⛔ Cast EXPLICITLY or not at all (ep 6: `auto` doesn't resolve past slot 1) */
+                             * the clip names, so the music video run's riders (`p2clip=z_rm_fv_rider>5.58s`) found nothing, said nothing, and stood in
+                             * z_rest across the pourer. ⛔ Cast EXPLICITLY or not at all (`auto` doesn't resolve past slot 1) */
                             for(int s9=2;s9<=3;s9++){ const char*sp9=(s9==2)?S8->p2clip:S8->p3clip;
                                 if(!g_cast[s9].pk||!sp9[0]) continue;
                                 const int sv9=g_castI; g_castI=s9;
@@ -3813,7 +3813,7 @@ int main(int argc,char**argv){
                                  * The fraction is of the clip's FRAMES, so the same number
                                  * means the same moment on a 40-frame clip and a 400-frame
                                  * one. */
-                                /* ⭐ ep 12: `name>0.33` -- CUE the loop: start it 33% through and PLAY ON, even when it
+                                /* ⭐ `name>0.33` -- CUE the loop: start it 33% through and PLAY ON, even when it
                                  * is the clip already playing. A loop only ever restarted when the clip CHANGED, so a
                                  * smoking loop ran on its own clock under the dialogue and put the cigarette in her
                                  * mouth in the middle of her line; the director has to be able to say where the drag
@@ -3914,7 +3914,7 @@ int main(int argc,char**argv){
                               g_cast[2].gap += (t2g      -g_cast[2].gap )*k8;
                               g_cast[2].yaw += (S8->p2yaw-g_cast[2].yaw )*k8;
                               g_cast[2].side+= (t2s      -g_cast[2].side)*k8; }
-                          /* ⭐ ep 7: SLOT 3 EASES THE SAME WAY, pushed off all three bodies
+                          /* ⭐ SLOT 3 EASES THE SAME WAY, pushed off all three bodies
                            * already placed -- the hero, slot 1 and slot 2. With four on a
                            * sidewalk the odds of landing inside somebody are three times what
                            * they were, and the clamp is the only thing standing between a
@@ -3940,7 +3940,7 @@ int main(int argc,char**argv){
                           if(g_stageOn&&S8->hasMark){
                               float tx9=(S8->hasMark&1)?S8->hx:g_stage[0];
                               float tz9=(S8->hasMark&2)?S8->hz:g_stage[1];
-                              float kk=g_scnSnap?1.f:0.f;   /* ⭐ ep 9: the pair WALKS to hx/hz (locoSpeed); it no longer eases there */
+                              float kk=g_scnSnap?1.f:0.f;   /* ⭐ the pair WALKS to hx/hz (locoSpeed); it no longer eases there */
                               float ox=g_stage[0], oz=g_stage[1];
                               if(kk>=1.f){ g_stage[0]=tx9; g_stage[1]=tz9; g_stageV9=0.f; }
                               else { float ddx9=tx9-g_stage[0], ddz9=tz9-g_stage[1], lf9=sqrtf(ddx9*ddx9+ddz9*ddz9);
@@ -3958,7 +3958,7 @@ int main(int argc,char**argv){
                               float dx=g_labPGap-g0, dz=g_labPSide-s0;
                               float v=sqrtf(dx*dx+dz*dz)/st8;
                               g_partSpd += (v-g_partSpd)*(1.f-expf(-st8/0.12f)); }
-                          locoTick(st8,g_scnSnap);   /* ⭐ ep 9: marks are walked to; speed is measured in the world */
+                          locoTick(st8,g_scnSnap);   /* ⭐ marks are walked to; speed is measured in the world */
                           /* ⭐ A JUMP IS NOT A WALK. The distance just covered in one frame reads as a
                            * sprint to the speed measures above, and a partner "sprinting" plays her
                            * walk -- so a snapped cut zeroes them before anything can listen. */
@@ -3967,7 +3967,7 @@ int main(int argc,char**argv){
                                * the LAST frame's draw published, and held props hang off last
                                * frame's grips -- so for one frame after a snap the bodies stood in
                                * the new place while the camera framed the old one: a flash frame on
-                               * every jump cut (ep 2's 8fps test, 33.7s). Shift the published marks
+                               * every jump cut (an 8fps test, 33.7s). Shift the published marks
                                * by exactly each body's jump; the next draw replaces them with the
                                * measured truth. Placement is the partner's own formula. */
                               float sh9=sinf(g_rvHead), ch9=cosf(g_rvHead);
@@ -4017,7 +4017,7 @@ int main(int argc,char**argv){
                          * (The aperture had this same "two sources for one opening"
                          * hazard and was fixed for it; this path was missed.) */
                         /* by NAME, every mesh that carries it: a sculpted shape is split
-                         * per material, so Anima's `jaw` is three morphs (lips, face, teeth). */
+                         * per material, so the bought character's `jaw` is three morphs (lips, face, teeth). */
                         if(L9->spk<SCN_VOICE&&!(SP&&SP->fmJaw>=0)){   /* the last slot is a voice with no mouth */
                             morphSetName(SP,SW,"jaw",amp9);
                             morphSetName(SP,SW,"smile",0.30f*amp9); }  /* widens as it opens */
@@ -4053,7 +4053,7 @@ int main(int argc,char**argv){
                               else morphSetName(BP,BW,"blink",sinf(3.14159f*(bP9[b9]/0.16f))); }
                           else { bT9[b9]-=st9; if(bT9[b9]<=0.f) bP9[b9]=0.f; } } }
                     /* (11-11) THE HELD FACE: a line's hface= pface= p2face= p3face= hold face shapes by name through it (a laugh's shut eyes
-                     * and its smile), over the speech's mouth and the blink clock (the Facade video). A line
+                     * and its smile), over the speech's mouth and the blink clock (the music video). A line
                      * that says none changes nothing. ⛔ The jaw is the BONE's on a body that has one: a held `jaw` here would fight it */
                     { int lf9=scnActive();
                       if(lf9>=0) for(int b9=0;b9<SCN_BODIES;b9++){ const char*s9=g_scnL[lf9].face[b9]; if(!s9[0]) continue;
@@ -4113,7 +4113,7 @@ int main(int argc,char**argv){
                          * the state tree. This is the authoring loop's playback path. */
                         /* THE KEY IS "clip=", NOT "...clip=". strstr finds it INSIDE
                          * `pclip=` and `hclip=`, so the driver passing --pclip idle was
-                         * silently setting the HERO's clip to idle -- which on kaeli is a
+                         * silently setting the HERO's clip to idle -- which on the co-star is a
                          * get-up-off-the-floor loop. She has been crouching on all fours
                          * through entire scenes because of a substring match. */
                         q=strstr(buf,"clip=");
@@ -4154,7 +4154,7 @@ int main(int argc,char**argv){
                         /* ⛔ A SCENE OWNS ITS CLIPS. The per-line staging resolves the
                          * hero's and partner's clips ~160 lines above this, and this
                          * parse ran afterwards -- so a ctl `clip=idle` overwrote the
-                         * staging's choice on EVERY poll, and kaeli spent an entire scene
+                         * staging's choice on EVERY poll, and the co-star spent an entire scene
                          * playing her get-up-off-the-floor loop on all fours. Two earlier
                          * attempts looked at the staging (which was correct, and said so
                          * in the log) and never at what came after it. */
@@ -4184,8 +4184,8 @@ int main(int argc,char**argv){
                           { char nm3[64]; int k3=0;
                             while(*q&&*q!='\n'&&*q!='\r'&&*q!=' '&&k3<63) nm3[k3++]=*q++;
                             nm3[k3]=0;
-                            /* ⭐ partnerN=<pack>@<height> -- a cast member's HEIGHT in club units
-                             * (ep 9). The loader sizes every body to reva's 3.45, which is right for
+                            /* ⭐ partnerN=<pack>@<height> -- a cast member's HEIGHT in engine units
+                             * The loader sizes every body to reva's 3.45, which is right for
                              * two women sharing a frame and wrong for a cartoon kid on a skateboard.
                              * A height, not a scale: a scale means nothing across rigs authored in
                              * different units. Stripped before the name is used to find the pack. */
@@ -4209,7 +4209,7 @@ int main(int argc,char**argv){
                                     if(cs9>=2&&g_labPartnerPk.nClips)
                                         g_labPClip=(g_labPartnerPk.idleIdx>=0)?g_labPartnerPk.idleIdx:0;
                                     /* SIZE HER LIKE A HERO, not like crowd furniture. The
-                                     * pack loader sizes by BONE SPAN, and kaeli's cloud runs
+                                     * pack loader sizes by BONE SPAN, and the co-star's cloud runs
                                      * ~57 rig-units below her own feet, which shrank her to a
                                      * third of reva's height standing next to her. The hero
                                      * path sizes by MESH for exactly this reason. Two
@@ -4258,7 +4258,7 @@ int main(int argc,char**argv){
                                      * a missing prop, and nothing else in the log could say which. */
                                     /* ⛔ packStr returns ONE static buffer. Called twice in one printf, both
                                      * arguments pointed at it and both hands printed the SAME name -- which
-                                     * read as a grip-election bug and cost a take (ROBOT NEKO ep 2). Copy each
+                                     * read as a grip-election bug and cost a take. Copy each
                                      * name out before the next call. */
                                     { char gr9[64], gl9[64];
                                       snprintf(gr9,64,"%s",g_labPartnerPk.gripNode>=0?packStr(&g_labPartnerPk,g_labPartnerPk.nodes[g_labPartnerPk.gripNode].name):"-");
@@ -4270,7 +4270,7 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"chains="))) g_chainsOn=atoi(q+7);
                         if((q=strstr(buf,"chainstiff="))) g_chStiff=(float)atof(q+11);
                         if((q=strstr(buf,"chaindamp="))) g_chDamp=(float)atof(q+10);
-                        /* multiples of REAL gravity -- 1.0 is physical at club scale.
+                        /* multiples of REAL gravity -- 1.0 is physical at the engine's scale.
                          * A dancefloor may want hair thrown harder than a woman sitting
                          * on a bed at 4am; that is a scene's choice, not the solver's. */
                         if((q=strstr(buf,"actors="))) g_setActorsOn=atoi(q+7)?1:0;
@@ -4295,7 +4295,7 @@ int main(int argc,char**argv){
                          * put a body on furniture without compiling a scene. `off` clears. */
                         { char*rl9=strstr(buf,"roomlit=");
                           if(rl9){ g_roomLit=(float)atof(rl9+8); printf("[set] roomlit %.2f\n",g_roomLit); fflush(stdout); } }
-                        { char*ca9=strstr(buf,"clipaudit=");   /* ⭐ ep 10: the clipping audit, live */
+                        { char*ca9=strstr(buf,"clipaudit=");   /* ⭐ the clipping audit, live */
                           if(ca9) caEnable(atoi(ca9+10)!=0,"ctl clipaudit="); }
                         { const char*mk9[4]={"hmark=","pmark=","p2mark=","p3mark="};
                           for(int s9=0;s9<4;s9++){ char*r=strstr(buf,mk9[s9]);
@@ -4384,11 +4384,11 @@ int main(int argc,char**argv){
                             g_stepCtl=g_stepFps=(v>0.f)?v:0.f;
                             printf("[step] ctl: %.0f exposures/sec%s\n",g_stepFps,g_stepFps>0.f?"":" (off)"); fflush(stdout); }
                         if((q=strstr(buf,"boil="))&&(q==buf||q[-1]==' ')) g_boil=(float)atof(q+5);
-                        /* ⭐ ep 12: smoke=0 clears and stops every wisp and exhale; smoke=1 lets them back */
+                        /* ⭐ smoke=0 clears and stops every wisp and exhale; smoke=1 lets them back */
                         if((q=strstr(buf,"smoke="))&&(q==buf||q[-1]==' ')){ g_smokeOn=atoi(q+6)?1:0;
                             if(!g_smokeOn){ g_nSmk=0; g_nJet=0; }
                             printf("[smoke] ctl: %s\n",g_smokeOn?"ON":"OFF (cleared)"); fflush(stdout); }
-                        /* ⭐ shotsize=<name>|auto and reverse=0|1|auto (ep 4) -- override the
+                        /* ⭐ shotsize=<name>|auto and reverse=0|1|auto -- override the
                          * loaded scene's own lens for EVERY line, so a framing can be shot in the
                          * lab off any scene instead of needing one authored for it.
                          * ⛔ NOT `shot=`: that is the SCREENSHOT key, and has been since 08-25. */
@@ -4428,12 +4428,12 @@ int main(int argc,char**argv){
                             o9[k9]=0;
                             if(g_labPartner) wardToggle(g_labPartner,o9); }
                         /* ⭐ jawgain=<f> -- the puppet jaw's opening scale in `mouth hinge` mode
-                         * (ep 4). A scene's own jawgain= beats it, and a scene STARTS on it. */
+                         * A scene's own jawgain= beats it, and a scene STARTS on it. */
                         if((q=strstr(buf,"jawgain="))&&(q==buf||q[-1]==' ')){ float v=(float)atof(q+8);
                             if(v<0.f) v=0.f;
                             if(v>4.f) v=4.f;
                             g_jawGainCtl=g_jawGain=v; printf("[jaw] gain %.2f (ctl)\n",v); fflush(stdout); }
-                        /* ⭐ hprop= / pprop= / p2prop= FROM THE CTL (ep 4). The spec was only ever
+                        /* ⭐ hprop= / pprop= / p2prop= FROM THE CTL. The spec was only ever
                          * reachable from a .scn, so a held prop -- and now a held LIGHT -- could not
                          * be put in a hand from the lab and looked at. Same string, same parser.
                          * ⛔ `pprop=` matches inside `p2prop=`: the digit guard, as everywhere. */
@@ -4450,7 +4450,7 @@ int main(int argc,char**argv){
                             while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) g_castProp[2][k++]=*q++;
                             g_castProp[2][k]=0;
                             printf("[held] ctl slot 2 '%s'\n",g_castProp[2]); fflush(stdout); }
-                        /* ⭐ THE SECOND HAND FROM THE CTL (ep 5). ⛔ The `=` keeps the long and
+                        /* ⭐ THE SECOND HAND FROM THE CTL. ⛔ The `=` keeps the long and
                          * short keys apart -- see the .scn stage parser -- and the digit guard
                          * is carried on the p-form exactly as above. */
                         if((q=strstr(buf,"hprop2="))){ int k=0; q+=7;
@@ -4503,9 +4503,9 @@ int main(int argc,char**argv){
                             fflush(stdout); }
                         if((q=strstr(buf,"todrate="))) g_todRate=(float)atof(q+8);
                         if((q=strstr(buf,"sky="))) sscanf(q+4,"%f,%f,%f",&g_sky[0],&g_sky[1],&g_sky[2]);
-                        /* ⭐ lamps=<scale>: the shot's dimmer on the SET's own practicals (ep 5).
+                        /* ⭐ lamps=<scale>: the shot's dimmer on the SET's own practicals.
                          * A day set shot at night needs its lamps taken down, and the alternative
-                         * was forking the .set file per episode. 1.0 = untouched. */
+                         * was forking the .set file per scene. 1.0 = untouched. */
                         if((q=strstr(buf,"lamps="))){ float s9=(float)atof(q+6);
                             if(s9<0.f) s9=0.f;
                             if(s9!=g_lampScale){ g_lampScale=s9;
@@ -4552,7 +4552,7 @@ int main(int argc,char**argv){
                                 printf("[cam] camsecs ignored (%s)\n",
                                        g_camOn?"T<=0":"no placed lens: set cam= first"); }
                             fflush(stdout); }
-                        /* ⭐ ep 10: lean=0 stands a rider on a path bolt upright (the carve's A/B); lean=1 leans again */
+                        /* ⭐ lean=0 stands a rider on a path bolt upright (the carve's A/B); lean=1 leans again */
                         if((q=strstr(buf,"lean="))&&(q==buf||q[-1]==' '||q[-1]=='\t'||q[-1]=='\n'||q[-1]=='\r')){
                             g_leanOff=(atoi(q+5)==0); printf("[lean] carve %s\n",g_leanOff?"OFF (lean=0)":"on"); fflush(stdout); }
                         if((q=strstr(buf,"set="))){ char nm6[64]; int k6=0; q+=4;
@@ -4576,7 +4576,7 @@ int main(int argc,char**argv){
                          * body cast as the partner could be DIRECTED inside a compiled scene but
                          * not POSED BY HAND -- and hand-posing is how a scene gets blocked before
                          * it is ever shot.
-                         * ⛔ Anima arrives with ONE clip (a two-frame rest stub; her Fab
+                         * ⛔ The bought character arrives with ONE clip (a two-frame rest stub; her Fab
                          * download carries no animation at all), so pclip=w_look came back NOT
                          * FOUND and she could not be looked at in a pose -- while the retarget
                          * that serves it sat in bankFind, already gated, ~370 lines above. */
@@ -4689,7 +4689,7 @@ int main(int argc,char**argv){
         if(g_wdrawN){
             for(int i9=0;i9<g_wdrawN;i9++){
                 int d9=g_wdraw[i9].def; if(d9<0||!g_wpnPackOK[d9]) continue;
-                float yw9=g_wdraw[i9].yaw-1.5708f;   /* the rack runs along +X; the club faces +Z */
+                float yw9=g_wdraw[i9].yaw-1.5708f;   /* the rack runs along +X; the engine faces +Z */
                 float ca9=cosf(yw9), sa9=sinf(yw9);
                 M4 wm; memset(wm,0,64);
                 wm[0]=ca9; wm[2]=-sa9; wm[5]=1.f; wm[8]=sa9; wm[10]=ca9; wm[15]=1.f;
@@ -4729,9 +4729,9 @@ int main(int argc,char**argv){
           artOver();   /* (11-11) the set's drawings that go over the finished picture, under the captions (setart.inc) */
           if(g_scnT>=0.f&&g_capOK) capDraw(HW,HH);   /* ⭐ (10-23) the captions (see capDraw); REVA_OLDCAPS=1 is the control */
           else if(g_scnT>=0.f){ int li9=scnActive();
-              if(li9>=0&&!g_scnL[li9].silent){ const char*tx=g_scnL[li9].text;   /* ⭐ ep 10: an ACTION line has no subtitle */
+              if(li9>=0&&!g_scnL[li9].silent){ const char*tx=g_scnL[li9].text;   /* ⭐ an ACTION line has no subtitle */
                   /* A SCRIM. The words landed on whoever was standing at the bottom of
-                   * the frame -- kaeli's midriff ate a whole line in the two-shot. Four
+                   * the frame -- the co-star's midriff ate a whole line in the two-shot. Four
                    * stacked bands fake the gradient a single flat colour cannot. */
                   { static float bd[12]; float y0=HH-146.f, st=36.5f;
                     for(int b6=0;b6<4;b6++){
@@ -4746,16 +4746,16 @@ int main(int argc,char**argv){
                   float x9=(HW-w9)*0.5f, y9=HH-62.f;
                   /* ⭐ BY SLOT, NOT BY "IS IT REVA". Three speakers need three colours --
                    * the audience tracks who is talking in a dark room by hue before they
-                   * read a word of it. reva cyan (hers since CLUB NIGHT), kaeli warm,
-                   * susan green. ⛔ And the NAME is indexed too: slot 2's dialogue used to
-                   * come up over kaeli's name, which is the exact bug that already
-                   * happened once to susan and would make act V unreadable. */
+                   * read a word of it. reva cyan (hers since the first show), the co-star warm,
+                   * slot 2 green. ⛔ And the NAME is indexed too: slot 2's dialogue used to
+                   * come up over the co-star's name, which is the exact bug that already
+                   * happened once to slot 2 and would make a long scene unreadable. */
                   int sp9=g_scnL[li9].spk; if(sp9<0||sp9>=SCN_MAXCAST) sp9=0;
                   static const float SPKC[SCN_MAXCAST][3]={
                       {0.55f,0.95f,1.00f},   /* reva  -- cyan */
-                      {1.00f,0.78f,0.42f},   /* kaeli -- warm */
-                      {0.62f,0.94f,0.58f},   /* susan   -- green */
-                      {0.78f,0.74f,0.82f},   /* archive -- dead grey-violet (ep 7) */
+                      {1.00f,0.78f,0.42f},   /* the co-star -- warm */
+                      {0.62f,0.94f,0.58f},   /* slot 2  -- green */
+                      {0.78f,0.74f,0.82f},   /* slot 3  -- dead grey-violet */
                       {0.86f,0.86f,0.90f}};  /* anyone else */
                   const float*cc9=SPKC[sp9];
                   drawText(x9+2.f,y9+2.f,sc9,tx,0.f,0.f,0.f,0.75f);
@@ -4824,7 +4824,7 @@ int main(int argc,char**argv){
                   float bs=2.9f; int bw=(int)(stb_easy_font_width(GM.msg)*bs);
                   drawText((HW-bw)*0.5f,HH*0.30f,bs,GM.msg,1.0f*pu,0.48f*pu,0.88f*pu,0.96f); }
               }
-          /* ---- THE START MENU OVERLAY: dim the club, three doors ---- */
+          /* ---- THE START MENU OVERLAY: dim the dance floor, three doors ---- */
           /* a menu left alone for five minutes goes dark, and any touch brings it back: the Wii's precedent for a static picture on a set that can burn */
           { static double pauseFrom=0.0; if(!g_pause||g_btnA||g_btnB||g_btnStart||fabsf(g_ly)>0.3f||fabsf(g_lx)>0.3f) pauseFrom=tsec; g_pauseDark=g_pause&&(tsec-pauseFrom>300.0); }
           if(g_pause){
@@ -4866,13 +4866,13 @@ int main(int argc,char**argv){
           if(g_manual&&g_lockTgt>=0){ char lk[96];
               snprintf(lk,sizeof lk,"LOCK-ON: %s",packs[slots[g_lockTgt].pack].label);
               drawText(60,340,1.8f,lk,1.0f,0.25f,0.95f,0.95f); }
-          /* ⛔ THE CLUB'S OWN CREDIT DOES NOT BELONG ON A STREET. The dancer spotlight
+          /* ⛔ THE DANCE FLOOR'S OWN CREDIT DOES NOT BELONG ON A STREET. The dancer spotlight
            * prints a pack label and artist over the frame, and it fired straight through
-           * Act I -- "bgirl pj" sitting in the bottom-left of a suburban morning.
+           * a whole act -- a pack's label sitting in the bottom-left of a suburban morning.
            * Exactly the lesson already learned for the lamp sprites, orbs and flame snake:
-           * A SET OWNS THE SCREEN, including the club's own decoration. Those were gated on
+           * A SET OWNS THE SCREEN, including the dance floor's own decoration. Those were gated on
            * a scene and then on a set; this credit was missed because it is drawn with the
-           * HUD text rather than with the club's props. Same gate as the mode hint above. */
+           * HUD text rather than with the dance floor's props. Same gate as the mode hint above. */
           if(CAMD.shot==9&&g_scnT<0.f&&!g_setNI&&!g_setSpace){ Pack*sp=&packs[slots[CAMD.tgt].pack];
               g_showH=sp->effH;
               if(tv9){ char a9[TV_COLS+1]; snprintf(a9,sizeof a9,"%s",sp->label); tvText(0,18,1,a9,1.0f,0.92f,1.0f);
@@ -4996,12 +4996,12 @@ int main(int argc,char**argv){
           int capArm=(getenv("REVA_SCENEFPS")&&g_scnT>=0.f);
           ++fno;
           /* ⭐ (11-12) REVA_SHOTLAG=1: A SCENE CAPTURE A FRAME LATE. Every captured frame used to wait for the GPU to finish it before the CPU began
-           * the next (gfxRead's idle wait: chorus 3b's draft, 166 ms of GPU and 35 of CPU a frame, one after the other). Here frame k is written at
+           * the next (gfxRead's idle wait: a music video chorus's draft, 166 ms of GPU and 35 of CPU a frame, one after the other). Here frame k is written at
            * frame k+1 (gfxReadLag waits only for it, which the GPU has drawn while the CPU built k+1), the last read whole at the end, and one left
            * over when the scene ends written then. Frame k's pixels still go to file k.
            * Measured losslessly (driver.py scene --lossless, 11-12): the same frames as the serialized capture but for a few single pixels at hair tips
            * (the GPU's hair lands a strand a pixel apart when frames overlap), the sim's hashes the same tick for tick. ⛔ A lossy A/B said "drifts from
-           * frame 32": one frame's difference runs through every frame coded after it. facade_take.sh's drafts use it; a final is serialized */
+           * frame 32": one frame's difference runs through every frame coded after it. a take script's drafts use it; a final is serialized */
           static int lag9=-1; static int lagK9=0; if(lag9<0){ const char*e9=getenv("REVA_SHOTLAG"); lag9=(e9&&e9[0]=='1'); }
           if(lag9&&shotPath&&burst>1&&capArm&&taken<burst){
               unsigned char*px=(unsigned char*)malloc((size_t)SW9*SH9*4);
@@ -5030,7 +5030,7 @@ int main(int argc,char**argv){
                           if(++stN9==30){ printf("[shottime] 30 shots, a shot's ms: GPU finish %.1f, readback %.1f, PPM write %.1f, hash and log %.1f; shot to shot %.1f\n",
                                               st9[1]/30,st9[2]/30,st9[3]/30,st9[4]/30,st9[5]/30); fflush(stdout); stN9=0; memset(st9,0,sizeof st9); } } }
               free(px); fflush(stdout); g_capBegun=1; if(++taken>=burst) exit(0); } }
-        clipAuditFrame();   /* ⭐ ep 10: every body drawn this frame, tested together */
+        clipAuditFrame();   /* ⭐ every body drawn this frame, tested together */
         ledgerMark(wall_ms());
         { static int rs9=-1, rw9, rh9, rf9;   /* (11-12) REVA_RESIZETEST=WxH@frame: the window made that size at that frame, for a check of the rebuild with no hands */
           if(rs9<0){ const char*e=getenv("REVA_RESIZETEST"); rs9=e&&sscanf(e,"%dx%d@%d",&rw9,&rh9,&rf9)==3; }
@@ -5071,7 +5071,7 @@ int main(int argc,char**argv){
                 else { printf("[mark] miss -- click ON her%c",10); fflush(stdout); } } } }
         (void)first;
 #else
-        clipAuditFrame();   /* ⭐ ep 10 */
+        clipAuditFrame();
 #endif
         frames++;
         if(wall_ms()-lastStat>5000){ if(g_dieN||g_hideN) printf("[ledger] die=%ld hide=%ld inflight=%ld%s\n",g_dieN,g_hideN,g_dieN-g_hideN,(g_dieN-g_hideN>3)?"  ZOMBIE ALARM":"");
@@ -5082,7 +5082,7 @@ int main(int argc,char**argv){
             sB9->x,sB9->z,sB9->state,sB9->spd,
             g_rvx,g_rvz,CAMD.tgt,sC9->x,sC9->z); printf("[tick] %.2f ticks/frame (%ld ticks, %.0f Hz)\n",frames?(double)tickAcc9/frames:0.0,g_tickTotal,1000.0/g_tickMs); ledgerPrint(); fflush(stdout); passPrint(frames); frames=0; workAcc=0; workN=0; tickAcc9=0; lastStat=wall_ms(); fflush(stdout); }
     }
-    clipAuditExit();   /* ⭐ ep 10: a scene cut off by the exit still gets its TOTAL */
+    clipAuditExit();   /* ⭐ a scene cut off by the exit still gets its TOTAL */
     printf("exiting clean\n");
     return 0;
 }

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""sfxgen.py -- CAPABILITY 3a: the club has no sound library, so make one.
+"""sfxgen.py -- CAPABILITY 3a: the engine has no sound library, so make one.
 
     python reva_native/scenes/sfxgen.py          # writes scenes/sfx/*.wav
 
-⛔ THE GAP. SEVENTY-FOUR has no sound in it but voices. Act V is *entirely* sound
-design -- sounds from outside, screams until there are no more screams, then only
-moans -- and the last beat of the whole film is A KNOCK AT A DOOR, which is a sound, not a
+⛔ THE GAP. The film had no sound in it but voices. Much of it wants sound
+design -- sounds from outside, screams, moans -- and A KNOCK AT A DOOR is a sound, not a
 line. There was no way to put one in.
 
 ⭐ AND MOST OF WHAT THIS FILM NEEDS IS SYNTHESISABLE. A knock is a damped impulse through a
@@ -13,17 +12,17 @@ wooden panel. A hammer is the same, harder and brighter. A sprinkler is a filter
 burst on a period. A car alarm is two square tones alternating. None of these need a
 recording, none of them need a licence, and all of them are a few lines of arithmetic:
 
-    knock        three taps, 180ms apart -- POLITE, which is the whole point of the ending
+    knock        three taps, 180ms apart -- polite
     hammer       a single strike, brighter and shorter than a knock
-    sprinkler    a tick and a rising hiss; the first sound in the film
-    car_alarm    two alternating tones, the thing act III happens over the top of
+    sprinkler    a tick and a rising hiss
+    car_alarm    two alternating tones
     glass        a bright noise burst with a long tail
     door_close   a low thud with a latch click on the end
     footstep     one soft step
 
 ⛔ WHAT IS NOT HERE, and is not being faked: SCREAMS and MOANS. Those are performances, not
-waveforms -- synthesising them would produce something between a kettle and a joke, and act
-V lives or dies on them. They need a real source. Written down rather than bodged.
+waveforms -- synthesising them would produce something between a kettle and a joke, and a scene
+that needs them needs them real. They need a real source. Written down rather than bodged.
 
 Everything is mono 22050, which is what say_piper writes and therefore what
 compile_scene.py can mix without resampling.
@@ -91,9 +90,8 @@ def main():
     rng = random.Random(406)
     print("sfxgen -> %s" % OUT)
 
-    # ⭐ THE KNOCK. The last thing in the film. Three taps, evenly spaced, unhurried --
-    # POLITE, because the thing outside still remembers how to knock, and that is the
-    # entire horror of it. Not banging. Not scratching. Knocking.
+    # ⭐ THE KNOCK. Three taps, evenly spaced, unhurried --
+    # POLITE. Not banging. Not scratching. Knocking.
     gap = int(0.34 * SR)
     one = tap(0.40, 96.0, 0.35, rng, 0.85)
     n = gap * 2 + len(one) + int(0.6 * SR)
@@ -108,7 +106,7 @@ def main():
     # a hammer: harder, brighter, shorter than a knock
     write("hammer", tap(0.22, 168.0, 0.62, rng, 0.95))
 
-    # the sprinkler: a tick, then the hiss rising and falling. The FIRST sound in the film.
+    # the sprinkler: a tick, then the hiss rising and falling.
     n = int(1.5 * SR)
     hiss = lowpass(noise(n, rng), 0.18)
     out = []
@@ -121,7 +119,7 @@ def main():
         out[i] += v
     write("sprinkler", out)
 
-    # a car alarm: two alternating tones. Act III happens over the top of this.
+    # a car alarm: two alternating tones.
     n = int(2.4 * SR)
     out = []
     for i in range(n):

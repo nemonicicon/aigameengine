@@ -13,7 +13,7 @@
 #define SP_MAXCOLS 6000000
 #define SP_MAXLIVE 384
 #define SP_JUMP 2.f        /* in one tick, that's 120 units a second: nothing walks that fast */
-/* (11-05, Bike Lane Bash) a span's top also says which way it faces and what it is: nx, nz of the top's own triangle (its normal faces up, in 32767ths), and kind, the set's
+/* (11-05, the street game) a span's top also says which way it faces and what it is: nx, nz of the top's own triangle (its normal faces up, in 32767ths), and kind, the set's
  * `surface` line its mesh's name matched (0: none said). They ride along with the top wherever it goes when spans merge, and nothing that walks or rays reads them: only E->surface */
 typedef struct { float y0,y1; int next,walk; short nx,nz; unsigned char kind,pad9[3]; } SpSpan;
 typedef struct { int W,H; float x0,z0; int*col; SpSpan*sp; int n,cap,freeSp,soft,mapped; } SpGrid;   /* soft: it can be knocked aside: something loose, asleep. mapped: a streamed cell whose part of the path map is in, so a search needn't ask about it again */

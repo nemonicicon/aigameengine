@@ -334,7 +334,7 @@ def main():
         if hi - lo > 1e-9:
             print('  --height %.3f m: it stands %.4f of its own units at rest, so everything is scaled by %.5f, and the pack is marked true size' % (a.height, hi - lo, a.height / (hi - lo) * a.scale))
             a.scale *= a.height / (hi - lo)
-    # ⭐ RIGID MESHES ON AN ANIMATED NODE (2026-09-30, ROBOT NEKO ep 15). The shipped characters carry
+    # ⭐ RIGID MESHES ON AN ANIMATED NODE (2026-09-30). The shipped characters carry
     # their skateboard as a mesh on its own node -- no JOINTS_0, animated per trick by that node's
     # translation/rotation channels. Skipped as "not skinned", both riders rode thin air for a whole
     # episode. A rigid mesh IS a skinned mesh with one bone: its own node, weight 1.0, inverse bind =

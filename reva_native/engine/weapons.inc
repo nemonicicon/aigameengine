@@ -21,14 +21,14 @@ static char g_feed[3][96]; static float g_feedT[3];   /* the kill feed: newest f
  * GUNS: the layer had them, the hands did not. Real meshes now:
  * AssetsvilleTown's rack out of CivicDefenseV2, exported headless through UE 5.8's
  * glTF plugin (skate_src/guns/) and baked as prop rpacks. One deferred draw list, so
- * every armed body in the club costs a single program switch. */
+ * every armed body in the engine costs a single program switch. */
 #define WPROP_N 5
 /* THE ARSENAL. Sixteen meshes out of AssetsvilleTown, each tagged with the weapon class
  * it serves; a class holds a SET, and a body picks one and keeps it, so a floor of armed
  * contestants carries bats, katanas, shovels and a chainsaw instead of one cloned prop.
  * UE's material graph did not survive the export (0 images in the GLBs), so each carries
  * its own tint. Every mesh runs along its own +X (measured: pistol 0.33m, bat 1.24m) and
- * the club's forward is +Z, so all of them are yawed a quarter turn. */
+ * the engine's forward is +Z, so all of them are yawed a quarter turn. */
 typedef struct { const char*file; int kind; float tint[3]; } WpnDef;
 static const WpnDef WPNDEF[]={
     {"props/v1_wpn_baseballbat.rpack",1,{0.74f,0.52f,0.28f}},   /* ash */

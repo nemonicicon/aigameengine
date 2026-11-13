@@ -1,4 +1,4 @@
-/* ---- A RIDDEN VEHICLE (11-05, Bike Lane Bash's M0; design/engine_plan.md, "Bike Lane Bash against the queue": the first thing the engine lacked) -----------------------------------
+/* ---- A RIDDEN VEHICLE (11-05, the street game's M0; design/engine_plan.md, "The street game against the queue": the first thing the engine lacked) -----------------------------------
  * Something with two wheels that a body stands on and rides: a scooter, a bike, a board. A game says what it is in numbers (EngineRide: its size, its weight and its rider's, its motor,
  * its brakes, its tyres, how its front end wobbles), says what the rider's hands and feet are doing each tick (E->rideControl), and the engine does the rest on the walked world:
  *   - its two wheels stand on what's really there (E->surface's height under each), so it pitches with the street, and its grade is the rise between them over its wheelbase;
@@ -15,7 +15,7 @@
  * REVA_RIDESAY=<ticks> prints each one's numbers that often. Nothing here runs until a game begins a ride, so no other game can see it. */
 static const char* apiSurfaceName(int k);
 #define RIDE_MAX 8
-#define RIDE_U (1.f/0.572f)    /* club units a metre, the same as CLUB_UNITS_PER_S2's */
+#define RIDE_U (1.f/0.572f)    /* engine units a metre, the same as CLUB_UNITS_PER_S2's */
 #define RIDE_G 9.81f
 typedef struct { int on,rider,obj; EngineRide sp; float thr,fb,rb,steer,steerWas; int kickReq; EngineRideState st; float acc,wobPh,kickT,airVy,downT,stepT; } Ride;
 static Ride g_ride[RIDE_MAX+1]; static int g_rideEver=0;
@@ -182,7 +182,7 @@ static void rideBodyModel(int si,float*model){ Ride*R=rideOfRider(si); if(!R) re
     const float sc=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]); float qy[4],qx[4],qz[4],qt[4],q[4],t[3]={model[12],model[13],model[14]},s3[3]={sc,sc,sc};
     qaxis(qy,0,1,0,R->st.yaw); qaxis(qx,1,0,0,R->st.pitch); qaxis(qz,0,0,1,R->st.lean); qmul(qt,qy,qx); qmul(q,qt,qz); m4_trs(model,t,q,s3); }
 /* ---- (11-06) THE HANDS ON THE GRIPS AND THE FEET ON THE DECK, ON ANY RIG (EngineRide.reach) --------------------------------------------------------------------------------------
- * The angles in ridePose turn bones about their parents' axes, which is right only for a rig whose bones rest square to the body. On Anima's (Kaeli's, the UE4 skeleton) the
+ * The angles in ridePose turn bones about their parents' axes, which is right only for a rig whose bones rest square to the body. On the co-star's (a bought character's, the UE4 skeleton) the
  * arms went out and up and the legs stayed straight. Here every limb is put where it has to be by its own two bones, in the body's model space (+z its front, +x its left, y up,
  * the deck's middle under its origin and the deck's top at its rest floor): a bone turns by the shortest arc from where its child is to where it has to be, so it keeps its
  * twist, and a knee or an elbow bends to the side it's told. The hips sink by the crouch and the back tips by the lean about the body's own side to side, the head keeps its line,

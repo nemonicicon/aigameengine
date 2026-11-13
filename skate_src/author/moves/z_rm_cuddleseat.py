@@ -2,7 +2,7 @@
 """z_cuddleseat.py -- reva's half of the curl-up: sit on the floor, rest a hand on the
 sleeper, breathe.
 
-The first request: kaeli crawls about like a cat, then curls up
+The first request: the co-star crawls about like a cat, then curls up
 round reva and falls asleep, purring. This is reva's part. She sits down
 cross-legged, looks down at the body curling up against her, lowers a hand onto the
 sleeper's flank, and settles into a slow breath for the rest of the clip.

@@ -65,7 +65,7 @@ call what was already written.
 ## Traps this project has already paid for
 
 - ⛔ **A fixed crop + pixel diff cannot measure anything while the camera moves.** It
-  returns 70-85% "movement" regardless. The club's director pans constantly.
+  returns 70-85% "movement" regardless. The engine's director pans constantly.
 - ⛔ **Feature-finding in a render does not work.** Counting connected blobs of hair colour
   reports 12-24 "detached strands" on *healthy* alpha-cut hair. `face_aim.py` failed this
   way twice. Measure the rig against itself, not the picture against an idea.

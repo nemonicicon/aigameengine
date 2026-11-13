@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""z_curlsleep.py -- kaeli's half: lie down, curl up around the seated one, sleep,
+"""z_curlsleep.py -- the co-star's half: lie down, curl up around the seated one, sleep,
 PURR.
 
 The other half of the first request. The bench's FIRST LYING-DOWN body: the root
@@ -135,7 +135,7 @@ def main(pack_path, SCALE, PGAP, SEATR):
         w9, _ = fk_world(nodes, qo, to)
         if t > T_CURL + 0.9 and f % 6 == 0:
             # BONES only: static scene-root nodes never move and sit at rig origin --
-            # 1.59u above the feet on kaeli -- and they are not the body
+            # 1.59u above the feet on the co-star -- and they are not the body
             bidx = [i for i in range(len(nodes)) if nodes[i].get("kind") == 1] or list(range(len(nodes)))
             ys = [(w9[i][1] - mny) * SCALE for i in bidx]
             lo, hi = min(ys), max(ys)

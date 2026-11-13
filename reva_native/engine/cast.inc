@@ -5,7 +5,7 @@ static void clipAuditBody(Pack*P,M4*W,const float*model,int slot){
     caLatch();
     CaSlot*S=&g_caS[slot]; CaRest*R=caRestOf(P);
     S->drawn=1; snprintf(S->label,sizeof S->label,"%s",P->label[0]?P->label:"?");
-    caSupport(slot,S);   /* ⭐ ep 12 */
+    caSupport(slot,S);
     float sc=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]);
     float H=R->headH*sc*1.12f;
     if(!(H>0.5f)) H=3.15f;
@@ -91,12 +91,12 @@ static float caSegDist(const float*a,const float*b,const float*p){
     return sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); }
 static float caTest(int self,const float*p,float rad,int bodies,char*into){
     int kind=0; float best;
-    /* ⭐ ep 12: over the furniture this body rests on, its top (less the sink) is the floor -- see caSupport */
+    /* ⭐ over the furniture this body rests on, its top (less the sink) is the floor -- see caSupport */
     float st9; const char*nm9;
     if(caSoftBed(self,p,&st9,&nm9)){ best=(st9>-1e8f)?(st9-CA_SINK)-p[1]:0.f-p[1]; snprintf(into,12,"%s",(st9>-1e8f)?"bedding":"floor"); }
     else { best=caGridDepth(&g_caG,p[0],p[1],p[2],rad,&kind);
            snprintf(into,12,"%s",kind?"obstacle":"floor"); }
-    /* ⭐ ep 11: the half-pipes are not in the grid: each answers for itself, from the same numbers it rides on */
+    /* ⭐ the half-pipes are not in the grid: each answers for itself, from the same numbers it rides on */
     for(int i=0;i<g_nPipe;i++){ int pk=0; float d=pipeDepth(&g_pipe[i],p,rad,pipeRides(self,i),&pk);
         if(d>best){ best=d; snprintf(into,12,"%s",pk?"pipe box":"pipe"); } }
     /* ⭐ against the MEASURED shapes (the contact pass's): a fixed-fraction capsule called an arm resting on a belly
@@ -197,9 +197,9 @@ static int scnLoad(const char*name){
     FILE*f=fopen(pth,"rb");
     if(!f){ printf("[scene] %s NOT FOUND\n",pth); fflush(stdout); return 0; }
     g_scnN=0; g_scnLen=0.f; g_scnCapN=0; g_scnShpN=0; g_scnShpUsed=0; g_trSecN=0; g_trNoseN=0; memset(g_trStamp,0,sizeof g_trStamp);   /* ⭐ (11-06) and the lines' shape tracks */
-    char wav[128]={0}; static char ln[32768];   /* ⭐ ep 10: 4096 -> 8192 -- four mark-list paths on one stage record; (10-23) -> 32768: an 84 s line's mouth envelope */
+    char wav[128]={0}; static char ln[32768];   /* ⭐ 4096 -> 8192 -- four mark-list paths on one stage record; (10-23) -> 32768: an 84 s line's mouth envelope */
     while(fgets(ln,sizeof ln,f)){
-        /* ⛔ ep 10: a record longer than the buffer used to be split in two, silently -- its tail lost */
+        /* ⛔ a record longer than the buffer used to be split in two, silently -- its tail lost */
         if(!strchr(ln,'\n')&&!feof(f)){ int c9; while((c9=fgetc(f))!=EOF&&c9!='\n'){ }
             printf("[scene] %s: a line longer than %d chars was CUT -- its tail is dropped\n",pth,(int)sizeof ln-1); fflush(stdout); }
         if(!strncmp(ln,"scene ",6)){ int nl=0; sscanf(ln,"scene %*d %127s %f %d",wav,&g_scnLen,&nl);
@@ -218,7 +218,7 @@ static int scnLoad(const char*name){
                 L->pgap=1.15f; L->pyaw=180.f; L->pside=0.12f;
                 L->p2gap=1.45f; L->p2yaw=214.f; L->p2side=-1.25f;
                 L->p2look=0; L->p2brow=0.f; L->p2has=0; L->p2clip[0]=0;
-                /* ⭐ ep 7: slot 3 stands further out than slot 2 by default, on the far
+                /* ⭐ slot 3 stands further out than slot 2 by default, on the far
                  * side, so a four-hander does not pile the last two on top of each other. */
                 L->p3gap=1.10f; L->p3yaw=196.f; L->p3side=-2.60f;
                 L->p3has=0; L->p3clip[0]=0;
@@ -226,19 +226,19 @@ static int scnLoad(const char*name){
                 L->hprop[0]=L->pprop[0]=L->p2prop[0]=0;
                 L->hprop2[0]=L->pprop2[0]=L->p2prop2[0]=0;
                 L->pmark[0]=L->p2mark[0]=L->p3mark[0]=L->hmark[0]=0;
-                /* ⭐ ep 10: no path, no speed, no tracking lens -- and a line with no text is an ACTION line */
+                /* ⭐ no path, no speed, no tracking lens -- and a line with no text is an ACTION line */
                 for(int k10=0;k10<4;k10++){ L->path[k10][0]=0; L->spd[k10]=-1.f; L->loop[k10]=L->pseg[k10]=L->pnext[k10]=-1;
-                    L->pipe[k10][0]=L->pipeAir[k10][0]=0; }   /* ⭐ ep 11 */
+                    L->pipe[k10][0]=L->pipeAir[k10][0]=0; }
                 L->trkN=L->trkHas=L->panN=L->panHas=L->hldN=L->hldHas=0;
                 L->movHas=L->orbN=L->orbHas=L->orbAbs=L->trkAbs=L->shkHas=0; L->secs=-1.f; L->set[0]=0; L->atHas=0;
-                L->home[0]=0; for(int o12=0;o12<4;o12++){ L->outfit[o12][0]=0; L->roll[o12][0]=0; L->eyes[o12][0]=0; }   /* ⭐ ep 11 */
+                L->home[0]=0; for(int o12=0;o12<4;o12++){ L->outfit[o12][0]=0; L->roll[o12][0]=0; L->eyes[o12][0]=0; }
                 L->silent=(L->text[0]==0);
                 L->hlook=L->plook=1; L->shot=SHOT_OTS;
                 L->hbrow=L->pbrow=-9.f; L->hgt=0.f; L->step=-1.f; L->tod=-1.f; L->tone=-1.f; L->feed=-1.f; L->fish=-1.f; L->snap=0; L->camRoll=L->shut=L->sepia=L->grain=-9999.f; L->focusSaid[0]=0;
                 L->reverse=0; L->jawgain=-1.f; L->to=-1; memset(L->face,0,sizeof L->face);
                 L->hover[0]=L->pover[0]=L->p2over[0]=0;
-                L->htrick[0]=L->ptrick[0]=L->p2trick[0]=L->p3trick[0]=0;   /* ⭐ ep 10 */
-                L->hpuff[0]=L->ppuff[0]=L->p2puff[0]=L->p3puff[0]=0;       /* ⭐ ep 12 */
+                L->htrick[0]=L->ptrick[0]=L->p2trick[0]=L->p3trick[0]=0;
+                L->hpuff[0]=L->ppuff[0]=L->p2puff[0]=L->p3puff[0]=0;
                 snprintf(L->hclip,sizeof L->hclip,"z_upright");
                 snprintf(L->pclip,sizeof L->pclip,"z_upright");
                 g_scnN++; } }
@@ -298,7 +298,7 @@ static int scnLoad(const char*name){
             if((q=strstr(ln,"p3gap=")))  { L->p3gap =(float)atof(q+6); L->p3has=1; }
             if((q=strstr(ln,"p3yaw=")))  { L->p3yaw =(float)atof(q+6); L->p3has=1; }
             if((q=strstr(ln,"p3side="))) { L->p3side=(float)atof(q+7); L->p3has=1; }
-            /* ⭐ ep 8: screen=x,y,z,yaw,pitch,w,h -- where Holly is, and which way up */
+            /* ⭐ screen=x,y,z,yaw,pitch,w,h -- where Holly is, and which way up */
             /* ⭐ cam=ex,ey,ez,ax,ay,az[,fov] -- an AUTHORED lens for this line, or
              * cam=off to hand it back to the shot ladder. Not sticky, on purpose. */
             if((q=strstr(ln,"cam="))){
@@ -322,7 +322,7 @@ static int scnLoad(const char*name){
               if(q){ int k=0; q+=6;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) L->pprop[k++]=*q++;
                 L->pprop[k]=0; if(*q&&*q!=' '&&*q!='\n'&&*q!='\r') specTooLong(L->pprop); } }
-            /* ⭐ THE SECOND HAND (ep 5). ⛔ THE `=` IS WHAT KEEPS THESE APART: the keys above
+            /* ⭐ THE SECOND HAND. ⛔ THE `=` IS WHAT KEEPS THESE APART: the keys above
              * are searched WITH their `=`, so "hprop=" cannot match inside "hprop2=" (a `2`
              * sits where the `=` must be) and "hprop2=" cannot match inside "hprop=". The
              * digit guard is still carried on the p-forms, exactly as above. */
@@ -344,14 +344,14 @@ static int scnLoad(const char*name){
             if((q=strstr(ln,"p2mark="))){ int k=0; q+=7;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<31) L->p2mark[k++]=*q++;
                 L->p2mark[k]=0; }
-            /* ⭐ ep 9: and slot 3 -- Kickflip rolls to his marks the way the others walk to theirs */
+            /* ⭐ and slot 3 -- a wheeled rig rolls to its marks the way the others walk to theirs */
             if((q=strstr(ln,"p3mark="))){ int k=0; q+=7;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<31) L->p3mark[k++]=*q++;
                 L->p3mark[k]=0; }
             if((q=strstr(ln,"hmark="))){ int k=0; q+=6;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<31) L->hmark[k++]=*q++;
                 L->hmark[k]=0; }
-            /* ⭐ ep 10: PATHS, their SPEEDS, THE TRACKING LENS and an ACTION line's dur=. Every key is matched
+            /* ⭐ PATHS, their SPEEDS, THE TRACKING LENS and an ACTION line's dur=. Every key is matched
              * WITH its leading space (a `stage` record is space-separated), so `ppath=` cannot hit inside
              * `p2path=` and `pspd=` cannot hit inside `p2spd=`. */
             { static const char*const PK10[4]={" hpath="," ppath="," p2path="," p3path="};
@@ -380,10 +380,10 @@ static int scnLoad(const char*name){
             if((q=strstr(ln," camtrack="))){ q+=10;
                 if(!strncmp(q,"off",3)) L->trkHas=2;
                 else { float t10[6]={0.f,6.f,2.f,0.f,-1.f,1.6f};
-                    int n10=lensNums(q,t10,6,2,&L->trkAbs);   /* ⭐ ep 11: height `=h` is absolute world y */
+                    int n10=lensNums(q,t10,6,2,&L->trkAbs);   /* ⭐ height `=h` is absolute world y */
                     if(n10>=5){ memcpy(L->trk,t10,sizeof t10); L->trkN=n10; L->trkHas=1; }
                     else printf("[lens] line %d: camtrack needs slot,dist,height,azim,fov[,aimh]\n",g_scnN-1); } }
-            /* ⭐ ep 11: cammove= (the END; the line's cam= is the start), camorbit=, camsecs=, camshake=. Leading
+            /* ⭐ cammove= (the END; the line's cam= is the start), camorbit=, camsecs=, camshake=. Leading
              * spaces, like camtrack: none of them can hit inside another key, and no older key sits inside them
              * (`cam=` is not in `cammove=`; the shake's rate is a VALUE, never an `hz=` key -- that is the hero's z). */
             if((q=strstr(ln," cammove="))){ q+=9;
@@ -429,8 +429,8 @@ static int scnLoad(const char*name){
                     if(n10>=1){ L->pan[0]=p10[0]; L->pan[1]=p10[1]; L->panN=n10; L->panHas=1; }
                     else printf("[lens] line %d: campan needs slot[,aimh]\n",g_scnN-1); } }
             if(strstr(ln," dur=")) L->silent=1;
-            /* ⭐ ep 11: THE HALF-PIPE -- hpipe=<name>[,<air>] and hair=<clip>[,<clip>...] per slot. Matched WITH the
-             * leading space like the ep 10 keys: ` pair=` cannot hit inside ` p2air=`, nor ` ppipe=` in ` p2pipe=`. */
+            /* ⭐ THE HALF-PIPE -- hpipe=<name>[,<air>] and hair=<clip>[,<clip>...] per slot. Matched WITH the
+             * leading space like the path keys: ` pair=` cannot hit inside ` p2air=`, nor ` ppipe=` in ` p2pipe=`. */
             { static const char*const PP11[4]={" hpipe="," ppipe="," p2pipe="," p3pipe="};
               static const char*const PA11[4]={" hair="," pair="," p2air="," p3air="};
               for(int s11=0;s11<4;s11++){
@@ -489,7 +489,7 @@ static int scnLoad(const char*name){
             if((q=strstr(ln," tod=")))   L->tod  =(float)atof(q+5);
             if((q=strstr(ln," tone=")))  L->tone =(float)atof(q+6);
             if((q=strstr(ln," snap=")))  L->snap =atoi(q+6);
-            /* ⭐ reverse= / jawgain= (ep 4). Leading space: every key on a `stage` record is
+            /* ⭐ reverse= / jawgain=. Leading space: every key on a `stage` record is
              * space-separated, and neither word is the tail of another key. */
             if((q=strstr(ln," reverse=")))  L->reverse=atoi(q+9)?1:0;
             if((q=strstr(ln," jawgain=")))  L->jawgain=(float)atof(q+9);
@@ -522,7 +522,7 @@ static int scnLoad(const char*name){
             if((q=strstr(ln,"pclip="))){ int k=0; q+=6;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<31) L->pclip[k++]=*q++;
                 L->pclip[k]=0; }
-            /* ⭐ ep 10: htrick= ptrick= p2trick= p3trick=, each clip@sec[,clip@sec...]. A hit must START a
+            /* ⭐ htrick= ptrick= p2trick= p3trick=, each clip@sec[,clip@sec...]. A hit must START a
              * word (a space before it) -- the pgap/pclip/pprop trap, closed by construction this time. */
             { static const char*TK9[4]={"htrick=","ptrick=","p2trick=","p3trick="};
               char*TD9[4]={L->htrick,L->ptrick,L->p2trick,L->p3trick};
@@ -536,7 +536,7 @@ static int scnLoad(const char*name){
                   if(*q&&*q!=' '&&*q!='\n'&&*q!='\r'){
                       printf("[trick] line %d: %s is longer than 95 characters -- TRUNCATED to '%s'\n",g_scnN-1,TK9[t9],TD9[t9]);
                       fflush(stdout); } } }
-            /* ⭐ ep 12: hpuff= ppuff= p2puff= p3puff=, each sec[,sec...] -- an EXHALE off that body's mouth, `sec`
+            /* ⭐ hpuff= ppuff= p2puff= p3puff=, each sec[,sec...] -- an EXHALE off that body's mouth, `sec`
              * into the line. Same word-start guard as the tricks: "ppuff=" must not match inside "p2puff=". */
             { static const char*PK9[4]={"hpuff=","ppuff=","p2puff=","p3puff="};
               char*PD9[4]={L->hpuff,L->ppuff,L->p2puff,L->p3puff};
@@ -571,7 +571,7 @@ static int scnLoad(const char*name){
                 int v9=0; while(*t>='0'&&*t<='9'){ v9=v9*10+(*t-'0'); t++; }
                 L->env[L->nEnv++]=(unsigned char)(v9>255?255:v9); } } }
     fclose(f);
-    /* ⭐ ep 10: WHICH PATH COMES NEXT. The compiler carries a path's value on every line while it is in force,
+    /* ⭐ WHICH PATH COMES NEXT. The compiler carries a path's value on every line while it is in force,
      * so a RUN of identical values is ONE path, named by the line it starts on (pseg), and the next run (pnext)
      * is the path that takes over -- -1 when a line drops the path first. The loco rolls a path that has a
      * successor WITHOUT braking, so a rider handed from one path to the next never stops in between. */
@@ -608,13 +608,13 @@ static int scnLoad(const char*name){
         printf("[scene] restarted away on '%s' -- home to '%s' first\n",g_scnAway,g_scnHome); fflush(stdout); }
     g_scnT=0.f; g_scnStaged=-1; g_scnTA=0.f; g_scnHomeOK=0; g_scnAway[0]=0;
     memset(g_castRoll,0,sizeof g_castRoll);   /* ⭐ 10-22: and every body stands */
-    trickReset();   /* ⭐ ep 10: no trick outlives the scene that asked for it */
-    puffReset();    /* ⭐ ep 12: ...and no smoke, exhale or drag outlives the take that made it */
-    g_locoPathReset=1; g_camTrk.mode=0;   /* ⭐ ep 10: a replayed scene rolls its paths again, and starts on no tracking lens */
-    g_camShk[0]=0.f; g_camShk[1]=1.5f;    /* ⭐ ep 11: ...and on a steady one */
+    trickReset();   /* ⭐ no trick outlives the scene that asked for it */
+    puffReset();    /* ⭐ ...and no smoke, exhale or drag outlives the take that made it */
+    g_locoPathReset=1; g_camTrk.mode=0;   /* ⭐ a replayed scene rolls its paths again, and starts on no tracking lens */
+    g_camShk[0]=0.f; g_camShk[1]=1.5f;    /* ⭐ ...and on a steady one */
     g_stepFps=g_stepCtl;   /* a scene starts on the ctl's exposure rate; its lines may change it */
     g_tone=g_toneCtl;
-    g_jawGain=g_jawGainCtl; g_scnRev=0;   /* ⭐ (ep 4) and on the ctl's jaw gain, facing the normal way */
+    g_jawGain=g_jawGainCtl; g_scnRev=0;   /* ⭐ and on the ctl's jaw gain, facing the normal way */
     printf("[scene] %s: %d lines, %.1fs, wav %s (%u bytes)\n",name,g_scnN,g_scnLen,wav,g_scnWavLen);
     if(g_scnShpN){ printf("[scene] %s: %d shape track(s) on its lines:",name,g_scnShpN);   /* ⭐ (11-06) */
         for(int k9=0;k9<g_scnShpN&&k9<12;k9++) printf(" %s",g_scnShp[k9].name);

@@ -1,5 +1,5 @@
-/* ================= SMOKE (ROBOT NEKO ep 12) =====================================================
- * 1 AM, kaeli at the window with a cigarette -- and the engine had never drawn smoke: not a wisp, not
+/* ================= SMOKE =====================================================
+ * The co-star at the window with a cigarette -- and the engine had never drawn smoke: not a wisp, not
  * a breath. This is the whole of it:
  *     hprop=v1_x_cigarette@0.16@0@hand@F2EFE8@light:0.5@smoke    the prop's FAR TIP smokes (@smoke:<rate>)
  *     hpuff=1.4[,sec...]   ppuff= p2puff= p3puff=                  an EXHALE off that body's mouth mark
@@ -12,7 +12,7 @@
  * smoke and the curtains agree which way the draught goes -- plus a divergence-free curl field, so the
  * smoke swirls instead of jittering.
  * THE LIGHT: lit per sprite on the CPU by the terms a body is lit with -- the sky ambient, the sun as
- * scatter, every set practical and every held light at the club's 1/(1+dd*0.055) -- so smoke by the
+ * scatter, every set practical and every held light at the engine's 1/(1+dd*0.055) -- so smoke by the
  * night light reads warm and smoke in the streetlight cool. An EMBER also lights its own smoke up close
  * (1/(1+dd*40)): the wisp glows at its root and not a foot above it.
  * THE DRAG: while the hand holding a smoking prop is at the mouth (its grip end or the hand itself
@@ -96,7 +96,7 @@ static void smkCurl(const float*p,float t,float*o){
 static void smkLight(const float*p,float*c){
     float r,g,b;
     if(g_sun[3]>0.f){ r=g_sky[0]+g_sunC[0]*g_sun[3]*0.35f; g=g_sky[1]+g_sunC[1]*g_sun[3]*0.35f; b=g_sky[2]+g_sunC[2]*g_sun[3]*0.35f; }
-    else { r=g=b=0.30f; }                        /* the club's dark-room rig: its ambient floor and key, averaged */
+    else { r=g=b=0.30f; }                        /* the engine's dark-room rig: its ambient floor and key, averaged */
     for(int k=0;k<g_setNL&&k<NLIGHT;k++){ const float*L=g_setLp+k*3,*C=g_setLc+k*3;
         float dx=L[0]-p[0], dy=L[1]-p[1], dz=L[2]-p[2];
         float f=0.55f*g_lampScale/(1.f+(dx*dx+dy*dy+dz*dz)*(0.055f+g_setLk[k]));
@@ -358,7 +358,7 @@ static int scnActive(void){
  * TIME, which is exactly right for dialogue, subtitles and the mouth envelope -- and wrong
  * for STAGING. A scene that opens on a held beat spent it unstaged, with the bodies and the
  * camera still wherever the last shot left them.
- * ⛔ The cold open's new 3.4s opening image -- a still room, reva sitting
+ * ⛔ A scene's new 3.4s opening image -- a still room, reva sitting
  * and thinking -- came back BLACK for exactly this reason. It was invisible until
  * now only because every other scene opens with a beat of nearly zero.
  * The two questions are genuinely different, so they get two functions: this one says what
@@ -367,7 +367,7 @@ static int scnStageLine(void){
     if(g_scnT<0.f||g_scnN<=0) return -1;
     if(g_scnT<g_scnL[0].t0) return 0;      /* the opening beat IS line 0's image */
     return scnActive(); }
-/* ⭐ ep 11: HOW LONG A LINE HOLDS THE PICTURE -- from its cut to the next line's: its words, the gap after them and
+/* ⭐ HOW LONG A LINE HOLDS THE PICTURE -- from its cut to the next line's: its words, the gap after them and
  * the next line's beat (a silence belongs to whoever just spoke), and for line 0 the opening beat before it too.
  * A cammove/camorbit with no camsecs= runs exactly this long, so it lands on the next cut. */
 static float scnLineSpan(int l){
@@ -377,14 +377,14 @@ static float scnLineSpan(int l){
 
 static float scnMouth(const void*Lv,float t){
     const ScnLine*L=(const ScnLine*)Lv; if(!L) return 0.f;
-    if(L->silent) return 0.f;   /* ⭐ ep 10: an ACTION line moves no mouth -- not even the hinge's resting 0.30 */
+    if(L->silent) return 0.f;   /* ⭐ an ACTION line moves no mouth -- not even the hinge's resting 0.30 */
     int fi=(int)((t-L->t0)*30.f); if(fi<0) fi=0;
     float a=0.f, v=1.f;
     if(L->nEnv){ int k=fi>=L->nEnv?L->nEnv-1:fi; a=(float)L->env[k]/100.f; }
     if(L->nVis){ int k=fi>=L->nVis?L->nVis-1:fi; v=(float)L->vis[k]/100.f; }
     if(a>1.f) a=1.f;
     a=powf(a,0.55f);          /* speech RMS lives at 0.2-0.4; linear leaves it mumbling */
-    /* ⭐ THE PUPPET JAW'S GAIN (ROBOT NEKO ep 4). `mouth hinge` drops the viseme track, which
+    /* ⭐ THE PUPPET JAW'S GAIN. `mouth hinge` drops the viseme track, which
      * is what leaves the jaw swinging on loudness alone -- and on a loud line that hinge opens
      * further than a puppet's ever would. Scaling it is the one dial the look was missing.
      * Only in hinge mode: with a viseme track the shape is the performance and this would

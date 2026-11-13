@@ -1,7 +1,7 @@
 /* engine/tvgrown.inc -- THE TV FONT ITSELF, AND IT GROWN TO A TYPEFACE'S SIZE (queue step 28, 11-05).
  * The typeface that ships with the engine (11-04) is the one the Pi's console letters already used. That's this font, and it's the only
  * one: nothing of anyone else's ships. So the text that used to be set in a typeface read off the machine, film's captions (engine/captions.inc) and the old start
- * menu (lighthouse.c), is the TV font four times its size, 32 x 32 a glyph, its stairs rounded off (the EPX rule, twice) and its edge softened by a pixel, as an alpha
+ * menu (a menu scene), is the TV font four times its size, 32 x 32 a glyph, its stairs rounded off (the EPX rule, twice) and its edge softened by a pixel, as an alpha
  * picture a renderer can scale. A run can still name a font of its own: REVA_CAPFONT=<a .ttf> for captions, REVA_LHFONT=system for the menu, as each says.
  * The font's two sheets are included here, once, ahead of everything that draws text: engine/tvtext.inc is the grid they're usually drawn on. */
 #include "tvfont.inc"

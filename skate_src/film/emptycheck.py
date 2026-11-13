@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """emptycheck.py -- HOW MUCH OF THE FILM IS NOBODY?
 
-    python skate_src/film/emptycheck.py seventy_four.mp4 [--fps 2]
+    python skate_src/film/emptycheck.py <film>.mp4 [--fps 2]
 
 ⛔ WHY THIS EXISTS. Two full shoots were called finished while a third of the running
 time was an empty sky with a shadow on it, and both times I missed it by eyeballing five

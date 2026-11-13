@@ -4,10 +4,10 @@
     python reva_native/anim_bench/zombiecheck.py [--body v1_Character_01]
                                                  [--secs 3] [--cols 6] [--clips a,b,c]
 
-WHAT IT PROVES. v1_zmoves holds 32 ZAMN clips authored on the UE5 mannequin. None of the
+WHAT IT PROVES. v1_zmoves holds 32 clips from the zombie prototype, authored on the UE5 mannequin. None of the
 105 town citizens has ever met that rig. Every clip therefore reaches a body through the
 canonical transfer (donorPoseF), and a transfer that "loads without error" can still
-produce a corpse standing in a T-pose -- the club has been fooled by exactly that before.
+produce a corpse standing in a T-pose -- the engine has been fooled by exactly that before.
 So each clip is played on a real citizen and LOOKED AT.
 
 Rows are clips, columns are time -- the ridecheck.py shape, for the same reason: a pose
@@ -148,7 +148,7 @@ def main():
         for i, c in enumerate(grp):
             x = i * GAP
             fx, fy = project((x, 0.0, 0.0))      # the ground under this actor
-            hx, hy = project((x, 3.15, 0.0))     # the top of a club-scale body
+            hx, hy = project((x, 3.15, 0.0))     # the top of a body at the engine's scale
             cy = (fy + hy) / 2.0
             # a portrait cell: tall enough for a standing body, wide enough that a body
             # lying on the ground still fits end to end

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """say_piper.py -- speak a dialogue file with PIPER (local neural TTS), one wav per line.
 
-    say_piper.py club_night.txt [--out wav]
+    say_piper.py <scene>.txt [--out wav]
 
-Better voices, from Piper. reva has a Scottish accent, and kaeli an American one, New York's.
+Better voices, from Piper. reva has a Scottish accent, and the co-star an American one, New York's.
 
 SAPI (the first pass) is a 2005-era formant synth: intelligible, robotic, and it made
 two characters sound like one machine reading a list. Piper is a neural vocoder running
@@ -12,7 +12,7 @@ is a different SPEAKER rather than the same speaker with a pitch knob.
 
   reva  -> en_GB-alba     a Scottish voice, and the only Scottish one Piper ships.
                           Slightly slowed: R.E.V.A. chooses her words.
-  kaeli -> en_US-amy      American and conversational; the closest Piper gets to the
+  the co-star -> en_US-amy  American and conversational; the closest Piper gets to the
                           streetwise read. Slightly quickened, less deliberate.
 
 length_scale is the speed knob (bigger = slower); noise_w_scale is how much the
@@ -34,7 +34,7 @@ PEOPLE = {
                   noise_w_scale=1.05, note="American, quick, loose cadence"),
     "susan": dict(model="en_US-kristin-medium", length_scale=1.00, noise_scale=0.700,
                   noise_w_scale=1.15, note="the neighbour: warm, chatty, deflects"),
-    # THE WORLD AT THE END OF TIME, scene 2.1 -- a TEMPORARY cast (10-18: a rough cut of scene 2.1 on
+    # THE SPACE SERIES -- a TEMPORARY cast (10-18: a rough cut of one scene on
     # temporary voices, Piper's). The only installed Piper model with men in it is LibriTTS (904
     # speakers, one `speaker` each); I cannot hear them, so the four were picked by MEASURED pitch and pace off one
     # line said by 113 of them (the audition folder's spk_NNN.wav): men read 99-152 Hz,
@@ -47,7 +47,7 @@ PEOPLE = {
                   noise_w_scale=0.75, note="a hundred and clear-eyed: the slowest reader of the sample"),
     "amelia": dict(model="en_US-libritts_r-medium", speaker=864, length_scale=0.95, noise_scale=0.700,
                   noise_w_scale=1.00, note="his mother, hurrying in: quick (220 Hz)"),
-    # chapter 2 (10-22), the same audition: men 99-152 Hz, women 170-255; nobody already cast is reused
+    # a second chapter (10-22), the same audition: men 99-152 Hz, women 170-255; nobody already cast is reused
     "pal": dict(model="en_US-libritts_r-medium", speaker=272, length_scale=0.98, noise_scale=0.680,
                   noise_w_scale=0.95, note="Pal, cheery, smiles often: a middle man (122 Hz), easy pace"),
     "marie_claude": dict(model="en_US-libritts_r-medium", speaker=96, length_scale=1.00, noise_scale=0.680,
@@ -88,7 +88,7 @@ def main():
     if a.voice0: CAST["0"]["model"] = a.voice0
     if a.voice1: CAST["1"]["model"] = a.voice1
     src = a.script if os.path.isabs(a.script) else os.path.join(HERE, a.script)
-    # ⭐ THE SCRIPT NAMES ITS OWN CAST: `cast 0=kaeli 1=susan`. Without it, 0=reva 1=kaeli.
+    # ⭐ THE SCRIPT NAMES ITS OWN CAST: `cast 0=<person> 1=<person>`. Without it, slot 0 is reva and slot 1 the co-star.
     for raw in open(src, encoding="utf-8"):
         t = raw.strip()
         if not t.startswith("cast "):
@@ -120,7 +120,7 @@ def main():
         head, text = s.split("|", 1)
         bits = head.split()
         spk = bits[0].strip(); text = text.strip()
-        if not text:                            # ⭐ ep 10: an ACTION line has no voice, but keeps its number
+        if not text:                            # ⭐ an ACTION line has no voice, but keeps its number
             print("  %2d  (action line: no voice)" % i)
             i += 1
             continue
@@ -135,7 +135,7 @@ def main():
         out = os.path.join(outdir, "line_%02d.wav" % i)
         with wave.open(out, "wb") as w:
             loaded[spk].synthesize_wav(text, w, syn_config=cfg)
-        # ⭐ (10-22) with=N: two people say it at once (2.29, BILLY & FREDDY) -- slot N's voice, mixed in
+        # ⭐ (10-22) with=N: two people say it at once (two boys in one scene) -- slot N's voice, mixed in
         both = [b.split("=", 1)[1] for b in bits[1:] if b.startswith("with=")]
         if both and both[0] in loaded:
             import numpy as _np

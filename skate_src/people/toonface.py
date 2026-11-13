@@ -1,5 +1,5 @@
-"""toonface.py -- THE WORLD AT THE END OF TIME's faces: Atlantis-leaning design, Futurama rendering (design/
-wateot_series.md, THE LOOK). A face is SHAPES lying a hair above a Person's head: the eye's white, the iris and
+"""toonface.py -- the space series' faces: Atlantis-leaning design, Futurama
+rendering. A face is SHAPES lying a hair above a Person's head: the eye's white, the iris and
 pupil CLIPPED to it, the upper lid's ink, a crease, the brows, the mouth's line, the nostrils, and -- for the old --
 a handful of ink lines where the years are. Everything is placed in FACE COORDINATES (a = degrees round the head
 from the middle of the face, u = share of head height from the chin), so a blink, a brow or a look is moving

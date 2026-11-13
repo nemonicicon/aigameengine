@@ -136,11 +136,11 @@ static void watStep(Water*W,float dt){
         for(int k=0;k<3;k++) W->nrm[i][k]=n[k]/L; } }
 
 
-/* ---- SPACE (10-22, THE WORLD AT THE END OF TIME: the New Mayflower) --------------------------------------------------
+/* ---- SPACE (10-22, the space series: a ship's set) --------------------------------------------------
  * A set that is a place in deep space says `space`, and its sky is BLACK with the stars drawn at infinity: procedural,
- * tens of thousands, most faint, "from firebox red to sapphire and white" (the book, p23), dense in a Milky Way haze
+ * tens of thousands, most faint, every colour from deep red to blue-white, dense in a Milky Way haze
  * along a great circle (`milkyway nx ny nz strength`, the band's pole), and up to eight NAMED stars (`star dx dy dz r g b
- * size_deg [halo]` -- the flare star, the destination), each a core and a glow. A ship at its true size outruns a lens's
+ * size_deg [halo]` -- a flare star, a destination), each a core and a glow. A ship at its true size outruns a lens's
  * 900 u, so `far <u>` lets a space set be seen whole. A set may carry its own light too: `sun elev azim I [r g b]` and
  * `sky r g b`, applied as it loads (the ctl line's own sun=/sky= still win).
  * ⛔ NOT the day sky with its colours turned down: that sky is a gradient with a CLOUD DECK, and it drew grey clouds
@@ -155,8 +155,8 @@ static void spaceFill(float*o,int H){ float sd9[8][4],sc9[8][4]; memcpy(sd9,g_st
     for(int i=0;i<g_nStar&&i<8;i++) if(g_starFl[i][2]>0.f){ float e=(g_setT-g_starFl[i][0])/fmaxf(g_starFl[i][1],0.01f); e=e<0.f?0.f:(e>1.f?1.f:e); e=e*e*(3.f-2.f*e); const float pk=1.f+(g_starFl[i][2]-1.f)*e; for(int k=0;k<3;k++) sc9[i][k]=(g_starCol[i][k]*(1.f-e)+BW9[k]*e)*pk; sc9[i][3]=g_starCol[i][3]*(1.f+2.f*e); sd9[i][3]=g_starDir[i][3]*(1.f+1.5f*e); }
     memcpy(o,sd9,sizeof sd9); memcpy(o+32,sc9,sizeof sc9); memcpy(o+64,g_milky,16); o[68]=(float)g_nStar; const float fov9=(g_camOn&&g_camFov>0.f)?g_camFov:42.f; o[69]=fov9*0.0174533f/(float)(H>0?H:720); o[70]=g_skyYaw; o[71]=g_skyPitch; }   /* (11-10) the last two were spare: the sky's turn, which shaders/space.frag undoes on each ray */
 
-/* ---- BEAMS (10-22, THE WORLD AT THE END OF TIME: "the haze of ions streaming from the drive jets fuzzed everything.
- * Including the star they were heading for", p24) ------------------------------------------------------------------------
+/* ---- BEAMS (10-22, the space series: the haze of ions streaming from a ship's drive jets)
+ * ------------------------------------------------------------------------------------------------------------------------
  * `beam x y z dx dy dz length r0 r1 r g b k [fade [thin]]` (u) in a set: a glowing VOLUME along a line -- a drive's ion plume, a
  * light shaft, a projector's throw. Its density is a gaussian tube whose radius runs r0 -> r1 along its length, thinned
  * as it spreads ((r0/r)^thin: 2, the default, is the same flux through a wider tube; less keeps a far plume visible)
@@ -164,7 +164,7 @@ static void spaceFill(float*o,int H){ float sd9[8][4],sc9[8][4]; memcpy(sd9,g_st
  * after every opaque thing, so it lights what is behind it and never darkens it. Each pixel INTEGRATES the density
  * along its own ray (between the ray's entry and exit of the tube's bound, in steps sized to the plume where they
  * are; k per u of it, saturating as 1-exp), so it reads as a volume from any side -- and a lens looking DOWN the plume sees it gather into its vanishing
- * point, which is the book's shot. The bound is a box drawn by its BACK faces, so a lens inside the plume still sees
+ * point, which is the shot that was wanted. The bound is a box drawn by its BACK faces, so a lens inside the plume still sees
  * it, and a solid thing between the lens and the box's far side hides the beam along that ray.
  * ⛔ A solid thing INSIDE the box hides ALL of the beam along its rays, the part in front of it too: the march
  * doesn't read the depth of what's in front, so it cannot stop at the surface. Up to 8. */
@@ -183,23 +183,23 @@ static void beamDraw(void){
         const float d9[24]={g_beamA[i][0],g_beamA[i][1],g_beamA[i][2],g_beamL[i], U[0],U[1],U[2],g_beamK[i], Vb[0],Vb[1],Vb[2],g_beamF[i], Wb[0],Wb[1],Wb[2],g_beamT[i], g_beamR[i][0],g_beamR[i][1],2.5f*fmaxf(g_beamR[i][0],g_beamR[i][1]),0.f, g_beamC[i][0],g_beamC[i][1],g_beamC[i][2],0.f}; gfxBeam(d9); }
 }
 
-/* ---- THE STAR (10-22, THE WORLD AT THE END OF TIME, chapter 1: WAN-TO'S STAR) ------------------------------------------
- * Chapter 1 sets the scene for the whole book. Wan-To lives in "the interior of a
- * medium-sized G-3 star" (p2): just under a million miles across, 6,000-7,000 K at its surface and "just a touch variable"
- * (p47), its core at fifteen million degrees (p5); a photon escapes by radiation for the first FOUR-FIFTHS of the way out and
- * by CONVECTION -- cells of hot gas rising, cooling ones falling back -- in the outer fifth (p4); its poles turn slower than
- * its equator (p5); its magnetic field lines twist, loop below the surface and here and there rise above it to make sunspots
- * (p5), and a sunspot is a patch only "a couple of thousand Kelvin" cooler, dark only by comparison (p49). Wan-To is plasma,
- * his pieces thousands of miles apart, held together by "the network of neutrinos that served him for neurons" (p6).
+/* ---- THE STAR (10-22, the space series) ------------------------------------------
+ * A creature of plasma lives in the interior of a
+ * medium-sized G-3 star: just under a million miles across, 6,000-7,000 K at its surface and just a touch variable,
+ * its core at fifteen million degrees; a photon escapes by radiation for the first FOUR-FIFTHS of the way out and
+ * by CONVECTION -- cells of hot gas rising, cooling ones falling back -- in the outer fifth; its poles turn slower than
+ * its equator; its magnetic field lines twist, loop below the surface and here and there rise above it to make sunspots,
+ * and a sunspot is a patch only a couple of thousand Kelvin cooler, dark only by comparison. The creature's
+ * pieces are thousands of miles apart, held together by a network of neutrino threads.
  * Set lines (u):
  *   starbody x y z radius [tempK] [cutdeg] [cutaz] [seed]   the star; cutdeg > 0 opens a wedge (centred on azimuth cutaz,
  *                                                          about +y, 0 = toward +z) down to the core, to show its layers
  *   starspot lat lon size_deg                              a sunspot on the turning surface (16)
  *   starloop lat1 lon1 lat2 lon2 height [thick]            a magnetic loop between two footpoints; height, thick in radii (24)
- *   starweb nodes [seed] [xray]                            WAN-TO: his pieces and the neutrino threads between them (32);
+ *   starweb nodes [seed] [xray]                            THE CREATURE: its pieces and the neutrino threads between them (32);
  *                                                          xray 1 (default) draws them through the star, as neutrinos go
  * OUR FILL: the core's size (a quarter of the radius), the colours (a warm grade of the true temperatures), the granules'
- * scale, the loops' pink, Wan-To's cyan. The clock is the exposure clock, so a held exposure holds the star. */
+ * scale, the loops' pink, the creature's cyan. The clock is the exposure clock, so a held exposure holds the star. */
 #define STB_SPOTS 16
 #define STB_LOOPS 24
 #define STB_WEB   32
@@ -266,7 +266,7 @@ static void stbBuildLoops(void){
                 V[k++]=(float)ii[a]/NA; V[k++]=(float)st; } } }
     g_stbLoopOff[g_stb.nLoop]=k/8;
      gfxBufferData(g_stbLoopVB, (long)(k>0?k:8)*4, V, 0); free(V); }
-/* WAN-TO: his pieces across the star (a quarter of the way out to nine-tenths), each held to its nearest by a thread */
+/* THE CREATURE: its pieces across the star (a quarter of the way out to nine-tenths), each held to its nearest by a thread */
 static void stbBuildWeb(void){
     unsigned r=(unsigned)(g_stb.webSeed*7919.f)+12345u; g_stbWebNL=0;
     for(int i=0;i<g_stb.webN;i++){ float p[3], l2;
@@ -305,7 +305,7 @@ static void starDraw(void){
     float dt=(float)g_animDtS; if(dt>0.1f) dt=0.1f; if(dt<0.f) dt=0.f; g_stbT+=dt;
     if(g_stb.dirty){ g_stb.dirty=0; stbBuildFaces(); if(g_stb.nLoop>0) stbBuildLoops(); if(g_stb.webN>0) stbBuildWeb(); }
     if(!g_noDraw) starPacket();
-    /* 5. WAN-TO: his pieces and the threads between them -- blended over, through the star when xray (neutrinos
+    /* 5. THE CREATURE: its pieces and the threads between them -- blended over, through the star when xray (neutrinos
      *    pass through everything), a pulse running down every thread */
     if(g_stb.webN>0&&g_stbWebNL>0){
         static float vb[(STB_WEB+STB_WEB*3*8)*6*9]; int n=0;

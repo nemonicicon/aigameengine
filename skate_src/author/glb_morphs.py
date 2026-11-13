@@ -3,15 +3,15 @@
 
     glb_morphs.py <glb> <pack> [--only a,b,c] [--min-delta 1e-5] [--dry]
 
-⭐ WHY: the club could already BLEND morphs (morphBlend, header slot 14, clip track type 3)
+⭐ WHY: the engine could already BLEND morphs (morphBlend, header slot 14, clip track type 3)
 and could only ever AUTHOR them -- morphs.py grows a breath by pushing a chest band along
-its normals. Nothing read the targets an artist had already sculpted. Anima's HiPoly body
+its normals. Nothing read the targets an artist had already sculpted. The bought character's HiPoly body
 arrives with a complete ARKit / Character Creator face -- 107 shape keys: the six CC
 visemes, eight brow shapes, per-eye look directions, per-eye blinks, jawOpen, smile and
 frown -- and every one of them was being thrown away at the door.
 
 ⛔ glTF REPEATS EVERY TARGET ON EVERY PRIMITIVE. A mesh split by material carries the whole
-morph list on each piece, so Anima's 15 body primitives x 28 kept shapes is 420 nominal
+morph list on each piece, so the bought character's 15 body primitives x 28 kept shapes is 420 nominal
 targets. Nearly all are EMPTY: a viseme does not move her leg, it just has an accessor full
 of zeros there. So a pair is written only when it actually displaces something, which is
 what keeps the count inside MORPH_MAX instead of blowing through it with nulls.

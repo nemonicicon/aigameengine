@@ -31,5 +31,5 @@ int holly_fbo_height(void);
 
 #endif
 
-/* ROBOT NEKO ep 9 probe: renders so far. */
+/* a probe: renders so far. */
 unsigned holly_fbo_renders(void);

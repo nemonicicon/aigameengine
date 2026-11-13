@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""z_sk_ride.py -- ROBOT NEKO ep 10: RIDING AND TRICKS, each clip with a BOARD CHANNEL.
+"""z_sk_ride.py -- RIDING AND TRICKS, each clip with a BOARD CHANNEL.
 
   z_rm_sk_ride    regular stance rolling: soft knees, a bob, an arm balance sway (LOOP 2.0 s, first frame == last)
   z_rm_sk_push    the back foot steps down beside the board, sweeps the floor at the path speed, comes back (1.2 s)
@@ -7,18 +7,18 @@
   z_rm_sk_kf      the kickflip: the ollie, the front foot flicks off the heel-side edge, a 360 roll about X (1.1 s)
   z_rm_sk_shove   the pop shove-it: she hops square, the board turns 180 about its Y under her feet (1.0 s)
   z_rm_sk_manual  weight back, nose up ~12 degrees on the back wheels, hold, set it down (1.6 s)
-  -- ep 11, the half-pipe AIRS (the engine flies the root and turns it 180; these are the body and the board) --
+  -- the half-pipe AIRS (the engine flies the root and turns it 180; these are the body and the board) --
   z_rm_sk_grab    INDY: knees tucked, the back (right) hand down between the feet onto the TOE rail, hold, land (1.1 s)
   z_rm_sk_method  METHOD: the front (left) hand on the HEEL rail, knees bent back, the board up behind her (1.2 s)
 
 THE REACH IS SOLVED, NOT GUESSED. How high the tuck brings the board is whatever puts the grabbing rail at a
 comfortable fraction of THIS body's own arm (shoulder -> wrist, plus the measured palm) from its shoulder in the
-held pose -- closed form, the board rises straight up in her model space. reva's arm and kaeli's differ by 12%.
+held pose -- closed form, the board rises straight up in her model space. reva's arm and the co-star's differ by 12%.
 The hand is IK'd so its PALM (the centroid of its own vertices) sits on the rail, then blended in by rotation.
 
 Every trick starts and ends EXACTLY on z_rm_sk_ride frame 0 (asserted), so the engine can cut ride -> trick -> ride.
 
-THE BOARD CHANNEL (ep 10 contract). For every clip NAME there is a companion NAME_bd: same fps, same frame
+THE BOARD CHANNEL (the contract). For every clip NAME there is a companion NAME_bd: same fps, same frame
 count, two tracks on node 0 -- (0,1) translation and (0,0) rotation, XYZW like every quat in a pack. Each
 frame is the pose of the BOARD FRAME in the rider's MODEL space (fk_world's space, rig units):
   origin = the centre of the deck's TOP surface;  +X = the nose = her LEFT, the lead foot, the way she
@@ -54,25 +54,25 @@ import z_board as ZB
 FPS = 30.0
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 BOARD_PROP = os.path.join(REPO, "reva_native", "props", "skateboard.rpack")
-BOARD_LEN = 1.4             # club u: the engine draws the prop with its longest side this long
-BODY_H = 3.45               # club u: the cast loader sizes every body to this by its mesh
-SPEED = 3.0                 # club u/s: the engine's default path speed -- the push foot sweeps at it
+BOARD_LEN = 1.4             # engine u: the engine draws the prop with its longest side this long
+BODY_H = 3.45               # engine u: the cast loader sizes every body to this by its mesh
+SPEED = 3.0                 # engine u/s: the engine's default path speed -- the push foot sweeps at it
 STANCE_OUT = os.environ.get("CLUB_OUT", "out")
 UP = [0.0, 1.0, 0.0]
 
-# the stance, club units along the board from its centre (+ = nose), degrees of toe-out toward the nose
+# the stance, engine units along the board from its centre (+ = nose), degrees of toe-out toward the nose
 FRONT_X, BACK_X = +0.34, -0.36
 FRONT_YAW, BACK_YAW = 26.0, -2.0
-RIDE_SINK = 0.26            # club u the pelvis sits lower than the stand's, over and above the deck height: BENT knees
+RIDE_SINK = 0.26            # engine u the pelvis sits lower than the stand's, over and above the deck height: BENT knees
 RIDE_KNEEOUT = 0.00         # the knees track out over the toes instead of driving together over the deck
 
-# gates, club units
+# gates, engine units
 TOL_WHEEL = 0.010
 TOL_SOLE = 0.015
 AIR_HOVER = 0.12
 FLOOR_EPS = 0.005
 CAP_EXTRA = 0.030           # rig u: deeper than at rest by more than this is a clip
-TOL_GRIP = 0.040            # club u: a holding palm is this close to its rail, or it is not holding
+TOL_GRIP = 0.040            # engine u: a holding palm is this close to its rail, or it is not holding
 REACH_FRAC = 0.90           # the held arm: shoulder -> wrist at this fraction of its full length (an elbow, not a rod)
 
 
@@ -180,7 +180,7 @@ def measure_board(path=BOARD_PROP):
     assert ext[2] >= ext[0] and ext[2] >= ext[1], "the board's long axis is no longer mesh Z"
     s = BOARD_LEN / ext[2]
     cx, cz = (lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2
-    # board-local club units, origin at the deck-top centre (fixed below): x = mesh z, y = mesh y, z = -mesh x
+    # board-local engine units, origin at the deck-top centre (fixed below): x = mesh z, y = mesh y, z = -mesh x
     P = [((v[2] - cz) * s, (v[1] - lo[1]) * s, -(v[0] - cx) * s) for v in pos]
     T = []
     for (i, j, k) in tris:
@@ -234,7 +234,7 @@ def measure_board(path=BOARD_PROP):
 
 
 def kick_top(B, ax):
-    """Deck-top height above the flat deck at |x| = ax (club), from the measured profile."""
+    """Deck-top height above the flat deck at |x| = ax (engine u), from the measured profile."""
     ax = abs(ax)
     k = B["kick"]
     if ax <= k[0][0]: return 0.0
@@ -385,7 +385,7 @@ class Rider:
             self.glen[s] = vlen(self.grip[s])
             self.arml[s] = vlen(vsub(wpr[la], wpr[ua])) + vlen(vsub(wpr[ha], wpr[la]))
             self.handpts[s] = [qrot(qinv(wqr[ha]), vsub(list(v), wpr[ha])) for v in own[::max(1, len(own) // 60)]]
-        try:                                              # fingers where the rig has them (kaeli); a mitten has none
+        try:                                              # fingers where the rig has them (the co-star); a mitten has none
             from authorlib import find_hands, HandRig
             H = find_hands(p, nodes, p.node_names(), RM["hand_l"], RM["hand_r"])
             for s, k in (("l", "L"), ("r", "R")):
@@ -400,7 +400,7 @@ class Rider:
 
     # ---- the board ------------------------------------------------------------------------------------
     def board_rigid(self, bs, with_roll=True):
-        """bs: dx dy dz (club, board axes), pitch about a local Z pivot (ppx, ppy club), yaw, roll (degrees).
+        """bs: dx dy dz (engine u, board axes), pitch about a local Z pivot (ppx, ppy engine u), yaw, roll (degrees).
         Local, applied innermost first: roll about the CoM line, yaw about the centre, pitch about the pivot."""
         c2r = self.c2r
         R = about([bs.get("ppx", 0.0) * c2r, bs.get("ppy", 0.0) * c2r, 0.0], qa([0, 0, 1], bs.get("pitch", 0.0)))
@@ -413,8 +413,8 @@ class Rider:
         return Rigid(self.qB0, self.G0) * Rigid(None, lift) * R
 
     def foot_world(self, s, spec, BT):
-        """spec = (mode, x, z, hover, yaw[, frac]). mode floor: x/z club along her left/front from the board's
-        rest centre, on the floor. deck/air/flip: board-local club x/z, hover above the deck top, the foot
+        """spec = (mode, x, z, hover, yaw[, frac]). mode floor: x/z in engine u along her left/front from the board's
+        rest centre, on the floor. deck/air/flip: board-local x/z in engine u, hover above the deck top, the foot
         tilted with the board by frac. The foot rests on its LOWEST sole point, never its centre."""
         mode, x, z, hover, yaw = spec[:5]
         yq = qa(UP, yaw)
@@ -496,7 +496,7 @@ class Rider:
 
     # ---- THE GRAB: a palm onto a rail -------------------------------------------------------------------
     def rail_local(self, gx, edge):
-        """Board-local club point on a rail: gx along the board (+ nose), edge +1 toe side / -1 heel side."""
+        """Board-local point (engine u) on a rail: gx along the board (+ nose), edge +1 toe side / -1 heel side."""
         return [gx, self.B["rail_y"], edge * self.B["rail_z"]]
 
     def grab_arm(self, qo, to, s, gx, edge, blend, curl, dn, BTr, clat, cfwd):
@@ -541,7 +541,7 @@ class Rider:
     def s_method(self, t, D): return self.air_like(t, D, "method")
 
     def air_h(self, kind, D):
-        """Solve the board's lift (club) at the hold: the grabbing rail at REACH_FRAC of the arm from the shoulder.
+        """Solve the board's lift (engine u) at the hold: the grabbing rail at REACH_FRAC of the arm from the shoulder.
         The rail rises straight up in model space with the lift, the shoulder does not move with it -> closed form."""
         if kind in self._air: return self._air[kind]
         A = self.AIRK[kind]; s = A["side"]
@@ -838,7 +838,7 @@ BONES = [("pelvis", "spine_01", "c"), ("spine_01", "spine_02", "c"), ("spine_02"
 
 
 def board_points(B):
-    """Board-local club points that must never go under the floor, and the wheel contacts."""
+    """Board-local points (engine u) that must never go under the floor, and the wheel contacts."""
     hx, hz, dt = 0.70, B["width"] / 2, B["deck_top"]
     pts = [(sx * 0.55, y, sz * hz) for sx in (-1, 1) for sz in (-1, 1) for y in (0.0, -B["deck_thick"])]
     pts += [(sx * hx, y, sz * 0.08) for sx in (-1, 1) for sz in (-1, 1) for y in (B["tip_under"], B["tip_top"])]
@@ -851,7 +851,7 @@ def gate_frame(R, S, qo, to, BT, feet, st, prev):
     w, wq = fk_world(nodes, qo, to)
     bad = []
     ib = qinv(BT.q)
-    def loc(p): return vmul(qrot(ib, vsub(p, BT.t)), sc)          # model rig -> board-local club
+    def loc(p): return vmul(qrot(ib, vsub(p, BT.t)), sc)          # model rig -> board-local engine u
     # the feet reached their targets
     for s in "lr":
         ref, qd, pole = feet[s]

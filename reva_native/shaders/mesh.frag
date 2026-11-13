@@ -289,7 +289,7 @@ void main() {
     }
     // which kind of surface this pixel is: the mesh's own, or painted into its texture's alpha, which is how one mesh is a whole person
     int kind = 0; float skinC = -1.0, curv0 = 0.0;
-    // how tightly the surface curves, in the table's units: how fast its normal turns over a millimetre (a club unit is 571 of them), against the table's tightest, a 3 mm radius.
+    // how tightly the surface curves, in the table's units: how fast its normal turns over a millimetre (an engine unit is 571 of them), against the table's tightest, a 3 mm radius.
     // Worked out for every pixel, skin or not, because a rate of change asked for inside a per-pixel choice isn't defined
     if (SKIN == 1) curv0 = clamp(length(fwidth(normalize(vN))) / max(length(fwidth(vW)), 1e-6) * 0.00547, 0.0, 1.0);
     if (SKIN == 1 || HAIR == 1 || EYES == 1 || SHEEN == 1) {

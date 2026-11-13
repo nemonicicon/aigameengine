@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """packetsum.py -- (11-07) what one frame asked the GPU for, by kind: the draws and indices of a REVA_PACKETDUMP frame, the main pass and the sun's
-apart, and the crowd's bodies by owner. It's how the Pi's frame was taken apart for Bike Lane Bash: its street's people were 1.17 M of 1.77 M indices.
+apart, and the crowd's bodies by owner. It's how the Pi's frame was taken apart for the street game: its street's people were 1.17 M of 1.77 M indices.
 
 usage: packetsum.py DUMP.txt          (REVA_PACKETDUMP=<tick>:<file> on any build; on the Pi, copy the file back first)"""
 import collections

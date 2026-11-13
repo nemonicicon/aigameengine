@@ -1,5 +1,5 @@
 #version 450
-// The last lighthouse's swarm: orbital bands, each turning on its orbit. The band is symmetric, so its turn is an arc offset, and the fragment shader cuts the gaps and the truss by position along the ring.
+// The menu scene's swarm: orbital bands, each turning on its orbit. The band is symmetric, so its turn is an arc offset, and the fragment shader cuts the gaps and the truss by position along the ring.
 #extension GL_GOOGLE_include_directive : enable
 #include "view.glsl"
 layout(push_constant) uniform PC { vec4 h; } P;   // xyz the black hole, w the clock

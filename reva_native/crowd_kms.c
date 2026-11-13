@@ -1,4 +1,4 @@
-/* crowd_kms.c — THE CLUB's engine, one translation unit: a table of contents over the engine/ includes. Born 2026-07-22 as the
+/* crowd_kms.c — aigameengine, one translation unit: a table of contents over the engine/ includes. Born 2026-07-22 as the
  * native dancer ON THE GLASS (DRM master on the Pi's card, the baked crowd page-flipped forever, under construction by
  * design on stream); since step 18 of the engine plan (11-04) the picture is Vulkan everywhere (gfx_vk.c), on SDL's window
  * or straight into the display card's buffers on the Pi, and the no-display build hashes the frame instead (gfx_packet.c).
@@ -80,7 +80,7 @@ static int clubRand(void){ if(g_diceLibc<0) clubSrand(1); if(g_diceLibc) return 
 /* Mouth state. Fixed until the UDP receiver lands -- the same three floats the
  * native renderer already takes, so the wire format needs no design. */
 static float g_holly_open=0.45f, g_holly_wide=0.0f, g_holly_seal=0.0f;
-/* ---- PLACED SCREENS (ROBOT NEKO ep 8) -------------------------------------------------
+/* ---- PLACED SCREENS -------------------------------------------------
  * Holly's head, hung anywhere in the world instead of only on the venue's jumbotrons.
  * Each screen is x,y,z,yaw,pitch,halfW,halfH. `screen` in a .set places one; the scene
  * key `screen=` moves it per line, so a telly face-down in the dirt (pitch ~90) can be
@@ -89,22 +89,22 @@ static float g_holly_open=0.45f, g_holly_wide=0.0f, g_holly_seal=0.0f;
 #define SCR_MAX 4
 static float g_scr[SCR_MAX][7];
 static int   g_scrN=0;
-static float g_camEye[3]={0,2,6};   /* where the lens is this frame (ep 8) */
+static float g_camEye[3]={0,2,6};   /* where the lens is this frame */
 static float g_scrAmp=2.8f;   /* ctl screenamp= : a screen emits, and his head is dim */
 
 /* ⭐ MEASURED: this machine reports MAX_VERTEX_UNIFORM_VECTORS=4095, i.e. 1023 mat4.
  * 64 was a guess that happened to work and cost a Daz-class rig most of its FACE (57 of
  * 92 facial joints pruned to fit). 256 mat4 is 1024 vec4 -- a quarter of what is
- * available here -- and covers every model in the club: her body wants 124, the cat girl
- * 108, Anima 95. ⛔ The shaders' pal[] is stringified FROM this, so the two cannot
+ * available here -- and covers every model in the engine: her body wants 124, the cat girl
+ * 108, the bought character 95. ⛔ The shaders' pal[] is stringified FROM this, so the two cannot
  * drift apart, and startup prints a warning if the hardware cannot carry it. */
-/* ---- THE CAST (ROBOT NEKO ep 7) -------------------------------------------------
+/* ---- THE CAST -------------------------------------------------
  * A scene seats SCN_MAXCAST slots. Slots 0..SCN_BODIES-1 carry a BODY; the last slot is
  * an off-screen VOICE with no body and no mouth (`cast 3=director`). These live up here,
  * not next to the scene code, because chainSim and the overlay/motion-energy arrays are
  * declared long before it and were carrying bare `[4]`s that nothing tied to the cap.
  * ⛔ EVERY array sized per cast slot uses SCN_MAXCAST. Growing this without growing them
- * is the ep 5 landmine (a cap sized "one per body" the moment there are two). */
+ * is an old landmine (a cap sized "one per body" the moment there are two). */
 #define SCN_MAXCAST 5
 #define SCN_BODIES  (SCN_MAXCAST-1)   /* slots with a body: 0..3 */
 #define SCN_VOICE   (SCN_MAXCAST-1)   /* the off-screen voice slot */
@@ -122,13 +122,13 @@ static float g_scrAmp=2.8f;   /* ctl screenamp= : a screen emits, and his head i
 static float g_dispAspect=0.f;
 static float g_fairNow=0.f;   /* (step 25) this frame the picture's held to a game's fair shape: its width over its height, 0 for the screen's own */
 #define VIEW_ASPECT(W,H) (g_fairNow>0.f?g_fairNow:g_dispAspect>0.f?g_dispAspect:(float)(W)/(float)(H))
-/* ⭐ ep 12: A HELD-PROP SPEC IS ONE STRING EVERYWHERE, AND IT OUTGREW 64. `v1_x_cigarette@0.16@0@middle_01_r:0.3@F2EFE8@
+/* ⭐ A HELD-PROP SPEC IS ONE STRING EVERYWHERE, AND IT OUTGREW 64. `v1_x_cigarette@0.16@0@middle_01_r:0.3@F2EFE8@
  * light:0.5:0.5@smoke` is 64 characters -- the 63 that fit ended in `@smok`, heldParse rejected the field, and
- * the cigarette never smoked, never registered a drag and never flared. (ep 4 hit the same wall at 32.) Every
+ * the cigarette never smoked, never registered a drag and never flared. (An earlier spec hit the same wall at 32.) Every
  * buffer a spec passes through is this size, and a value that still does not fit is refused out loud. */
 #define PROP_SPEC 160
 #define NCANON 46   /* 16 body bones + 30 finger joints (09-11); slots 16.. are 16+side*15+finger*3+joint */
-/* ⭐ THE CLIPPING AUDIT'S HOOKS (ROBOT NEKO ep 10) -- defined beside the scene clock, search
+/* ⭐ THE CLIPPING AUDIT'S HOOKS -- defined beside the scene clock, search
  * "THE CLIPPING AUDIT". Anything drawn on or with a cast body (a board's wheels, a deck's
  * corners, a held prop) feeds its world points here; they are tested at the end of the frame
  * against the floor, the set and every OTHER cast body. Free when the audit is off. */
@@ -177,7 +177,7 @@ static FILE* clubOpen(const char*p,const char*m){ FILE*f=fopen(p,m); if(f&&m[0]=
 #include "engine/android.inc" /* (11-06) the phone: the data out of the APK, the touch controls */
 #endif
 #include "engine/tvgrown.inc" /* the TV font's two sheets, and the font grown to a typeface's size: the only typeface that ships */
-#include "engine/menus.inc"   /* character select, game mode select, the lighthouse door's include */
+#include "engine/menus.inc"   /* character select, game mode select, a menu scene's include */
 #include "engine/skater.inc"  /* the skater: physics, tricks, points; the beat clock */
 #include "engine/weapons.inc" /* weapons in the hand */
 #include "engine/set.inc"     /* sets, marks, collision, actors, the nav grid and minds, placed lenses, stage marks */

@@ -3,7 +3,7 @@
 
     gaitcheck.py <pack>#<clip[:cycle seconds]> ...
 
-Foot slide says a foot doesn't skate. It says nothing about whether a body walks like one: the DontGetDropped alien's hand-keyed gaits slid under 6 cm and were
+Foot slide says a foot doesn't skate. It says nothing about whether a body walks like one: the skate game's alien's hand-keyed gaits slid under 6 cm and were
 plainly unnatural at a glance. A clean-footed gait can still run on two rails with its hands up and its chest square, and this bench reads that off:
 how far apart the feet run, how wide and high the hands go, how much the shoulders turn against the hips and the belt line tips, the lean, the knees, the foot's lift.
 The control is real mocap on the same bench (v1_mob1's w_walk, w_jog, w_run: a known-good, measure-only). One caveat from running it: that pack's clips hold the hips

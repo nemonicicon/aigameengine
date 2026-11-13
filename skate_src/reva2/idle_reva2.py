@@ -8,7 +8,7 @@ loop -- spine pitch with neck counter-phase and a lagged arm swing, the crawl st
 lesson (motion reads through counter-phase) applied to standing still.
 
 The name "idle" TRIPS THE LINT ON PURPOSE: this is the one kind of clip that is meant
-to be mined -- it becomes her idleIdx, so the club (and rig_map's _base_clip on every
+to be mined -- it becomes her idleIdx, so the engine (and rig_map's _base_clip on every
 later moves score) elects it as the base stand. force=True is the visible record of
 that intent.
 

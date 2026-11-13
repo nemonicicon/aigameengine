@@ -5,7 +5,7 @@
 
 WHY. bake_town.sh assigns textures by FILENAME PATTERN -- SM_road_* gets the road sheet,
 SM_wall_* gets siding, everything else gets the shared colour palette. That is a guess,
-and the guesses are visibly wrong: the mailbox Mrs. Parsons stands at came out PURPLE,
+and the guesses are visibly wrong: the mailbox a neighbour stands at came out PURPLE,
 the pickups rainbow, house windows striped with swatch grids. UE knows the answer, so
 ask it once and write the map to a file the baker reads.
 
@@ -21,8 +21,8 @@ Output: skate_src/town/texmap.txt   -- "<meshname> <texturename>" per line
 """
 import unreal, os
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # club-engine kit: machine-independent paths
-MAP = os.path.join("skate_src", "town", "texmap.txt")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "town")   # machine-independent paths
+MAP = os.path.join("skate_src", "town", "texmap.txt")   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/AssetsvilleTown/Meshes/"
 

@@ -2,8 +2,8 @@
 """showreel.py -- cycle the two-body repertoire on the live lab wall (the demo reel).
 
 The lab plays one clip at a time; this driver is the playlist. It writes lab_ctl.txt
-on a timer with an ever-increasing seq, walking reva2 + kaeli through the whole
-authored two-body story: the five, the hug, the skip hand-in-hand, the kiss, and the
+on a timer with an ever-increasing seq, walking reva2 + the co-star through the whole
+authored two-body repertoire: the five, the hug, the skip hand-in-hand, the kiss, and the
 curl-up-and-purr closer. Each entry carries the EXACT staging its score was solved
 for (pgap/pside/pyaw from the bake receipts -- a pair clip at the wrong gap is two
 strangers acting at each other).

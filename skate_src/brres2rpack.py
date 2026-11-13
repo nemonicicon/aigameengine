@@ -5,11 +5,11 @@
                    [--notpose] [--map pelvis=HipN,...] [--bones] [--fps 30] [--scale S] [--facing +z|-z]
                    [--nearest] [--dae out.dae] [--sheet out.png]
 
-  1. brres.scene_from_brres   the MDL0 as the club's scene: bones -> nodes, objects -> meshes baked to
+  1. brres.scene_from_brres   the MDL0 as the engine's scene: bones -> nodes, objects -> meshes baked to
                               rig space (single-bound parts through their bone, weighted parts through
                               the node mixes), TEX0 -> PNG, CHR0 -> clips resampled to --fps
                               (--anim adds the CHR0s of other archives: Brawl keeps motion in a second file)
-  2. tpose.canon_map          which bone is which limb: the club's canon, the Nintendo matcher
+  2. tpose.canon_map          which bone is which limb: the engine's canon, the Nintendo matcher
                               (HipN, LLegJ, ArmR1 ...), then --map. A model with NO limbs (a statue on
                               dummy bones) skips the T-pose and says so: rig it first (statue2body)
   3. tpose.solve/bake         the limbs re-aimed and the skin re-baked in the T-pose

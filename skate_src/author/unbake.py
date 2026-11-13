@@ -5,7 +5,7 @@ so it only needs un-baking.
 
 ⭐ YES, AND THAT IS THE WHOLE POINT OF THIS FILE. A bake that "merges" objects CONCATENATES
 their vertex buffers -- it does not STITCH their triangles. So every original shell is still
-sitting there intact inside the merged mesh, and connected components find them again. Hina's
+sitting there intact inside the merged mesh, and connected components find them again. A bought model's
 `merged_1` is 7061 vertices in **133 separate shells**, and they read straight off as anatomy:
 
     518 / 518 verts  Y 0.12..0.83   X +0.01..+0.15 / -0.15..-0.01   her two legs
@@ -23,10 +23,10 @@ load, the cloth solver claims a mesh by the `~cloth` marker in its name, and `me
 a colour off it. Splitting the shoes out makes all three apply to the shoes alone.
 
     # what is in there
-    python skate_src/author/unbake.py hina_scene_gltf --list
+    python skate_src/author/unbake.py <body> --list
 
     # carve named parts out by height, everything else stays in the body mesh
-    python skate_src/author/unbake.py hina_scene_gltf hina_split --part shoes:0.0:0.16
+    python skate_src/author/unbake.py <body> <body>_split --part shoes:0.0:0.16
 """
 import argparse
 import os

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""shoot.py -- shoot SEVENTY-FOUR with COVERAGE, and cut it.
+"""shoot.py -- shoot the film with COVERAGE, and cut it.
 
     python skate_src/film/shoot.py                    # the film
     python skate_src/film/shoot.py --only denial      # one scene, both cameras, cut
@@ -7,16 +7,16 @@
 
 ⭐ EVERY SCENE IS SHOT TWICE. The first cut had one lens per take and it showed: six of
 seven takes were the conversation camera, which frames the two HEADS, so the whole film
-was two women in medium shots. Worse, act III's hinge -- mrs parsons taking the mail
-carrier -- happened BEHIND them, on a timeline built for exactly that, and the picture
+was two women in medium shots. Worse, a scene's turning point -- something happening across
+the road -- happened BEHIND them, on a timeline built for exactly that, and the picture
 never once looked at it.
 
 So each scene gets an A camera (the conversation lens, which is very good at a
 conversation) and a B camera (pinned, and pointed at whatever the scene is ABOUT), and an
 EDL says when to be on which:
 
-    denial     B is behind them looking ACROSS the road at mrs parsons -- the woman they
-               are arguing about, standing at her mailbox for the whole scene
+    denial     B is behind them looking ACROSS the road at a neighbour, standing at
+               her mailbox for the whole scene
     it_starts  B is the turn itself, at the camera it was verified on, cut in at t=9
                because the cue fires at 12.4
     boarding   B is the window, and the boards going over it
@@ -42,7 +42,7 @@ FFMPEG = next(iter(glob.glob(os.path.join(
 
 # hour of the story -> the light, off the same keyframes tod= interpolates
 LIGHT = {
-    # ⛔ NIGHT IS NOT sun=off -- that is the club's dark-room constant path, with no sky
+    # ⛔ NIGHT IS NOT sun=off -- that is the engine's dark-room constant path, with no sky
     # and no direction. Night is a WEAK BLUE DIRECTIONAL over a near-black sky, and the sun
     # is never let below y=0.06 as a light because a directional from underneath lights a
     # face from the chin up. Taken from the same tod curve the day arc runs on.
@@ -60,7 +60,7 @@ LIGHT = {
     "1330": ("56,206,1.10,1.00,0.95,0.88",  "0.400,0.450,0.560"),
     "1500": ("40,238,1.24,1.00,0.94,0.84",  "0.440,0.495,0.605"),
     # ⛔ DUSK WAS TOO DARK TO READ A FACE. At elevation 6 and intensity 0.62 over a 0.31
-    # sky, act IV -- the payoff of the film -- came back as silhouettes in a grey haze.
+    # sky, the dusk scene came back as silhouettes in a grey haze.
     # Lifted the key and warmed the sky; it is still dusk, the shadows are still long,
     # and now there are faces in it.
     "1840": ("9,270,0.92,1.00,0.66,0.40",   "0.360,0.320,0.350"),
@@ -71,27 +71,25 @@ LIGHT = {
 # P2 is who stands in slot 2 -- "" for a two-hander, which is every row that had one
 # before, so nothing that already worked changes shape.
 # EDL: (start, end, 'A'|'B') in seconds. Anything not covered is A.
-# ⛔ ANIMA IS KAELI, IN EVERY SCENE (2026-09-03: the right actor,
-# and for kaeli that is Anima). Only the cold open had been recast after
+# ⛔ THE CO-STAR (A BOUGHT CHARACTER) IN EVERY SCENE (2026-09-03: the right actor).
+# Only the first scene had been recast after
 # the model search; the other seven rows still loaded `kmoves`, which is the cat-girl body
 # in a bikini -- so six of the nine scenes were being shot with the wrong woman, wearing the
-# wrong clothes, at a block party and a boarding-up. kmoves stays LOADED as a clip bank, so
+# wrong clothes. kmoves stays LOADED as a clip bank, so
 # every borrowed clip (x_convo, w_look, x_chairsat, z_rm_curlsleep) still resolves through
-# bankFind onto anima's rig exactly as it does in the cold open.
+# bankFind onto the bought character's rig exactly as it does in the first scene.
 SHOTS = [
-    # ⭐ THE COLD OPEN. Interior, before dawn, and the only scene in the film with no
+    # ⭐ THE FIRST SCENE. Interior, before dawn, and the only scene in the film with no
     # street in it. The conversation lens does the whole thing: it is two people in a dark
-    # room and there is nothing else to look at, which is the point.
-    # ⛔ WAS SHOT IN `boarded` -- act V's room, with the planks up and susan sitting in
-    # the corner as a set actor. The first ninety seconds of the film showed the audience
-    # the last two minutes of it, in a house susan does not live in. This is kaeli's house,
-    # normal, at four in the morning, and the only two people in it live here.
-    # ⭐ AND THEY ARE DRESSED FOR BED. She had too little on to be standing out on the
-    # street at 7am -- and it is worse at four in the morning in her own bedroom. Both
+    # room and there is nothing else to look at.
+    # ⛔ WAS SHOT IN `boarded` -- the last scene's room, with the planks up and a third body
+    # sitting in the corner as a set actor, so the film's opening showed its own ending.
+    # This scene has its own room, as it is at four in the morning.
+    # ⭐ AND THEY ARE DRESSED FOR BED. Both
     # bodies wear the simulated garments here and ONLY here; by the porch at 07:15 they are
     # dressed and back on their normal packs.
-    # ⭐ ANIMA IS KAELI. After the model search: Anima is the one
-    # that looks good consistently. She is the only body in the club
+    # ⭐ THE CO-STAR IS THE BOUGHT CHARACTER. After the model search: she is the one
+    # that looks good consistently. She is the only body in the engine
     # with a sculpted face -- her own visemes, brows, per-eye blinks and a jawOpen the
     # speech envelope drives -- and this scene is ninety seconds of two faces in the dark,
     # which is the one place that difference is the whole shot.
@@ -115,9 +113,8 @@ SHOTS = [
     # ⛔ A FIXED A LENS LOSES A PAIR THAT WALKS -- this one shot an empty street, the two
     # of them out of the left edge in the first second. The conversation lens frames the
     # two HEAD POSITIONS and cannot lose them; that is what it is for.
-    # ⭐ THE THIRD PAIRING. reva and susan, alone, which the film had never done -- and
-    # where the small kind lie is. B is the tables themselves, so the scene has something
-    # to be ABOUT other than two faces.
+    # ⭐ THE THIRD PAIRING: reva and a third body, alone. B is the tables themselves, so
+    # the scene has something to be ABOUT other than two faces.
     ("tables", "I", "r2moves", "crowd_susan", "", "parsons", "33,-19,110", "0800",
      "", "38.5,2.35,-12.0,33.4,1.50,-19.2,44",
      [(0, 5, "B"), (44, 52, "B")]),
@@ -127,7 +124,7 @@ SHOTS = [
      [(0, 6, "B"), (36, 46, "B")]),
 
     # ⭐ B LOOKS AT WHAT THEY ARE ARGUING ABOUT: from behind the pair, across the road, at
-    # mrs parsons standing at her mailbox -- which she does for this entire scene.
+    # a neighbour standing at her mailbox -- which she does for this entire scene.
     ("denial", "II", "r2moves", "anima_fx", "", "parsons", "30,-20,0", "1200",
      "", "33.2,2.70,-25.5,30.4,1.55,14.0,38",
      [(15, 27, "B"), (64, 75, "B"), (92, 99, "B")]),
@@ -147,7 +144,7 @@ SHOTS = [
     # were right and the mark was wrong -- 68 seconds of correctly-lit empty grass.
     ("three_lawns", "IV", "r2moves", "anima_fx", "crowd_susan", "three_lawns", "35.5,-21,10", "1840",
      # ⛔ WAS "55,3.4,3.5,35,1.5,-22,52" -- 31 units back, a standing woman at SIX PER
-     # CENT of frame height, for 112 seconds, on the payoff of the entire film.
+     # CENT of frame height, for 112 seconds.
      # framecheck's size test convicts it. In to 12 units: still a wide, still shows the
      # ground they have to cross, and they are people rather than specks.
      "40.5,2.10,-14.5,35.5,1.45,-20.5,40", "38.2,1.55,-16.2,35.5,1.30,-21.0,36",
@@ -169,10 +166,9 @@ BROLL = {
     # ⛔ EVERY ONE OF THESE LOOKED AT z ~ -6..-20 AND THE ACTORS ARE ALL AT z ~ +19..+21.
     # Twelve lenses aimed at the opposite side of the road from the entire cast, which is
     # why the b-roll measured 0.01 -- a photograph. Turned round.
-    # ⭐ THE FILM'S FIRST IMAGE, and the first MOVING shot the club has ever had.
-    # The shot: a slow zoom from an eagle's height into the window reva is looking out of,
-    # from kaeli's house, as she sits on kaeli's bed and kaeli wakes from a nightmare.
-    # The cold open plays INSIDE kaeli_house, which is a 14x14 room with no
+    # ⭐ THE FILM'S FIRST IMAGE, and the first MOVING shot the engine has ever had.
+    # The shot: a slow zoom from an eagle's height into the lit window the first scene
+    # plays behind. That scene plays INSIDE its room set, which is a 14x14 room with no
     # exterior, so the approach is shot on the street and cut to -- exterior establisher
     # into interior, which is also what Mascelli says the film owes an audience before it
     # closes in (design/cinematography.md).
@@ -186,9 +182,9 @@ BROLL = {
     # descent ends in the 4am dark at the window, which is where the scene picks up.
     # ⛔ AIMED STEEPLY DOWN, NOT BACK: a shallow angle from 190 units puts the edge of the
     # world in frame (open_avenues item 7). Steep fills it with town.
-    # ⛔ `actors=0`: parsons casts 27 people and block adds six SKATEBOARDERS, and at ten
+    # ⛔ `actors=0`: the street set casts 27 people and block adds six SKATEBOARDERS, and at ten
     # past four in the morning an empty street is the point -- one lit window and nobody
-    # else awake plants "have you been sitting there the whole time" before a word is said.
+    # else awake.
     "kaeli_window": ("kaeli_ext", "PREDAWN", "70.0,190.0,80.0,60.0,0.0,0.0,52", 18.0,
                      "actors=0 camto=32.5,2.90,-17.5,32.5,2.60,-26.0,32 "
                      "camsecs=18 camease=1"),
@@ -202,10 +198,9 @@ BROLL = {
     # angled onto the lit wall instead of straight down the lot line.
     "night_house":  ("parsons", "2200", "34.0,2.20,13.0,30.4,1.90,20.4,36", 6.0),
 
-    # ⭐⭐ THE LULL -- act II-and-a-half, and its script IS this table. Seven held shots,
+    # ⭐⭐ THE LULL -- a run of b-roll, and its script IS this table. Seven held shots,
     # no moves, no cuts inside a shot. THE ORDER IS THE ARGUMENT: it runs from the widest
     # and most alive to one still person, and each shot is quieter than the one before it.
-    # Nobody says a word and by shot seven the audience has done the arithmetic on its own.
     "lull1_street": ("parsons", "1200", "2.0,6.60,7.5,60.0,2.10,20.0,52",  12.0),
     "lull2_grill":  ("parsons", "1200", "70.0,2.10,14.0,74.0,1.70,20.4,40", 10.0),
     "lull3_pool":   ("parsons", "1200", "56.0,2.05,14.0,59.6,1.30,20.8,42", 10.0),
@@ -222,15 +217,13 @@ FILM = [("b", "kaeli_window"), ("s", "coldopen"),
         ("b", "open_street"), ("s", "porch"), ("s", "tables"), ("s", "dogwalk"),
         ("b", "block_alive"),
         ("s", "denial"), ("s", "theleash"),
-        # ⛔ THE DOG USED TO GO MISSING TWICE. `denial` ends on reva reporting the empty
-        # leash from across the road -- it is what breaks kaeli and triggers "So. What do
-        # you see?" -- and `theleash` is that same minute at the fence, up close, with
-        # susan. The lull's seven shots used to sit BETWEEN them, so the film revealed the
-        # dog, played 78 seconds of a calm street, and then discovered the dog again.
+        # ⛔ A REVEAL USED TO HAPPEN TWICE. `denial` ends on a reveal from across the
+        # road, and `theleash` is that same minute at the fence, up close. The lull's seven
+        # shots used to sit BETWEEN them, so the film revealed it, played 78 seconds of a
+        # calm street, and then discovered it again.
         # theleash now follows denial immediately (informational reveal, then the emotional
-        # one, which is coverage rather than repetition), and act II-and-a-half lands where
-        # the treatment always put it: after act II, before it starts.
-        # act II-and-a-half: the street, one last time, and nobody speaks
+        # one, which is coverage rather than repetition), and the lull lands after both.
+        # the lull: the street, and nobody speaks
         ("b", "lull1_street"), ("b", "lull2_grill"), ("b", "lull3_pool"),
         ("b", "lull4_tables"), ("b", "lull5_bikes"), ("b", "lull6_gate"),
         ("b", "lull7_parsons"),

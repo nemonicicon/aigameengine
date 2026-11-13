@@ -10,7 +10,7 @@ general, so the next body -- a man in a suit, a lizard -- is a body module and a
   kit.export()                          <name>.glb + <name>.blend
   kit.renders(outfits, poses, ...)      turnarounds and poses per outfit (Cycles, AgX Punchy)
 
-THE WARDROBE TAGS (what the club engine's `wear=` and Godot's ClubWardrobe read off the mesh names):
+THE WARDROBE TAGS (what the engine's `wear=` and Godot's ClubWardrobe read off the mesh names):
   skin | skin~h=a,b | head | wear~<slot>~<piece>~<outfit>+<outfit>
 """
 import math, os, time
@@ -176,7 +176,7 @@ class Kit:
         self.log("%d objects, %d verts" % (len(self.OBJ), sum(len(bpy.data.objects[n].data.vertices) for n in self.OBJ)))
 
     def outfit_objects(self, outfit):
-        """what is drawn in an outfit -- as the club engine and Godot's ClubWardrobe draw it: its pieces, but a
+        """what is drawn in an outfit -- as the engine and Godot's ClubWardrobe draw it: its pieces, but a
         piece's part tagged ~h=x not while x is worn; the skin nothing worn covers"""
         worn = {n for n, (k, pc, o) in self.OBJ.items() if k == "wear" and outfit in o}
         wnames = {self.OBJ[n][1] for n in worn}

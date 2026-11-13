@@ -14,7 +14,7 @@ ap.add_argument("exe"); ap.add_argument("out")
 ap.add_argument("--packs", default="packs"); ap.add_argument("--hero", default="packs/v1_Character_17_Female_Police.rpack")
 ap.add_argument("--ticks", type=int, default=1800); ap.add_argument("--env", action="append", default=[]); ap.add_argument("--slots", default="100")
 a = ap.parse_args()
-NATIVE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # club-engine kit: machine-independent paths
+NATIVE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # machine-independent paths
 env = dict(os.environ, PATH=r"C:\msys64\mingw64\bin;" + os.environ["PATH"], REVA_WINDOWED="1", REVA_NOSAVE="1", REVA_FIXEDSTEP="60", REVA_SIMHASH="60",
            REVA_AUTOMODE="9", REVA_AUTOVAR="1", REVA_AUTOPICK="0", REVA_TIER="pi")
 for e in a.env:

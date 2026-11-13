@@ -11,7 +11,7 @@ on its first run:
   * ⛔ A T-POSE PUTS THE ARMS AT CHEST HEIGHT, so a chest band measured a "body radius" of
     0.934 -- her ARM SPAN -- and duly reported the shirt as 0.11 INSIDE her body. A bone
     owns its own vertices no matter what pose the body is in.
-  * ⛔ The band's compass was wrong too: it called +X "front" when club forward is +Z, so
+  * ⛔ The band's compass was wrong too: it called +X "front" when the engine's forward is +Z, so
     every direction in the table was 90 degrees from its label.
   * ⭐ And a bone capsule is EXACTLY WHAT THE ENGINE COLLIDES AGAINST, so this number
     predicts what the solver will do rather than merely describing the mesh.

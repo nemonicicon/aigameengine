@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""song_stems.py -- A RECORDING'S STEMS, with Demucs (design/pdoom_video.md): drums, bass, other and vocals as four wavs, so its notes can be read one instrument at a time.
+"""song_stems.py -- A RECORDING'S STEMS, with Demucs (for a music video): drums, bass, other and vocals as four wavs, so its notes can be read one instrument at a time.
 
     <a python 3.11 venv with demucs and soundfile>/python song_stems.py SONG.wav OUTDIR [--model htdemucs] [--threads 6] [--shifts 1]
 
-Not the club's python: it wants torch, so it lives in its own environment (a python of its own, beside the song). Runs on the CPU, about real time to a few times slower.
+Not the engine's python: it wants torch, so it lives in its own environment (a python of its own, beside the song). Runs on the CPU, about real time to a few times slower.
 """
 import argparse, os, time
 import numpy as np

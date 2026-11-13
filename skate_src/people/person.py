@@ -1,5 +1,5 @@
-"""person.py -- A PERSON BY MEASUREMENT: one parametric human body for a whole cast (10-18, THE WORLD AT THE END OF
-TIME, ep 1 scene 2.1: a twelve-year-old, a hundred-year-old woman, a mother, two five-year-olds).
+"""person.py -- A PERSON BY MEASUREMENT: one parametric human body for a whole cast (10-18, the space series, a
+scene with a twelve-year-old, a hundred-year-old woman, a mother, two five-year-olds).
 
 A body built as a MODULE (REVA's is one) has every height in it measured off one sheet, so it can't be
 a child. Here a body is a SPEC of the measurements a tailor or an anthropometry table gives -- stature, head height,
@@ -10,7 +10,7 @@ machine work on these bodies exactly as on REVA's:
 
   Person(spec).TORSO / LEG[+1/-1] / ARM["Left"/"Right"]    the dress form (atelier Surfaces)
   .build_skin() .build_arm_skin(sg) .build_head() .build_eyes() .build_hair()    Parts
-  .bones()      Mixamo names (the club's canon and Godot's humanoid); A-pose, arms 45 degrees down
+  .bones()      Mixamo names (the engine's canon and Godot's humanoid); A-pose, arms 45 degrees down
   .outward(p, part_name)                                    which way is out of the body (hide sets, garments)
 
 Built on z = 0 (bare soles), z up, -Y forward, +X the body's left. Metres.
@@ -27,7 +27,7 @@ _DONOR = {}
 
 
 def donor_hand(path=None):
-    """Anima's left hand in her wrist's frame (skate_src/people/extract_hand.py -> models/_out/anima_hand_l.npz)"""
+    """The bought character's left hand in her wrist's frame (extracted from her mesh -> models/_out/anima_hand_l.npz)"""
     import os
     import numpy as np
     path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "models", "_out",
@@ -472,7 +472,7 @@ class Person:
 
     # ---------------------------------------------------------------- THE DONOR HAND (spec "hand_donor")
     def _hand_frame(self, A):
-        """the wrist's frame as extract_hand.py stores the donor's: +Y along the hand, +Z the BACK of the hand
+        """the wrist's frame as the hand's extraction stores the donor's: +Y along the hand, +Z the BACK of the hand
         (+q: the A-pose palm faces down and in), +X = Y x Z -- which is the FRONT on the left, the back on the right,
         so the right hand is the left one mirrored in X"""
         Y = A["d"].normalized(); Z = A["q"].normalized(); X = Y.cross(Z)
@@ -550,7 +550,7 @@ class Person:
         four hexagonal rings, one ON each joint: straight prisms that folded at a single ring like bent pipe, cut
         flat at the tip, butted onto a slab. A finger is now a smooth tube: 10 sides, rings all along each bone,
         weight shared only near a knuckle, a rounded tip, its root sunk inside the palm (no seam).
-        A fourth "still looking weird" -> spec "hand_donor": Anima's own hand, refitted (extract_hand.py)."""
+        A fourth "still looking weird" -> spec "hand_donor": the bought character's own hand, refitted."""
         if self.S.get("hand_donor"): return self._donor_hand(P, A, side, wrist_ring, mat)
         k = self.S["hand"] / 0.185
         d, q, fr, J = A["d"], A["q"], A["fr"], A["joint"]

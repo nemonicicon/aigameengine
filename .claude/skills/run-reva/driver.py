@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""driver.py -- build, launch and DRIVE the club (reva_native/crowd.exe) headlessly.
+"""driver.py -- build, launch and DRIVE the engine (reva_native/crowd.exe) headlessly.
 
-The club is a fullscreen Vulkan game, and how it looks only ever comes out as PIXELS (what it
+The engine is a fullscreen Vulkan game, and how it looks only ever comes out as PIXELS (what it
 decides has a check with no window: `check`). This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
 on disk that you are expected to LOOK at -- the engine's own law is "pixels or it
 didn't happen", and a log line is not a receipt.
@@ -20,7 +20,7 @@ didn't happen", and a log line is not a receipt.
     kill                       kill any running instance (only one may run)
     up / down                  leave ONE window running for a run of shots (--live on lab, face, looks), close it
     packs [substr]             list packs, or census one pack's clips/morphs/marks
-    shot OUT.png               boot the club and capture a frame
+    shot OUT.png               boot the engine and capture a frame
     lab OUT.png                the ANIM LAB with a ctl line (--ctl "...")
     looks OUT.png              ONE SET FROM EVERY CAMERA in one boot (--set, --cams): a PNG a camera, and a sheet
     face OUT.png               the FACE RIG (8 angles + mouth/eye cams) + mark gizmo
@@ -150,7 +150,7 @@ def game_unit(a):
 
 
 def buildvk(a):
-    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe, or crowd_<game>_vk.exe for one game with no old game modes. Since step 18 (11-04) `build` makes the same engine as crowd_new.exe; this stays for the games. reva_native/rvz_vk.bat plays it."""
+    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe, or crowd_<game>_vk.exe for one game with no old game modes. Since step 18 (11-04) `build` makes the same engine as crowd_new.exe; this stays for the games."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
     name, src, outdir, inc = game_unit(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it. Or --game PATH
@@ -436,16 +436,16 @@ def _live_shot(a, ctl_text, crop=None, scale=None):
 
 
 def shot(a):
-    """boot the club proper (mode select -> variant -> character -> play) and shoot it"""
-    # ⛔ argv[3] is the FLOW, not a body. The club boots mode select -> variant ->
+    """boot the engine proper (mode select -> variant -> character -> play) and shoot it"""
+    # ⛔ argv[3] is the FLOW, not a body. The engine boots mode select -> variant ->
     # character select, and that flow is named "select"; handing it a pack name here
     # loads that body as the hero and the menus never run, so REVA_SHOT fires on a
     # frame the capture path never reaches and NO FILE IS WRITTEN.
     env = {}
     if a.mode is not None:
         env.update(REVA_AUTOMODE=str(a.mode), REVA_AUTOVAR=str(a.var), REVA_AUTOPICK=str(a.pick))
-    # ⭐ --ctl lets a GAME DOOR load a set (`set=parsons`) the way the lab does. Without it a
-    # door boots onto the bare club floor, and "walk the player into a house" cannot be
+    # ⭐ --ctl lets a GAME DOOR load a set (`set=<street>`) the way the lab does. Without it a
+    # door boots onto the bare dance floor, and "walk the player into a house" cannot be
     # tested in the mode that actually has a player.
     return _capture(a, a.ctl, env, argv3=a.flow)
 
@@ -490,7 +490,7 @@ def scene(a):
     os.makedirs(tmp, exist_ok=True)
     for f in glob.glob(os.path.join(tmp, "*.ppm")): os.remove(f)
     # ⛔ NO clip=/pclip= HERE. A scene's own per-line staging resolves both, and writing
-    # them into the ctl overwrote that resolution on every poll -- which is how kaeli spent
+    # them into the ctl overwrote that resolution on every poll -- which is how the co-star spent
     # a whole take crawling through her get-up-off-the-floor loop. The engine ignores them
     # during a scene now too; this just stops sending them.
     ctl = ("face=0 grid=0 dqs=0 partner=%s pyaw=%s pgap=%s pside=%s "
@@ -509,13 +509,13 @@ def scene(a):
         if a.sun:   ctl += " sun=%s" % a.sun
         if a.sky:   ctl += " sky=%s" % a.sky
         # ⛔ A DAY SET SHOT AT NIGHT NEEDS ITS LAMPS TAKEN DOWN. other_side.set's practicals
-        # were authored for ep 4 at tod=10.0; at ep 5's tod=21.5 the same porch light delivers
+        # were authored for a day scene at tod=10.0; at a night scene's tod=21.5 the same porch light delivers
         # ~30x the sky ambient and the street comes back in FULL DAYLIGHT with sun=/sky=
         # correctly set and visibly doing nothing. The engine reports it at set load now;
         # this is the dimmer. 1.0 (default) leaves the set exactly as authored.
         if a.lamps is not None: ctl += " lamps=%s" % a.lamps
         # A WIDE PINS ITS OWN LENS. The conversation camera frames the two heads, which is
-        # right for coverage and wrong for act IV, where the pair are off-camera and the
+        # right for coverage and wrong for a scene where the pair are off-camera and the
         # shot is the street. cam= overrides it for that one kind of shot.
         if a.cam:   ctl += " cam=%s" % a.cam
     _, body = _ctl(ctl); print("ctl: " + body.strip())
@@ -550,14 +550,14 @@ def scene(a):
     # why a clip was missing. It lands beside the mp4.
     logp = os.path.splitext(os.path.abspath(a.out))[0] + ".log"
     logf = open(logp, "w")
-    # ⭐ ep 12: --res WxH is the engine's argv[4] (it always forced the window size; the driver never passed it),
+    # ⭐ --res WxH is the engine's argv[4] (it always forced the window size; the driver never passed it),
     # so a scene can be filmed at 1080p. Each frame is a PPM (6.2 MB at 1920x1080) only until the encoder has it: since
     # 10-24 a take is streamed, so --tmp holds a frame or two, not the take.
     pr = subprocess.Popen([exe, str(getattr(a, "crowd", 400)), "packs", a.subject] + ([a.res] if getattr(a, "res", "") else []),
                           cwd=NATIVE, env=env, stdout=logf, stderr=subprocess.STDOUT)
     # ⭐ (10-24) THE TAKE IS STREAMED, NOT SPOOLED. A re-record's peak left too little room on the disk.
     # Every frame sat on disk as a raw PPM until the take ended (2.76 MB each at 720p, ~4 GB a minute of scene:
-    # chapter 3's 13.6 min peaked at 54 GB) and was encoded only then. Now each frame goes into the encoder the moment
+    # a 13.6 min chapter peaked at 54 GB) and was encoded only then. Now each frame goes into the encoder the moment
     # the engine has written all of it, and is deleted: a take needs a few frames of disk and its own mp4. The --film dip
     # to black wants the END, which a stream does not know until it gets there, so the last 0.6 s are held back in
     # memory (~40 MB) and faded on the way out -- what ffmpeg's fade filter did, done here.
@@ -779,7 +779,7 @@ def marks(a):
 
     A person places them more easily than any calculation. Placing a face mark is
     something a person does by LOOKING, and the automatic tools genuinely cannot do it on
-    kaeli: geometry picks her FRINGE, and face_calibrate.py reads eyes as the darkest texels
+    the co-star: geometry picks her FRINGE, and face_calibrate.py reads eyes as the darkest texels
     and reports "no symmetric dark pair" because of her liner.
 
     ⛔ THE FIRST VERSION OF THIS WAS FOUR ENVIRONMENT VARIABLES AND A WALKING SUBJECT. In the
@@ -857,7 +857,7 @@ def looks(a):
     """⭐ (10-22) A SET FROM EVERY CAMERA IN ONE BOOT. One engine boot per camera was ~25 s each, so a
     five-camera look spent two minutes booting. `looks` boots -- or reuses -- ONE live window, grabs every camera of the set from it (~2-4 s each: the first
     waits --settle for the set to load, the rest only for the lens), and tiles them into one sheet, each frame labelled
-    ABOVE itself. Cameras `name=ex,ey,ez,ax,ay,az,fov;...` in club units, or in METRES with --metres (x1.75).
+    ABOVE itself. Cameras `name=ex,ey,ez,ax,ay,az,fov;...` in engine units, or in METRES with --metres (x1.75).
     One frame a camera: motion is `bench`'s or a scene's job."""
     from PIL import Image, ImageDraw, ImageFont
     U = 1.75 if a.metres else 1.0
@@ -1007,7 +1007,7 @@ def main():
     sp.add_argument("--partner", default="kmoves"); sp.add_argument("--pclip", default="idle")
     # ⭐ the scene system takes three bodies now; slot 2 is loaded the same way slot 1 is
     sp.add_argument("--partner2", default="")
-    sp.add_argument("--partner3", default="")   # ⭐ ep 7: the fourth body (SCN_MAXCAST 5)
+    sp.add_argument("--partner3", default="")   # ⭐ the fourth body (SCN_MAXCAST 5)
     sp.add_argument("--clip", default="idle")
     sp.add_argument("--pyaw", default="185"); sp.add_argument("--pgap", default="1.05")
     sp.add_argument("--pside", default="0.12"); sp.add_argument("--look", action="store_true", default=True)

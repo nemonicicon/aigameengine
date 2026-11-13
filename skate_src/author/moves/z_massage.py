@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """z_massage.py -- THE MASSAGE. The first pair move where the two bodies play
-DIFFERENT parts of the same action: reva works, kaeli receives.
+DIFFERENT parts of the same action: reva works, the co-star receives.
 
-reva massages kaeli.
+reva massages the co-star.
 
 Every pair move before this one was mirror-symmetric (hug, kiss: same clip on both
 bodies, the choreography interlocking by construction) or two independent poses that
@@ -101,7 +101,7 @@ class Body:
         self.wr, self.wqr = wr, wqr
         self.wp0, _ = fk_world(self.nodes, self.base_q, self.base_t)
         self.lat = [1.0, 0.0, 0.0]      # the body's LEFT
-        self.fwd = [0.0, 0.0, 1.0]      # club forward, the engine's pixel-verified contract
+        self.fwd = [0.0, 0.0, 1.0]      # the engine's forward, its pixel-verified contract
         self.dims = body_dims(self.p, self.RM)
         self.caps = body_capsules(self.p, self.RM)
         self.traps = self._trapezius()
@@ -160,7 +160,7 @@ def her_to_me(w, PGAP, PYAW):
         return [w[0], w[1], PGAP + w[2]]
     return [-w[0], w[1], PGAP - w[2]]
 
-# ---------------------------------------------------------------- the taker (kaeli)
+# ---------------------------------------------------------------- the taker (the co-star)
 def taker_setup(K):
     """audited signs + the solved yield angle. Returns (rollSign, nodSign, yieldDeg)."""
     RM = K.RM
@@ -191,7 +191,7 @@ def taker_setup(K):
     return rollS, nodS, 0.5 * (lo + hi)
 
 def taker_pose(K, t, cfg):
-    """kaeli receiving: head hangs and rolls slowly, the spine softens, and each
+    """The co-star receiving: head hangs and rolls slowly, the spine softens, and each
     shoulder yields on ITS OWN hand's press -- the phase contract, her half."""
     rollS, nodS, yieldA = cfg
     u = work_env(t)
@@ -341,7 +341,7 @@ def main(pack, ROLE, SCALE, ARMW, PGAP, PPACK, PSCALE, PYAW):
 
     # HER HEAD CAPSULE IS A HAIRSTYLE. body_capsules takes the p90 perpendicular
     # distance of a bone's flesh -- right for a ribcage, wrong for a head with hair:
-    # kaeli's reads 0.280u, a blob that swallows her own shoulders (the measured
+    # the co-star's reads 0.280u, a blob that swallows her own shoulders (the measured
     # contact spot sits 0.085u INSIDE it), so an arm laid on her shoulder gets
     # convicted of head collision while never coming near her skull. The skull and
     # neck get LEAN radii here -- p30 of the same flesh, which tracks bone, not hair --
@@ -440,7 +440,7 @@ def main(pack, ROLE, SCALE, ARMW, PGAP, PPACK, PSCALE, PYAW):
         fa = _n([G.wr[chain[2]][k] - G.wr[chain[1]][k] for k in range(3)])
         return qrot(qinv(_wqr[chain[2]]), fa)
     hdirR, hdirL = hand_local_dir(armR), hand_local_dir(armL)
-    # HOW LONG IS THE HAND? On both club rigs the "hand" node IS THE WRIST -- a leaf,
+    # HOW LONG IS THE HAND? On both rigs the "hand" node IS THE WRIST -- a leaf,
     # with the whole palm hanging off it as flesh only. IK-ing that node onto her
     # trapezius parked the WRIST on the muscle and swung the entire palm past it, over
     # her collarbone and across her FACE. The palm is what touches, so its offset is
@@ -490,7 +490,7 @@ def main(pack, ROLE, SCALE, ARMW, PGAP, PPACK, PSCALE, PYAW):
                                  q_override=qo, t_override=to))
         # the hands lie ALONG the top of her shoulders: fingers forward over her
         # collarbone, tilted down -- driven from the measured local hand direction
-        # (both club rigs are fingerless, so the palm roll cannot be audited from
+        # (both rigs are fingerless, so the palm roll cannot be audited from
         # knuckles the way z_hi5 does it; the drape direction is what reads)
         if u > 0.35:
             _w, _wq = fk_world(G.nodes, qo, to)

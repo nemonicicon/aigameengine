@@ -22,7 +22,7 @@ usage:
 import argparse, os, re, sys, math
 import numpy as np
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # club-engine kit: machine-independent paths
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # machine-independent paths
 SETS_DIR = os.path.join(REPO, "reva_native", "sets")
 DEFAULT_GRID = os.path.join(os.environ.get("CLUB_OUT", "out"), "grid.npz")
 

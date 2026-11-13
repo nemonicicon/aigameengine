@@ -1,4 +1,4 @@
-/* ---- LIQUID IN A CONTAINER (11-05, Bike Lane Bash's bag: design/engine_plan.md, "Bike Lane Bash against the queue", liquid in a container was on the list of what the engine lacked) ----
+/* ---- LIQUID IN A CONTAINER (11-05, the street game's bag: design/engine_plan.md, "The street game against the queue", liquid in a container was on the list of what the engine lacked) ----
  * A drink, a soup, a milkshake: liquid in an upright round container, carried on a ride (E->rideBegin) or set down, open or under a lid. Its free surface is the first sloshing mode of
  * a liquid in an upright cylinder, taken as a damped pendulum in two directions (the carrier's forward and its side):
  *   - the surface's slope wants to lie against the carrier's acceleration, s = -a / (g + a_up): speeding up, the liquid climbs the back wall; turning, the outside one;

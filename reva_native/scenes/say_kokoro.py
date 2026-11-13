@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """say_kokoro.py -- speak a dialogue file with KOKORO, one wav per line.
 
-    say_kokoro.py denial.txt [--out wav/denial]
+    say_kokoro.py <scene>.txt [--out wav/<scene>]
 
 The first text-to-speech was unrealistic, in the manner of an old desktop synthesizer; Kokoro replaced it.
 
@@ -11,7 +11,7 @@ onnxruntime that is already here (no torch), carries 54 voices, and takes about 
 three seconds a line on this CPU -- so a 30-line scene still speaks in under a minute.
 
 SAME CONTRACT AS say_piper.py, deliberately, so nothing downstream changes:
-  * `cast 0=kaeli 1=susan` still names who is in the scene; slots are POSITIONAL (0 is
+  * `cast 0=<person> 1=<person>` still names who is in the scene; slots are POSITIONAL (0 is
     the hero the lab loaded) so a voice can never be keyed on the index.
   * one wav per line into wav/<scene>/line_NN.wav, which compile_scene.py mixes.
 
@@ -24,7 +24,7 @@ engine has the knobs they are already written down.
 ⛔ AND THE TIMINGS CHANGE. Every line is a different length from Piper's, so every `.scn`
 must be recompiled after re-speaking or the staging and the subtitles drift off the audio.
 
-⭐ (10-23, THE WORLD AT THE END OF TIME, for better voices) A LINE IS SPOKEN IN SENTENCES. Kokoro reads a
+⭐ (10-23, the space series, for better voices) A LINE IS SPOKEN IN SENTENCES. Kokoro reads a
 sentence far better than a paragraph (a narration slot runs to 1350 characters), so each sentence is said on its own,
 trimmed, and joined to the next by the breath its own stop asks for (a full stop longer than a comma). Where each one
 starts is written beside the wav -- line_NN.json, {"sr", "sentences": [[t0, t1, text], ...]} -- and compile_scene.py
@@ -50,32 +50,29 @@ PEOPLE = {
                   note="American, quick, loose"),
     "susan": dict(voice="af_sarah",  lang="en-us", speed=1.00,
                   note="the neighbour: warm, chatty, deflects"),
-    # ROBOT NEKO ep 6 (THE HOLD): Mrs. Parsons' first line in the show's history, after five
-    # episodes placed by geometry alone. Older, unhurried, the actual professional in the room.
+    # the stop-motion show's older neighbour: unhurried.
     "parsons": dict(voice="af_bella", lang="en-us", speed=0.90,
                   note="older, dry, has clearly been right about this the whole time"),
-    # ROBOT NEKO's director. ⭐ ep 8: he is HOLLY, and he always was -- Red Dwarf's ship's
-    # computer, a head on a monitor with an IQ of 6000 who has been alone far too long.
-    # He was am_onyx (American, authoritative, a man with a megaphone) for seven episodes
-    # because nobody could see him; now that he has a face the voice has to match it.
-    # Flat, unhurried, Northern, faintly disappointed. The RECAST is the joke: he sounds
-    # different because you have never actually heard him properly before.
-    # ⛔ Slot SCN_VOICE has no body -- but since ep 8 his jaw IS driven: the scene envelope
-    # moves Holly's hinge on whatever screen he is being shown on.
+    # the stop-motion show's director: a head on a monitor, after Red Dwarf's ship's computer.
+    # He was am_onyx (American, authoritative, a man with a megaphone) while
+    # nobody could see him; once he had a face the voice had to match it.
+    # Flat, unhurried, Northern, faintly disappointed.
+    # ⛔ Slot SCN_VOICE has no body -- but his jaw IS driven: the scene envelope
+    # moves the director's hinge on whatever screen he is being shown on.
     "director": dict(voice="bm_lewis", lang="en-gb", speed=0.88,
                   note="Holly. flat, unhurried, has been staring at the same six feet since July"),
     "holly": dict(voice="bm_lewis", lang="en-gb", speed=0.88,
                   note="the same voice under his own name, for scripts that prefer to say it"),
-    # ROBOT NEKO ep 3 (UPDATE): a voice nobody in the cast has heard -- the device talking.
+    # a voice nobody in the cast has heard -- the device talking.
     # Never cast; only ever borrowed by a line's `voice=`.
     "stranger": dict(voice="bm_george", lang="en-gb", speed=0.95,
                   note="nobody we know: a system announcement"),
-    # ROBOT NEKO ep 9: KICKFLIP, a Fab store skater brought into the show. Every one of his
+    # a Fab store skater (a bought model). Every one of his
     # sixteen clips is on a skateboard and the board is skinned to his skeleton -- he has never
-    # once been off it, which is the episode.
+    # once been off it.
     "kickflip": dict(voice="am_puck", lang="en-us", speed=1.08,
                   note="a skate kid: easy, unbothered, has never touched the floor"),
-    # ---- THE WORLD AT THE END OF TIME (10-23): the whole cast, recast from the temporary Piper readers. Picked by
+    # ---- THE SPACE SERIES (10-23): the whole cast, recast from the temporary Piper readers. Picked by
     # MEASURED pitch (every English voice saying one line, median F0: men 92-160 Hz, women 151-226) and Kokoro's own
     # quality grades (A af_heart, A- af_bella, B- bf_emma, C+ af_aoede af_kore af_sarah am_fenrir am_michael am_puck,
     # C bm_fable bm_george). A child is a light woman's voice raised: pitch and formants rise together, as a smaller
@@ -245,13 +242,13 @@ def main():
         spk = bits[0].strip()
         text = text.strip()
         who = CAST.get(spk, "reva")
-        # ⭐ ep 10: an ACTION line (nothing after `|`, a dur=) has no voice. Its number is still
+        # ⭐ an ACTION line (nothing after `|`, a dur=) has no voice. Its number is still
         # counted: compile_scene.py names line_NN.wav by the line's place in the script.
         if not text:
             print("  %2d  %-5s (action line: no voice)" % (i, who))
             i += 1
             continue
-        # ⭐ `voice=<person>` (per line, NOT sticky; ROBOT NEKO ep 3): the line is spoken in
+        # ⭐ `voice=<person>` (per line, NOT sticky): the line is spoken in
         # someone else's voice while the slot's body and jaw still speak it -- the engine never
         # sees this key, compile_scene passes it over like rate/var/pitch.
         for b in bits[1:]:
@@ -270,7 +267,7 @@ def main():
                     pass
         speed = min(1.6, max(0.6, speed))
         pcm, sr, sents = speak(k, p, text, speed)
-        # ⭐ (10-22) with=N: two people say it at once (2.29, BILLY & FREDDY) -- slot N's voice, mixed in
+        # ⭐ (10-22) with=N: two people say it at once (two boys in one scene) -- slot N's voice, mixed in
         both = [b.split("=", 1)[1] for b in bits[1:] if b.startswith("with=")]
         if both and both[0] in CAST:
             q = PEOPLE[CAST[both[0]]]

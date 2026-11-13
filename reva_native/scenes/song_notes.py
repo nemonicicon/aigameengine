@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""song_notes.py -- A RECORDING'S NOTES (design/pdoom_video.md): drum hits and pitched notes read off Demucs stems, written as ordinary MIDI so they can be opened in a DAW and judged by ear.
+"""song_notes.py -- A RECORDING'S NOTES (for a music video): drum hits and pitched notes read off Demucs stems, written as ordinary MIDI so they can be opened in a DAW and judged by ear.
 
     <the Basic Pitch venv>/python song_notes.py STEMDIR MAP.json OUTDIR [--selftest]
 

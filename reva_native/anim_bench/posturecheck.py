@@ -183,7 +183,7 @@ def measure(F):
 # said nine of ten were standing fine. A metric that fails almost everything is usually
 # a bad threshold, not a bad fleet. So each band below is now set from the population of
 # stands CONFIRMED upright on a nine-angle wall, widened to clear the worst good one,
-# and checked to still catch the known-bad (crowd_susan asleep on the floor, reva frozen
+# and checked to still catch the known-bad (a crowd body asleep on the floor, reva frozen
 # mid-stride). BALANCE is deliberately coarse: the dump carries the ANKLE, not the toe,
 # so the true support centre sits some way forward of the point measured against.
 TESTS = [

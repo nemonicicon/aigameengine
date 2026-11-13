@@ -13,7 +13,7 @@ Clip names ARE the engine contract (crowd_kms.c hero clip-map, read 2026-08-25):
 """
 import bpy, os, sys
 
-BASE = os.path.dirname(os.path.abspath(__file__))   # club-engine kit: machine-independent paths
+BASE = os.path.dirname(os.path.abspath(__file__))   # machine-independent paths
 EXP = os.path.join(BASE, "export")
 
 NAME = {

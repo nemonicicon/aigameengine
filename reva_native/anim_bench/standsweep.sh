@@ -10,7 +10,7 @@
 # every number. posturecheck.py turns the dump into one row of a table.
 #
 # A subject named in SUBJECTS is resolved as packs/v1_<name>.rpack; anything containing
-# a dot is taken as a path (that is how the root-level packs -- reva, kaeli -- get in).
+# a dot is taken as a path (that is how the root-level packs -- reva, the co-star's -- get in).
 set -e
 PY="${CLUB_PYTHON:-python}"
 OUT="${STANDOUT:-$PWD/anim_bench/_sweep}"; mkdir -p "$OUT"

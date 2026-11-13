@@ -1,5 +1,5 @@
 """merge_mob1.py -- Blender headless: fuse the CivicDefenseV2 Source/FBX mocap set
-onto one UE-mannequin armature -> mob1.glb (the club's second donor bank).
+onto one UE-mannequin armature -> mob1.glb (the engine's second donor bank).
 
     blender --background --factory-startup --python merge_mob1.py
 
@@ -8,16 +8,16 @@ Output: skate_src/mob1/mob1.glb  (one rig, 20 named clips, stub mesh for the bak
 
 Clip names ARE the engine contract (donor election is by EXACT name; the census
 miner also reads substrings, so parked clips use x_/v_ prefixes that dodge the
-locomotion matchers -- the kaeli lesson, see merge_cleo.py).
+locomotion matchers -- the co-star's lesson, see merge_cleo.py).
 
 Rotation-only on purpose: location+scale curves are dropped from every action.
-The UE scale-compensation convention crushed kaeli's first bake to a point
-(hips scale 1e-4), and the club's donor transfer is rotation-only anyway.
+The UE scale-compensation convention crushed the co-star's first bake to a point
+(hips scale 1e-4), and the engine's donor transfer is rotation-only anyway.
 """
 import bpy, os
 
-SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "mob1.glb")   # club-engine kit: machine-independent paths
+SRC = os.environ.get("CLUB_FBX", "fbx")   # machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "mob1.glb")   # machine-independent paths
 
 NAME = {
     r"Mobility\In_Place\MOB1_Walk_F_IPC.fbx":                    "w_walk",

@@ -36,7 +36,7 @@ __all__ = ["U", "PAL", "LC", "Atlas", "A", "FONT", "font", "roty", "rotx", "Geo"
            "disc_tex", "tube", "rod", "rr", "lcars_frame", "paint_cove", "KICK", "RAIL0", "RAIL1", "STRIP0", "STRIP1",
            "COVE", "DOOR_H", "walls", "door_frame", "screen", "write_glb"]
 
-U = 1.75                                  # club units a metre (TrueScale)
+U = 1.75                                  # engine units a metre (TrueScale)
 
 # ---------------------------------------------------------------------------------------------- the palette
 PAL = {   # the kit's own swatches (the room's); a builder adds its own, or recolours these, with PAL.update

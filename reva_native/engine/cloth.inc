@@ -19,7 +19,7 @@
  * skin the simulation a second time. */
 /* ⛔ 2048 WAS A SILENT CAP (09-11). clothPrep returned 0 for any garment over it and said
  * nothing, so the first premade garment (the cargo pants, 4271 vertices) skinned straight
- * through Anima's hips with the solver never engaged, and two A/B sheets came back identical.
+ * through the bought character's hips with the solver never engaged, and two A/B sheets came back identical.
  * The pyjamas were under it, which is why it was never met. 8192 is what a modelled garment
  * needs; a refusal prints now. */
 #define CLOTH_MAXV 8192
@@ -69,7 +69,7 @@ static float g_clothEase=0.0f;
 static int meshIsCloth(Pack*P,unsigned mi){
     if(!(P->meshes[mi].flags&4)) return 0;
     return strstr(packStr(P,P->meshes[mi].name),"~cloth")!=NULL; }
-/* ⭐ ep 14 (WARDROBE): A WORN GARMENT. `<name>~worn` is a premade garment dresspack.py put on a
+/* ⭐ WARDROBE: A WORN GARMENT. `<name>~worn` is a premade garment dresspack.py put on a
  * finished pack: skinned with the weights of the skin under it (which it hides), drawn and
  * shadowed like the body -- and, like `~cloth`, NEVER MEASURED as the body. The limb radii the
  * contact pass, the ragdoll and the clip audit stand on are the body's own, so a pair of baggy
@@ -119,7 +119,7 @@ static void clothInit(Cloth*C,Pack*P,unsigned mi,float*skinned){
             hh[h]=C->ne;
             C->opp0[C->ne]=(third[k]<(unsigned)C->nv)?(unsigned short)third[k]:65535; C->opp1[C->ne]=65535;
             /* ⛔ REST LENGTHS COME FROM THE SKINNED WORLD POSE, NOT THE PACK'S LOCAL
-             * VERTICES. The solver runs in world space; kaeli's pyjama pack loads at
+             * VERTICES. The solver runs in world space; the co-star's pyjama pack loads at
              * scale 0.0182, so local-space rest lengths asked 3072 constraints to
              * inflate the garment 55x on frame one and it filled the screen. Measuring
              * the pose we are actually starting from also starts the sim with ZERO
@@ -336,7 +336,7 @@ static void clothStep(Cloth*C,float*skinned,const float(*sph)[4],int nsph,float 
 
 /* ⭐ ONE HOOK, BOTH BODIES. This began life inline in labDrawPartner, which quietly said
  * that only the OTHER person in a scene can wear clothes -- and the player is going to
- * wear clothes. It also meant the club's own four-angle bench (ridecheck.py) could not see
+ * wear clothes. It also meant the engine's own four-angle bench (ridecheck.py) could not see
  * a garment at all, because that bench drives its subject as the HERO.
  *
  * Skin the garment on the CPU (the palette is already built by the caller), build the body
@@ -420,12 +420,12 @@ static void measureBoneR(Pack*P){
     for(unsigned m=0;m<P->nMeshes;m++){
         PMesh*M=&P->meshes[m];
         /* ⛔ SKIN UNDER CLOTHES IS STILL THE BODY (10-18). An undrawn mesh was skipped, and with a wardrobe the
-         * skin under a worn garment IS undrawn -- Amelia's undersuit hid her thighs, so they measured NOTHING and
+         * skin under a worn garment IS undrawn -- one body's undersuit hid her thighs, so they measured NOTHING and
          * the robe had no thigh capsule to wrap over (37 of 46 bones; the shins from 14 ankle vertices). Hidden
          * SKIN (meshKind 1) is measured; hidden anything else is not. */
         if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB) continue;
         if(MOFF(P,m)&&!(P->meshKind&&P->meshKind[m]==1)) continue;
-        if(meshIsGarment(P,m)) continue;   /* do not measure the clothes (~cloth, and ep 14's ~worn) */
+        if(meshIsGarment(P,m)) continue;   /* do not measure the clothes (~cloth, and the wardrobe's ~worn) */
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
         float*rp=(float*)(P->pk+M->offPos);
         unsigned char*jp=(unsigned char*)(P->pk+M->offJoints);
@@ -483,7 +483,7 @@ static void measureBoneR(Pack*P){
     fflush(stdout); }
 
 /* ======================== THE HANGING CLOTH (10-18) ==================================
- * On Amelia's run, with the skirt pushed out of the legs in the vertex shader, the lab coat didn't behave as a physical object.
+ * On one body's run, with the skirt pushed out of the legs in the vertex shader, the lab coat didn't behave as a physical object.
  * It was not one. The skirt was SKINNED to a ring of swinging chains
  * and each vertex was then shoved sideways out of the leg capsules -- so a knee coming up under the coat left a
  * flat flap at the hem, the cloth below a raised knee stretched to its own hem, and a heel kicked up behind fanned
@@ -1225,7 +1225,7 @@ static void skirtStep(Skirt*S,float dtFull,float sc,float cap1[][8],int ncap,con
                     for(int k=0;k<3;k++){ float dk=m[k];
                         A[k]-=dk*gA; S->prv[ia][k]-=dk*gA; B[k]-=dk*gB; S->prv[ib][k]-=dk*gB; C[k]-=dk*gC; S->prv[ic][k]-=dk*gC; }
                     contacts++; } }
-            /* ⭐ A LYING BODY'S HAND AGAINST THE CLOTH'S TRIANGLES (10-18, second round). Viktor asleep in the
+            /* ⭐ A LYING BODY'S HAND AGAINST THE CLOTH'S TRIANGLES (10-18, second round). A man asleep in the
              * pan with his hands beside his thighs showed it. The lying hand pass pushed cloth POINTS out of the hand, and a finger is
              * thinner than the 2-3 cm between two of them: the hem of his shift ran through his fingers. Every hand point
              * now stays rh off any outer triangle near it, the triangle moved AWAY from it the shortest way -- over a hand

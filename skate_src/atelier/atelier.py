@@ -1,4 +1,4 @@
-"""atelier.py -- THE ATELIER: the club's tailor. A garment is a DESIGN -- panels cut on a dress form, a fabric, the
+"""atelier.py -- THE ATELIER: the engine's tailor. A garment is a DESIGN -- panels cut on a dress form, a fabric, the
 ease it sits off the skin with, trims, prints, the free edges that swing -- and the tailor sews it onto a body as
 its OWN PIECE: a skinned mesh on the body's skeleton that knows exactly which skin it covers, with cloth chains
 where it hangs free.
@@ -18,7 +18,7 @@ can dress its body with it:
   Piece      a wearable: its slot, the outfits it belongs to, its parts, its cloth chains
   hide_sets  which garments cover each skin face -- measured by rays from the skin -- so a worn garment hides the
              skin under it (nothing pokes through) and the skin is whole again when it comes off
-  chains     bones down a garment's free panel (Cloth_*): the club's chain solver and Godot's SpringBoneSimulator3D
+  chains     bones down a garment's free panel (Cloth_*): the engine's chain solver and Godot's SpringBoneSimulator3D
              both swing them natively
   Atlas      one painted texture: flat swatches, and BOXES a garment's own (u, v) maps into, for its prints --
              vector text from any font (Blender's own curves, so the kanji come out crisp at any size)
@@ -573,8 +573,8 @@ def paint_text(A, bpy, s, font, to_px, x, y, h, rgb, align="CENTER", spacing=1.0
 
 # ------------------------------------------------------------------ stretch bones: a drape held between two limbs
 def stretch_constraints(rig):
-    """the club's STRETCH BONES, live in Blender: every Stretch_<x> gets a Stretch To aimed at the head of Anchor_<x>
-    (the club engine's stretchTick and Godot's ClubStretch run the same rig at runtime; glTF carries only the bones)"""
+    """the engine's STRETCH BONES, live in Blender: every Stretch_<x> gets a Stretch To aimed at the head of Anchor_<x>
+    (the engine's stretchTick and Godot's ClubStretch run the same rig at runtime; glTF carries only the bones)"""
     n = 0
     for pb in rig.pose.bones:
         if not pb.name.startswith("Stretch_"): continue

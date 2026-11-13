@@ -144,7 +144,7 @@ static void actionsLoad(void){ if(getenv("REVA_NOSAVE")||getenv("REVA_REPLAY")) 
 
 /* ================= KEYBOARD + MOUSE (08-25: every mode has keyboard and mouse controls,
  * on WASD, not the arrow keys) ============
- * The pad is the club's native input; this speaks the SAME globals, so every mode, cab
+ * The pad is the engine's native input; this speaks the SAME globals, so every mode, cab
  * and menu gets it at once with no per-mode work. Runs AFTER jsPoll and writes only what
  * is actually held, so a pad and a keyboard can be used together or one after the other.
  *

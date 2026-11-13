@@ -8,10 +8,10 @@ index takes a scene's title from the script's first line, and from a generated h
 the title alone); --label is how the index names a scene. The joined file and the index are written next to the
 takes. Stream copy: every take comes out of the same driver (h264 + aac), so nothing is re-encoded.
 
-Built for THE WORLD AT THE END OF TIME's chapter 2 (10-23), which it joins as:
+Built for a series' chapter of 29 scenes (10-23), which it joins as:
 
-    python join_chapter.py <production>/chapter2 3 31 --take "wateot_2_{n}_rough.mp4" --script "wateot_2_{n}.txt" \\
-        --label "2.{n}" --out wateot_ch2_rough.mp4 --index wateot_ch2_index.txt
+    python join_chapter.py <production>/<chapter> 3 31 --take "<series>_2_{n}_rough.mp4" --script "<series>_2_{n}.txt" \\
+        --label "2.{n}" --out <chapter>_rough.mp4 --index <chapter>_index.txt
 """
 import argparse, glob, os, re, subprocess
 

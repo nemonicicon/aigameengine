@@ -5,9 +5,9 @@
                  [--fps 30] [--scale S] [--facing +z|-z] [--dae out.dae] [--nearest] [--sheet out.png]
 
 What happens, in order (each stage prints its receipt):
-  1. daelib.read_dae   the scene as the club's shape, every mesh baked to rig space at the file's
+  1. daelib.read_dae   the scene as the engine's shape, every mesh baked to rig space at the file's
                        own rest pose (up axis, units, bind-shape and node transforms settled here)
-  2. tpose.canon_map   which node is which limb: the club's canon, the Nintendo/generic matcher,
+  2. tpose.canon_map   which node is which limb: the engine's canon, the Nintendo/generic matcher,
                        then --map. UNRESOLVED limbs are printed; --bones lists the rig to map them
   3. tpose.solve/bake  the limbs re-aimed into a T-pose and the skin RE-BAKED there: positions,
                        normals, inverse binds and the rest pose itself (--notpose keeps the file's)
@@ -16,7 +16,7 @@ What happens, in order (each stage prints its receipt):
                        LOOK at it; the angle table is a number, the sheet is the frame
 
 Clip names are kept as the file names them (lint with `rpack.py lint`); a COLLADA export rarely
-carries the club's roles, and the T-pose is the point. A clip that drove the old rest gets hold
+carries the engine's roles, and the T-pose is the point. A clip that drove the old rest gets hold
 tracks for every bone the T-pose moved, so it still plays as authored.
 """
 import sys, os, argparse

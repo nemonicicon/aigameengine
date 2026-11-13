@@ -3,7 +3,7 @@
 
     face_morphs.py <pack>
 
-Neither club body has a single bone below the head: reva2's rig ends at Head, kaeli's
+Neither lead body has a single bone below the head: reva2's rig ends at Head, the co-star's
 at Head/head_end. So a face cannot be posed -- it has to be SHAPED, which is exactly
 what rpack v3 morphs (homecoming H6) exist for.
 
@@ -34,7 +34,7 @@ BROW_A = 0.022
 LIP_PART = 0.42      # how much of the jaw the LOWER LIP takes (the rest is chin)
 BLINK_F = 0.42       # of the eye band's height, the lid travels down
 
-# THE ANGLE IS SOLVED, NOT PICKED. A fixed 6 degrees moved reva's chin 1cm and kaeli's
+# THE ANGLE IS SOLVED, NOT PICKED. A fixed 6 degrees moved reva's chin 1cm and the co-star's
 # half that -- invisible at conversation distance, which is exactly how it
 # looked: mouths that didn't move. Two bodies with different face geometry and wildly
 # different rig scales (1.81 vs 0.018) need different angles to open the same MOUTH,
@@ -115,7 +115,7 @@ def build(path, scale=1.0):
         r = xform(MW, mv)                                  # rig space
         if r[2] <= head[2] - 0.15 * xw: continue           # front of the head only
         # ---- jaw ----
-        # THE LIP SEAM STAYS SHUT. Both club mouths are SEALED geometry -- there is no
+        # THE LIP SEAM STAYS SHUT. Both leads' mouths are SEALED geometry -- there is no
         # modelled interior, no teeth, no tongue -- so rotating the lip surface itself
         # does not open a mouth, it tears the seam and stretches the inner-lip texture
         # into a pale mass hanging out of her face, where the inside

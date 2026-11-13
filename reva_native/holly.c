@@ -1,6 +1,6 @@
 // Holly, the head on the venue's screens: his model, its maths, his mouth's shapes, the interior a photo shell
 // lacks, and the rig's numbers. Once this was a renderer of its own on the tube (DRM, GBM and a GL context, the
-// mouth arriving over UDP); since step 18 of the engine plan (11-04) the drawing is the club's renderer's, and
+// mouth arriving over UDP); since step 18 of the engine plan (11-04) the drawing is the engine's renderer's, and
 // holly_fbo.c includes this file for the rest. Every symbol is static.
 //
 // The model is a flat blob produced by scripts/bake-model.mjs: parsing glTF and decoding JPEG is done once on

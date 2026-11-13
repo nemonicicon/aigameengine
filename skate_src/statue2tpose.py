@@ -6,7 +6,7 @@ body, in one command: the chain that put Noxus and Kanden into T-poses on 2026-1
                     [--facing +z] [--rigid | --hybrid] [--pick SUBSTR] [--model NAME] [--nearest] [--up z] [--unit 0.01]
 
   1. the importer      brres2rpack / dae2rpack (--notpose, --height, --yaw, --glb): the body in rig
-                       space at club height, facing +z, as <outstem>_raw.rpack + .glb
+                       space at the engine's height, facing +z, as <outstem>_raw.rpack + .glb
      (a .glb input skips this step and is used as is)
   2. statue2body strip the dummy skeleton out (every object of a Brawl-era rip hangs on a TopN/rotN
                        chain that is not a rig)

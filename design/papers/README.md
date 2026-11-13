@@ -88,5 +88,5 @@ cinematography course listings.
 
 ⛔ **This is the half where the work is weakest.** The physics side is entirely free and
 papers beat books there anyway — a 2006 paper with pseudocode is more actionable than a
-chapter of prose. The film-craft side is the paid half, and `design/406_qc_pass.md` already
+chapter of prose. The film-craft side is the paid half, and a quality pass over the film already
 showed coverage and cutting are the thinnest layer in the whole film.

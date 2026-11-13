@@ -1,10 +1,10 @@
 """dropmesh.py -- take meshes OFF a body by name, in place.
 
-2026-09-03: Anima without her bra and briefs, for a clean baseline.
+2026-09-03: the bought character without her bra and briefs, for a clean baseline.
 
-    python skate_src/author/dropmesh.py anima_fx anima_bra anima_panties
-    python skate_src/author/dropmesh.py anima_fx --list
-    python skate_src/author/dropmesh.py anima_fx --restore
+    python skate_src/author/dropmesh.py <body> <mesh> <mesh>
+    python skate_src/author/dropmesh.py <body> --list
+    python skate_src/author/dropmesh.py <body> --restore
 
 ⭐ WHY THIS IS A TOOL AND NOT A ONE-OFF. Every garment this project fits wants a clean base
 body underneath it -- `autoweights.py`, `fitcheck.py` and the cloth sim all assume the thing
@@ -18,9 +18,9 @@ header points at it. The dropped meshes' vertex data stays in the file as harmle
 nothing else moves, and no existing offset can be invalidated by this. That is also why
 --restore is exact rather than approximate -- the .bak is a byte copy.
 
-⛔ MESH NAMES ARE NOT UNIQUE. anima_fx carries `anima_body` FOURTEEN times (one record per
+⛔ MESH NAMES ARE NOT UNIQUE. The bought character's pack carries `anima_body` FOURTEEN times (one record per
 material chunk), so a name selects every record that carries it. That is what you want --
-dropping "anima_bra" must drop all of its chunks or you get half a bra.
+dropping the bra must drop all of its chunks or you get half a bra.
 """
 import argparse
 import os

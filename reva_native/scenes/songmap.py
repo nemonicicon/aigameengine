@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """songmap.py -- A MAP OF A RECORDING: its beat grid, its bars, its drum hits, its chords and every sung word's time, read from
-the samples (design/pdoom_video.md). A music video plays to this: a hit lands because it was scheduled off the same grid as the cut.
+the samples. A music video plays to this: a hit lands because it was scheduled off the same grid as the cut.
 
     python songmap.py SONG.wav --out DIR [--words] [--clicks] [--prompt "terms the singer uses"]
     python songmap.py --selftest

@@ -3,7 +3,7 @@
 
     brres.py info <file.brres|.szs|.arc>          the tree: models, bones, objects, textures, animations
     brres.py tex  <file> <outdir>                 every TEX0 decoded to PNG (the proof the decoder works)
-    brres.py scene <file> [model]                 -> dict(nodes, meshes, clips, textures, names) in the club's
+    brres.py scene <file> [model]                 -> dict(nodes, meshes, clips, textures, names) in the engine's
                                                   shape (see rpackwrite.py), meshes pre-baked to rig space;
                                                   brres2rpack.py and brres2dae.py are thin over this
 

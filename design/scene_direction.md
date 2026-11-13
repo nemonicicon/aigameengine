@@ -1,6 +1,6 @@
 # DIRECTING A SCENE — staging, coverage and light for two bodies talking
 
-*(written 2026-08-28, out of THE SPOT — a scripted scene where kaeli is mad at reva, made
+*(written 2026-08-28, out of THE SPOT — a scripted two-person argument, made
 as a showcase, starting from a written script.)*
 
 The conversation system could already speak: two Piper voices with per-line direction,
@@ -17,7 +17,7 @@ engine acts on it.
 
 `reva_native/scenes/<name>.txt` — one line per line of dialogue:
 
-    speaker[ key=value ...]|text          0 = reva (hero), 1 = kaeli (partner)
+    speaker[ key=value ...]|text          0 = reva (hero), 1 = the co-star (partner)
 
 | | keys | what it does |
 |---|---|---|
@@ -50,16 +50,16 @@ difference between `pyaw=46` as a number and `pyaw=46` as a woman turning her ba
 Four things carry the argument, and none of them are the words:
 
 - **Facing.** She opens the scene at `pyaw=134` — talking to someone without turning
-  round. When she finally turns to `180` on "I never asked you to stop", the scene
+  round. When she finally turns to `180` on the line that starts the fight, the scene
   changes gear without a single line saying so.
 - **Distance.** `1.34 → 1.12 → 1.02 → 0.94 → 0.98` across the accusation, then back out
   to `1.06` when she has said the worst of it, and `1.78 → 2.20` as she leaves.
 - **Gaze.** `plook=0` is her refusing to look at reva. It is switched on at the turn and
   off again at the exit, and the moment it goes on is the moment the fight starts.
 - **The brow.** The morph LIFTS, so a NEGATIVE weight furrows it (the sampler already
-  takes signed weights — it tests `fabsf`). Kaeli runs −0.35 down to −0.90 at the peak,
+  takes signed weights — it tests `fabsf`). The co-star runs −0.35 down to −0.90 at the peak,
   then **comes back up to 0.00** for the exit: the anger leaving her face is what makes
-  "next show, I'm standing in the back" final rather than heated. Because the key is per
+  her last line final rather than heated. Because the key is per
   BODY and sticky, she holds the scowl through reva's lines, which is most of what being
   angry at someone actually looks like.
 
@@ -67,7 +67,7 @@ Four things carry the argument, and none of them are the words:
 
 **A LENS PER SHOT.** The first verdict on the finished cut was that its composition and
 angles needed work, and the root cause was one number: every shot was taken on
-the club's 42-degree vertical, a wide angle chosen to hold a whole dancefloor. On a
+the engine's 42-degree vertical, a wide angle chosen to hold a whole dancefloor. On a
 conversation that is the wrong glass, and it does three bad things at once — the
 speaker's face comes out small, anything near the lens (the listener's shoulder, in
 every over-the-shoulder) comes out vast beside it, and the frame is so broad that two
@@ -77,7 +77,7 @@ fixes a lens choice.
     SHOT_FOV[] = { ots 30, tight 22, two 30, wide 40, solo 30 }
 
 Every distance is then derived from the lens rather than picked: frame height is
-`2*D*tan(fov/2)`, a head is ~0.45 club units, so `D = 0.45 / (fraction * that)`.
+`2*D*tan(fov/2)`, a head is ~0.45 engine units, so `D = 0.45 / (fraction * that)`.
 
 | | lens | where | head fills | for |
 |---|---|---|---|---|
@@ -98,8 +98,8 @@ sits inside the skull, and on two bodies 0.46 apart in height it centres the wro
 
 ⭐ **SIZE-MATCHED COVERAGE.** A shot and its reverse are only "the same shot" if the head
 fills the same part of the frame — and these two heads are not the same size. Measured
-off the rig, in world units, **kaeli's interocular is 0.151 and reva's 0.131**: reva is
-a stylised model with a small head, kaeli a realistic one, and the camera had no idea.
+off the rig, in world units, **the co-star's interocular is 0.151 and reva's 0.131**: reva is
+a stylised model with a small head, the co-star a realistic one, and the camera had no idea.
 The engine now publishes the interocular every frame (both eye marks are already in
 world space for the look-at, so the distance is free) and scales the shot distance by
 it, so reva is framed 13% closer and the coverage matches on any pair of bodies without
@@ -107,7 +107,7 @@ a per-character table.
 
 ⛔ **AND THE NOMINAL MUST BE MEASURED, NOT GUESSED.** Hand-computing those interoculars
 from the packs' rig units gave a 3x difference — the two packs carry wildly different
-scales (reva's IOD reads 0.0719 in her rig, kaeli's 8.295 in hers) and the world scale
+scales (reva's IOD reads 0.0719 in her rig, the co-star's 8.295 in hers) and the world scale
 I divided by was an estimate. The real answer was 1.15x. The first `IOD_NOM` was a guess
 at 0.26, which pinned every shot to the clamp floor and flew the lens halfway into both
 of them.
@@ -115,7 +115,7 @@ of them.
 ⭐ **`hgt=` IS THE ANGLE.** Camera height off the speaker's eyeline, per line: below it
 for the accusation (a low angle is what makes someone loom), above it for the confession
 and the last line (a high angle is what makes someone small). It runs −0.26 through
-kaeli's peak and +0.28 through reva's, and back to level for the exit.
+the co-star's peak and +0.28 through reva's, and back to level for the exit.
 
 ⭐ **THE SIDE FOLLOWS THE SPEAKER, NOT THE LINE INDEX.** The original coverage alternated
 the camera side with `held9&1`, and because `d` and `s` already flip when speaker and
@@ -130,7 +130,7 @@ talking to someone off-screen reads as wrong before anyone can say why.
 
 ## The stage
 
-A scene **takes the set down**. The club's dressing — lava lamps, orbs, the flame snake,
+A scene **takes the set down**. The dance floor's dressing — lava lamps, orbs, the flame snake,
 the electric arcs — floats at head height and crosses both faces; against a conversation
 it is debris. The lab's own instruments go with it: the measured floor grid, the footfall
 breadcrumbs, the runway marker and the ANIM LAB label are for judging a gait.
@@ -168,9 +168,9 @@ the words landed on whoever was standing at the bottom of the frame.
 
 ## ⛔ The traps
 
-- ⛔ **THE LENS NUMBERS ARE IN CLUB UNITS, NOT METRES.** `tight` and `solo` were first
+- ⛔ **THE LENS NUMBERS ARE IN ENGINE UNITS, NOT METRES.** `tight` and `solo` were first
   sized the way you would size a close-up on a human-scale set — 0.52 back, 0.46 across.
-  The club is about **1.75× metric** (measured: heads sit at y 2.62 and 3.08), so the lens
+  The engine's world is about **1.75× metric** (measured: heads sit at y 2.62 and 3.08), so the lens
   landed 0.70 from a head: inside the hair, and inside the **0.8 near plane**. Whole shots
   came back as an empty horizon with a shoulder at the bottom, and not one log line said
   anything was wrong. Derive from what works instead: the over-the-shoulder sits 2.4–3.0
@@ -181,7 +181,7 @@ the words landed on whoever was standing at the bottom of the frame.
   very little room between them, which is why `tight` goes wide around the axis rather
   than close along it.
 - ⛔ **REVA NEVER TURNS.** She stands on the lab's heading and only her head aims (clamped
-  to 0.62 rad). Every unit of `pside` is therefore a degree that kaeli sits off reva's
+  to 0.62 rad). Every unit of `pside` is therefore a degree that the co-star sits off reva's
   facing, and it comes straight off the close-up — at `pside=0.24` reva played her
   confession in near profile, because the lens angle, the placement angle and her own
   head turn all added up. Keep it near zero until somebody leaves.
@@ -217,11 +217,11 @@ the words landed on whoever was standing at the bottom of the frame.
 ## THE CONVERSATION LEAVES THE BLACK STAGE (2026-08-29, Z5)
 
 `the_spot` was directed on a deliberate void, which was right for two people arguing in the
-dark. SEVENTY-FOUR is fifteen minutes of people talking **in a street**, so the
+dark. The film is fifteen minutes of people talking **in a street**, so the
 scene system had to meet the set renderer.
 
 ⭐ **They already coexisted.** Proven on pixels before a line of code was written:
-`scene=the_spot set=parsons` played its lines, drew its subtitle, and rendered all 500
+`scene=the_spot set=<street>` played its lines, drew its subtitle, and rendered all 500
 props and 11 actors behind it. The only thing wrong was that the pair stood where the lab
 parks them (0, −150) and the street was somewhere else.
 
@@ -238,7 +238,7 @@ array would have rewritten the system that produced THE SPOT, for a film that ne
 ⛔ **It must be applied AFTER the lab's floor clamps** (`g_rvx` to ±FLOOR_X, `g_rvz` to
 2.0), which otherwise drag the pair straight back off the street they were staged on.
 
-The driver carries it: `driver.py scene OUT.mp4 --name porch --set parsons --stage
+The driver carries it: `driver.py scene OUT.mp4 --name porch --set <street> --stage
 "30,-20,0" --sun "46,204,1.25,1.0,0.96,0.90" --sky "0.46,0.52,0.64"`.
 
 ### Blocking a scene that is NOT an argument
@@ -247,17 +247,17 @@ The driver carries it: `driver.py scene OUT.mp4 --name porch --set parsons --sta
 had to read as its opposite, and the staging keys say so directly: `pyaw` stays near **96**
 (a quarter turn, not a confrontation), `plook=0` for most of the scene, and `shot=two` or
 `wide` so the STREET is the third thing in frame. They sit shoulder to shoulder pointing
-the same way. The one time kaeli turns her head — `pyaw=142 plook=1 shot=tight` — is the
-line where she stops humouring the count.
+the same way. The one time the co-star turns her head — `pyaw=142 plook=1 shot=tight` — is the
+line where she stops humouring the other.
 
 **Still owed:** there is no porch. They stand on the verge because the set has no steps
-placed yet, and the film's `0:40` is explicitly *"REVA on kaeli's porch steps"*.
+placed yet, and the film's script puts them on porch steps.
 
 ---
 
 ## ⛔ SHE HAS TO WALK TO HER MARK
 
-*(The first take of `denial` had the characters clipping through each other, and kaeli
+*(The first take of `denial` had the characters clipping through each other, and the co-star
 sliding unnaturally instead of taking steps. Both were real and both were mine.)*
 
 **THE SLIDE WAS BUILT IN.** Per-line staging eases `pgap` / `pyaw` / `pside` toward each
@@ -270,9 +270,9 @@ because there is no ground to slide against.
 **THE FIX:** measure her real world speed from the ease each frame, and above 0.22 units/s
 play a WALK instead of the staged clip — her own (`w_walk` / `walking`), or borrowed off a
 bank through the same canonical transfer the zombie clips use — with the phase running at
-`gaitRate()`, the club's existing "how far does this clip's planted foot travel" measure.
+`gaitRate()`, the engine's existing "how far does this clip's planted foot travel" measure.
 Mixed in and out over 0.18s so the hand-off never pops. Measured working: speed peaks at
-**0.621**, mix reaches **1.00** on kaeli's own `w_walk`, and it eases back to 0 when she
+**0.621**, mix reaches **1.00** on the co-star's own `w_walk`, and it eases back to 0 when she
 arrives.
 
 ⛔ **AND A CONTACT SHEET CANNOT JUDGE THIS.** A walk and a glide look identical in stills;
@@ -312,16 +312,16 @@ mark HEIGHT, the hip drop for a borrowed lay, and it beats the colliders. `off` 
 
 A mark now carries a CONTACT: `mark <name> x y z yaw [hips]`. Default (feet) puts the rest mesh
 lowest point at the height — right for lying and standing. `hips` pins the PELVIS bone there — a
-seat: feet dangle below the edge. `sets/kaeli_house.set` `bedside` is reva on the edge of the bed.
+seat: feet dangle below the edge. `sets/<house>.set` `bedside` is reva on the edge of the bed.
 A/B on the A camera: promoted binary = reva standing in the middle of the mattress; this build =
-seated on the near edge, kaeli under the covers behind her. Log: `[hmark] hero on ... contact hips`.
+seated on the near edge, the co-star under the covers behind her. Log: `[hmark] hero on ... contact hips`.
 
 ⛔ The ctl `clip=` path only ever asked the moves pack; scenes resolved `hclip` through every bank.
 It now falls through to `bankFind` (`[lab] clip -> bank ...`), so `clip=x_chairsat` works from the lab.
 
 ---
 
-## ⭐ FOUR MORE KEYS, AND A SOLO THAT IS A SOLO (ROBOT NEKO ep 4, 09-11)
+## ⭐ FOUR MORE KEYS, AND A SOLO THAT IS A SOLO (09-11)
 
 Every one of these is a per-line key on a `stage` record, written by `compile_scene.py` out of
 `scenes/<name>.txt` and read by the engine's scene parser — the same road `snap=` and `tone=`
@@ -386,7 +386,7 @@ runs out it says which number did — `… the speaker is inside the 0.30 near p
 single exists; using ots` (they are standing on top of each other), or `… the frame is only
 X tall on the 38 deg lens and the speaker's head will not fit — aiming at her eyeline`.
 
-⚠ This changes every existing `shot=solo` in the film. `update` is the one shot scene that uses
+⚠ This changes every existing `shot=solo` in the film. One shot scene uses
 it today.
 
 ### `jawgain=<f>` — the puppet jaw's opening
@@ -455,9 +455,9 @@ falling to OTS.
 
 ## ⭐ THE FILMER, THE PHONE AND THE FALL (the skate promo, 09-19 → 09-20)
 
-*(reva films: most of the episode is the camera feed she is holding, because the game it
-promotes is about capturing clips of skaters. Four promo cuts came out of it -- `sk_promo`, `ep2_lines`, `ep3_session`,
-`ep4_london` -- and four keys. Takes on `<data>/robot_neko/promo/`. All of it runs on
+*(reva films: most of the promo is the camera feed she is holding, because the game it
+promotes is about capturing clips of skaters. Four promo cuts came out of it,
+and four keys. Takes on `<data>/promo/`. All of it runs on
 `crowd_new.exe`; `crowd.exe` has not been promoted since 09-11.)*
 
 ### `camhold=filmer,subject[,fov[,aimh[,drop]]]` — the camera in a body's hand
@@ -472,7 +472,7 @@ read as footage (`feed_test`'s FAIL case, "a locked-off frame"). The filmer's ow
 drawn. One lens mode per line; any other lens said on a line takes the camera out of her hand,
 and `camhold=off` hands it back. Log: `[lens] line N camhold: slot F is filming slot S`.
 
-⭐ **THE FILMER'S DISTANCE IS THE SHOT.** A foot behind kaeli on a fisheye reads as a knee, and
+⭐ **THE FILMER'S DISTANCE IS THE SHOT.** A foot behind the co-star on a fisheye reads as a knee, and
 the first take came back as one; at ~3 u behind, a fisheye holds a whole body with the park
 behind it. And the filmer RIDES: `z_rm_sk_film` (one arm out holding the camera, watching the
 shot and not the road) on her own path beside or inside the subject's.
@@ -488,7 +488,7 @@ post pass). ⛔ A fisheye is a WIDE lens as well as a bent one: under `fish=` th
 its field toward 120° diagonal, so the corners have real geometry to bend; warping at the
 authored fov moved the field six degrees and looked like nothing.
 
-THE CAMERA RULE (ep 2 onward): every shot is a camera that EXISTS in the place -- a phone in
+THE CAMERA RULE (from the second cut on): every shot is a camera that EXISTS in the place -- a phone in
 somebody's hand or a tripod left standing -- and the script names which.
 
 ### `hdoll= / pdoll= / p2doll= / p3doll= <sec>` — the fall is physics
@@ -506,16 +506,16 @@ different marks.
 
 ### ⛔ ONE RUN, MANY CAMERAS
 
-Ep 2 gave each shot its own short path, so she rode for four seconds and stood still for three
+The second cut gave each shot its own short path, so she rode for four seconds and stood still for three
 while the shot played out -- which is exactly what "static" looks like. A line is ONE continuous
-path down the whole yard and the CAMERAS change over it (ep 3, ep 4): that is how a line is
+path down the whole yard and the CAMERAS change over it (the third and fourth cuts): that is how a line is
 filmed. A trick going AWAY from the camera is a speck: the lens waits at the far end of the lane
 and she rides at it, slowly enough that the cut comes while she is still short of it (at 3.6 u/s
 she ate the lane in two seconds and the kickflip happened inside the lens). And a missing
-partner clip is a T-POSE for the whole line (ep 3: half the episode) -- the engine now boxes the
+partner clip is a T-POSE for the whole line (the third cut: half of it) -- the engine now boxes the
 first miss and counts them at exit.
 
-### ⭐ `hpath=@around:<slot>[,<radius>[,<points>]]` — a route round a body (ROBOT NEKO ep 13)
+### ⭐ `hpath=@around:<slot>[,<radius>[,<points>]]` — a route round a body
 
 A closed circle of marks round where that slot IS right now — its hips, when it is a ragdoll on the floor —
 entered at the point nearest this body, run the way she is already travelling, and rebuilt round the body's
@@ -526,7 +526,7 @@ mark name went through the hero's placement once and parked reva at z −150 wit
 
 ⛔ **A PATH HANDED ON EARLY IS THAT LINE'S PATH.** When a path runs out before the next path's line, the next
 one starts early — and it now takes ITS OWN line's `hspd=` and `hloop=`, pinned against the lines in between.
-Before ep 13 it ran at the old speed without the loop, lapped once and stopped for good, because a stopped run
+Before this it ran at the old speed without the loop, lapped once and stopped for good, because a stopped run
 with the same value never restarts. The log says `starts early: rolling in at 6.60 u/s, to that line's 2.40 u/s,
 looping`. So a filmer's line may simply END near the subject, and her orbit begins the moment it does.
 
@@ -535,50 +535,50 @@ subtitle play over her own footage (subtitles land after the post pass, sharp ac
 her body is never drawn; a body cued limp with `pdoll=` speaks through nine lines and stays down. `aimh` 1.1 for
 a rider (a fisheye bends the top of the frame away from a body close by), 0.5 for a body on the ground.
 
-## THE SHOW'S KEYS (THE WORLD AT THE END OF TIME, 10-22 → 10-23)
+## THE SHOW'S KEYS (the space series, 10-22 → 10-23)
 
 ### `set=<name>` and `camat=x,y,z` — a cutaway, and a lens round a world point
-A line may play on ANOTHER set -- the freezatorium's racks, the ship outside, Wan-To's star -- and the scene comes home
+A line may play on ANOTHER set -- a cold room's racks, the ship outside, a star -- and the scene comes home
 after it. `camorbit=` with `camat=` circles a world point instead of a body (engine_capabilities.md section 41).
 
 ### `home=<set>` — the scene's room changes (sticky)
-The scene moves (Wanda tugs Viktor from the freezatorium to the workshop and back to the warm corridor). Every line
+The scene moves (one character leads another through three rooms). Every line
 after it plays there until another `home=`.
 
 ### `heyes= / peyes= / p2eyes= / p3eyes=` — eyes that glow (11-04, queue step 23)
-`r,g,b[,amount]`, or `off`. Sticky. That body's eyes glow the colour from this line on, at any graphics setting; past 1 the amount is brighter than the colour, for the bloom. It needs eyes the engine can find: meshes of their own (Anima's are found by their shape) or a built person's. REVA 902's are paint on her head, so hers wait for her rebuild. On a lab line the keys are `eyes=` for the hero and `peyes=`, `p2eyes=`, `p3eyes=`.
+`r,g,b[,amount]`, or `off`. Sticky. That body's eyes glow the colour from this line on, at any graphics setting; past 1 the amount is brighter than the colour, for the bloom. It needs eyes the engine can find: meshes of their own (the bought character's are found by their shape) or a built person's. REVA 902's are paint on her head, so hers wait for her rebuild. On a lab line the keys are `eyes=` for the hero and `peyes=`, `p2eyes=`, `p3eyes=`.
 
 ### `houtfit= / poutfit= / p2outfit= / p3outfit=` — dressed on the cut; `hroll=` — carried round a drum
 Section 43. (A set ACTOR's outfit is its line's `outfit=` -- design/the_set.md.)
 
 ### `with=N` — two people say it at once
-`say_piper.py` voices the line again in slot N's voice and mixes the two (2.29: BILLY & FREDDY). The mouth on screen is
+`say_piper.py` voices the line again in slot N's voice and mixes the two (two boys saying one line). The mouth on screen is
 the line's own speaker's.
 
-### ⭐ A SCENE WRITTEN BY A PLAN: `scenes/wateot_ch2.py`
-Chapter 2's 29 scenes are not typed: each is a plan (its room, its cast, its extras with their outfits, per slot a lens
-or staging keys) that writes `wateot_2_N.txt`, `sets/_s2_N.set` and `record_ch2.sh`. Its lenses are MEASURED and then
+### ⭐ A SCENE WRITTEN BY A PLAN
+A chapter's 29 scenes are not typed: each is a plan (its room, its cast, its extras with their outfits, per slot a lens
+or staging keys) that writes the scene's script, its set and the chapter's record script. Its lenses are MEASURED and then
 TESTED before they are used -- the speaker's face toward the lens; no head, torso or furniture (the room's own triangles,
 glass included) across the line; a listener's back may edge a single, never fill it -- and when none passes the line
 gets a two-shot or a wide, and a WARNING says so. The machinery has no show in it: `scenes/blocking.py` (10-23) --
 `Stage` (marks, the tested singles, two-shots, wides), `free_floor`, `turn_to_others`, `write_scene`; a plan's script
 sets `blocking.ROOMS` (where the room glbs are) and `blocking.HEIGHTS` (each person's height), and `python blocking.py
---selftest` blocks a scene in a synthetic room. wateot_ch2.py is the show's plans; split out of it, chapter 2
-regenerated byte for byte. What the first takes taught it (design/wateot_series.md):
+--selftest` blocks a scene in a synthetic room. The show's plans stay with the show; split out of them, the chapter
+regenerated byte for byte. What the first takes taught it:
 - ⛔ over-the-shoulder is for two people FACING each other. Side by side (a row of stations) it shot the back of the
   speaker's head through the listener: those singles come from in front, swung 35 degrees toward the listener.
-- ⛔ a body on a mark faces the MARK's way and only its head turns (35 degrees): Viktor on his door's mark talked to the
+- ⛔ a body on a mark faces the MARK's way and only its head turns (35 degrees): a body on a door's mark talked to the
   door. Standing people on room marks are turned to each other, and moved out of furniture to free floor.
 - ⭐ a lying face looks UP: its single comes from above it, else from the open side at bed height.
 
 ### ⭐ THE FILM MIX, THE CAPTIONS, THE PACING (10-23)
-The rough cuts of chapters 1-3 needed better voices, more readable captions, some music and atmosphere, and better
+The first rough cuts needed better voices, more readable captions, some music and atmosphere, and better
 pacing and finish overall. What a scene script says now:
 
     mix film room=<set> [music=ship|warm|wonder|tense|sad|none] [head=1.0] [tail=1.8] [seed=n]
 
 - **VOICES: Kokoro** (`say_kokoro.py`), the whole cast recast from the temporary Piper readers by MEASURED pitch and
-  Kokoro's own quality grades (wateot_series.md has the table): blends (`af_sarah+af_aoede`) and an AGE shift -- a child
+  Kokoro's own quality grades: blends (`af_sarah+af_aoede`) and an AGE shift -- a child
   is a light woman's voice resampled up, pitch and formants together, Kokoro's speed keeping the pace. **A line is said
   as its SENTENCES**, each trimmed and joined by the breath its stop asks for, and where each starts is written beside
   the wav (`line_NN.json`).
@@ -597,7 +597,7 @@ pacing and finish overall. What a scene script says now:
   lens, the longest 84 s). Past 260 characters a narration is written as groups of sentences, a line each. In a room
   (write_scene) they ALTERNATE: the slot's own lens, a cut to coverage the blocker has tested -- the hero's single, the
   wide -- the slot's lens again FURTHER ALONG ITS MOVE (the move cut into as many pieces as it returns), and so on. On a
-  cutaway, or a script with no plan (`python blocking.py --split <scene.txt>`, chapter 1; wateot_ch3.py calls it) the
+  cutaway, or a script with no plan (`python blocking.py --split <scene.txt>`; a chapter's plan calls it) the
   sentences share ONE move: `camspan=N` on the first, which the compiler turns into the move's `camsecs` from the
   timeline, so the engine carries it on through them.
 - **THE TAKE**: `driver.py scene ... --film` -- SSAA, the post pass, the engine's grade and vignette, and a dip to black at
@@ -605,25 +605,25 @@ pacing and finish overall. What a scene script says now:
 
 ### ⭐ THE LENS IS TESTED FOR WHAT ELSE IS IN IT (10-23, round 2)
 The first sample was only middling. A frame a line showed lenses that SAW their faces and still framed
-furniture: 2.4's singles were half the backs of console screens, the cabin's screen shot a locker and half a boy, and a
-coverage cut in 2.3 caught Viktor's back mid-walk. What blocking.py tests now:
+furniture: one scene's singles were half the backs of console screens, the cabin's screen shot a locker and half a boy, and a
+coverage cut in another caught a walker's back mid-walk. What blocking.py tests now:
 - **CLUTTER**: the share of a 16:9 frame (an 8x5 grid of rays at the lens's fov) that meets the room's triangles before
   the subject. A single, a two-shot, a wide and an over-the-shoulder take the first candidate under 0.22 (a wide 0.30);
   failing all, the least cluttered, and the log says so. A single that fails searches WIDER: higher (over the screens),
   swung round, farther back with the fov narrowed to keep the framing.
-- **HEADROOM**: a seated head is 0.81 of the body's height (measured: Pal 0.820, Marie-Claude 0.789, the navigator 0.812;
+- **HEADROOM**: a seated head is 0.81 of the body's height (measured on three of the cast: 0.820, 0.789, 0.812;
   the old guess cut the crowns), and a single aims under a seated head (-0.10 m) and just over a standing one (+0.03).
 - **A WALK**: the wide on a line that moves someone looks from the corner that sees where they START as well as where they
   end, and a long narration on such a line HOLDS its lens for two sentence groups before its first coverage cut.
 - **OVER-THE-SHOULDER** searches both shoulders, three distances and two heights for a lens that SEES its point and is not
   furniture: `over:s:x,y,z` (a point, in engine units), `over:s:@t` (at slot t's head), `over:s:work` (at what slot s works
-  at: hands at a console -- 2.4's "one of the others taps a few keys" had been a two-shot of console backs).
-- ⛔ A plan's TYPED `cam=` is never tested: 2.4's door lens looked through Marie-Claude's monitor at Viktor. Prefer a
-  tested form (`single:0:1` is Viktor in the doorway, clean).
+  at: hands at a console -- a line of someone working a console had been a two-shot of console backs).
+- ⛔ A plan's TYPED `cam=` is never tested: one scene's door lens looked through a monitor at the body in the doorway. Prefer a
+  tested form (`single:0:1` is that body in the doorway, clean).
 
 ### ⭐ NOTHING HOLDS DEAD STILL (10-23, round 3)
 The second sample was not ready either: the sample is refined first. Measured (`anim_bench/stillcheck.py`): 68% of
-2.4's frames and 43% of 2.3's did not change -- a locked lens on a body that only moved its mouth. Now:
+one scene's frames and 43% of another's did not change -- a locked lens on a body that only moved its mouth. Now:
 - **THE BODIES ACT** (engine_capabilities.md section 48, THE PERFORMANCE LAYER): listeners look at the speaker, the
   speaker at the one it talks to, nods on the stresses, a nod as the other finishes, breath; under a narrator, a body
   looks about. A speech line can say who it is SAID TO: `to=<slot>` (not sticky). blocking.py writes it on every speech
@@ -632,30 +632,30 @@ The second sample was not ready either: the sample is refined first. Measured (`
   slow push in, 7% of its distance on a single, 5% on a two-shot, 4% on a wide, over its line or over the RUN of lines
   that hold it (one move, `camspan=N`, never a jump back to its start); under 1.5 s it stays still, under 5 s it moves
   less. In SPACE (the line's set, or the script's home, carries a `space` line) a dolly moves nothing -- the stars are at
-  infinity -- so there the lens ZOOMS (its fov narrows 2.5 times the share). write_scene and wateot_ch3.py apply it;
+  infinity -- so there the lens ZOOMS (its fov narrows 2.5 times the share). write_scene and a chapter's plan apply it;
   `python blocking.py --push <scene.txt> [--home <set>]` does it to a finished script.
 - **THE NARRATION BREATHES**: the narrator read 183-199 words a minute at speed 1.10 (an audiobook's is 150-165); it is
   at Kokoro's own pace now (1.00, ~170), and a new paragraph of a narration (a slot after a narration slot) waits a
   `beat=0.35` before it.
-- A seated single aims 0.15 under its head's centre (at 0.10 Pal's eyes sat 43% down the frame; a single's are near a
+- A seated single aims 0.15 under its head's centre (at 0.10 one body's eyes sat 43% down the frame; a single's are near a
   third).
 
 ### ⭐ THE CUT, AND THE FOLEY (10-23, round 4)
 The same note again (not yet: keep refining the sample), so the next thing measured was the EDIT: shots averaged
-9.4 s in 2.3 (the longest 18), 12.9 s in chapter 3's opening (23), 6.2 s in 2.4, where two speeches held 12 and 15 s on
+9.4 s in one scene (the longest 18), 12.9 s in a chapter's opening (23), 6.2 s in another, where two speeches held 12 and 15 s on
 one face. Television animation cuts every 3-5 s, a slow narrated drama every 6-8. Now 7.4 s, 6.9 s and 5.3 s:
 - **Smaller groups**: a narration is said as its sentences past 150 characters (was 260), in groups of ~125 (was 210) --
   at ~170 words a minute a 210-character group was a 12 s shot.
 - **Five ways in** (blocking.py `coverage`): the hero's single and the wide, and now a CUT-IN on the single (its own eye,
   the fov 0.55, only when that single sees the face; ⛔ a standing one aims 0.09 OVER the head estimate, which runs ~0.1 m
-  low on the cast's bodies -- at -0.05 a close-up of Viktor at his mirror was his chin and his collar), ANOTHER ANGLE (60-120 degrees round the body, a profile counts, a
+  low on the cast's bodies -- at -0.05 a close-up of a body at a mirror was its chin and its collar), ANOTHER ANGLE (60-120 degrees round the body, a profile counts, a
   metre from every lens it is cut with), a HIGH ANGLE (0.95 m over the head, in front) and the wide from ANOTHER CORNER --
   each tested for the head's line and for clutter, cut to in that order so a cut does not keep coming back to two pictures.
 - **A long speech is cut with the listener's face**: past 150 characters it is said as its sentences (groups of ~110) on
   the speaker's lens, the one it is said to listening (their own single), and the pair; `to=` rides every line of it.
 - **A long cutaway is cut into pieces of its own move or orbit**, every other piece TIGHTER (the fov 0.6) -- a cut in, a
   cut back out, the motion running on through both -- pieces of ~11 s balanced by the text (none under ~4 s).
-- **A walk the grid cannot route is `snap=1`**: 2.3's walks to the screen and the mirror went straight, STUCK, and were
+- **A walk the grid cannot route is `snap=1`**: one scene's walks to the screen and the mirror went straight, STUCK, and were
   PLACED 0.6 s in -- a pop on camera. Read every `STUCK` in a take's log; the line opens on a cut, so the body is there
   at the cut.
 - **FOLEY** (`scenes/foley.py <scene.txt> <take.log> [--child names]`): the film mix had nothing for what the bodies do.
@@ -665,16 +665,16 @@ one face. Television animation cuts every 3-5 s, a slow narrated drama every 6-8
   lay the new mix under the same pictures (`ffmpeg -i take.mp4 -i scene.wav -map 0:v -map 1:a -c:v copy ...`): no
   re-render. ⛔ The times are the take's: a re-voiced script wants a new take, then foley.py again.
 - ⛔ A script NAMES every body's outfit on its first line (`houtfit=`/`poutfit=`/`p2outfit=`): unnamed, a body wears
-  its pack's first, which changes the day the pack gains one (2.1/2.2 and Wanda's and Viktor's `furs`).
+  its pack's first, which changes the day the pack gains one (two scenes, and two bodies' `furs`).
 - Coverage and a reaction shot are OPTIONAL: a single that cannot see the face is dropped, never cut to with a
-  warning (2.24: Viktor's back, over a shoulder).
-- `record_ch2.sh` sizes each take from the COMPILED scene (the plan's estimate ran 2.3 ~55 s past its end) and, after
+  warning (one scene: a body's back, over a shoulder).
+- The chapter's record script sizes each take from the COMPILED scene (the plan's estimate ran one scene ~55 s past its end) and, after
   each take, writes its foley from the take's log, recompiles and lays the mix back under the frames.
-- A script with no plan (chapter 1, 2.1, 2.2): `blocking.py --split` says its long narration as sentences AND gives each
+- A script with no plan: `blocking.py --split` says its long narration as sentences AND gives each
   new paragraph its `beat=` -- run it on an UNSPLIT script (a split one's moves are spans already) -- then `--push
-  <script> --home <set>`. `wateot_ch2.py --takes <dir>` writes record_ch2.sh's takes into another folder.
-- ⛔ OWED: a single long sentence (Pohl writes 300-character ones) cannot be cut inside without breaking the narrator's
-  intonation -- six of 2.3's shots still run past 10 s. A mid-line cut needs the timeline to split a line at the voice's
+  <script> --home <set>`. A plan's `--takes <dir>` writes the record script's takes into another folder.
+- ⛔ OWED: a single long sentence (the book has 300-character ones) cannot be cut inside without breaking the narrator's
+  intonation -- six of one scene's shots still run past 10 s. A mid-line cut needs the timeline to split a line at the voice's
   own pause (line_NN.json has them).
 
 ### ⛔ A walk that cannot be walked

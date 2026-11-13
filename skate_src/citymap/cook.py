@@ -1,4 +1,4 @@
-"""cook.py -- the city cook's steps, in the order Bike Lane Bash's map plan gives them ("THE MAP: HOW SEATTLE GETS BUILT"):
+"""cook.py -- the city cook's steps, in the order the street game's map plan gives them:
 true size, ground and streets, bridges from the tags, lanes and rails, buildings, cells. citymap.py is the command; README.md says what's what."""
 import heapq
 import json

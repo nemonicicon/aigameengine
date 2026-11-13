@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """broll.py -- capture a SILENT shot of the world. No dialogue, no subtitles, no pair.
 
-    python skate_src/film/broll.py OUT.mp4 --set parsons --cam "..." --seconds 8
+    python skate_src/film/broll.py OUT.mp4 --set <street> --cam "..." --seconds 8
 
 The film had too few scenic shots, most of all at its start, where it dropped straight
 into dialogue, and its script read as disjointed.

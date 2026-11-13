@@ -25,7 +25,7 @@ static const struct { const char*key; int kind; float r; } MAT_KIND[]={
     {"sleeve",4,0.85f},{"bandana",4,0.85f},{"panties",4,0.85f},{"glove",4,0.85f},{"robe",4,0.85f},{"tunic",4,0.85f},{"uniform",4,0.85f},{"trouser",4,0.85f},{"jeans",4,0.85f},{"_top",4,0.85f}};
 static const char*const MAT_NOTCLOTH[]={"~shoes~","~feet~","~belt","~wrists~","~ears~","~harness~","~neck~","~arms~","~decals~","~thigh~","latex","vinyl","leather","tech","stud","metal","chain","rubber","plastic","glass","boot","heel","sneaker"};
 static int matWordIn(const char*name,const char*key){ const size_t kl=strlen(key); if(!kl) return 0; for(const char*p=name;*p;p++){ size_t i=0; while(i<kl&&p[i]&&((p[i]|32)==(key[i]|32))) i++; if(i==kl) return 1; } return 0; }
-/* (step 23) EYES NOBODY NAMED. A body from another tool often has its eyeballs as meshes under the body's own name (Anima's four are all `anima_body`), so no word finds them.
+/* (step 23) EYES NOBODY NAMED. A body from another tool often has its eyeballs as meshes under the body's own name (the bought character's four are all `<name>_body`), so no word finds them.
  * They're found by what an eye is: a small skinned mesh as deep as it's wide and tall, high on the body, a little off its middle line, with a twin mirrored across it. Only meshes
  * the words left as skin or as nothing are looked at, a few hundred of each one's vertices, through its own bones at rest. The pack's own chunk still has the last word. */
 static void packEyesFind(Pack*P){
@@ -109,12 +109,12 @@ static void packMaterials(Pack*P){
     /* say what a body's surfaces came out as, once, so a wrong word in a name shows */
     { int k9[7]={0,0,0,0,0,0,0}; for(unsigned mi=0;mi<P->nMeshes;mi++){ const int k=(int)(P->meshMat[mi][4]+0.5f); if(k>=0&&k<7) k9[k]++; }
       if(k9[1]+k9[2]+k9[3]+k9[4]+k9[5]+k9[6]&&!g_loadQuiet) printf("[material] %s: %d skin, %d hair, %d eye, %d cloth, %d fur%s, %d plain\n",P->label,k9[1],k9[2],k9[3],k9[4],k9[6],k9[5]?", and one painted pixel by pixel":"",k9[0]); } }
-/* ⭐ A TRANSITION PLAYS ONCE IN A SCENE (ROBOT NEKO ep 9). The same measure as the idle rule: a clip
+/* ⭐ A TRANSITION PLAYS ONCE IN A SCENE. The same measure as the idle rule: a clip
  * whose last frame is more than IDLE_LOOP_DEG from its first is a move, not a loop. A scene keeps a
- * line's clip for as long as no later line changes it -- kaeli's bail stayed on for eighteen lines and
+ * line's clip for as long as no later line changes it -- the co-star's bail stayed on for eighteen lines and
  * she fell down every four seconds. Cached per clip; said once. */
 /* the largest first-to-last rotation among the 16 canonical body bones; the all-track mean on a rig
- * with no canon. A mean over 111 nodes let kaeli's fall average under the line (ep 9). */
+ * with no canon. A mean over 111 nodes let the co-star's fall average under the line. */
 static float clipEndGapBodyDeg(Pack*P,PClip*c){
     if(!c||c->frames<2||!c->nTracks) return 0.f;
     unsigned char*tr=P->pk+c->offTracks; float mx=0.f; int n=0;
@@ -189,7 +189,7 @@ static Pack loadPack(const char*path){
             /* the VERTEX RANGE this target touches, found once at load: a face morph on
              * a 294k-vertex body must not re-upload the whole position buffer every
              * frame (and the old blend silently clamped at 80k, which would have left
-             * kaeli's face -- her head verts start at 46k -- half unmoved). */
+             * the co-star's face -- her head verts start at 46k -- half unmoved). */
             unsigned lo9=0xffffffffu, hi9=0; unsigned char*sd9=P.pk+e9[3];
             for(unsigned s9=0;s9<e9[2];s9++){ unsigned vi9=*(unsigned*)(sd9+s9*16);
                 if(vi9<lo9) lo9=vi9;
@@ -239,7 +239,7 @@ static Pack loadPack(const char*path){
          * so bp = bind*p is the buffer position, and on a UE export that is NOT rig
          * space (the trap the authoring tools already know: "raw buffers are not rig
          * space on UE packs"). reva's happens to be, which is why her aperture landed
-         * and kaeli's opened a hole across her whole jaw. So the marks are carried
+         * and the co-star's opened a hole across her whole jaw. So the marks are carried
          * INTO mesh space through the mesh node's inverse, and the two scales are
          * measured there as well. */
         unsigned mn9=P.meshes[0].node; if(mn9>=P.nNodes) mn9=0;
@@ -261,7 +261,7 @@ static Pack loadPack(const char*path){
         P.mouthBind[0]=mo[0]; P.mouthBind[1]=mo[1]; P.mouthBind[2]=mo[2];
         /* THE APERTURE IS SIZED BY THE MOUTH, NOT BY THE EYES. It used to be
          * 0.42 x the interocular distance -- and the EYE marks are themselves placed
-         * by proportion, so that was a guess resting on a guess. Forced open on kaeli
+         * by proportion, so that was a guess resting on a guess. Forced open on the co-star
          * it cut a circle from her nose to her chin, wider than her mouth and
          * see-through to the hair behind her skull. face_marks.py now measures the
          * CORNERS; when they are in the rig the width is simply the distance between
@@ -273,7 +273,7 @@ static Pack loadPack(const char*path){
             float dx9=ml[0]-mr[0], dy9=ml[1]-mr[1], dz9=ml[2]-mr[2];
             float w9=0.5f*sqrtf(dx9*dx9+dy9*dy9+dz9*dz9);
             if(w9>1e-6f){ P.mouthBind[3]=w9; src9="MEASURED corner marks";
-                /* A MOUTH IS NOT ALWAYS LEVEL. kaeli's is a little off kilter on her model: lower than
+                /* A MOUTH IS NOT ALWAYS LEVEL. The co-star's is a little off kilter on her model: lower than
                  * the aperture was put, and tilted. The aperture assumed the lip line ran along mesh +X; it now
                  * takes the angle the CORNER MARKS actually make, so tilting the marks
                  * tilts the opening with them. (The interior already followed the
@@ -345,7 +345,7 @@ static Pack loadPack(const char*path){
          * pins to u=0 -- the LEFT EDGE of the colour palette, which is where that atlas
          * keeps its labelled swatch chart -- so the car drove around wearing a picture
          * of the texture's own legend, mirrored text and all. It was parked beside the
-         * porch in every act III close-up.
+         * porch in every close-up of a whole act.
          * The props that were fine (mailbox 0.217..0.782, pickup 0.463..0.851) were fine
          * only because they happened to stay inside the tile; wrap mode never mattered
          * for them, so this cannot make them worse. */
@@ -402,7 +402,7 @@ static Pack loadPack(const char*path){
             lp[k]=0;
             parMatch=CHNAME(lp); }
         if(parMatch) continue;                      /* not a chain root */
-        /* \u26d4 A BRANCH IS A CHAIN, AND THIS USED TO TAKE THE FIRST CHILD AND STOP. Anima
+        /* \u26d4 A BRANCH IS A CHAIN, AND THIS USED TO TAKE THE FIRST CHILD AND STOP. The bought character
          * carries two seven-bone braids (hair_braids_01_l..07_l and 01_r..07_r) with 22,380
          * verts weighted to them; from the root `hair_braids` the walk found the leaf
          * `high_braids` first and quit, mining ONE chain of TWO bones and discarding both
@@ -522,10 +522,10 @@ static Pack loadPack(const char*path){
     /* SKY HIERARCHY (the starfish is the largest thing in the sky, everyone else smaller) */
     if(P.fly){ char lo3[64]; for(int k3=0;k3<64;k3++){ char c3=P.label[k3]; lo3[k3]=(c3>='A'&&c3<='Z')?c3+32:c3; if(!c3) break; }
         if(!strstr(lo3,"starfish")&&!strstr(lo3,"star fish")) P.scale*=0.55f; }   /* the starfish is UNTOUCHABLE -- it reigns at its own size */
-    /* THE GIANTESS, ON PURPOSE: hina's rig is HONEST now (re-seated rest,
+    /* THE GIANTESS, ON PURPOSE: the giant's rig is HONEST now (re-seated rest,
      * measured sizing -> feet ON the floor, sane deformation); the giant is a deliberate 2.3x. */
     if(strstr(P.label,"hina")) P.scale*=2.3f;
-    if(P.trueScale){ P.scale=1.75f;                 /* TRUE SIZE: metres -> club units, never normalised */
+    if(P.trueScale){ P.scale=1.75f;                 /* TRUE SIZE: metres -> engine units, never normalised */
         P.trueH=(mxy-mny)*1.75f;
         printf("[size] %s: TRUE SIZE, %.2f m -> %.2f club units tall\n",P.label,(mxy-mny),(mxy-mny)*1.75f); fflush(stdout); }
     P.avoidR=2.4f*fminf(3.f,fmaxf(1.f,P.effH/3.15f));   /* the giantess gets giantess clearance */
@@ -557,7 +557,7 @@ static Pack loadPack(const char*path){
                   if(P.nodeCanon[i]<0) P.nodeCanon[i]=(short)c; } }
     /* P5 SPINE CHAIN BY TOPOLOGY. Name digits lie in both directions: UE spine_01/02/03
      * all collapse to canon 1 (two of three spine bones DROPPED from every transfer --
-     * a 45-degree authored bow arrived as 27), and kaeli's Spine02 is her LOWEST spine
+     * a 45-degree authored bow arrived as 27), and the co-star's Spine02 is her LOWEST spine
      * bone. Walk the real parent chain from the neck to the hips: every spine-ish node
      * between them takes canon 1,2,3 in hips-to-neck order. */
     if(P.pb[0]>=0&&P.pb[4]>=0){
@@ -591,7 +591,7 @@ static Pack loadPack(const char*path){
             if(d2>bestD){ bestD=d2; pick=(int)i; } }
         if(side9) P.gripL=(pick>=0)?pick:fore9; else P.gripNode=(pick>=0)?pick:fore9; }
     /* ⛔ A TWIST BONE IS NOT A FOREARM, AND THE CHILD SEARCH CANNOT SEE PAST ONE.
-     * On anima the canonical forearm resolves to `lowerarm_twist_01_r` while `hand_r`
+     * On the bought character the canonical forearm resolves to `lowerarm_twist_01_r` while `hand_r`
      * hangs off `lowerarm_r` -- so no child was named hand, the grip fell back to the
      * twist bone itself, and every prop she was handed rode the middle of her forearm.
      * With her arms at her sides that is exactly hip height, which is where
@@ -654,7 +654,7 @@ static Pack loadPack(const char*path){
                 if(best<0) best=leg;                        /* nothing hangs off it: fall back */
                 if(side) P.footR=best; else P.footL=best; }
             free(RW); } }
-    /* ⭐ ep 9: the wheels, by name -- the rig's own word for what touches the floor */
+    /* ⭐ the wheels, by name -- the rig's own word for what touches the floor */
     P.nWheel=0;
     for(unsigned i=0;i<P.nNodes&&P.nWheel<8;i++){
         const char*nm9=packStr(&P,P.nodes[i].name); char lw9[64]; int k9=0;
@@ -823,8 +823,8 @@ static Pack loadPack(const char*path){
          * three because there were three when it was written. P.morphMesh is filled from
          * the header BEFORE this block runs, so each morph held a FILE mesh index into a
          * list that had just been permuted.
-         * It did not read as "no expression": Anima's jaw is recorded against pack mesh 2
-         * (anima_body, 67,300 verts) and engine mesh 2 after the reorder is anima_BOOTS
+         * It did not read as "no expression": the bought character's jaw is recorded against pack mesh 2
+         * (`<name>_body`, 67,300 verts) and engine mesh 2 after the reorder is `<name>_BOOTS`
          * with 51,660, so the blend pushed face deltas into the boots' vertex buffer past
          * its end -- the old renderer's buffer update failed (0x502) and her face moved 1.55% of a panel,
          * which looks like a weak morph and is actually a morph on her shoes. */
@@ -887,11 +887,11 @@ static Pack loadPack(const char*path){
      * here is the one place that hides a mesh from the hero, the partner, an actor, the
      * multi-cam wall and the shadow pass together.
      * ⭐ WHY IT EXISTS: anim_bench/pathcheck.py asks "did this path draw the garment", and
-     * three attempts to answer that by COLOUR all failed -- a loose match caught kaeli's
+     * three attempts to answer that by COLOUR all failed -- a loose match caught the co-star's
      * blue hair, a tight one rejected the lit garment, and a hue match counted the SKY.
      * Rendering the same body with and without the mesh and differencing needs no colour
      * classification at all: the difference IS the garment. */
-    /* ⭐ A COMMA-SEPARATED LIST, because a garment is rarely one mesh. Camilia's
+    /* ⭐ A COMMA-SEPARATED LIST, because a garment is rarely one mesh. A bought model's
      * underwear is `Bra` AND `Underwear_Bottoms`, which share no substring, so "show her
      * with and without underwear" was impossible with a single needle. */
     { const char*hm=getenv("REVA_HIDEMESH");

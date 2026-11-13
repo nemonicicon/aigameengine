@@ -119,7 +119,7 @@ The format has no fields for these. The engine reads them out of names at load, 
 
 **Files found by name.** `v1_moves.rpack` in the packs folder, `packs/v1_zmoves.rpack`, and `v1_mob1.rpack` and `v1_kaeli.rpack` in the working folder are the donor banks. Beside a pack, `<pack>.gait` holds each clip's authored speed. `credits.txt` holds `label|artist` lines.
 
-⛔ **What shouldn't be here.** The loader still gives a few specific labels their own treatment: a label naming a fish or bird flies, `starfish` keeps its size, `hina` is scaled up 2.3 times. That's content in the engine, left over from the club, and it goes when someone works on the loader.
+⛔ **What shouldn't be here.** The loader still gives a few specific labels their own treatment: a label naming a fish or bird flies, `starfish` keeps its size, `hina` is scaled up 2.3 times. That's content in the engine, left over from the dance floor, and it goes when someone works on the loader.
 
 ## Writing a pack
 

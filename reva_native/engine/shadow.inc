@@ -1,5 +1,5 @@
 /* ================= SUN SHADOW MAPS (09-11) ==========================================
- * The audit ranked "shadow maps for the world" fourth: the club's whole shadow budget was
+ * The audit ranked "shadow maps for the world" fourth: the engine's whole shadow budget was
  * one 256^2 silhouette of reva projected onto the dance floor, plus blob ellipses under the
  * crowd (gated off in sets). Every street frame had bodies with no contact to the ground.
  * Since step 18 (11-04) the map itself is the renderer's (a depth image, sampled with four taps and
@@ -177,10 +177,10 @@ static void leadsCollect(void){
 static void rbDraw(void);   /* rigid bodies (09-11), defined below */
 static void objDraw(void);   /* what a game made: engine/objects.inc */
 static void stFarDraw(void);
-/* ⭐ PLACED SCREENS, ONE DRAW PATH (ROBOT NEKO ep 9). A screen is a quad the renderer draws showing Holly's
+/* ⭐ PLACED SCREENS, ONE DRAW PATH. A screen is a quad the renderer draws showing Holly's
  * target (gfxScreen); see the two call sites. ⛔ ORDER IS THE WHOLE POINT: drawSet() paints its sky first
  * with no depth test, so a screen drawn before the set comes out as a sky-coloured hole in the room
- * (Holly "blank" in ep 8 and in ep 9's first take). With a set loaded this is drawn AFTER the world. */
+ * (Holly "blank" in two takes). With a set loaded this is drawn AFTER the world. */
 #ifdef REVA_VK
 #define SCR_VK(m) do{ if(!g_noDraw) gfxScreen(holly_fbo_texture(),m,g_scrAmp); }while(0)
 #else
@@ -194,7 +194,7 @@ static void scrDrawPlaced(void){
         fflush(stdout); } }
     /* ⛔ HOLLY IS LIT FOR A NIGHTCLUB (mean 6 / max 166 off-screen). A placed screen EMITS, so the
      * `amp` lifting him is correct, not a cheat. `screenamp=` overrides it per shot. */
-    /* ep 9 HOLLY PROBE (REVA_HOLLYDBG=1): how often his head has been drawn into its target */
+    /* HOLLY PROBE (REVA_HOLLYDBG=1): how often his head has been drawn into its target */
     { static int hd9=-1, hn9=0; if(hd9<0) hd9=getenv("REVA_HOLLYDBG")?1:0;
       if(hd9&&(hn9++%20)==0){
           printf("[holly] probe draw %d (frame %u): tex %u  renders %u\n",hn9,(unsigned)g_frameStamp,(unsigned)holly_fbo_texture(),holly_fbo_renders());
@@ -228,7 +228,7 @@ static void scrDrawPlaced(void){
         mm3[8]= sy3*cp;     mm3[9]=-sp;     mm3[10]= cy*cp;
         mm3[12]=S3[0]; mm3[13]=S3[1]; mm3[14]=S3[2]; mm3[15]=1.f;
         SCR_VK(mm3); } }
-/* ⭐ ep 11: THE HALF-PIPES, drawn from drawSet as props are (in the sun pass too: they cast).
+/* ⭐ THE HALF-PIPES, drawn from drawSet as props are (in the sun pass too: they cast).
  * A flat bottom sits ON the set's floor, so it is pulled a hair toward the lens to win that tie -- never in the
  * sun pass, where the same pull would be self-shadow acne. */
 static void pipeDraw(void){
@@ -242,14 +242,14 @@ static void pipeDraw(void){
             for(int q9=0;q9<3;q9++){ if(cnt9[q9]<=0) continue; GfxMesh m9; memset(&m9,0,sizeof m9); m9.id=((unsigned)GFX_KIND_PROP<<28)|((0xf200u+(unsigned)i)<<12)|(unsigned)q9; m9.vb[0]=H->vk[q9*2]; m9.vb[1]=H->vk[q9*2+1]; m9.nVerts=(unsigned)cnt9[q9]; m9.model=g_shadowPass?(const float*)ident:up9; memcpy(m9.tint,k9[q9],12); m9.flags=g_shadowPass?GFX_SHADOW:0; gfxMesh(&m9); } }
     } }
 static void drawSet(void){
-    if(!g_setNI&&!g_nPipe&&!g_setSpace) return;   /* ⭐ ep 11: a set may be only a half-pipe -- (10-22) or only space */
-    /* ⭐ THE SKY GOES DOWN FIRST, and only for a SET. The club's eleven doors have their
+    if(!g_setNI&&!g_nPipe&&!g_setSpace) return;   /* ⭐ a set may be only a half-pipe -- (10-22) or only space */
+    /* ⭐ THE SKY GOES DOWN FIRST, and only for a SET. The engine's eleven doors have their
      * own deliberate backdrops -- a black room, a star field, a dance floor -- and a
      * daylight sky behind them would be wrong. Gating here also leaves shotsweep's lab and
      * face-rig shots byte-identical, which is what separates a rendering change from a
      * rendering regression. */
     /* ⭐ FRUSTUM CULL (09-11). The set renderer was "deliberately dumb: no culling, no batching,
-     * no LOD" and drew all 559 of parsons' props every frame whichever way the lens faced.
+     * no LOD" and drew all 559 of a street set's props every frame whichever way the lens faced.
      * Measured first: 10.4 ms a frame in a door on the street, 13.8 on a lab wide. Each
      * instance carries a sphere (the pack's XZ radius and rendered height, at the instance's
      * scale) tested against the six planes of this pass's view-projection (Gribb-Hartmann,
@@ -282,8 +282,8 @@ static void drawSet(void){
              * tile is anchored at its MAX corner and extends 28 units back; centred on the
              * origin, the near tile was culled and the bottom 14% of a wide went missing. */
             float cx=I->m[12]+I->m[0]*Q->propCx+I->m[8]*Q->propCz, cy=I->m[13]+hh*sc, cz=I->m[14]+I->m[2]*Q->propCx+I->m[10]*Q->propCz; int out=0;
-            /* ⛔ (11-05) AND NOT A BODY'S HEIGHT OFF THE FLOOR WHEN ITS TRIANGLES ARE SOMEWHERE ELSE. A streamed city cell stands at y 0 and its ground is 50 to 130 units up a hill (Bike Lane Bash's
-             * Seattle): this sphere sat at y 1.6, and a lens looking level along the Jose Rizal Bridge's deck culled the cell it stood in, so the deck under it was missing. Where the vertices' own
+            /* ⛔ (11-05) AND NOT A BODY'S HEIGHT OFF THE FLOOR WHEN ITS TRIANGLES ARE SOMEWHERE ELSE. A streamed city cell stands at y 0 and its ground is 50 to 130 units up a hill (the street game's
+             * city): this sphere sat at y 1.6, and a lens looking level along a bridge's deck culled the cell it stood in, so the deck under it was missing. Where the vertices' own
              * height range isn't inside the sphere, the sphere is put round them; where it is, nothing changes */
             { const float y09=I->m[13]+Q->propY0*sc,y19=I->m[13]+Q->propY1*sc;
               static int old9=-1; if(old9<0){ const char*e9=getenv("REVA_OLDCULL"); old9=(e9&&e9[0]=='1')?1:0; }   /* the control: the sphere as it was */
@@ -294,9 +294,9 @@ static void drawSet(void){
         drawn++;
         setInstLook(I);
         g_vkOwner=((unsigned)GFX_KIND_PROP<<28)|(((unsigned)i&0xffffu)<<12);
-        /* ⭐ A ROOM CARRIES ITS OWN LIGHT (ROBOT NEKO ep 9). A photogrammetry texture IS the light
-         * the place had when it was photographed; lit again by the club's sun it went dark and flat
-         * (the first frame inside the Undercroft read as night). uEmis is a gain on the texture. */
+        /* ⭐ A ROOM CARRIES ITS OWN LIGHT. A photogrammetry texture IS the light
+         * the place had when it was photographed; lit again by the engine's sun it went dark and flat
+         * (the first frame inside the skatepark set read as night). uEmis is a gain on the texture. */
         { Pack*Qd9=&g_setPk[I->pk]; const float*Md9=I->m; float m9[16];
           /* (step 24) LEVEL OF DETAIL: how big it is in the picture picks which copy of it is drawn. Its shadow comes from a lighter one sooner */
           if(g_setLod[I->pk][0]!=-1||g_setLod[I->pk][2]!=-1){ static const float bias9[5]={0.5f,0.75f,1.f,1.4f,2.f};
@@ -318,7 +318,7 @@ static void drawSet(void){
     rbDraw();   /* ⭐ the loose objects, in both passes (09-11) */
     objDraw();
     stFarDraw();
-    pipeDraw();   /* ⭐ ep 11: the half-pipes, in both passes */
+    pipeDraw();   /* ⭐ the half-pipes, in both passes */
     if(g_shadowPass) return;
     { static int n=0; static int dbg=-1; if(dbg<0){ const char*e=getenv("REVA_CULLDBG"); dbg=e?atoi(e):0; if(e&&dbg<1) dbg=1; }
       if(dbg>=2){ printf("[cull] f%lu %d of %d props drawn (%s)\n",g_frameNo,drawn,g_setNI,cullOn?"frustum":"cull=0"); fflush(stdout); }

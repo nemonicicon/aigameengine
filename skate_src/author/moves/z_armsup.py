@@ -2,9 +2,9 @@
 """z_armsup.py -- both arms up over the head and HELD there, hands waving: a body showing off
 its shoulders.
 
-ROBOT NEKO ep 3 (UPDATE), 2026-09-10. reva's rig had hung her arm joints under her arms, and her
-line 4 is "Raising them is not supported." After the rebuild, the payoff line is "I appear to
-have functional shoulders" -- and the first cut of it played her conversational x_convo gestures,
+2026-09-10. reva's rig had hung her arm joints under her arms, so she could not raise them. After
+the rebuild, a scene had to show that her shoulders now work -- and the first cut of it played
+her conversational x_convo gestures,
 which on a wide are arms-at-the-sides with a bent elbow: nobody could see that anything had
 changed. A payoff the frame cannot show is not a payoff. This is the one move a broken shoulder
 could never make: full abduction, held, with the hands going.

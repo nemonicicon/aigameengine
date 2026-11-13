@@ -19,7 +19,7 @@ proposal, not a decision: nothing here is built, and a decision is still owed on
 | Three point lights | Stale: `NLIGHT` is 6 | Minor |
 | glTF sources carry roughness and metal, the bake drops them | Half: `glb2rpack_anim.py` reads only the base colour. But UE exports lose their materials (`bake_town.sh`), and code-built packs never had any | Overstated |
 | Reva looked too plasticky because there is no specular | Wrong: that remark was about the BLENDER renders of her sheet, and the answer was the bake (`build_reva.py`: unique UVs, AO, SSS, AgX Punchy) | **Wrong** |
-| Hit-stop, shake, knockback and impact audio are what make ZAMNC feel better | Wrong: ZAMNC's Blueprints have none of them (`skate_src/zamnc/zamnc_logic.txt`). What it has is instant movement and a 4:1 speed ratio. The list is still good advice for this game | **Wrong about why** |
+| Hit-stop, shake, knockback and impact audio are what make the zombie prototype feel better | Wrong: the zombie prototype's Blueprints have none of them (read off its logic). What it has is instant movement and a 4:1 speed ratio. The list is still good advice for this game | **Wrong about why** |
 | Zombies run on dance-floor logic | True until that night: `street_step` fixed it | Right, done |
 | RTS variants all boot the same skirmish | Stale: one engine, four parameter sets (`RTSVAR`) | Minor |
 | Skate bench names packs that do not exist | True: `v1_reva_skate`, `v1_kickflip` are gone | Right |
@@ -34,7 +34,7 @@ proposal, not a decision: nothing here is built, and a decision is still owed on
 2. **There is no linear colour.** 0 lines mention sRGB or gamma, and nothing linearises a texture, so all lighting runs on
    gamma-encoded values. This sits UNDER the note's step 1: ACES on gamma-space light is wrong, and adding lights goes wrong
    the same way. It is the real 2005 tell. It re-lights every set and every show, so it needs its own A/B.
-3. **"Lifts every scene at once" is not free, and not true.** WATEOT's toon palette is hand-tuned against a light capped at 1
+3. **"Lifts every scene at once" is not free, and not true.** The space series' toon palette is hand-tuned against a light capped at 1
    (the `⛔ THE LIGHT'S BRIGHTNESS IS CAPPED` note); a tonemap has to stand off toon bodies or it repaints the show. The post
    pass is off in the lab and in plain takes, so step 1 only reaches doors and `--film`.
 4. **A rebake is not cheap here.** `CLAUDE.md`: a bake drops the face, the morphs and every authored clip. Per-material roughness
@@ -47,9 +47,9 @@ proposal, not a decision: nothing here is built, and a decision is still owed on
 
 ## Proposed order
 
-1. ~~Play `reva_native/rvz.bat`~~ done 11-02: it works decently and feels a bit like ZAMNC. Playing it decides the next rung.
+1. ~~Play the zombie game~~ done 11-02: it works decently and feels a bit like the zombie prototype. Playing it decides the next rung.
 2. ~~Promote~~ done 11-02: `crowd.exe` is from 87f5b6c, the old build is `crowd_0911.exe`.
-3. The game-feel rung on Reva vs Zombies: hit-stop, shake on a hit (`camshake` exists), the dead telegraphing a bite, music.
+3. The game-feel rung on the zombie game: hit-stop, shake on a hit (`camshake` exists), the dead telegraphing a bite, music.
    It is the game in build, and lighting will not make it fun.
 4. The lighting rung, each step with an off-switch and a look on a realistic body AND a toon one:
    anisotropy and the sun window (an hour) → linear colour → 16F + ACES on `high`/`ultra` → hemisphere ambient → SSAO → cascades →

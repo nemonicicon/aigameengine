@@ -14,7 +14,7 @@
  * AFTER the contact and up JUST AFTER the passing position.
  *
  * ⭐ WHY THIS IS NEEDED AT ALL: donorPoseF is ROTATION-ONLY, so every retargeted walk
- * in the club arrives with its pelvis HEIGHT deleted. Williams says a traced walk
+ * in the engine arrives with its pelvis HEIGHT deleted. Williams says a traced walk
  * floats even WITH its translation; ours had none. That is the rail every citizen in
  * the film has been gliding along. */
 
@@ -58,7 +58,7 @@ static void wmsApply(Pack*P,float T[][3],float Q[][4],M4*W,WmsState*st,float dt,
         /* ...and then SIT PART WAY BACK toward it, which is the part arriving late. */
         float out[4]; qnlerp(out,Q[b],lag,DK[k]*amt); memcpy(Q[b],out,16); }
 
-    /* ---- MEASURE THE STRIDE. In RIG space the club's bodies face +Z (the model matrix
+    /* ---- MEASURE THE STRIDE. In RIG space the engine's bodies face +Z (the model matrix
      * carries the yaw), which is the same convention the knee test and the board use. */
     if(P->footL<0||P->footR<0){ st->init=1; return; }
     const float*L=W[P->footL], *R=W[P->footR];
@@ -99,7 +99,7 @@ static void wmsApply(Pack*P,float T[][3],float Q[][4],M4*W,WmsState*st,float dt,
     /* 0.045 -> a 9%-of-leg-length peak-to-peak rise and fall, about 5cm on these bodies.
      * A real walk is nearer 4-5cm, and Williams is explicit that TRACING the real amount
      * still floats -- you have to go past it. Measured at 0.030 the head moved 10px in a
-     * 720 line frame; the club's own dial (ctl wms=, default 0.85) is where taste lives. */
+     * 720 line frame; the engine's own dial (ctl wms=, default 0.85) is where taste lives. */
     {   float dy=(st->um-st->u)*2.f*0.045f*legLen*g;
         int pa=P->nodes[hp].parent;
         float up[3]={0.f,1.f,0.f}, ps=1.f;
@@ -128,7 +128,7 @@ static void wmsApply(Pack*P,float T[][3],float Q[][4],M4*W,WmsState*st,float dt,
 
 /* ⭐ A MESH CARRIES ITS OWN COLOUR IN ITS NAME -- `#rrggbb` on an untextured mesh, so an
  * authored garment brings a colour without the pack format needing a material it does not
- * have. The hero's draw learned this when kaeli's pyjamas were appended; the ACTOR path
+ * have. The hero's draw learned this when the co-star's pyjamas were appended; the ACTOR path
  * never did, so a garment on anyone in the street rendered in whatever texture the
  * previous prop had left bound -- which is why a blue pyjama came back BROWN. */
 /* (11-12) A GAME'S BODY COLOURED BY ITS MESHES' NAMES (E->bodyTint: the skate game's rider colour, on the meshes named MAT_Skin): the crowd's
@@ -349,7 +349,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
      * skater's deck plant uses -- it was simply never given to anybody else. */
     if(groundIt&&!sk&&P->footL>=0&&P->footR>=0){
         float fy9=(W[P->footL][13]<W[P->footR][13])?W[P->footL][13]:W[P->footR][13];
-        for(int w9=0;w9<P->nWheel;w9++){ float y9=W[P->wheel[w9]][13]; if(y9<fy9) fy9=y9; }   /* ⭐ ep 9: a deck stands on its wheels */
+        for(int w9=0;w9<P->nWheel;w9++){ float y9=W[P->wheel[w9]][13]; if(y9<fy9) fy9=y9; }   /* ⭐ a deck stands on its wheels */
         float d9=(P->mny-fy9);
         /* a third of her height. The rest span is not stored, but P->scale was DERIVED
          * from it at load (scale = 3.15/(span*1.13)), so the span comes back out of it --
@@ -368,7 +368,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
             float eff=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]);
             /* ...and then UP ONTO THE DECK. Planting to the rest height puts the soles on
              * the ROAD; a rider stands on a board, whose deck sits about 9cm up -- 0.16
-             * club units at 1.75 per metre. The deck is then placed 0.16 back down from
+             * engine units at 1.75 per metre. The deck is then placed 0.16 back down from
              * the soles, which lands its wheels on the road. One number, used twice, in
              * opposite directions: they cannot drift apart. */
             mdl[13]+=((restFoot-ftY)*eff + SK_DECK_H)*plantMix; } }
@@ -447,11 +447,11 @@ static void actorsTick(float dt){
             colResolve(&A->cx,&A->cz,0.42f);
             float dx=x1-x0, dz=z1-z0, d=sqrtf(dx*dx+dz*dz);
             A->cspd=(t1>t0&&u<1.f)?(d/(t1-t0)):0.f;
-            /* face the way she is going; club forward is +z */
+            /* face the way she is going; the engine's forward is +z */
             if(d>1e-3f&&A->cspd>0.f) A->cyaw=atan2f(dx,dz)*57.2957795f; }
         /* the clip's own fps drives the phase -- and a BORROWED clip's fps lives in the
          * bank it came from, not in the body playing it */
-        /* ⭐ ON A PATH, THE STRIDE MATCHES THE SPEED. gaitRate() is the club's measure of
+        /* ⭐ ON A PATH, THE STRIDE MATCHES THE SPEED. gaitRate() is the engine's measure of
          * how far a clip's planted foot travels per frame, so a body crossing a lawn in
          * four seconds takes the strides that carry her there instead of sliding. */
         float grate=A->rate;
@@ -474,7 +474,7 @@ static void actorsTick(float dt){
         /* (11-11) `sceneclock`: HER CLIP ON THE SCENE'S CLOCK. The set's own clock (g_setT) runs from the set's load, or from the capture's first frame,
          * and a take at a fixed scene rate (REVA_SCENEFPS) starts it at boot: a set actor beside the scene's cast played her clip seconds ahead of
          * theirs, and of the timeline's cards. Her frame is the scene's time (the bodies' clock, scnBodyT) times her clip's rate, plus her offset;
-         * before the scene starts she stands on that first frame, so her hair settles on the pose she starts in. The Facade chorus's fourth copy */
+         * before the scene starts she stands on that first frame, so her hair settles on the pose she starts in. The music video's chorus's fourth copy */
         if(A->sceneClk&&!A->skate){ const PClip*c7=(A->dnP&&A->dnC>=0&&(unsigned)A->dnC<A->dnP->nClips)?&A->dnP->clips[A->dnC]
                                                   :((A->clip>=0&&(unsigned)A->clip<P->nClips)?&P->clips[A->clip]:NULL);
             if(c7){ float t7=scnBodyT(); if(!(t7>=0.f)) t7=0.f; t7+=A->sceneOff; if(t7<0.f) t7=0.f;

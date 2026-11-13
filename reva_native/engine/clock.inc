@@ -66,7 +66,7 @@ static float  g_boil=1.f;         /* ctl boil=: the animator's hand; 0 = a perfe
 /* ---- TONE: a highlight shoulder --------------------------------------------------------
  * Daylight is lit as base*(sky + sun*cos) -- about 1.8x a texture's own brightness at noon --
  * and nothing ever mapped it back into range, so white siding at 0.95 landed at 1.3 and
- * clipped. MEASURED on ROBOT NEKO ep 1 (2026-09-10): 25-41% of every frame was pure white.
+ * clipped. MEASURED on the stop-motion show (2026-09-10): 25-41% of every frame was pure white.
  * `tone=<knee>` leaves everything below the knee exactly alone and rolls everything above it
  * off exponentially toward a WHITE POINT of 0.96, per channel -- toward 1.0 it still left 9.3%
  * of a sunlit frame at 252/255. 0 = off, which is byte-for-byte the old
@@ -91,7 +91,7 @@ static double now_ms(void){
  * facecheck.py's SEE-THROUGH check has to tell "backdrop AROUND her head" from
  * "backdrop THROUGH her head", and it cannot do that against the lab's near-black
  * studio because the inside of a mouth is near-black too, on purpose. Shot against a
- * colour the club never renders, any such pixel inside her mouth arrived through a
+ * colour the engine never renders, any such pixel inside her mouth arrived through a
  * hole in her skull. Returns 1 if it overrode. */
 static float g_sun[4], g_sunC[3], g_sky[3];   /* the sun rig; defined once, used by the sky too */
 static int clearOverride(float*c){
@@ -110,7 +110,7 @@ static void sunInit(void){ g_sun[0]=0.f; g_sun[1]=1.f; g_sun[2]=0.f; g_sun[3]=0.
  * that has gone violet. Keyframed rather than computed from an ephemeris -- this is a
  * film, and the golden hour lasts as long as the cutting needs it to.
  * ⭐ NIGHT IS A WEAK BLUE DIRECTIONAL over a near-black sky, not sun=off: w==0 is the
- * club's dark-room path, which has no sky and no direction and is useless outdoors. */
+ * engine's dark-room path, which has no sky and no direction and is useless outdoors. */
 typedef struct { float h, el, az, it, r,g,b, sr,sg,sb; } TodKey;
 static const TodKey TOD[]={
  /*  h    el    az     I     sun r,g,b            sky r,g,b            */
@@ -208,7 +208,7 @@ static void clockFrame(void){
     g_virtMs+=(g_fixedStepMs>0.0)?g_fixedStepMs:g_tickMs; g_tickTotal++; }
 static float simStepS(void){ return (float)(((g_fixedStepMs>0.0)?g_fixedStepMs:g_tickMs)*0.001); }   /* one tick, always */
 /* ---- THE LADDER (2026-09-30): one build, from a Pi 4 to a desktop -----------------------------
- * REVA_TIER=pi|low|mid|high|ultra|auto (default high: byte for byte what the club drew before).
+ * REVA_TIER=pi|low|mid|high|ultra|auto (default high: byte for byte what the engine drew before).
  * A tier is the render scale (the 3D rect inside the post target), the sun map size (boot only:
  * the map is allocated once), bloom, FXAA and the cloth substeps. ⛔ There is no `auto` rung any
  * more (11-02): a rung that changes itself by measuring performance seesaws.
@@ -221,7 +221,7 @@ static const Tier TIERS[]={
     {"mid",  0.85f,2048, 0.12f,1,4},
     {"high", 1.00f,2048, 0.12f,1,4},
     {"ultra",1.00f,4096, 0.12f,1,8},
-    {"film", 1.00f,4096, 0.12f,1,8}};   /* film's own: every sample and light the old look had, on the old look's colours. An episode's palette was made on it */
+    {"film", 1.00f,4096, 0.12f,1,8}};   /* film's own: every sample and light the old look had, on the old look's colours. The stop-motion show's palette was made on it */
 #define TIER_N 6
 static int g_tier=3, g_clothSub=4, g_sunMap=2048;
 static void tierApply(int t,int boot);
@@ -298,7 +298,7 @@ static int floorClipName(const char*lo){
                            "ground","dead","death","dying","fall","down",NULL};
     for(int i=0;F[i];i++) if(strstr(lo,F[i])) return 1;
     return 0; }
-/* 09-01 AN IDLE MUST LOOP. kaeli's `idle` (v1_kmoves) is a 184-frame GET-UP -- crouch,
+/* 09-01 AN IDLE MUST LOOP. The co-star's `idle` (v1_kmoves) is a 184-frame GET-UP -- crouch,
  * rise, stand -- whose last frame sits 111 deg from its first; every miner that read the
  * word "idle" elected it and played it on a loop, so she stood up and snapped back to the
  * floor for the whole of every scene.

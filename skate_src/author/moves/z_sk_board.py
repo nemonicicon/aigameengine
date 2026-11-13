@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""z_sk_board.py -- ROBOT NEKO ep 10: handling the board, with a BOARD CHANNEL.
+"""z_sk_board.py -- handling the board, with a BOARD CHANNEL.
 
-After ep 9: picking the board up needed a better animation, one in which
+After the first pickup (z_board.py): picking the board up needed a better animation, one in which
 nothing clips through anything.
 
-What was wrong in ep 9 (z_board.py, read off ep09_lesson_two.mp4): the reach was a stiff
+What was wrong in the first pickup (z_board.py, read off its take): the reach was a stiff
 jackknife held for the whole line, the board jumped from the floor to the hand on a line cut
-(a prop slot was on the floor OR in the hand), kaeli folded into a hairpin with her head below
+(a prop slot was on the floor OR in the hand), the co-star folded into a hairpin with her head below
 her knees, and the carried board stuck out horizontally through the hip.
 
   z_rm_sk_carry     LOOP 2.0 s   the carry: right hand on the back rail by the front truck, nose up
@@ -24,10 +24,10 @@ top surface; +X = the nose (her LEFT foot leads); +Y = the deck normal; +Z = X x
 z_rm_: root motion owns Y, and the engine adds no deck lift.
 
 The board is MEASURED from reva_native/props/skateboard.rpack at its held size (long side 1.4 u).
-⛔ The ep 9 "deck height" 0.223 is the kicktail TIPS (the mesh bbox); the flat deck top between
+⛔ The first pickup's "deck height" 0.223 is the kicktail TIPS (the mesh bbox); the flat deck top between
 the trucks is ~0.16 u above the floor. The channel's origin is the deck top, so it uses the latter.
 
-Gates are asserted and printed (club units): grounded board wheels on the floor, nothing below
+Gates are asserted and printed (engine units): grounded board wheels on the floor, nothing below
 the floor, planted feet on the floor or deck, body capsules not deeper into each other than at the
 stand, the board clear of every capsule (except a sole on it / the gripping forearm), the grip
 within 0.04 u of the rail after contact and the board static before first contact, knees forward.
@@ -51,7 +51,7 @@ PROP = os.path.join(REPO, "reva_native", "props", "skateboard.rpack")
 STANCE_DIR = os.environ.get("CLUB_OUT", "out")
 UP = [0.0, 1.0, 0.0]
 CLIPS = ["z_rm_sk_carry", "z_rm_sk_pickup", "z_rm_sk_catchup", "z_rm_sk_dropin", "z_rm_sk_stepoff", "z_rm_sk_bail"]
-# gate tolerances, CLUB units
+# gate tolerances, ENGINE units
 TOL_WHEEL, TOL_FLOOR, TOL_DECKFOOT, TOL_GRIP = 0.01, 0.01, 0.015, 0.04
 TOL_BODY, TOL_BOARD = 0.03, 0.01
 
@@ -161,7 +161,7 @@ def measure_board():
     cloud = list(vox.values())
     B = dict(DT=DT, TH=TH, W=W, WB=WB, wheelR=wheelR, track=track, tip=tip, kick0=kick0, H=H,
              long_axis="xyz"[la], up_axis="xyz"[ua], cloud=cloud)
-    # collision boxes (board frame, club units): the flat deck, the two kicks, the two trucks
+    # collision boxes (board frame, engine units): the flat deck, the two kicks, the two trucks
     B["boxes"] = [([-kick0, -TH, -W], [kick0, 0.0, W], "deck")]
     for s in (-1.0, 1.0):
         x0, x1 = sorted([s * kick0, s * 0.70])
@@ -201,8 +201,8 @@ class Rig:
         self.ank0 = {s: list(wp0[self.leg[s][2]]) for s in "lr"}
         pts = p.skinned_positions(with_bones=True)
         ys = [v[1] for v in pts]
-        self.scale = 3.45 / (max(ys) - min(ys))          # club units per rig unit
-        self.cu = 1.0 / self.scale                       # rig units per club unit
+        self.scale = 3.45 / (max(ys) - min(ys))          # engine units per rig unit
+        self.cu = 1.0 / self.scale                       # rig units per engine unit
         # hinge / side-bend signs, measured (a forward fold moves the head forward)
         def head_after(axis, ang):
             qo = dict(self.base_q); qo[self.pel] = rotate_bone_world(nodes, self.pel, axis, ang, qo)
@@ -398,7 +398,7 @@ class Rig:
 
 # ==== SCORES ====
 class Scores:
-    GX, EY = 0.46, -0.012          # the grip station on the rail: just outboard of the front truck (club)
+    GX, EY = 0.46, -0.012          # the grip station on the rail: just outboard of the front truck (engine u)
 
     def __init__(self, R, B, stance_dir):
         self.R, self.B = R, B
@@ -415,7 +415,7 @@ class Scores:
         self.heel_sign = 1.0 if qrot(q_axis_angle(self.lt, 0.3), rel)[1] > rel[1] else -1.0
         self.carry_setup()
 
-    # ---- board kit (club dims -> rig) ----
+    # ---- board kit (engine dims -> rig) ----
     def P(self, x, y, z): return mul([x, y, z], self.R.cu)
     def bpt(self, bp, x, y, z): return add(bp[0], qrot(bp[1], self.P(x, y, z)))
     def edge(self, bp, zs, x=None): return self.bpt(bp, self.GX if x is None else x, self.EY, zs * (self.B["W"] - 0.004))
@@ -1364,7 +1364,7 @@ def chain_checks(sc, res):
 
 
 def offsets(sc):
-    """Where the set's marks go: the board's pose relative to the body's mark, in WORLD club units."""
+    """Where the set's marks go: the board's pose relative to the body's mark, in WORLD engine units."""
     R = sc.R
     def rel(bp, label):
         o = bp[0]

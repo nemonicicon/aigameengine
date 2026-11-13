@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """z_sit.py -- SITTING, LYING and CARRYING in code, over REST via rig_map (the way the kit's z_gest.py and z_walk.py are
-written), so they resolve on any rig the canon knows -- written for THE WORLD AT THE END OF TIME's chapter 2 (10-22):
-the navigators "peck away at their computers" (p14), breakfast at the table, dinner in the refectory, dominoes in the
-rec room, the captain's table, Werner "webbed into his bed, sound asleep" (p18), a frozen woman in her casket "her eyes
-closed but her mouth open, looking as though she were trying to scream" (p34), and Viktor carrying Marie-Claude's
-tray "extremely careful" (p18). The banks' sitting clips are named `Rig|Sitting_...`, and a `|` cannot ride a scene
+written), so they resolve on any rig the canon knows -- written for a ship's scenes in the space series (10-22):
+people typing at computers, eating at tables, playing a game at a table, a sleeper strapped into a bunk, a frozen
+woman lying in a casket with her eyes shut and her mouth open, and someone carrying a tray with care. The banks' sitting clips are named `Rig|Sitting_...`, and a `|` cannot ride a scene
 line (it is the line's separator), nor does bankFind reach a pack that is not a bank.
 
     z_sit.py <pack> [--force] [--hang 10] [--seat 0.46] [--desk 0.74] [--only z_sit,...]
@@ -15,13 +13,13 @@ line (it is the line's separator), nor does bankFind reach a pack that is not a 
   z_sit_type  2.0 s LOOP  z_sit at a desk `desk` m high: the forearms forward, the hands at the keys, tapping
   z_rm_lie    4.0 s LOOP  on the back, the head toward -z, the arms along the body, breathing: a mark AT the bed's top
   z_rm_doze   4.0 s LOOP  z_rm_lie with the eyes shut (the blink morphs held at 1)
-  z_rm_scream 4.0 s LOOP  z_rm_lie, eyes shut, the mouth open (jaw 0.85): Accardo in her casket
+  z_rm_scream 4.0 s LOOP  z_rm_lie, eyes shut, the mouth open (jaw 0.85): a body lying in a casket
   (z_rm_: a lying clip OWNS ITS ROOT -- otherwise the engine grounds the body by its feet and drives it underground)
   z_carry     2.0 s LOOP  standing, the forearms forward and level, the hands a tray's width apart (hover= it on a walk)
   z_rm_sit, z_rm_sit_talk, z_rm_sit_type   the sits owning their root: for a SET ACTOR whose feet hang from the seat
   (a body whose feet cannot reach the floor from the seat -- a child on a stool -- sits with its legs HANGING)
 
-Units are the pack's rig units -- METRES for a TrueScale pack (the WATEOT cast). The root stays on the floor: a scene's
+Units are the pack's rig units -- METRES for a TrueScale pack (the space series' cast). The root stays on the floor: a scene's
 mark puts the body where it sits (a lying body's mark carries the bed's height). Every clip ends where it starts.
 """
 import sys, os, math
@@ -82,7 +80,7 @@ class Body:
             hp = wp[th]
             tgt = [hp[0] * 1.08, self.ankle_y, hp[2] + self.thigh * 0.97]                   # the shin straight down
             if self.dangles(seat):
-                # ⭐ (10-22) A CHILD ON A GROWN-UP'S STOOL: the floor is out of reach (Freddy's legs straightened to find
+                # ⭐ (10-22) A CHILD ON A GROWN-UP'S STOOL: the floor is out of reach (a child's legs straightened to find
                 # it and he sat as a plank leaning back) -- the thigh lies level on the seat and the shin HANGS from the
                 # knee a little forward, swinging (a five-year-old's legs do)
                 sw = math.radians(9.0) * math.sin(2 * math.pi * t / 2.0 + (0.0 if side == "l" else math.pi))
@@ -192,7 +190,7 @@ def mv_carry(B, t, D, o):
 
 MOVES = [("z_sit", 4.0, mv_sit, None), ("z_sit_talk", 4.0, mv_sit_talk, None), ("z_sit_type", 2.0, mv_sit_type, None),
          # ⛔ A LYING CLIP MUST OWN ITS ROOT: the engine grounds a body by its FEET unless the clip is named z_rm_
-         # (crowd_kms.c, P3 root ownership) -- Werner's first sleep was driven under the floor, his hands poking up
+         # (crowd_kms.c, P3 root ownership) -- the first sleeper was driven under the floor, his hands poking up
          ("z_rm_lie", 4.0, mv_lie, None), ("z_rm_doze", 4.0, mv_lie, {"blink_L": 1.0, "blink_R": 1.0, "blink": 1.0}),
          ("z_rm_scream", 4.0, mv_lie, {"blink_L": 1.0, "blink_R": 1.0, "blink": 1.0, "jaw": 0.85}),
          ("z_carry", 2.0, mv_carry, None),

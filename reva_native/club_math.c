@@ -1,4 +1,4 @@
-/* club_math.c -- the club's 4x4s. Split out of crowd_kms.c 2026-09-30 (stage 1 of the split):
+/* club_math.c -- the engine's 4x4s. Split out of crowd_kms.c 2026-09-30 (stage 1 of the split):
  * pure functions, no globals, the first translation unit that could leave without a fight. */
 #define CLUB_MATH_IMPL   /* this file uses the C library's floor, sqrt and so on, and defines the rest */
 #include "club.h"
@@ -23,7 +23,7 @@ void m4_lookat(M4 m,float ex,float ey,float ez,float cx,float cy,float cz){
     m[8]=sx[2];m[9]=uy[2];m[10]=fz[2];m[11]=0;
     m[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); m[13]=-(uy[0]*ex+uy[1]*ey+uy[2]*ez); m[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); m[15]=1; }
 
-/* ---- THE CLUB'S OWN MATH (11-02, engine plan Phase 1) ---------------------------------------
+/* ---- THE ENGINE'S OWN MATH (11-02, engine plan Phase 1) ---------------------------------------
  * Each machine's C library rounds sin, cos, atan2, exp, log and pow its own way, within its own
  * accuracy. Measured: same source, same packs, and the hero's x is one bit apart between Windows
  * and the Pi at tick 247, which is one bit more than "same rules everywhere" allows. So there is

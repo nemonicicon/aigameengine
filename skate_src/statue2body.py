@@ -73,7 +73,7 @@ def rig(src, dst, facing=None, marks=None):
     # ⛔ EVERY PRIMITIVE OF THE BODY, NOT primitives[0] OF meshes[0]. A glTF primitive is
     # one MATERIAL's slice of a mesh, so on a Character Creator body with six materials the
     # old form measured facing, the arm band and every landmark from about one sixth of her,
-    # picked by material order -- and duly refused to rig Camilia "backwards" when her own
+    # picked by material order -- and duly refused to rig a bought model "backwards" when her own
     # chest-minus-waist is +0.041 the right way and her nose is at +Z. It survived this long
     # only because every earlier statue was a single-material scan, where primitives[0] IS
     # the whole body.

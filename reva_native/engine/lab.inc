@@ -63,7 +63,7 @@ static int clipUpright(Pack*P,int clip){
      * toe) failed an adult's 0.945 -- the boys' walk was refused and they glided to every mark */
     if(P->trueScale&&P->trueH>0.5f) want=P->trueH*0.30f;
     return hipH>=want; }
-/* ---- P7: THE PARTNER -- a SECOND BODY in the lab (kaeli and reva
+/* ---- P7: THE PARTNER -- a SECOND BODY in the lab (the co-star and reva
  * together, for a high five). Every authored move so far has been one body
  * alone, and a five is a different class of problem: the contact point belongs to
  * NEITHER body, it lives in the world between them.
@@ -75,7 +75,7 @@ static int clipUpright(Pack*P,int clip){
  * helper nudged a limb into place.
  *
  * Placement is the ENGINE's job here, not the authored root track. Putting the
- * separation in the data would have been tidier, but kaeli's pack is the known unit
+ * separation in the data would have been tidier, but the co-star's pack is the known unit
  * chimera -- her clip translations and node rests disagree, so an authored root
  * displacement dissolves on her. Gap and facing are engine-side and explicit, and the
  * hand-to-hand distance below is what proves they agree with the score. */
@@ -85,7 +85,7 @@ static int clipUpright(Pack*P,int clip){
  *
  * ⛔ The scene system was a two-hander to the bone -- one g_labPartner, one g_labPClip,
  * one g_partHeadW, and 74 references to a second body that could only ever be a second
- * body. Act V had to be split in half to be shootable.
+ * body. One act of the film had to be split in half to be shootable.
  *
  * ⛔ AND A STRAIGHT REFACTOR IS THE WRONG MOVE. This project already wrote that down:
  * turning hero/partner into an array "would have rewritten the system that made THE
@@ -109,9 +109,9 @@ typedef struct {
     float  gap, side, yaw;                    /* placement relative to the HERO's frame */
     float  headW[3], eyeW[3], mouthW[3];      /* measured by her draw, in world space */
     int    headOK, faceOK;  float iod;
-    int    mouthOK;   /* ⭐ ep 12: a face_mouth mark on its own (no eyes) -- the smoke's mouth, never the aperture's */
+    int    mouthOK;   /* ⭐ a face_mouth mark on its own (no eyes) -- the smoke's mouth, never the aperture's */
     /* ⭐ HELD AT A PHASE. >=0 means this body is holding a single frame of its clip -- a
-     * POSE, not an animation. Every clip in the club is a verb; a set needs nouns. */
+     * POSE, not an animation. Every clip in the engine is a verb; a set needs nouns. */
     float  hold;
     Pack   storage;                           /* the loaded pack itself */
 } CastSlot;
@@ -234,7 +234,7 @@ static void toonTell(void){ gfxToonSet(g_toonCel,g_toonOff?0.f:g_toonRim,(float)
 
 /* ================= MORPH BLENDING, for ANY body ==============================
  * Was hero-only and capped at 80k vertices. A conversation needs it on both faces,
- * and kaeli's mesh is 294k, so this blends over the target's own VERTEX RANGE and
+ * and the co-star's mesh is 294k, so this blends over the target's own VERTEX RANGE and
  * uploads only that window. What each mesh's buffer holds is kept on the pack
  * (morphAt, 11-11), so a shape that goes back to zero is taken off its mesh again
  * whatever else the face is doing (morphBlend's note says what that cost). */
@@ -292,10 +292,10 @@ static int faceGizmo(Pack*P,M4*world,const float*model,float*v,int cap,float scl
 /* how far this body's mouth is open, 0..1 -- one source of truth for the aperture */
 static float mouthOpenOf(Pack*P,const float*wts){
     float open=0.f;
-    /* ⛔ ep 12: THE APERTURE'S OWN GATE, HERE, where BOTH arms read it. mouthArm refused a body without eye
-     * marks, but mouthMeshArm set every mesh's uOpen straight from this -- so the day kaeli got a lone
+    /* ⛔ THE APERTURE'S OWN GATE, HERE, where BOTH arms read it. mouthArm refused a body without eye
+     * marks, but mouthMeshArm set every mesh's uOpen straight from this -- so the day the co-star got a lone
      * `face_mouth` (for the smoke), her jaw weight would have armed an aperture positioned by whichever
-     * body last set mouthP/mouthS (reva's lips, in kaeli's bind space): a hole in her face on every word. */
+     * body last set mouthP/mouthS (reva's lips, in the co-star's bind space): a hole in her face on every word. */
     if(!P||P->fmMouth<0||P->fmEyeL<0||P->fmEyeR<0) return 0.f;
     /* THE APERTURE FOLLOWS THE JAW BONE when the body has one, and only falls back to
      * the old "jaw" morph weight for a body that was never rigged. Two sources for one
@@ -399,7 +399,7 @@ static int morphIdx(Pack*P,const char*nm){
 
 /* \u2b50 SET EVERY MORPH THAT CARRIES THIS NAME, not the first one.
  * glTF splits a mesh by MATERIAL and repeats each sculpted shape on every primitive, so one
- * authored shape arrives as several rpack morphs -- Anima's `jaw` is three (her lips, her
+ * authored shape arrives as several rpack morphs -- the bought character's `jaw` is three (her lips, her
  * face and her teeth, 4873 + 14694 + 20725 deltas on three different meshes with three
  * different VBOs). Driving it through morphIdx moved her lips and left her jaw shut, and
  * the whole expression read as 1.58% of a face panel changing.

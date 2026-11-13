@@ -1,5 +1,5 @@
 #version 450
-// The last lighthouse's red dwarf.
+// The menu scene's red dwarf.
 #extension GL_GOOGLE_include_directive : enable
 #include "view.glsl"
 layout(location = 0) in vec3 aP;

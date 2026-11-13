@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""make_crowd.py -- writes set `actor` lines for a CROWD (ROBOT NEKO ep 11: the half-pipe).
+"""make_crowd.py -- writes set `actor` lines for a CROWD (a half-pipe scene).
 
     actor <pack> <clip> x y z yaw scale [rate] [speed] [runlen] [board]
 
 The set format is `design/the_set.md`; live examples are reva_native/sets/three_lawns.set,
-parsons.set and other_side.set. Two facts from crowd_kms.c drive every choice below:
+<street>.set and other_side.set. Two facts from crowd_kms.c drive every choice below:
 
   SCALE is self-normalising. loadPack() measures each pack's own bind-pose span and sets
   P.scale = 3.15/(span*1.13) (crowd_kms.c ~line 940), and the actor draw path does
   `eff = A->sc * P->scale` (~line 5714) -- the SAME formula the prop path uses. That is why
   every humanoid actor in every shipped set carries `scale 1.000` regardless of how wild the
   pack's raw rig units are (measured: v1_Character_04 bind-pose span ~466 "units" tall,
-  v1_crowd_susan ~1.7, v1_manny ~183, the curated packs ~0.03-0.07 -- and all four already
+  a bought crowd body ~1.7, v1_manny ~183, the curated packs ~0.03-0.07 -- and all four already
   read as adults on disk at scale 1.000). So scale stays 1.000 here too.
 
   YAW faces +z at 0 and turns toward +x as it increases: the static actor matrix builds
@@ -22,14 +22,14 @@ parsons.set and other_side.set. Two facts from crowd_kms.c drive every choice be
 
 CLIP RESOLUTION (actorClip(), crowd_kms.c ~4152): the actor's OWN pack is searched first;
 only if the name is not found there does it fall through to bankFind() across the five
-packs bankAdd() loads at boot (v1_mob1, v1_kaeli, v1_moves, v1_kmoves, v1_zmoves -- see
+packs bankAdd() loads at boot (v1_mob1, the co-star's, v1_moves, v1_kmoves, v1_zmoves -- see
 ~line 11991-12023) -- and a bank hit only reaches the body if that body's OWN pack has
 cbOK && pbOK>=10 (the canonical-skeleton census), else the engine prints
 "is in a bank, but this rig has no canonical basis" and the actor is left with no clip at
 all (a statue). This module never guesses that census: CHEER_OWN pairs are clips native to
 their own pack (checked below with Rpack.clip_names(), so cbOK/pbOK never matters), and
 CHEER_BANK_PACKS is exactly the roster already proven to receive a bank clip by shipped,
-committed sets (three_lawns.set/parsons.set/twelve.set/other_side.set already run
+committed sets (three_lawns.set/<street>.set/twelve.set/other_side.set already run
 zombie/w_cheer/m_drink/m_sway/x_fidget/w_look/w_text/z_greet on every one of them).
 
 usage:
@@ -70,7 +70,7 @@ CHEER_OWN = [
 # committed set on disk, which is the only real proof of cbOK/pbOK short of running the
 # engine (out of scope for this task) -- so the roster is exactly that proven set, not a
 # guess extended to unrelated packs.
-# ⛔ parsons.set ALSO references v1_Character_{18,20,22,24,25,27,28,33,35,37,39} bare, but
+# ⛔ the <street>.set ALSO references v1_Character_{18,20,22,24,25,27,28,33,35,37,39} bare, but
 # verify_roster() (below) shows none of those .rpack files exist any more -- 17-28 now only
 # exist as costumed variants (_Police/_Female_Police/_Firefighter/_Doctor/_HM) and 33-39
 # bare don't exist at all. Those set lines are dead today (setPack returns -1, the actor is
@@ -90,7 +90,7 @@ BANK_DONOR_PACK = "v1_moves"
 BANK_CLIP = "w_cheer"
 
 # ============================ THE SIGHT GAG ==========================================
-# ep 7 note, confirmed by reading the pack directly (rpack.py): v1_reva (the July ancestor,
+# a note confirmed by reading the pack directly (rpack.py): v1_reva (the July ancestor,
 # 27 nodes) carries exactly 37 clips -- p_live1-3, 8 mirrored dance-pair sets, c_kiss/insult,
 # w_walk/fly/ski/run -- and NOT ONE of them is an idle. m_macarena is one of the 37, native
 # to the pack, so it needs no bank/canonical transfer at all: she will macarena, forever,
@@ -213,7 +213,7 @@ def build_actors(points, roster, target, rng, rate_range=(0.85, 1.15), scale=1.0
     return lines
 
 
-# ============================ THE EP11 PRESET ========================================
+# ============================ THE HALF-PIPE PRESET ===================================
 def ep11_halfpipe(seed=11):
     """Two crowds lining the half-pipe's long sides (the pipe: centred at 0,0,0, axis along
     z, spans x -14..14 including its decks, z -7..7) plus a short row at the +z end. Rows

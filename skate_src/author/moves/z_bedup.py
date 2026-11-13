@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""z_bedup.py -- ROBOT NEKO ep 12, "1 AM": kaeli GETS OUT OF BED, and SMOKES at the window. (kaeli's two clips;
+"""z_bedup.py -- the co-star GETS OUT OF BED, and SMOKES at the window. (the co-star's two clips;
 A1's z_bed.py lies the pair down -- z_rm_bed_back / z_rm_bed_nestle -- and these follow it.)
 
   z_rm_bed_getup  4.0 s ONE-SHOT  from z_rm_bed_nestle frame 0 EXACTLY. Her head comes up off reva and she rocks
@@ -23,15 +23,15 @@ floor (the engine's `MK->y - P->mny*sc`), and the clip's own pelvis track carrie
 frame 0 joint for joint; only the pelvis translation is re-based, by exactly the height the hips mark gave it, so
 the two lines meet in the WORLD on the cut. The script prints the mark line and the standing spot.
 
-WORLD FRAME (kaeli_house.set, A1's convention: yaw 0, model axes ARE the world's): x runs along the bed (head of the
+WORLD FRAME (the bedroom set, A1's convention: yaw 0, model axes ARE the world's): x runs along the bed (head of the
 bed at x ~2.3), z runs across it toward the far edge (7.80) and the window (14), y up. Mattress solid top 1.02
 (x 2.30..6.90, z 3.40..7.80); pillows are boxes to y 1.34. The bedding gives: a body may sink SINK into it.
 
 THE GRIP IN THE SMOKE GATE is the knuckle point between the index and middle fingers (where a cigarette is held),
-not the engine's gripNode: on anima that is `hand_r`, the WRIST, and a wrist 0.06 u from the mouth puts the hand
+not the engine's gripNode: on the bought character that is `hand_r`, the WRIST, and a wrist 0.06 u from the mouth puts the hand
 across her face. Both distances are printed.
 
-usage: z_bedup.py <v1_anima_outfit pack> [--nestle-mark x,y,z] [--preview DIR] [--only a,b] [--nobake] [--force] [--live] [--no-lids]
+usage: z_bedup.py <v1_<body> pack> [--nestle-mark x,y,z] [--preview DIR] [--only a,b] [--nobake] [--force] [--live] [--no-lids]
   ⛔ reva_native/packs is REFUSED without --live; a failed gate bakes nothing without --force.
 """
 import sys, os, math, struct
@@ -47,10 +47,10 @@ from z_sk_board import add, sub, mul, dot, cross, nrm, lerp, clamp01, q_from_axe
 FPS = 30.0
 GETUP_D, SMOKE_D = 4.0, 5.0
 NESTLE = "z_rm_bed_nestle"
-NESTLE_MARK = (4.90, 1.25, 5.85)       # A1's hips mark for kaeli: a GUESS until z_bed.py prints it (--nestle-mark)
+NESTLE_MARK = (4.90, 1.25, 5.85)       # A1's hips mark for the co-star: a GUESS until z_bed.py prints it (--nestle-mark)
 MATTRESS = ((2.30, 0.00, 3.40), (6.90, 1.02, 7.80))
 PILLOWS = [((2.33, 1.02, 4.43), (3.57, 1.34, 5.27)), ((2.33, 1.02, 6.03), (3.57, 1.34, 6.87))]
-SINK = 0.12                            # club u a body may press into the duvet / a pillow
+SINK = 0.12                            # engine u a body may press into the duvet / a pillow
 EDGE_Z = 7.80
 SEAT_BACK, FEET_OUT = 0.36, 0.50       # seated: the pelvis this far inside the edge; standing: this far outside it
 MOUTH_TOL = 0.06
@@ -198,7 +198,7 @@ def blend_pose(A, B, u):
 
 # ---- gates ------------------------------------------------------------------------------------------------------
 def box_pen(caps, sc, boxes, W):
-    """Deepest a capsule reaches into any box (world, club u; >0 = inside), boxes already shrunk by the sink."""
+    """Deepest a capsule reaches into any box (world, engine u; >0 = inside), boxes already shrunk by the sink."""
     worst, who = -9.0, ""
     for (a, b, r, nm) in caps:
         A, B = W(a), W(b)
@@ -487,7 +487,7 @@ class Getup:
         return G, F
 
     def head_eval(self, key, w, wq, direction):
-        """A key value: a world point/direction, or ("h", (left, up, front)) in the head's frame (club u)."""
+        """A key value: a world point/direction, or ("h", (left, up, front)) in the head's frame (engine u)."""
         B = self.B; R = B.R
         if isinstance(key, tuple) and key and key[0] in ("kl", "kr"):
             kn = w[R.leg[key[0][1]][1]]
@@ -691,9 +691,9 @@ class Smoke:
         q9 = pose_l(self.clear_abd(pose_l, abd0))[0]
         return B.full(q9, to)
 
-    GAP = 0.032         # club u: the free arm (and the hanging smoking arm) stay this far off her skin
-    FILTER, EMBER = 0.048, 0.112   # club u from middle_01_r along the palm normal: filter (palm side), ember (the back)
-    STANDOFF = 0.006    # club u: the filter tip sits this far in front of the lip point (touching, not inside)
+    GAP = 0.032         # engine u: the free arm (and the hanging smoking arm) stay this far off her skin
+    FILTER, EMBER = 0.048, 0.112   # engine u from middle_01_r along the palm normal: filter (palm side), ember (the back)
+    STANDOFF = 0.006    # engine u: the filter tip sits this far in front of the lip point (touching, not inside)
     # the drag hand, chosen by probe (probe_drag*.py): fingers at the 40 deg end of the brief (the ring/pinky edge of a
     # palm-to-mouth right hand RISES as the fingers tilt out -- anatomy -- and at 45-50 deg it reached her nose), the
     # palm facing the mouth from her front-right, ring and pinky tucked tight, index and middle straight
@@ -764,7 +764,7 @@ class Smoke:
         return W, Qh, pole, n_p
 
     def finger_gap(self, w, wq):
-        """The closest any finger segment (knuckle to tip, every finger) comes to her head's skin, club u, less a
+        """The closest any finger segment (knuckle to tip, every finger) comes to her head's skin, engine u, less a
         finger's half-thickness (0.012 u)."""
         R = self.B.R
         P = self.hworld(w, wq)
@@ -780,7 +780,7 @@ class Smoke:
         return best * R.scale - 0.012
 
     def tips_out(self, w, wq):
-        """How far the index and middle fingertips sit to her RIGHT of the nose's own half-width, club u."""
+        """How far the index and middle fingertips sit to her RIGHT of the nose's own half-width, engine u."""
         R = self.B.R
         hd = R.RM["head"]
         u, f, l = self.B.frame_of(wq, hd)
@@ -803,7 +803,7 @@ class Smoke:
         return max(pe["upperarm_" + s], pe["lowerarm_" + s], self.cloud.hand_pen(w, wq, s, self.r_hand))
 
     def cap_pen(self, w, wq, s):
-        """The arm's capsules against every other body capsule (the body gate's own test, this arm only), club u."""
+        """The arm's capsules against every other body capsule (the body gate's own test, this arm only), engine u."""
         R = self.B.R
         caps = R.capsules(w, wq)
         worst = -9.0

@@ -11,7 +11,7 @@ BY EYE last session, and the eye is exactly what is not available in a regressio
 
 ⛔ AND THE OBVIOUS INSTRUMENT IS THE ONE THAT DOES NOT WORK. face_aim.py tries to FIND
 the mouth and the eye line in the render by colour and shape. That approach failed twice
-in one session: a saturation detector found reva's lips perfectly and located kaeli's
+in one session: a saturation detector found reva's lips perfectly and located the co-star's
 chin instead (the lab stage is dark and her lips are low-contrast), and a "the lip seam
 is a dark ridge" detector locked onto HAIR on both women. Feature-finding in a picture
 of a stylised face is not reliable, so nothing here does it.
@@ -27,15 +27,15 @@ What IS reliable is measuring the rig against itself and the render against PHYS
   MOUTH IN PROPORTION the corner marks must be inside the head and wider than a slit.
                       The aperture used to be sized 0.42 x the interocular distance --
                       a guess resting on the eye marks, which are themselves a
-                      proportion -- and cut a hole from kaeli's nose to her chin.
+                      proportion -- and cut a hole from the co-star's nose to her chin.
   THE JAW MOVES       posing the jaw bone must actually displace the chin, by a
                       distance comparable to the mouth's own size. A jaw banded onto the
                       throat once measured 5cm of travel while the lips never moved.
   ⛔ NO SEE-THROUGH   THE ELDRITCH TEST, and the only one that needs pixels. With the
                       mouth open, the background must not be visible through the head.
-                      kaeli's open mouth was a flat BLUE DISC -- her own hair, seen
+                      the co-star's open mouth was a flat BLUE DISC -- her own hair, seen
                       through the back of her skull -- and that is what an interior is
-                      for. Shot against a colour the club never renders, so anything
+                      for. Shot against a colour the engine never renders, so anything
                       showing through is unambiguous.
 
 Rig checks need no engine. The see-through test shoots the face rig's mouth camera.
@@ -177,10 +177,10 @@ def rig_checks(subject, verbose=False):
         if p.sname(rec[0]) == "mouth_interior": interior = rec[2]
     # ⭐ AN INTERIOR IS A JOB, NOT A MESH NAME. mouth_interior.py authors one for a body
     # whose lips are sealed geometry with nothing behind them. Some bodies ARRIVE with a
-    # mouth: v1_crowd_susan is a Character-Creator-style head whose own mesh carries
+    # mouth: a bought crowd body (v1_crowd_<body>) is a Character-Creator-style head whose own mesh carries
     # teeth (they are in her texture atlas, beside an eye sphere and a tongue), so
     # authoring a second set put two rows of teeth in the same skull. What the interior
-    # actually has to deliver is "you cannot see through her head", and SEETHRU below
+    # actually has to deliver is that nothing shows through her head, and SEETHRU below
     # measures exactly that -- so a body without the authored mesh is asked to prove it
     # the other way rather than being failed for the missing name.
     out.append(("INTERIOR", interior is not None if interior else None,
@@ -203,7 +203,7 @@ def seethrough(subject, jaw=1.0, keep=None):
         subprocess.run(["taskkill", "/IM", x, "/F"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     env = dict(os.environ, REVA_WINDOWED="1", REVA_FIXEDSTEP="60", REVA_NOSKY="1",
-               REVA_CLEAR="1,0,1",          # a colour the club never renders
+               REVA_CLEAR="1,0,1",          # a colour the engine never renders
                REVA_LABCTL="anim_bench/lab_ctl.txt", REVA_AUTOMODE="11",
                REVA_ANIMSUBJ=subject, REVA_ANIMSTATE="0",
                REVA_SHOT="420", REVA_SHOTN="1",
@@ -218,7 +218,7 @@ def seethrough(subject, jaw=1.0, keep=None):
     # The camera AIMS AT face_mouth, so her mouth is at the panel centre by
     # construction -- no feature-finding needed. Sample a box around it big enough to
     # cover a wide-open mouth and no more, and count MAGENTA: the stage was cleared to
-    # a colour nothing in the club renders, so a magenta pixel there came through her
+    # a colour nothing in the engine renders, so a magenta pixel there came through her
     # skull. (Counting "dark" pixels instead cannot work -- the inside of a mouth is
     # deliberately near-black, and so is the lab stage around her head. That first
     # version reported 6% and 13% see-through on two faces that are demonstrably solid.)
@@ -289,7 +289,7 @@ def main():
                   % ("SEETHRU", "ok" if good else "FAIL", frac * 100, SEETHRU_MAX * 100))
             bad += not good
         # A body that brought its own mouth passes on SEETHRU's evidence -- that is the
-        # job the authored mesh exists to do, and v1_crowd_susan already does it.
+        # job the authored mesh exists to do, and that crowd body already does it.
         for nm, note in deferred:
             print("  %-10s %-4s %s" % (nm, "ok" if good else "FAIL",
                                        note + (" -> her own geometry closes the skull"

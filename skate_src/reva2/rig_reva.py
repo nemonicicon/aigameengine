@@ -9,7 +9,7 @@ LANDMARKS (all positions derived from the mesh's own slices -- nothing hand-plac
 bind on a watertight proxy and transfer the weights, add a 2-frame rest action so the
 anim baker has a clip, and export GLB. canonOf speaks the bone names.
 
-Units: ONE system end to end (the kaeli chimera lesson) -- transforms applied, metres.
+Units: ONE system end to end (the co-star's chimera lesson) -- transforms applied, metres.
 
 REBUILT 2026-09-10 (her model had gone wrong somewhere: her shoulders,
 her texture). What the first recipe got wrong, all measured on the source:
@@ -29,14 +29,14 @@ her texture). What the first recipe got wrong, all measured on the source:
   * Blender's auto-weights were run on the raw Meshy surface (self-intersecting shells,
     the cyber arm a separate one): weights now solve on a voxel proxy and transfer.
 """
-import sys  # club-engine kit: machine-independent paths
+import sys  # machine-independent paths
 import bpy, os, math, mathutils
 import numpy as np
 
 D = os.path.join(os.environ.get("REVA_SRC", "models/reva_meshy"),
                  "Meshy_AI_REVA_Holographic_Neon_0629075151_image-to-3d-texture_fbx")
 FBX = os.path.join(D, "Meshy_AI_REVA_Holographic_Neon_0629075151_image-to-3d-texture.fbx")
-OUT = os.environ.get("REVA_OUT", os.path.join(os.environ.get("CLUB_OUT", "out"), "reva2.glb"))   # club-engine kit: machine-independent paths
+OUT = os.environ.get("REVA_OUT", os.path.join(os.environ.get("CLUB_OUT", "out"), "reva2.glb"))   # machine-independent paths
 TRI_TARGET = int(os.environ.get("REVA_TRIS", "100000"))
 TEX = int(os.environ.get("REVA_TEX", "4096"))
 VOXEL = float(os.environ.get("REVA_VOXEL", "0.010"))
@@ -61,7 +61,7 @@ def shift(dx, dy, dz):
 
 # ---- ground + center ---------------------------------------------------------------
 # NO turn. Meshy ships her facing Blender -Y, and the glTF Y-up export maps -Y to +Z,
-# which is club forward. She goes in as she arrives. (The first cut turned her 180 on a
+# which is the engine's forward. She goes in as she arrives. (The first cut turned her 180 on a
 # CIRCULAR measurement -- a toe bone this script had itself placed -- and it showed
 # on sight: she was built backward, her back where her front belongs. Facing is asserted below from
 # anatomy no bone placement can move.) Facing -Y with +Z up, her left is +X.
@@ -197,7 +197,7 @@ neckZ = min(tops) if tops else H * 0.83
 headZ = chinZ + H * 0.008                              # the skull pivots just above the chin line
 yN = float(np.interp(neckZ, col[:, 0], col[:, 1]))
 # The LEAN is the donor library's, because the P5 transfer aligns exactly this segment to
-# theirs (measured off the rest skeletons: kmoves 6.5, moves 11.8, anima 14.5 forward); the
+# theirs (measured off the rest skeletons: kmoves 6.5, moves 11.8, the bought character 14.5 forward); the
 # column's own reading is printed beside it and has agreed to within a few degrees.
 LEAN = math.radians(11.8)
 slope = -math.tan(LEAN)                                # dy/dz; forward is -y

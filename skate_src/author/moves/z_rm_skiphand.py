@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_rm_skiphand.py -- P8: SKIPPING HAND IN HAND. Movement + a SUSTAINED contact.
 
-A move that travels: reva skips along hand in hand with kaeli.
+A move that travels: reva skips along hand in hand with the co-star.
 
 Every inter-body contact so far was a MOMENT (the five) or a held POSE (the hug). This
 is the third class: two bodies TRAVELING with root motion while one contact point --
@@ -19,7 +19,7 @@ crawl's closure-by-construction), the pelvis bounces twice per cycle, and travel
 strictly monotonic -- skipping goes somewhere.
 
 Sidedness: the hero (reva) has the partner on her RIGHT (bench pside NEGATIVE), so her
-inner arm is the RIGHT; the partner (kaeli) mirrors with her LEFT. --inner picks.
+inner arm is the RIGHT; the partner (the co-star) mirrors with her LEFT. --inner picks.
 
 usage: z_rm_skiphand.py <pack> --scale S --arm A --inner r|l --sidegap G --meeth H
     S: the engine's scale for this pack

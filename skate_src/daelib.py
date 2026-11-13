@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""daelib.py -- COLLADA (.dae) in and out, to and from the club's scene shape (2026-10-05).
+"""daelib.py -- COLLADA (.dae) in and out, to and from the engine's scene shape (2026-10-05).
 
 READ  scene = read_dae(path, report)  ->  dict(nodes, meshes, clips, textures, names)
       in rpackwrite's shape, with every mesh PRE-BAKED INTO RIG SPACE at the rest pose:

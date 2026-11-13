@@ -76,7 +76,7 @@ def main():
     ap.add_argument("--n", type=int, default=12)
     ap.add_argument("--frame", type=int, default=520)
     ap.add_argument("--set", default="parsons")
-    # across the road from the porch mark: the walking neighbours and mrs parsons in frame
+    # across the road from the porch mark: the walking neighbours and the woman at her mailbox in frame
     ap.add_argument("--cam", default="30.0,3.2,-8.0,42.0,1.4,12.0,40")
     ap.add_argument("--sun", default="66,178,1.38,1.00,0.98,0.94")
     ap.add_argument("--sky", default="0.460,0.520,0.640")

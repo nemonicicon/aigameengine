@@ -1,5 +1,5 @@
 ﻿import unreal, os
-OUT = "out/kaeli/anim_glb"   # club-engine kit: machine-independent paths
+OUT = "out/kaeli/anim_glb"   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/TopDown/Models/ZAMN_Cleo"
 opts = unreal.GLTFExportOptions()

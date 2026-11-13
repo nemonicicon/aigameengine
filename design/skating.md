@@ -1,8 +1,8 @@
 # SKATING — the pose, generalized off the skate bench
 
 *(written 2026-08-29. The brief: skaters added to the scene, with a punk influence, the
-gritty-neighbourhood kind, and the skate animations generalized, since zombies vs
-neighbours is punk in character. Then a screenshot of reva contorted in the park: a pose
+gritty-neighbourhood kind, and the skate animations generalized, since the zombie
+material is punk in character. Then a screenshot of reva contorted in the park: a pose
 for a T-1000 getting blasted, not for a skater.)*
 
 ---
@@ -124,8 +124,8 @@ often; without a start frame nothing is written and the run hangs forever. And t
 *(The rider lives in AUTHORED clips now -- `skate_src/author/moves/z_sk_ride.py` (ride, push,
 pop, kickflip, shove-it, manual, indy, method, and the filmer's ride) and `z_sk_board.py`
 (carry, pickup, catch-up, drop-in, step-off, bail) -- baked onto each body with the board as a
-channel of the clip (`@board`, ROBOT NEKO ep 10). The procedural rider above is the 08-29
-actor-path ancestor. The skate promo -- four cuts, 09-19 → 09-20, `<data>/robot_neko/promo/`
+channel of the clip (`@board`). The procedural rider above is the 08-29
+actor-path ancestor. The skate promo -- four cuts, 09-19 → 09-20, `<data>/promo/`
 -- is the game's own look test: the game is about FILMING skaters, so the camera is in a rider's hand more often than not.)*
 
 ⭐ **THE STANCE IS JUDGED FROM BEHIND.** The knees looked off and the stance on the board
@@ -143,7 +143,7 @@ that hand (`design/scene_direction.md`). Every loop but the ride is gated first-
 
 ⭐ **A BAIL IS PHYSICS, NOT A CLIP.** `z_rm_sk_bail` plays the same way every time; `pdoll=<sec>`
 hands the body to the ragdoll -- her own pose, the speed she was actually carrying (7 u/s
-mid-run in ep 3), the real floor -- and she slides and settles instead of skating on her face
+mid-run), the real floor -- and she slides and settles instead of skating on her face
 (`engine_capabilities.md` §22; the fixture is `scenes/rd_slam.txt`, and it is written the way a
 test should be: THE ONE QUESTION, PASS, FAIL, CONTROL, PRECONDITIONS, then the take).
 

@@ -1,15 +1,15 @@
 """sliceclip.py -- cut a frame range out of one clip into a new one, and rename the source.
 
-09-01: kaeli's base idle animation turned out to be a crouch-to-standing transition.
+09-01: the co-star's base idle animation turned out to be a crouch-to-standing transition.
 
-Yes -- and it was measured before it was believed. kaeli's `idle` (v1_kmoves, 184 frames)
+Yes -- and it was measured before it was believed. The co-star's `idle` (her moves pack, 184 frames)
 is a GET-UP: frames 0-80 are a crouch (left thigh 120 deg and both knees ~100 deg off her
 rest pose), 80-100 she rises, and from ~100 on she is standing (thigh 18-46 deg, knees
 10-25 deg -- the same numbers as her `w_walk`). Its last frame is 111 deg away from its
 first, so it does not loop, and every election that mines the word "idle" -- the pack's
 idleIdx, the hero's foot idle, the donor bank's exact-name idle -- picked it and played it
 on a loop: stand up, snap to the floor, stand up, for the whole of every scene.
-compile_scene.py already knew ("kaeli's own idle is a GET-UP-OFF-THE-FLOOR loop") and
+compile_scene.py already knew (the co-star's own idle is a GET-UP-OFF-THE-FLOOR loop) and
 dodged it with role casting; the other three elections never heard.
 
 The fix is in the asset, not the engine's opinion of it:

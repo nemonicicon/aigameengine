@@ -1,5 +1,5 @@
 #version 450
-// A soft glowing point or thread, its middle going to white: Wan-To's pieces and what holds them.
+// A soft glowing point or thread, its middle going to white: a plasma creature's pieces and what holds them.
 layout(constant_id = 3) const int LINEAR = 0;
 layout(location = 0) in vec4 vC;
 layout(location = 1) in vec2 vU;

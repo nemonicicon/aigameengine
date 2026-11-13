@@ -1,4 +1,4 @@
-"""lhshot.py -- shoot door 11's start menu (the last lighthouse) at several orbit phases.
+"""lhshot.py -- shoot door 11's start menu (a menu scene) at several orbit phases.
 
     python anim_bench/lhshot.py out.png [--t 0,75,150,225] [--frame 300] [--env K=V ...] [--promoted]
 

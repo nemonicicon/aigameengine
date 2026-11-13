@@ -2,7 +2,7 @@
 """z_greet.py -- P6e specimen 1: a wave with REAL FINGERS.
 
 Raise the right arm, spread the hand wide open with a per-finger wiggle, clench to a
-fist, open again, lower. The first authored motion in the club with articulated hands.
+fist, open again, lower. The first authored motion in the engine with articulated hands.
 All axes derived per rig and sign-audited (HandRig); the asserts are geometric:
 
     OPEN  -- fingertip span (index tip to pinky tip) grows past 1.25x its rest span

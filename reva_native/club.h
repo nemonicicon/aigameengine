@@ -1,4 +1,4 @@
-/* club.h -- what the club's translation units share. 2026-09-30: the split, stage 1 and 2.
+/* club.h -- what the engine's translation units share. 2026-09-30: the split, stage 1 and 2.
  * ⛔ Everything in crowd_kms.c is static and always was; a section leaves only when its outside
  * face is this small. The receipt for every stage: REVA_SIMHASH lines and the lab frame byte-identical
  * to the run before the move (design/platform_tiers.md, "the split"). */
@@ -10,7 +10,7 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 
-/* THE CLUB'S OWN MATH (11-02) is club_math.h: one answer on every machine. A game gets that header through engine.h and nothing else of this one (step 20) */
+/* THE ENGINE'S OWN MATH (11-02) is club_math.h: one answer on every machine. A game gets that header through engine.h and nothing else of this one (step 20) */
 #include "club_math.h"
 
 /* club_math.c: column-major 4x4 */
@@ -29,7 +29,7 @@ void sfxPreload(const char*name);                    /* in the bank now, so its 
 void sfxStop(int id);
 void sfxListener(const float*eye,const float*ctr);
 void sfxInit(void);
-/* (10-22, reva) door 11 (lighthouse.c) synthesises its own sounds and turns them while they play */
+/* (10-22, reva) door 11 (a menu scene) synthesises its own sounds and turns them while they play */
 #define SFX_RATE 44100
 float* sfxDecodeFile(const char*path,int*n);          /* a WAV or an Ogg, whole, as mono float at SFX_RATE. malloc'd; NULL if it can't be read. Any thread. A name with no such file tries .wav and .ogg */
 void sfxBankFree(int slot);                          /* its memory goes, and anything playing it stops */

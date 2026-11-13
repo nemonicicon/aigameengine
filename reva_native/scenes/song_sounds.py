@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""song_sounds.py -- HOW MANY KEYBOARD SOUNDS, AND WHEN (design/pdoom_video.md: with two keyboards in front of her, she plays both where their sounds differ).
+"""song_sounds.py -- HOW MANY KEYBOARD SOUNDS, AND WHEN (a music video: with two keyboards in front of her, she plays both where their sounds differ).
 Each note on the keyboard stem gets the shape of its spectrum, which does not move with its pitch (MFCC 2-12, at its attack and in its body, with what pitch explains regressed out); those split into groups, each tested
 against two controls that must lose: one Gaussian blob of the same shape (does it split better than a thing with no groups?) and the same labels shuffled in time (does it come in runs, like a player's phrase?).
   song_sounds.py <stems dir> <map.json> <notes.json> <out sounds.json>

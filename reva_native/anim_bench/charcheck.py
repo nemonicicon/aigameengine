@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """charcheck.py -- what a character has, read off its pack, and how that stands against the character standard (queue step 23, 11-04).
 
-Anima has most of the features wanted in a model, and is held as the standard. So the standard is a list of things a body either has or
-hasn't, each one measured from the file, and Anima's own answers are the bar (design/character_standard.md says why each is on the list).
+The bought character has most of the features wanted in a model, and is held as the standard. So the standard is a list of things a body either has or
+hasn't, each one measured from the file, and its own answers are the bar (design/character_standard.md says why each is on the list).
 
   charcheck.py PACK [PACK ...]         each body's answers, side by side
-  charcheck.py PACK --against STANDARD the rows where PACK has less than STANDARD (a pack path; Anima's is packs/v1_kaeli_street.rpack)
+  charcheck.py PACK --against STANDARD the rows where PACK has less than STANDARD (a pack path; the bought character's is packs/v1_<body>.rpack)
 
 It reads the pack as the engine does once it's loaded (chunks merged), poses nothing, and opens no window. An eye is found the way the engine finds one: by name, or a small
 mesh as deep as it's wide and tall, in the head, off the middle, with a twin. Shape rules are rules of thumb: a row says how it was told.

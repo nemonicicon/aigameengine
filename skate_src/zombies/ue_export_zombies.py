@@ -1,14 +1,14 @@
-"""ue_export_zombies.py -- UE headless: the ZAMN zombie clip bank -> GLB, for Z4.
+"""ue_export_zombies.py -- UE headless: the zombie prototype's clip bank -> GLB, for Z4.
 
     UnrealEditor-Cmd.exe GunExport.uproject -run=pythonscript -script=ue_export_zombies.py
         -stdout -FullStdOutLogOutput -unattended -nosplash -nullrhi
 
-Source: ZAMNRemake/Content/ZombieAnimationPack/Animations/Mannequin_UE5 (32 AnimSequences,
+Source: <the zombie prototype's project>/Content/ZombieAnimationPack/Animations/Mannequin_UE5 (32 AnimSequences,
 copied into the shim). Same artery as ue_export_town.py and skate_src/kaeli's
 ue_export_anim_gltf.py -- exporting an AnimSequence through GLTFExporter brings its
 skeletal mesh along with it, so each GLB is one rig + one clip.
 
-⭐ THESE ARRIVE IN THE CLUB'S OWN BONE LANGUAGE. The canonical map in crowd_kms.c is
+⭐ THESE ARRIVE IN THE ENGINE'S OWN BONE LANGUAGE. The canonical map in crowd_kms.c is
 written against UE names -- "pelvis", "spine_", "clavicle_l", "upperarm_l", "thigh_l",
 "calf_l" -- because that is the convention the whole retarget was authored to. The UE5
 mannequin these clips ride is therefore not "a rig we must map"; it is the reference rig.
@@ -19,7 +19,7 @@ way merge_mob1.py fused the CivicDefenseV2 mocap -- one rig, named clips, one rp
 """
 import unreal, os
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "zombies")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "zombies")   # machine-independent paths
 os.makedirs(OUT, exist_ok=True)
 ROOT = "/Game/ZombieAnimationPack/Animations/Mannequin_UE5"
 

@@ -1,4 +1,4 @@
-/* gfx_shd.inc -- ⭐ (11-12) A SURFACE'S OWN SHADER, on Vulkan (the Godot proof of concept's step 12: their Hedge Maze draws its hedges and its
+/* gfx_shd.inc -- ⭐ (11-12) A SURFACE'S OWN SHADER, on Vulkan (the Godot proof of concept's step 12: one of their levels draws its hedges and its
  * ground with shaders of its own, and no plain material carries what those draw). Included by gfx_vk.c straight after pipeMake.
  *
  * A shader here is shaders/mesh.frag built with GODOT_HOOK round a game's surface code, which skate_src/godot/godot_shader.py translates from the

@@ -1,6 +1,6 @@
 /* ==================== MARK EDITOR ===================================================
  * ⭐ A PERSON PLACES THEM FASTER. Placing a face mark is a thing a person does by LOOKING, and I converged
- * on kaeli's eyes by bisecting render sweeps -- too wide, then too high, then too low --
+ * on the co-star's eyes by bisecting render sweeps -- too wide, then too high, then too low --
  * while a person could have pointed at them. face_calibrate.py cannot do it on her either (heavy
  * liner and a blue fringe defeat the darkest-texel rule), so the automatic path is out and
  * the person who can see is the right instrument.
@@ -46,7 +46,7 @@ __attribute__((unused)) static int markPick(Pack*P,M4*world,const float*model,co
     for(unsigned mi=0;mi<P->nMeshes;mi++){
         PMesh*M=&P->meshes[mi];
         if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB||MOFF(P,mi)) continue;
-        if(meshIsGarment(P,mi)) continue;   /* the skin, not the clothes (~cloth, ep 14 ~worn) */
+        if(meshIsGarment(P,mi)) continue;   /* the skin, not the clothes (~cloth, ~worn) */
         unsigned short*bm=(unsigned short*)(P->pk+M->offBoneMap);
         float*ibm=(float*)(P->pk+M->offIBM);
         float*rp=(float*)(P->pk+M->offPos);
@@ -99,7 +99,7 @@ __attribute__((unused)) static void markWrite(const char*subj){
     printf("[mark] wrote %s%c",pth,10); fflush(stdout); }
 
 /* ⭐ EYES THAT AIM WITHOUT EYE BONES (09-11). In the cut, the eyes were bad on most models.
- * Reva's are painted and kaeli's are lid shells, but ANIMA
+ * Reva's are painted and the co-star's are lid shells, but her bought body
  * carries the ARKit eye-look shapes (eyeLookIn/Out/Up/Down, Left/Right) and they were
  * never wired. The same residual gaze eyeAim() gives a bone rig drives them here: yaw>0
  * is her RIGHT (lookTarget's frame), so the right eye looks Out and the left looks In.
@@ -121,13 +121,13 @@ static void eyeMorphAim(Pack*P,float*wts,float dyaw,float dpitch){
     morphSetName(P,wts,"eyeLookOutLeft",L);  morphSetName(P,wts,"eyeLookInRight",L);
     morphSetName(P,wts,"eyeLookUpLeft",U);   morphSetName(P,wts,"eyeLookUpRight",U);
     morphSetName(P,wts,"eyeLookDownLeft",D); morphSetName(P,wts,"eyeLookDownRight",D); }
-/* ---- THE EXPOSURE LATCH ON THE FACE SOLVE (ROBOT NEKO ep 6) ---------------------
- * ep 1's law was written for the chains and the cloth: "a held exposure does not
- * integrate". The face was never brought under it, and it cost exactly what ep 4 and
- * ep 5 measured -- on a held pair the only thing that moves is a head and its hair.
+/* ---- THE EXPOSURE LATCH ON THE FACE SOLVE ---------------------
+ * Stop motion's first law was written for the chains and the cloth: "a held exposure does not
+ * integrate". The face was never brought under it, and it cost exactly what two later
+ * shoots measured -- on a held pair the only thing that moves is a head and its hair.
  *
  * It is NOT a clock. The head layer has run on scnBodyT(), the latched exposure clock,
- * since ep 1. It is a FEEDBACK LOOP: lookTarget() aims each head at the OTHER body's
+ * since the first shoot. It is a FEEDBACK LOOP: lookTarget() aims each head at the OTHER body's
  * published eye mark, and that mark is republished out of last frame's FK. One rendered
  * frame is one iteration of that solve, so a held exposure goes on converging a pose the
  * shutter has already photographed -- a fraction of a degree at the neck, which is a
@@ -140,8 +140,8 @@ static void eyeMorphAim(Pack*P,float*wts,float dyaw,float dpitch){
  * loop, the eye aim, the eye shapes, the jaw, the joint boil.
  *
  * ⛔ PER CAST SLOT, NOT PER `who`. scnHeadLayer is called with who=1 for EVERY cast
- * member -- the slot is g_castI. A cache keyed on `who` is the ep 2 bug (kaeli and mrs
- * parsons overwriting each other) wearing a fix's clothes.
+ * member -- the slot is g_castI. A cache keyed on `who` is the old bug (two partners
+ * overwriting each other) wearing a fix's clothes.
  * REVA_NOHOLDLATCH=1 is the control run. */
 #define HOLD_MAXN 512
 static float g_holdQ[SCN_MAXCAST][HOLD_MAXN][4];
@@ -243,7 +243,7 @@ static void perfLayer(Pack*P,float Q[][4],int who,int li,float t){
     float yawT=0.f, pitchT=0.f; int aimed=0, about=0;
     float dt0=t-g_perfT[me]; int fresh=(!g_perfHas[me]||dt0<0.f||dt0>0.75f);
     /* ⭐ THE LOOK-AT IS ABSOLUTE. An offset on the clip's head was not a look: a sitting clip holds the head down at
-     * its console, and "look at Marie" came out as a look at Marie's lap (2.4's first take). Where the CLIP's head faces
+     * its console, and "look at her" came out as a look at her lap (a first take). Where the CLIP's head faces
      * -- its rotations carried root to head, low-passed over 1.2 s so the clip's own nods still play -- is corrected to
      * where the other one's head is. */
     { float fc[3], *FD=g_perfF[me];
@@ -425,7 +425,7 @@ static void scnHeadLayer(Pack*P,float Q[][4],int who){
     if(hd>=0){ qaxis(off,1,0,0,pitch*0.55f); qmul(Q[hd],Q[hd],off);
                qaxis(off,0,1,0,yaw*0.55f);   qmul(Q[hd],Q[hd],off); }
     }   /* the old head layer */
-    /* ⭐ THE ANIMATOR'S HAND, IN THE JOINTS. Ep 1's boil moved the whole puppet a hair and
+    /* ⭐ THE ANIMATOR'S HAND, IN THE JOINTS. The first boil moved the whole puppet a hair and
      * nobody could see it: a root offset of +-0.005 is a pixel or two in a wide. A puppet's
      * boil is in the JOINTS -- every exposure the neck, the head and the arms are set down a
      * fraction of a degree off where they were. Exposure-seeded, so a held frame holds it;

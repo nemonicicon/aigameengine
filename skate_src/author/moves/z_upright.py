@@ -2,7 +2,7 @@
 """z_upright.py -- author a STANDING base pose on any rig, from the rest skeleton.
 
 Scores compose over a base pose, and until now that base was whatever clip the miner
-elected as the body's "idle". On kaeli that election is a trap: her `idle` clip opens
+elected as the body's "idle". On the co-star that election is a trap: her `idle` clip opens
 CROUCHED -- frame 0 lifts her feet 52 rig-units toward her pelvis and drops her head by
 16 -- so every move authored on top of it began from a kneel. Her five reached the right
 point in the world and still looked wrong, because she was doing it from all fours.

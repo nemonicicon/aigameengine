@@ -1,5 +1,5 @@
 #version 450
-// What's bright enough in the last lighthouse's picture to bloom.
+// What's bright enough in the menu scene's picture to bloom.
 layout(set = 0, binding = 0) uniform sampler2D tx;
 layout(push_constant) uniform PC { vec4 a; } pc;   // xy one texel of the source
 layout(location = 0) in vec2 vUV;

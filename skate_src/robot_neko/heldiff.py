@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """heldiff.py MP4 T IDXA IDXB OUT.png [--amp 8] [--grid 8x6] [--thr 10] -- WHAT moves on a held pair.
 
-ep 4's OPEN RESIDUE: a held frame (two frames inside the same stop-motion exposure, which
+AN OPEN RESIDUE: a held frame (two frames inside the same stop-motion exposure, which
 should be bit-identical) drifts by a fraction of a percent, worst on a tight/solo. A whole-frame
 percentage says THAT something moves; this says WHERE, which is the difference between guessing
 at a fix and finding one. T is a start time (mp4steps.py's own -ss); IDXA/IDXB are 0-based frame

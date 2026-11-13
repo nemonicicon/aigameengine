@@ -1,18 +1,18 @@
-# cam_test -- a LENS TEST FIXTURE, not a scene (ROBOT NEKO ep 11, B3). Shoot it with --set southbank.
+# cam_test -- a LENS TEST FIXTURE, not a scene. Shoot it with --set southbank.
 # The X-Games lenses: cammove (a dolly / crane / push-in from the line's cam= to its own pose), camsecs (its
 # travel time), camorbit (the replay orbit round a body's CONTINUOUS spot), camshake (a handheld on top of any
 # placed lens), and an ABSOLUTE eye height (`=h`) for camtrack/camorbit. The lens is never stepped: under
 # step=12 the bodies step on the exposure clock and every lens here glides on its own.
-# reva laps the open floor on the ep 10 path test's loop (kf_a r_roll kf_b kb t_b kf_a -- counter-clockwise seen
-# from above, so her FRONT faces into the loop); kaeli stands on her board on t_c, north of it, in front of the
-# ep 9 main wide. Every eye is on the main wide's side of the loop, inside the loop, or over a mark a body has
+# reva laps the open floor on an earlier path test's loop (kf_a r_roll kf_b kb t_b kf_a -- counter-clockwise seen
+# from above, so her FRONT faces into the loop); the co-star stands on her board on t_c, north of it, in front of an
+# earlier main wide. Every eye is on the main wide's side of the loop, inside the loop, or over a mark a body has
 # stood on -- the two pillars on record are (11.9, 0.4) and (26.5, 13).
 #   line 0  (snap) the main wide, held
 #   line 1  cammove, no camsecs: the main wide pushes in and cranes down to a low 3/4 over the WHOLE line -- its
 #           words, the gap and the next beat -- so it lands on the next cut
 #   line 2  cammove + camsecs=4.0 on a 2.9 s line: it moves on from where line 1 left it (the carried end) ...
 #   line 3  ... and, with no lens key, is CARRIED ON into this line until its 4 s are up (no cut)
-#   line 4  camorbit round kaeli (slot 1), standing: headings 100 -> 260, the lens on her north side, the loop behind
+#   line 4  camorbit round the co-star (slot 1), standing: headings 100 -> 260, the lens on her north side, the loop behind
 #   line 5  camorbit 0,0 with `=2.2`: a WORLD-frame follow -- 4 u south of reva wherever she is on the loop, eye at
 #           world y 2.2 -- the half-pipe's lens (camtrack's azim turns with a rider who reverses at every wall)
 #   line 6  camshake=0.25,1.5 on the plain main wide: the handheld, alone
@@ -32,7 +32,7 @@
 # RUN from the repo root, PY="${CLUB_PYTHON:-python}" (action lines only:
 # nothing to voice):
 #   $PY reva_native/scenes/compile_scene.py reva_native/scenes/cam_test.txt
-#   $PY .claude/skills/run-reva/driver.py scene out/cam_test_t8.mp4 --name cam_test --set southbank --seconds 35 --fps 8 --new --raw --subject r2moves --partner anima_outfit --pclip z_rm_sk_ride --clip z_rm_sk_ride
+#   $PY .claude/skills/run-reva/driver.py scene out/cam_test_t8.mp4 --name cam_test --set southbank --seconds 35 --fps 8 --new --raw --subject r2moves --partner <body> --pclip z_rm_sk_ride --clip z_rm_sk_ride
 # (judge SMOOTHNESS at --fps 24, not 8: an 8 fps take cannot show a lens gliding between stepped bodies)
 # grammar: a lens test fixture, not a scene
 cast 0=reva 1=kaeli

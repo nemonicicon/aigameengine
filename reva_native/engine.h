@@ -1,7 +1,7 @@
 /* engine.h -- everything a game sees of the engine (engine plan, Phase 3). A game includes this and nothing else of ours, so an AI working on a game needs this header and that game's file.
  * Quake II's shape: one table of what the engine offers (EngineAPI), one of what the game does (GameExport), and a version. The tables are append-only: a field never moves or changes
- * meaning, so an old game still links. The engine owns the loop and calls the game; the game never calls back into a draw. club_math.h comes with it, and nothing else of the club's: the
- * club's math, one answer on every machine, which a deterministic game must use. Sound, music and a save are in the table (step 20). Bodies are the engine's fixed pool, reached by index.
+ * meaning, so an old game still links. The engine owns the loop and calls the game; the game never calls back into a draw. club_math.h comes with it, and nothing else of the engine's: the
+ * engine's math, one answer on every machine, which a deterministic game must use. Sound, music and a save are in the table (step 20). Bodies are the engine's fixed pool, reached by index.
  * A game keeps its own state and reads nothing back from the renderer. Its tick writes that state; its draw and hud get it const, which is the packet rule in C: what's on screen can't
  * change what happens. */
 #ifndef ENGINE_H

@@ -7,7 +7,7 @@
  * hipDrop is a FRACTION of the body's own leg length, measured from its rest pose, or a
  * tall body and a short one crouch by different amounts and only one of them looks like
  * it is standing on something. */
-/* deck height: a skateboard stands ~9cm off the ground, and the club runs 1.75
+/* deck height: a skateboard stands ~9cm off the ground, and the engine runs 1.75
  * units per metre. Used to lift the rider onto the board and to drop the board
  * back under the rider -- the same constant both ways. */
 #define SK_DECK_H 0.16f

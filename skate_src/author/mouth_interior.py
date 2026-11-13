@@ -3,16 +3,16 @@
 
     mouth_interior.py <pack> [--report] [--depth F] [--teeth F] [--drop]
 
-kaeli's first working jaw opened on something monstrous, where the inside
+The co-star's first working jaw opened on something monstrous, where the inside
 of a mouth is dark, or in shadow.
 
-It should, and there was nothing in there to be dark. Both club women are sealed
+It should, and there was nothing in there to be dark. Both leads are sealed
 heads: lips modelled shut, no interior, no teeth, no tongue. mouth_dark.py painted the
 inner-lip TEXELS dark, which helped a sealed seam -- but once face_jaw actually swings
 the mandible open you are looking through the hole and out the back of her skull. On
-kaeli that reads as a flat blue disc, because what is behind her head is her hair.
+the co-star that reads as a flat blue disc, because what is behind her head is her hair.
 
-⛔ The club's reference rig cannot donate this. v1_crowd_goblin has the BONES for it
+⛔ The engine's reference rig cannot donate this. v1_crowd_goblin has the BONES for it
 (CC_Base_Teeth01/02, Tongue01→03) but its teeth and tongue meshes did not survive the
 bake -- those bones carry zero weights. So the geometry is authored here, to the
 goblin's measured proportions.
@@ -112,7 +112,7 @@ def build(path, report=False, depth=CAV_DEPTH, tooth=TOOTH_H, drop=False, mesh=N
     # ⛔ THE RIM CANNOT SIT AT A CONSTANT DEPTH. A face RECEDES away from the midline,
     # so a cavity whose mouth is a flat ellipse 0.1 half-widths behind the lip surface
     # bursts out through the CHEEKS at its corners -- it showed as dark bands running
-    # sideways past kaeli's mouth corners. The rim follows the MEASURED surface: cast a
+    # sideways past the co-star's mouth corners. The rim follows the MEASURED surface: cast a
     # ray along the mouth's own forward axis at each rim point and tuck in behind
     # whatever it hits.
     SP = p.skinned_positions(with_bones=True)
@@ -303,13 +303,13 @@ def _write(p, path, verts, nors, uvs, bind, tris, head, jawN, W, M, hw, fam):
     # Without the gum band the teeth floated in black and read as a skull.
     # ⛔ ONE PINK CANNOT SERVE A PURPLE WOMAN AND A BROWN ONE. The lip colour is taken
     # from HER OWN texture -- the median texel of the skin right around her mouth mark,
-    # pushed toward red and darkened. reva comes out mauve, kaeli comes out brown-red,
+    # pushed toward red and darkened. reva comes out mauve, the co-star comes out brown-red,
     # and neither needed a per-character constant.
     COLS = {"cav": (16, 7, 10), "teeth": (232, 226, 214), "tongue": (168, 74, 84)}
     uvmap = {}
     # ⛔ PAINT BOTH ENDS. Which way V runs is not knowable from the pack alone: it
-    # depends on the loader's flip, and the two club packs disagreed in practice --
-    # the same UV gave reva a dark cavity and kaeli a TAN one, because neither was
+    # depends on the loader's flip, and the two leads' packs disagreed in practice --
+    # the same UV gave reva a dark cavity and the co-star a TAN one, because neither was
     # landing on the patch at all and reva's texture corner merely happened to be
     # dark. Painting the cell at the top AND the bottom of the sheet makes the sample
     # correct under either convention, which is cheaper than being clever about it.

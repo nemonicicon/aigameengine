@@ -20,7 +20,7 @@
  * so smoke can thin out and not only shrink. picture: which cell of its sheet, counted along the rows from 0, and -1 is its own texture. A look is a place for scene
  * slot N's head and eyes to go to, while its `on` is over a half: it beats who's talking, and a body told not to look.
  * (11-11) TRK5's spots row: for each of the set's first <spots> `spot` lines, in their order, what its colour is multiplied by this frame (1 1 1 as the line
- * says, 0 0 0 dark): a spot keeps its place, its aim and its shadow, and its colour can change on a beat (the Facade video's panel light, orange and blue).
+ * says, 0 0 0 dark): a spot keeps its place, its aim and its shadow, and its colour can change on a beat (the music video's panel light, orange and blue).
  * Taken from the nearest frame, never eased, so a swap is a cut. TRK4 and older have none, and the spots are as the set says.
  * TRK2 had no colour, alpha, picture or looks, and TRK1 one scale and the prop stood on its lowest point: both still read. Beams and lights replace what the set's
  * own lines said, once the track has a frame. A set with no `track` line never comes here. */

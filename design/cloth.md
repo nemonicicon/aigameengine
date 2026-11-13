@@ -1,13 +1,12 @@
 # CLOTH — garments, and the instruments that stopped me guessing about them
 
 > The goal: cloth physics done very well — blowing curtains, torn clothing exposing wounds
-> underneath, dainty dresses showing every curve, and kaeli's loose, comfortable pajamas.
+> underneath, dainty dresses showing every curve, and the co-star's loose, comfortable pajamas.
 
 Two cloth systems share one engine. **Set cloth** (`sclAdd/sclStep/sclDraw`) is curtains,
 sheets and bedding — hung in the world, pinned to a rail. **Garment cloth** (`clothInit/
 clothStep`) is worn: it is skinned to a body first and simulated second, and everything below
-is about that one. Design home for the film that needs them:
-[seventy_four.md](seventy_four.md).
+is about that one.
 
 ---
 
@@ -41,7 +40,7 @@ Nothing is ever cut. That is why a real shirt survives having armholes and the t
 
 ### ⛔ THE COMPASS — made twice in one session
 
-`shell()` places at `cos(a)→X, sin(a)→Z`, so angle 0 is **+X**. **Club forward is +Z.**
+`shell()` places at `cos(a)→X, sin(a)→Z`, so angle 0 is **+X**. **Engine forward is +Z.**
 Centring the "front" panel on angle 0 put it on her *right side*, the back panel on her left,
 and both armhole gaps on her chest and her spine. She rendered bare-chested with blue at the
 flanks — while the piece dump insisted the shirt was present, correctly sized and centred at

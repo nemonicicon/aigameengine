@@ -1,21 +1,21 @@
 """make_gait_sidecar.py -- write the AUTHORED speed of every locomotion clip.
 
-The club plays in-place cycles, so playback rate has to be derived: rate = desired speed
+The engine plays in-place cycles, so playback rate has to be derived: rate = desired speed
 / the speed the cycle was authored at. crowd_kms.c estimates that by walking the clip
 with forward kinematics and measuring the contact foot -- which measured 16% slow on the
 one clip that could be checked, and 16% slow means the body outruns its feet.
 
 MoCap Online ships a root-motion sibling of every in-place cycle, and its root
 displacement IS the authored speed. This measures each one and writes a sidecar the
-engine loads next to the rpack:  <clip name> <club units per second>
+engine loads next to the rpack:  <clip name> <engine units per second>
 
     blender --background --factory-startup --python make_gait_sidecar.py
 """
 import bpy, os, math
 
-SRC = os.environ.get("CLUB_FBX", "fbx")   # club-engine kit: machine-independent paths
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "v1_mob1.gait")   # club-engine kit: machine-independent paths
-CLUB = 1.75   # club units per metre
+SRC = os.environ.get("CLUB_FBX", "fbx")   # machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "v1_mob1.gait")   # machine-independent paths
+CLUB = 1.75   # engine units per metre
 
 # clip name in the pack  ->  its root-motion sibling
 PAIRS = {

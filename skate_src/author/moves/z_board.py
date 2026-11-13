@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""z_board.py -- ROBOT NEKO ep 9: picking a skateboard up off the floor, and putting it down.
+"""z_board.py -- picking a skateboard up off the floor, and putting it down.
 
-After ep 8: there was no animation of bending over and picking the TV up. Nobody in the
-club could take anything off the ground -- every held prop was simply in a hand after a cut.
+Until this file there was no animation of bending over and picking a prop up. Nobody in the
+engine could take anything off the ground -- every held prop was simply in a hand after a cut.
 These are the verbs, authored from each rig's own proportions (rig_map), so the same score is
-reva's pickup and kaeli's:
+reva's pickup and the co-star's:
 
   z_board_reach   stand -> squat and hinge, right hand down onto the board -- HOLD
   z_board_lift    hand on the board -> rise with it into the carry -- HOLD
@@ -21,7 +21,7 @@ THE BOARD'S SPOT IS DERIVED, never placed by eye: REACH_F forward and REACH_R ri
 in the rig's own leg lengths, on its floor. The script prints the same spot in WORLD units for
 the body's engine scale, which is where the set's board mark goes.
 
-Composed over REST with z_upright's relaxed arms, so it needs no base clip -- anima_outfit ships
+Composed over REST with z_upright's relaxed arms, so it needs no base clip -- the bought character's pack ships
 exactly one clip (z_rest). The feet stay planted (both legs IK'd to their stand ankles every
 frame, feet held flat -- z_touch's lesson), the HIPS hinge (spine-only folding never reaches
 the floor), the knees bend FORWARD (an explicit pole: a stand's legs are straight, and a

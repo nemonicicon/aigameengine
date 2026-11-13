@@ -3,7 +3,7 @@
 A stable test bench: clothes can't be calibrated on a body that is dancing
 when it should be standing in a T or a pose.
 
-Only reva2 shipped with a `tpose`; every other body in the club arrives with nothing but
+Only reva2 shipped with a `tpose`; every other body in the engine arrives with nothing but
 dance clips, so the moment the bench moves to a better model the stable fixture vanishes.
 A pack's nodes already carry their bind TRS, so a one-frame clip restating it is a
 perfect static fixture -- exact for that body, and nothing to author.
@@ -33,7 +33,7 @@ and it happened twice: on reva, and later on miko, dancing while a garment was m
 
 ⭐ A garment measured on a body mid-
 crouch is unreadable; a T-pose is what showed the first version was a CATSUIT after six
-animated benches had not. But `tpose` only existed on reva2 -- every other body in the club
+animated benches had not. But `tpose` only existed on reva2 -- every other body in the engine
 arrives with nothing but dance clips, so the moment the bench moved to a better model the
 stable fixture vanished and I went straight back to calibrating on a moving target.
 
@@ -50,7 +50,7 @@ must be safer than a partial one. It folded miko into a ball: head, torso and le
 into a single white blob while her arms stayed correct.
 ⭐ The answer was in her own clips, and it took one line to read: `m_uprock` is
 **21 tracks, ALL TYPE 0** -- rotation only, 21 joints. Mine was 230 tracks, 115 rotation and
-115 translation. The club's rigs carry bone offsets in the NODE hierarchy and animate purely
+115 translation. The engine's rigs carry bone offsets in the NODE hierarchy and animate purely
 by rotation; a translation track re-asserts a bone's offset in a frame the engine does not
 expect it in, and the skeleton collapses.
 ⛔ And a first guess -- that the glTF SCENE ROOTS were being clobbered -- was wrong, tested,

@@ -1,6 +1,6 @@
-# Fab assets -> the club (ROBOT NEKO ep 9)
+# Fab assets -> the engine
 
-Fab downloads land in `models/VaultCache/FabLibrary/`. Two came into ep 9. Both packs are
+Fab downloads land in `models/VaultCache/FabLibrary/`. Two came in for one episode. Both packs are
 GITIGNORED outputs (`packs/`, `props/`), so this file is how they come back after a rebake or a wipe.
 
 ## Southbank Undercroft -- `props/southbank.rpack`
@@ -22,10 +22,10 @@ How it is placed (all measured, see the header of `sets/southbank.set`): its hei
 (pitch -90 stands it up), the hall floor is local z 1.72 and level to 0.2 degrees, and it is a
 `room` -- never a collider, drawn with its own photographed light.
 
-## Kickflip -- `packs/v1_dude.rpack`
+## The Fab skater -- `packs/v1_dude.rpack`
 
 A cartoon skater whose every clip is on his board, and the board is skinned to his skeleton.
-His animation isn't used for reva or kaeli -- he plays only his own bank.
+His animation isn't used for reva or the co-star -- he plays only his own bank.
 
 ```bash
 F=models/VaultCache/FabLibrary/Kickflip-4347bca6/fbx/kickflip_extracted
@@ -38,14 +38,14 @@ python skate_src/glb2rpack_anim.py --keepnames $OUT/kickflip_tex.glb reva_native
 python skate_src/author/sliceclip.py dude kf_seg8 kf_idle --from 32 --to 43 --pingpong --force
 ```
 
-Cast him as `partner3=dude@2.6` (a height in club units, not a scale). The engine elects his wheels
+Cast him as `partner3=dude@2.6` (a height in engine units, not a scale). The engine elects his wheels
 as ground contacts and measures that his board runs along his rig's Z, so he rolls to a mark along
 his board; his head looks down the board's front (rig -z), so a mark yaw of 180 points his face at
 a lens on +z.
 
-## reva / kaeli board moves (authoring on top of a bake)
+## reva / co-star board moves (authoring on top of a bake)
 
-A rebake of `v1_r2moves` or `v1_anima_outfit` DROPS these; re-run both scores on each pack:
+A rebake of `v1_r2moves` or the co-star's pack (`v1_<body>`) DROPS these; re-run both scores on each pack:
 
 ```bash
 python skate_src/author/moves/z_board.py      reva_native/packs/v1_<pack>.rpack
@@ -54,7 +54,7 @@ python skate_src/author/moves/z_board_ride.py reva_native/packs/v1_<pack>.rpack
 
 Each prints the numbers the set's board marks are derived from.
 
-## ep 10 skate moves -- every clip carries its board as a channel (`<clip>_bd`)
+## Skate moves -- every clip carries its board as a channel (`<clip>_bd`)
 
 The same rule: a rebake DROPS them. Both scripts gate every clip (feet on the deck, wheels on the floor, no capsule
 or board clipping) and print the numbers.
@@ -63,7 +63,7 @@ or board clipping) and print the numbers.
 # riding + tricks (ride push pop kf shove manual). It refuses reva_native/packs -- bake a COPY, then copy it in
 python skate_src/author/moves/z_sk_ride.py  out/packs/v1_<pack>.rpack
 # board handling (carry catchup stepoff dropin bail, and the pickup that still fails). --live allows the live pack;
-# --force bakes past failed gates (the show's tenth episode shipped with --force)
+# --force bakes past failed gates (one episode shipped with --force)
 python skate_src/author/moves/z_sk_board.py reva_native/packs/v1_<pack>.rpack --live --force
 ```
 

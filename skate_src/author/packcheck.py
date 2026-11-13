@@ -2,7 +2,7 @@
 """packcheck.py -- the invariants a .rpack must satisfy, checked without rendering anything.
 
     python skate_src/author/packcheck.py                 # every pack
-    python skate_src/author/packcheck.py v1_kaeli_pj     # one
+    python skate_src/author/packcheck.py v1_<body>     # one
     python skate_src/author/packcheck.py --selftest      # prove the checks can fail
 
 WHY THIS EXISTS. The old regression test was run again and again and showed little.
@@ -19,7 +19,7 @@ actually change.
 than pixel identity. Every check below is a bug that cost real time this session:
 
   BIND      world[boneMap[b]] x inverseBind[b] must be the IDENTITY at rest.
-            ⭐ THE ONE THAT MATTERS. kaeli's pyjamas were written with boneMap = 0,1,2..8
+            ⭐ THE ONE THAT MATTERS. The co-star's pyjamas were written with boneMap = 0,1,2..8
             (node indices) while the inverse binds came from the REAL bones -- so every
             garment vertex was driven by one bone's world matrix and a different bone's
             inverse bind. The rest palette was out by up to 111 units. It cost FOUR static
@@ -54,11 +54,11 @@ sys.path.insert(0, HERE)
 from rpack import Rpack   # noqa: E402
 
 IDENT = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-BIND_TOL = 1e-2          # club units; the pyjama bug was 111
+BIND_TOL = 1e-2          # engine units; the pyjama bug was 111
 BIND_REL = 0.10
 # ⛔ AND THIS CHECK IS INFO BY DEFAULT, BECAUSE I COULD NOT JUSTIFY IT AS A FAILURE.
 # Demanding rest == bind convicted 173 meshes; normalising by rig size got it to 37; and
-# those 37 packs RENDER CORRECTLY IN THE CLUB EVERY DAY. If their bone maps were really
+# those 37 packs RENDER CORRECTLY IN THE ENGINE EVERY DAY. If their bone maps were really
 # mismatched their bodies would be visibly exploded, and they are not. The truth is that
 # a stored rest pose is very often NOT the bind pose -- it is frame 0 of an animation --
 # so the bones disagree legitimately and no magnitude threshold separates that from a
@@ -168,7 +168,7 @@ def check(path, only=None):
         # deformation. W[meshNode] is one way a baker makes inverse binds, not the only one.
         # ⭐ So: every bone must yield the SAME matrix as every other. If they agree, that
         # shared matrix is just the mesh's own frame and the pack is fine. If they disagree,
-        # the bone map and the inverse binds are mismatched -- which is precisely kaeli's
+        # the bone map and the inverse binds are mismatched -- which is precisely the co-star's
         # pyjama bug (bones disagreeing by 111 units) and not susan's legitimate bake.
         bm = struct.unpack_from("<%dH" % boneCount, R.buf, offBM)
         pals, ok_b = [], []
@@ -188,7 +188,7 @@ def check(path, only=None):
                 if e > spread:
                     spread, worstb = e, ok_b[k]
             # ⛔ SCALE-FREE, AND ONCE PER PACK. The spread only means something against
-            # the size of the rig: kaeli's broken garment disagreed by 111 on a body spanning
+            # the size of the rig: the co-star's broken garment disagreed by 111 on a body spanning
             # 140 (28% of it), while the Mixamo crowd packs disagree by ~2 on comparable rigs
             # (1.5%) -- because their stored REST pose is not their BIND pose, which is legal
             # and extremely common. And the bone map is a PACK fault, not a mesh fault: a

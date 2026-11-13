@@ -1,4 +1,4 @@
-"""ue_export_textures.py -- pull Anima's TEXTURES out of the ZAMNRemake UE project as PNG.
+"""ue_export_textures.py -- pull the bought character's TEXTURES out of the zombie prototype's UE project as PNG.
 
 Run headless, in the artery's proven shape (see skate_src/guns/bake_guns.sh):
 
@@ -13,9 +13,9 @@ passed the source and destination as arguments after `-script=` with forward sla
 script never ran at all -- no LogPython output whatsoever, no error. bake_guns.sh has the
 working form and every deviation from it is a way to get silence.
 
-⭐ WHY THIS EXISTS: Anima's Fab download shipped the FBX and the .max and NO TEXTURE FOLDER --
+⭐ WHY THIS EXISTS: The bought character's Fab download shipped the FBX and the .max and NO TEXTURE FOLDER --
 all 66 of her image datablocks are `packed=False, exists=False` and stay 0x0 even after a
-forced reload, so she came into the club on flat per-mesh tints. Her textures might be in an Unreal project she had been
+forced reload, so she came into the engine on flat per-mesh tints. Her textures might be in an Unreal project she had been
 downloaded into. They are: 201 texture assets, and all 29 diffuse maps -- T_Body_Diffuse, T_Head_Diffuse,
 T_Arm_Diffuse, T_Leg_Diffuse, T_Hair1/2/3_Diffuse, T_Bra_Diffuse, T_Boot_Diffuse,
 T_Cloth_Diffuse -- named after exactly the materials her FBX carries.
@@ -30,7 +30,7 @@ import os
 import unreal
 
 SRC = "/Game/Anima/Characters/Textures"
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "anima_tex")   # machine-independent paths
 
 
 def wanted(name):

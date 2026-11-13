@@ -28,7 +28,7 @@ done
 
 "$PY" skate_src/author/rpack.py info "$DST" | tail -5
 
-# P5b: KAELI'S OWN MOVES -- the same scores re-solved on her rig, contacts exact by
+# P5b: THE CO-STAR'S OWN MOVES -- the same scores re-solved on her rig, contacts exact by
 # construction. Scores that cannot resolve on her (missing bones) report and skip.
 KDST="reva_native/packs/v1_kmoves.rpack"
 cp -f reva_native/v1_kaeli.rpack "$KDST"
@@ -40,7 +40,7 @@ done
 "$PY" skate_src/author/rpack.py info "$KDST" | tail -3
 
 # REVA2: the re-ingested body (skate_src/reva2/bake_reva2.sh). Clean metres end to
-# end, so unlike kaeli's unit-chimera pack her copy can carry AUTHORED ROOT MOTION.
+# end, so unlike the co-star's unit-chimera pack her copy can carry AUTHORED ROOT MOTION.
 RDST="reva_native/packs/v1_r2moves.rpack"
 if [ -f reva_native/packs/v1_reva2.rpack ]; then
     cp -f reva_native/packs/v1_reva2.rpack "$RDST"

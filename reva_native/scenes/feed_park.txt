@@ -1,9 +1,9 @@
-# feed_park -- REVA IS FILMING (the look test for skate promo ep 2, not an episode).
+# feed_park -- REVA IS FILMING (the look test for a skate promo, not an episode).
 # reva is filming: most of the episode is the feed of the camera she holds,
 # as in a game about capturing clips of the people you skate with.
 # THE SHAPE OF THE WHOLE EPISODE, in miniature: her feed, a wide out of it, her feed again.
 # `feed=1 fish=0.42` puts the shot inside her camera; `feed=0 fish=0` is the room's own eye.
-# THE FILMER'S DISTANCE IS THE SHOT: at a foot behind kaeli the fisheye reads as a knee, and the first take came
+# THE FILMER'S DISTANCE IS THE SHOT: at a foot behind the co-star the fisheye reads as a knee, and the first take came
 # back as one. She trails by ~3 u, which on a fisheye is a whole body in frame with the park behind it.
 cast 0=reva 1=kaeli
 

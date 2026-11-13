@@ -12,7 +12,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 uniform float fish = 0.0;   // 0 = the rectilinear lens, 1 = a full equidistant fisheye (~0.4-0.6 is the skate-video look)
 uniform float tht = 0.8;    // the DIAGONAL half-angle the frame covers, radians (ClubCamera.fish_fov)
 uniform float feed = 0.0;   // 0 off, 1 phone portrait (9:16), 2 phone sideways (16:9)
-uniform float tone = 0.0;   // the engine's luminance knee start (0.66 in its episodes); 0 = leave tone to the Environment
+uniform float tone = 0.0;   // the engine's luminance knee start (0.66 in the engine's own takes); 0 = leave tone to the Environment
 
 float fhash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }

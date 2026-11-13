@@ -9,7 +9,7 @@
  *   goes limp; `off` hands her back to the clip.  FROM GAMEPLAY: ragdollGo(slot) on a bail, a hit, a fall.
  *   The write-back is the chain solver's: each bone is turned from its animated direction to its simulated one
  *   (chainArc), root first, so fingers and twist bones follow the limb they hang off.
- * ⛔ A HELD EXPOSURE DOES NOT INTEGRATE (ep 1): stop motion holds the fall between exposures like everything else. */
+ * ⛔ A HELD EXPOSURE DOES NOT INTEGRATE: stop motion holds the fall between exposures like everything else. */
 #define RD_J 18
 #define RD_MU 0.55f   /* Coulomb: the share of tangential speed a full-depth contact takes */
 enum { RD_HIPS, RD_CHEST, RD_NECK, RD_HEAD, RD_SHL, RD_ELL, RD_HNL, RD_SHR, RD_ELR, RD_HNR,
@@ -26,8 +26,8 @@ typedef struct { int on,coulomb; float lift[RD_J]; Pack*P; float t; int node[RD_
                  float v0[3]; int seeded; int haveMem; int haveTor; float torV[3]; float tors[3]; float rest; int asleep;
                  float trx[2], trz[2], trzb[2];   /* ⭐ the TORSO's measured half-widths: a chest is not a ball */
                  float hinge[4][3];   /* ⭐ each knee's/elbow's bend axis, in the body frame (lat,up,fwd) */
-                 float hp0[3]; int hp0ok;   /* ⭐ ep 13: the hips a frame ago, for the rest test */
-                 float downT;               /* ⭐ ep 13: seconds spent DOWN -- two and a half of them is at rest */
+                 float hp0[3]; int hp0ok;   /* ⭐ the hips a frame ago, for the rest test */
+                 float downT;               /* ⭐ seconds spent DOWN -- two and a half of them is at rest */
                  float skin; } Ragdoll;   /* tors: hips-neck, shoulder-shoulder, thigh-thigh, AS MEASURED */
 /* fsign: cross(shoulder-to-shoulder, hips-to-chest) times this points FORWARD out of the chest.
  * bend[]: which way the knee/elbow was bent in the pose she bailed from (kneeL, kneeR, elbowL, elbowR). */   /* reach: parent-to-grandchild limit (a knee does not bend backwards) */
@@ -110,7 +110,7 @@ static void ragdollGo(int slot,Pack*P,M4*W,const float*model,const float*vel){
     float sc=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]); if(sc<1e-6f) sc=1.f;
     static const signed char SEG[RD_J]={CT_SPINE,CT_CHEST,CT_HEAD,CT_HEAD,CT_UAL,CT_FAL,CT_FAL,CT_UAR,CT_FAR,CT_FAR,
                                         CT_THL,CT_SHL,CT_FTL,CT_FTL,CT_THR,CT_SHR,CT_FTR,CT_FTR};
-    /* ⛔ A MISSING TOE IS NOT A MISSING BODY. anima (kaeli) has no toe bones at all and the first cue REFUSED
+    /* ⛔ A MISSING TOE IS NOT A MISSING BODY. The co-star (a bought character) has no toe bones at all and the first cue REFUSED
      * her outright. The four extremities are OPTIONAL -- the limb simply ends at the ankle or the wrist. */
     static const signed char OPT[RD_J]={0,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,1};
     int nskip=0;
@@ -226,7 +226,7 @@ static void rdFold(Ragdoll*R,float dt){
     for(int c=0;c<2;c++){ const int j=K[c]; if(R->use[j]) for(int k=0;k<3;k++) R->q[j][k]-=fw[k]*R->fsign*1.6f*dt; } }
 static void rdStep(Ragdoll*R,float dt){
     rdSwitches();
-    /* ⭐ ep 13: ONCE SHE IS DOWN AND SLOW THE CONE RULE STANDS DOWN. Lying face down with a leg folded, a
+    /* ⭐ ONCE SHE IS DOWN AND SLOW THE CONE RULE STANDS DOWN. Lying face down with a leg folded, a
      * persistently violated hip cone turned the limb a couple of degrees a pass, the bone lengths pulled the hips
      * after it and the floor pushed back: a ratchet that walked her BACKWARDS 0.7 u/s for seven seconds while the
      * phone was on her, with a velocity term of nothing. The cone's job is the fall; on the floor the lengths, the
@@ -419,7 +419,7 @@ static void rdStep(Ragdoll*R,float dt){
         float vx=R->p[j][0]-R->q[j][0], vz=R->p[j][2]-R->q[j][2];
         float sp=sqrtf(vx*vx+vz*vz); if(sp<1e-9f) continue;
         float rr=(R->rad[j]>1e-4f)?R->rad[j]:0.1f;
-        float cut=settled9?1.f:RD_MU*(dp+0.006f)/rr;   /* the depth, as a fraction of the limb's own thickness -- and at rest (ep 13) a grounded joint HOLDS */
+        float cut=settled9?1.f:RD_MU*(dp+0.006f)/rr;   /* the depth, as a fraction of the limb's own thickness -- and at rest a grounded joint HOLDS */
         /* ⛔ 11-04: the world's clamp above has already been, so that depth is always 0 here, and all that's left is the 0.006: next to no friction, and a body that wasn't slow by the time it was down slid about on the floor for seconds. A game's bodies get what the words say, friction that takes a fixed speed per second. Film's takes were made on the old one, and that's still theirs */
         if(R->coulomb&&!settled9) cut=RD_MU*CLUB_UNITS_PER_S2*dt*dt/sp;
         if(cut>1.f) cut=1.f;                          /* at worst it stops: it never runs backwards */
@@ -487,7 +487,7 @@ static void ragdollTick(Pack*P,M4*W,const float*model,int slot){
             /* ⛔ SHE LEAVES HER PATH ON THE SPOT. The ragdoll lives in WORLD space and rdWrite re-anchors it to
              * the body's root every frame -- a body still rolling would DRAG its own falling skeleton down the
              * street. Her root freezes where she bailed; the ragdoll carries the speed she had. */
-            /* ⭐ ep 13: and she drops her CARVE BANK. The lean she was carving with froze into her root with the
+            /* ⭐ and she drops her CARVE BANK. The lean she was carving with froze into her root with the
              * rest of it, and the board left at the bail spot (drawn off that root) stood tilted 15 degrees in
              * the air beside her boot for the whole last act. Flat, like a board somebody fell off. */
             if(rdActive(slot)){ L->path=0; L->hold=1; L->lapping=0; L->spd=0.f; L->walkMix=0.f; L->bank=0.f; L->pbank=0.f; } } }
@@ -513,13 +513,13 @@ static void ragdollTick(Pack*P,M4*W,const float*model,int slot){
          * not motion, and without this she crawled across the floor for ever at a quarter of a unit a second */
         if(down&&fast<2.2f){ for(int j=0;j<RD_J;j++){ if(!R->use[j]) continue;
             for(int k=0;k<3;k++) R->q[j][k]=R->p[j][k]-(R->p[j][k]-R->q[j][k])*0.55f; } }
-        /* ⭐ ep 13: A BODY THAT IS DOWN AND WHOSE HIPS HAVE STOPPED IS AT REST, whatever its joints are still
+        /* ⭐ A BODY THAT IS DOWN AND WHOSE HIPS HAVE STOPPED IS AT REST, whatever its joints are still
          * doing. The solver's own jitter (a shoulder or an ankle at ~1 u/s under a body lying still) kept the
          * fastest-joint test from ever passing, and the projections walked her BACKWARDS 4.7 u over seven seconds
          * while she was being filmed. The hips' real displacement, frame to frame, is what a viewer calls moving. */
         float hsp=0.f; { float vx=(R->p[RD_HIPS][0]-R->q[RD_HIPS][0])/h, vz=(R->p[RD_HIPS][2]-R->q[RD_HIPS][2])/h; hsp=sqrtf(vx*vx+vz*vz); }
         if(down) R->downT+=dt; else R->downT=0.f;
-        /* ⛔ ep 13: the rest timer DECAYS on a busy frame instead of resetting -- at 60 fps thirty quiet frames in a
+        /* ⛔ the rest timer DECAYS on a busy frame instead of resetting -- at 60 fps thirty quiet frames in a
          * row never came (one projection spike in thirty reset it) -- and two and a half seconds on the floor is at
          * rest whatever the solver is still doing: with self-collision on OR off (A/B'd) a face-down body with a leg
          * folded crept 0.7 u/s for seconds on a velocity term of nothing. Asleep, nothing steps, and it stops. */

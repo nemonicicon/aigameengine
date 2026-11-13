@@ -1,6 +1,6 @@
-"""eyelids.py -- THE WORLD AT THE END OF TIME's faces CLOSE THEIR EYES: a blink morph per eye on every cast member's pack.
+"""eyelids.py -- the space series' faces CLOSE THEIR EYES: a blink morph per eye on every cast member's pack.
 
-10-18: the boys' huddle in the milk, and Viktor waking in the pan -- and a boy asleep in a pan, or waking,
+10-18: a boy asleep, or waking,
 needs eyes that SHUT. The toon face (toonface.py) is shapes a hair above the skin: the eye's white, the iris and pupil
 clipped to it, the upper lid's heavy ink line. A closed eye, drawn that way, is the upper lid's ink lying ON the lower
 lid -- so the morph moves points, it adds none:
@@ -10,19 +10,19 @@ lid -- so the morph moves points, it adds none:
     thin to nothing) -- at the corners, where the opening is zero, nothing moves;
   - the lower lid's line, the crease, the brows, the lines of age: untouched. ⛔ The lid inks and the brows are told
     apart by their OFFSET (toonface: lid inks 0.0015 out, brows 0.0016), never by distance from the lid: a low, heavy
-    brow (Billy's) lies within half an opening of the upper lid, and the first build slid its lower edge down onto the
+    brow (a boy's) lies within half an opening of the upper lid, and the first build slid its lower edge down onto the
     shut lid -- a dark wedge that read as open eyes from across the room.
 
 Each face vertex is put back into FACE COORDINATES (a = degrees round the head, u = share of head height, off = how far
 out from the skin) by inverting person.face_xyz numerically, moved there, and mapped forward again -- so a closed lid
 lies on the head's own surface at its own offset, never through the skin.
 
-    blender --background --factory-startup --python-exit-code 1 --python skate_src/people/eyelids.py -- [--only viktor,billy] [--redo 1]
+    blender --background --factory-startup --python-exit-code 1 --python skate_src/people/eyelids.py -- [--only <name>,<name>] [--redo 1]
 
 `--redo 1` drops a pack's blink morphs and builds them again (morphs.drop_morphs; the old deltas stay as orphans).
 
 Morphs `blink_L`, `blink_R` (the body's left = +a) go into reva_native/packs/v1_<name>.rpack (a pack carrying the cast's
-authored clips is first put back to its clipless base -- skate_src/people/moves/bake.py re-appends them). A clip drives
+authored clips is first put back to its clipless base -- the cast's own clip bake re-appends them). A clip drives
 them with type-3 tracks (one float a frame per morph index).
 """
 import math, os, shutil, sys
@@ -41,7 +41,7 @@ from rpack import Rpack                                       # noqa: E402
 import morphs                                                 # noqa: E402
 
 PACKS = os.path.join(REPO, "reva_native", "packs")
-ENGINE = os.path.join(os.environ.get("CLUB_OUT", "out"), "engine")   # club-engine kit: machine-independent paths
+ENGINE = os.path.join(os.environ.get("CLUB_OUT", "out"), "engine")   # machine-independent paths
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 opt = {argv[i]: argv[i + 1] for i in range(0, len(argv) - 1, 2)}
 NAMES = opt.get("--only", ",".join(cast.LINEUP)).split(",")

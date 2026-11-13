@@ -1,13 +1,13 @@
-/* ================= THE CONTACT PASS (after ROBOT NEKO ep 12: an engine that handles clipping
+/* ================= THE CONTACT PASS (after the stop-motion show: an engine that handles clipping
  * itself makes every animation easier to get right) ==========
  * The audit above only ever REPORTED a limb inside something; every fix happened offline, in an authoring script
- * that had to land every contact to the millimetre before it was allowed to save -- ep 12's cuddle took eight rounds
+ * that had to land every contact to the millimetre before it was allowed to save -- one cuddle took eight rounds
  * and four hours that way. A game engine settles the last few centimetres itself, every frame, after the pose.
  *   THE SHAPES: measured ONCE per body off its own skinned mesh (hair excluded): each limb's thickness (p55 of its
  *   vertices' distance to the bone), and the torso as two ELLIPSES (hips->chest, chest->neck) with its front-back
  *   depth separate from its width. ⛔ The audit's old body capsules were a fixed fraction of height and a chest was
  *   shoulder-wide in EVERY direction, so an arm resting on a belly read 0.1 u "inside" and nearly every frame of the
- *   ep 12 cuddle was "bad". Anything that judges two bodies touching needs the measured shape.
+ *   cuddle was "bad". Anything that judges two bodies touching needs the measured shape.
  *   THE PASS (scenes only; REVA_NOCONTACT=1 is the control): a torso inside the world (the bed from the floor, a
  *   table) moves the WHOLE body out; an arm or leg inside another body, the world, the furniture it rests on (past
  *   the sink it may take into bedding) or its own torso (a forearm) rotates at its shoulder / elbow / hip / knee until
@@ -209,7 +209,7 @@ static float ctWorldPen(int self,const float*p,float rs,float*dir,const char**wh
     /* ⭐ THE FURNITURE A BODY LIES ON IS SOFT TO THAT BODY. Over its footprint -- the mattress, the bed's own
      * pillows (bed_01's stand 2.03 u tall against the headboard, and the grid calls anything that tall a
      * headboard), the bedding -- the animator put her INTO it on purpose; only the floor under it still pushes.
-     * The first pass pushed kaeli's hand out from under her pillow and her arm stood up in the air. */
+     * The first pass pushed the co-star's hand out from under her pillow and her arm stood up in the air. */
     { float st; const char*nm;
       if(caSoftBed(self,p,&st,&nm)){ if(sideOnly) return -1e9f; dir[0]=0.f; dir[1]=1.f; dir[2]=0.f; *what=nm;
           return (st>-1e8f)?(st-CA_SINK)-(p[1]-rs):0.f-(p[1]-rs); } }
@@ -260,9 +260,9 @@ static void ctSay(int slot,const char*limb,const char*what,float d){
 /* ⭐ THE JIGGLE: each soft-mass bone's tip (projected out to ~0.13 u, the mass's reach) follows its ANIMATED position
  * through a damped spring in WORLD space -- 3.2 Hz, damping 0.22, so it overshoots and settles like flesh -- capped at
  * 0.05 u, and the bone is turned to point at the sprung tip. Integrated on the EXPOSURE clock: a held frame holds its
- * jiggle, exactly as the chains and the cloth do (stop motion, ep 1). Runs before the contact pass, so a bounce can
+ * jiggle, exactly as the chains and the cloth do (stop motion). Runs before the contact pass, so a bounce can
  * never carry into anything. */
-/* ⭐ SET ACTORS JIGGLE TOO (09-29, REVA: "i want ... boob jiggle physic"): the state is per CHAIN slot -- the cast's
+/* ⭐ SET ACTORS JIGGLE TOO (09-29): the state is per CHAIN slot -- the cast's
  * five and the actors' sixteen -- so a skater on a set springs exactly as the hero does. */
 static float g_jgP[CH_SLOTS][4][3], g_jgV[CH_SLOTS][4][3]; static int g_jgInit[CH_SLOTS][4]; static const Pack*g_jgPk[CH_SLOTS];
 static unsigned long g_jgFrame[CH_SLOTS];   /* ⛔ the springs integrate once per frame, not once per draw pass */

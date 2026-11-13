@@ -4,7 +4,7 @@
 > animations myself without premade ones, and the engine should eventually author fully
 > custom animation.
 
-The target is a sentence like **"reva does a cartwheel"** or **"kaeli crawls about like a cat,
+The target is a sentence like **"reva does a cartwheel"** or **"the co-star crawls about like a cat,
 then curls up round reva and falls asleep, purring"** turning into motion
 that did not exist before — not a clip found in a donor pack and renamed.
 
@@ -57,7 +57,7 @@ Worth stating, because it decides how much of this is new:
 | asset artery | UE 5.4–5.8 + Blender 5.1, headless, unattended | `skate_src/kaeli/`, `skate_src/guns/` |
 
 **What does not exist: any path from a pose I decide to a body holding it.** Every clip in
-the club arrived as baked data from someone else's capture. That is the hole.
+the engine arrived as baked data from someone else's capture. That is the hole.
 
 ---
 
@@ -72,10 +72,10 @@ Decomposed, they are seven capabilities, and only some are hard:
 | C | rig-agnostic authoring (author once, plays on any body) | **high** | "any character" |
 | D | verification that authored motion is physically coherent | medium | everything |
 | E | engine plays authored root motion without fighting it | medium, wide blast radius | anything airborne |
-| F | multi-actor choreography with spatial relations | medium | the kaeli/reva scene |
-| G | audio (purring) | separate discipline, nothing exists | the kaeli/reva scene |
+| F | multi-actor choreography with spatial relations | medium | the co-star/reva scene |
+| G | audio (purring) | separate discipline, nothing exists | the co-star/reva scene |
 
-A cartwheel needs A, B, D, E. The kaeli/reva scene needs all seven — which is why it is the
+A cartwheel needs A, B, D, E. The co-star/reva scene needs all seven — which is why it is the
 more useful of the two sentences to design against, and why the cartwheel is treated
 throughout as one probe among several rather than as the target.
 
@@ -278,11 +278,11 @@ the body plays a donor stand. Same idea, generalised to named bone groups.
 
 **5. Two bodies in contact** — curling against reva. Stresses frames and interpenetration.
 ```python
-Scene("s_kaeli_sleeps_on_reva")
+Scene("s_costar_sleeps_on_reva")
   actor("reva",  at=(0,0,0), facing=0, play="z_sit_relaxed")
-  actor("kaeli", play=["z_crawl_cat" * 3, "z_curl_sleep"],
+  actor("costar", play=["z_crawl_cat" * 3, "z_curl_sleep"],
         path=approach("reva", stop_at=0.55, facing=TOWARD))
-  contact("kaeli.hip.R", frame=actor("reva").local(0.30, 0.10, -0.15), t=(FROM_CURL, END))
+  contact("costar.hip.R", frame=actor("reva").local(0.30, 0.10, -0.15), t=(FROM_CURL, END))
 ```
 *Stress it reveals:* everything the director phase needs — relative placement, per-actor
 sequencing, and contacts resolved in another body's frame.
@@ -331,7 +331,7 @@ measuring tool, the instrument gets designed as carefully as the thing it measur
 |---|---|---|
 | contact fidelity | declared contact met within **2cm** | the score |
 | floor penetration | no joint below y=0 beyond tolerance | physics |
-| ballistic truth | during declared flight, root Y is parabolic — and its *g* matches the club's | physics |
+| ballistic truth | during declared flight, root Y is parabolic — and its *g* matches the engine's | physics |
 | bone length | invariant (already built, upleg→knee, one joint) | rig geometry |
 | joint limits | no hyperextension or inversion; knees, elbows, spine | anatomy |
 | self-intersection | limb segments vs a torso capsule, approximate — **tolerance comes from the score**, see below | geometry |
@@ -349,7 +349,7 @@ Declared closeness is intent; undeclared closeness is a defect.
 
 ### `anim_bench/corpus.py` — real motion as the reference
 The strongest available answer to *"is this any good"* short of a person's eyes, and it costs
-almost nothing because the reference already sits on disk: **every clip in the club is real
+almost nothing because the reference already sits on disk: **every clip in the engine is real
 mocap**, plus 777 animation assets in `CivicDefenseV2`.
 
 Extract, per motion class, the statistics that separate captured human movement from
@@ -465,7 +465,7 @@ and P4's "returns to a clean stand" gate cannot be met without this.
 ### P1.5 — The interpolating sampler (engine rung E1)
 Not a decision point. A fix, and the highest-value one in this document.
 
-**What is there now:** every clip in the club is sampled **nearest-frame with no
+**What is there now:** every clip in the engine is sampled **nearest-frame with no
 interpolation** — `((unsigned)phase) % frames`, then a `memcpy` of that frame's raw
 quaternion. Measured this session: at an 18fps bake against a 97fps render, **every pose
 is held for about five render frames.** That is a systemic stair-step under all 133 packs,
@@ -478,7 +478,7 @@ It is also copy-pasted across **eight sampling sites** (`crowd_kms.c` lines 424,
 *fractional* phase and slerps rotations / lerps translations between frame N and N+1.
 Replace all eight call sites with it.
 
-**Gate:** the club-wide step rate rises from ~18/s to the render rate, measured by
+**Gate:** the engine-wide step rate rises from ~18/s to the render rate, measured by
 `posturecheck`'s `clip stepping` readout; `certify.sh` and `standsweep.sh` show no
 regression; frame time holds at ~95–102fps with 400 bodies armed.
 
@@ -493,7 +493,7 @@ engineering trade; "bake at 60fps and live with it" was me ducking it.
 **Build:** analytic 2-bone IK for all four limbs. Contact declarations. Author-time
 grounding — compute the root trajectory so declared contacts sit at floor level.
 
-**Also in P2 — `corpus.py` v1, over the club's own packs.** They are all real mocap, so
+**Also in P2 — `corpus.py` v1, over the engine's own packs.** They are all real mocap, so
 the envelope costs one measurement pass. The CivicDefense 777 widen it later via an artery
 batch — an upgrade, not a prerequisite. Scheduled here because P4 *depends* on the corpus
 existing and, until this pass, no phase actually built it.
@@ -510,7 +510,7 @@ result — which already contains any hip translation the clip authored. Raise t
 ankle is *high*, so the body is driven underground.
 
 That is not a bug and not an obstacle. It is auto-grounding, written when every clip in
-the club was an in-place cycle with no root motion — correct for the job it had. The
+the engine was an in-place cycle with no root motion — correct for the job it had. The
 engine simply only implements **one** of the three ways a root can be owned.
 
 **Build the whole model, explicitly:**
@@ -593,8 +593,8 @@ scene-scripting alone would have been the plan's biggest under-estimate.
 each other** ("curl up *around* reva" = a position derived from reva's transform and
 facing), sequencing, blends between clips. A mode or lab state that plays a scene.
 
-**Gate:** the kaeli-and-reva scene runs end to end — crawl, approach, curl, settle — with
-kaeli's placement derived from reva's, and no interpenetration.
+**Gate:** the co-star-and-reva scene runs end to end — crawl, approach, curl, settle — with
+the co-star's placement derived from reva's, and no interpenetration.
 
 ⛔ **If the director gets its own camera, gate it against the F310 chase cam in
 `camDirector` FIRST.** That path fires before the shot switch whenever `g_manual=1` and
@@ -655,7 +655,7 @@ Two different things were mixed together in the first draft, and separating them
 ## 11. What "done" looks like
 
 The capability is finished when a person names a motion in a sentence and, inside one working
-session, it exists in the club: authored, passing `movecheck`, playing on any humanoid
+session, it exists in the engine: authored, passing `movecheck`, playing on any humanoid
 body, committed as a regenerable score — and the verdict on it is favourable more often than not.
 
 That last clause is the real bar, and it is the one this plan is least able to guarantee by
@@ -688,18 +688,18 @@ Two things to watch in it:
    recommended — it exercises the language end to end and P5 becomes a widening rather than
    a rewrite, because the language is canonical and frame-relative from day one either way.
    **A case for going earlier on P1.5 (the interpolating sampler):** it is independent of
-   all of this, improves every animation already in the club, and is the smallest rung here.
+   all of this, improves every animation already in the engine, and is the smallest rung here.
 2. **How far before there is something to see?** The plan stops cleanly after P4 with a
    real authoring tool and four moves. P5/P6 are the difference between "reva can do it"
    and "anyone can do it, together."
 3. **House style.** Timing and proportion would come from published biomechanics and the
-   measured corpus. That gives *plausible*, not *the club's own* — the club has a look, and a
-   cartwheel in a dance club is not a gymnastics-floor cartwheel. If there is a reference
+   measured corpus. That gives *plausible*, not *the engine's own* — the engine has a look, and a
+   cartwheel on a dance floor is not a gymnastics-floor cartwheel. If there is a reference
    in mind (a game, a show, a specific weight and snap), that is the single most
    useful thing to have, and it is exactly the intent I cannot infer.
 4. **How much stylisation is wanted at all?** The corpus envelope pulls authored motion
    toward *realistic*. Cartoon timing — big anticipation, snappy extremes, held poses —
-   deliberately violates it. If the club's look is stylised, the envelope becomes a
+   deliberately violates it. If the engine's look is stylised, the envelope becomes a
    reference rather than a gate, and I should know that before I start tuning against it.
 
 ---
@@ -786,7 +786,7 @@ build a cartwheel:
   proves one code path; four that stress root physics, cycle closure, endings and masking
   prove a language. If three pass and one fails, the failure names an underspecified
   primitive.
-- **Added `corpus.py`.** Every clip in the club is real mocap, and 777 more sit in
+- **Added `corpus.py`.** Every clip in the engine is real mocap, and 777 more sit in
   `CivicDefenseV2` — so the statistics of real human movement (angular velocity, jerk,
   contact duration, COM oscillation, settle time) are free reference data already on disk.
   Authored motion can be checked against that envelope. It does not measure charm; it
@@ -828,7 +828,7 @@ first would have quietly invalidated three phases:
   reference skeleton (a copy of manny's pack), the lab subject *is* the moves pack until
   P5, playback is direct. P0's gate is re-worded to demand same-rig directness explicitly.
 - **`corpus.py` was P4's dependency and no phase built it.** It appeared in §6 as a tool
-  and in P4 as a reference, and was never scheduled. Now built in P2, club packs first
+  and in P4 as a reference, and was never scheduled. Now built in P2, the engine's own packs first
   (the 777 CivicDefense assets are a later widening), gated on reproducing numbers the
   bench has already certified.
 - **P5's gate demanded `posturecheck` on the cartwheel** — a standing audit on a body

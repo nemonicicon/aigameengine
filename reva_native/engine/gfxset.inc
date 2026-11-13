@@ -50,7 +50,7 @@ __attribute__((unused)) static void displayPrefs(int*windowed,int*W,int*H){   /*
     if(*windowed&&w>=160&&h>=120){ *W=w; *H=h; } }
 static void gfxConfigBoot(void){
     GfxConfig c=gfxRow(g_tier);
-    c.zpre=0;   /* (11-07) off: on the Pi early depth rejection turns nothing away (REVA_GPUCOUNT's FEP-clipped-quads is 0), so laying the depth first only adds work: 21.3 frames a second against 23.9 at 12th and Jackson. REVA_GFX=zpre=1 for when it does */
+    c.zpre=0;   /* (11-07) off: on the Pi early depth rejection turns nothing away (REVA_GPUCOUNT's FEP-clipped-quads is 0), so laying the depth first only adds work: 21.3 frames a second against 23.9 on the street game's corner. REVA_GFX=zpre=1 for when it does */
     /* (11-11) A HEADSET'S RUNG: the depth laid first, and nothing worked out on the picture after it's drawn. On the bridge at 2160 x 2160 an eye (GTX 1070) the depth first
      * took the solids from 37.8 ms to 15.6, and the occlusion was 5.9 more. Each eye would work out its own occlusion, contact shadows and blur, and the two would differ.
      * graphics_vr.txt (below) can put any of it back */

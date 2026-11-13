@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_hello.py -- P0.5, the hello pose: two arms, two DIFFERENT authored angles.
 
-The first motion in the club that was DECIDED rather than captured, and deliberately the
+The first motion in the engine that was DECIDED rather than captured, and deliberately the
 smallest discriminating authoring act. The first cut aimed one arm at 90 deg -- and the
 gate read 88.95 on BOTH arms, because manny's untracked rest is a T-POSE: rest was
 already at ~89, so hitting 90 proved coincidence, not control. Two corrections, both of

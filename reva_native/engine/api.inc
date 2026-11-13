@@ -50,7 +50,7 @@ static void apiLightShadow(void){ if(g_frameNL>0) g_frameLight[g_frameNL-1].shad
 static void apiLightReach(float reach){ if(g_frameNL>0&&reach-reach==0.f) g_frameLight[g_frameNL-1].reach=reach>0.f?reach:0.f; }   /* (11-11) */
 static void apiLight(float x,float y,float z,float r,float g,float b,float falloff){ frameLightAdd(x,y,z,r,g,b,falloff,0.f,0.f,0.f,0.f); }
 static void apiSpot(float x,float y,float z,float dx,float dy,float dz,float r,float g,float b,float falloff,float deg){ frameLightAdd(x,y,z,r,g,b,falloff,dx,dy,dz,deg); }
-/* step 20 (11-04): sound, music and a save of the game's own, in the table. The mixer and the slot store are the club's; a game reaches them here and nowhere else */
+/* step 20 (11-04): sound, music and a save of the game's own, in the table. The mixer and the slot store are the engine's; a game reaches them here and nowhere else */
 static int apiPackOutfit(int pack,const char*o){ if(!o||pack<0||pack>=g_packN) return 0; return wardWear(&g_packs[pack],o); }   /* (11-08) */
 static int apiSound(const char*name,float gain,const float*pos,int loop){ return sfxPlayBus(BUS_SFX,name,gain,pos,loop); }
 static void apiSoundPlace(int id,float x,float y,float z){ const float p[3]={x,y,z}; sfxVoicePlace(id,p); }   /* (11-12) */

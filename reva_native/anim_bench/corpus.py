@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""corpus.py -- the club's real mocap, measured: the envelope authored motion is judged in.
+"""corpus.py -- the engine's real mocap, measured: the envelope authored motion is judged in.
 
 v1 scope (P2): gait-class statistics from offline FK over baked clips -- cadence,
 contact duty, vertical center-of-mass oscillation. No engine, no playback: this reads

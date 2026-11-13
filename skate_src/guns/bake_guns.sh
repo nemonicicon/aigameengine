@@ -7,10 +7,10 @@
 # 2. glb2rpack.py bakes each into a prop rpack the engine loads at boot
 #
 # rpacks are gitignored (repo convention: recipes in, artifacts out), so this script IS
-# the record. The meshes are real-world metres and the club runs 3.15 units per 1.8m
+# the record. The meshes are real-world metres and the engine runs 3.15 units per 1.8m
 # body, so --scale 1.75 lands them at true size; --center puts the origin in the hand.
 #
-# The staging project (GunExport/) is a copy of the kaeli shim with the weapon uassets
+# The staging project (GunExport/) is a copy of the co-star's export shim with the weapon uassets
 # dropped into its Content -- see ue_export_guns.py. Materials do NOT survive the
 # export (0 images in the GLBs); the engine tints each weapon instead.
 set -e

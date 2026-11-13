@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """daycheck.py -- the same street, all the way through a day. One sheet.
 
-    python reva_native/anim_bench/daycheck.py [--set parsons] [--from 5] [--to 23]
+    python reva_native/anim_bench/daycheck.py [--set <street>] [--from 5] [--to 23]
                                               [--cols 10] [--cam "ex,ey,ez,ax,ay,az,fov"]
 
-SEVENTY-FOUR runs from a wet 7am to a boarded window after dark, so the sun going
-down is not dressing, it is the plot. This shoots the arc as a strip: one camera, one set,
+The film runs from a wet 7am to after dark, so the sun going
+down is not dressing, it is part of the film. This shoots the arc as a strip: one camera, one set,
 the clock running underneath.
 
 ⭐ IT RUNS THE CLOCK RATHER THAN SETTING IT. Twelve launches at twelve fixed hours would

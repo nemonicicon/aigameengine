@@ -25,7 +25,7 @@ write as fingers.py: node indices never move, so every existing clip still plays
 
 THE CORNERS (08-28). The shader aperture used to size itself as 0.42 x the interocular
 distance -- a guess on top of a guess, because the EYE marks are themselves placed by
-proportion. On kaeli that cut a hole across her whole lower face; forced open it read
+proportion. On the co-star that cut a hole across her whole lower face; forced open it read
 as a circle from her nose to her chin, wider than her mouth and see-through to the hair
 behind her skull. A mouth is not derivable from an eye line, so it gets its own pair of
 marks and the engine measures the aperture off them.
@@ -52,9 +52,9 @@ from fingers import (m4_trs, m4_mul, m4_inv_affine, xform, NODE, q_between, qrot
 MARKS = ("face_mouth", "face_eye_l", "face_eye_r", "face_chin",
          "face_mouth_l", "face_mouth_r")
 
-# A MOUTH IS NOT AN EYE LINE. The default half-width is anatomy from the club's own
+# A MOUTH IS NOT AN EYE LINE. The default half-width is anatomy from the engine's own
 # reference head (v1_crowd_goblin's Character Creator rig: interocular 3.666 with a
-# lip line 2.153 below the eyes), sanity-checked against the two club faces in the
+# lip line 2.153 below the eyes), sanity-checked against the two lead faces in the
 # mouth camera. It is a STARTING POINT -- calibrate it per body with --mouthhw and the
 # face rig's mark gizmo (REVA_FACEDBG=1), the same loop --mouthdy already uses.
 MOUTH_HW_IOD = 0.34     # half-width, in interocular distances
@@ -64,8 +64,8 @@ CHIN_DROP = 0.50        # chin below the lip line, in eye-to-mouth heights
 def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
           eye_xf=0.32,
           chin_dy=0.0, report=False, mouth_tilt=0.0, from_file=None, only=None):
-    # ⭐ ep 12: `--only face_mouth` writes just that mark -- a MOUTH for the smoke on a body whose eyes must stay
-    # unmarked (kaeli: eye marks turn the shader aperture on over a morph-driven mouth). Every mark is still
+    # ⭐ `--only face_mouth` writes just that mark -- a MOUTH for the smoke on a body whose eyes must stay
+    # unmarked (the co-star: eye marks turn the shader aperture on over a morph-driven mouth). Every mark is still
     # measured and printed; only the named ones are written.
     p = Rpack(path)
     RM = rig_map(p)
@@ -179,7 +179,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
     # ⛔ AND THE SPREAD WAS A HARD 0.32 WITH NO WAY TO CHANGE IT. This block says
     # "calibrated by eye, per body", from a screenshot
     # somebody looks at -- and then offered --eyedy for the height and NOTHING for the width, so
-    # the one axis that was actually wrong on kaeli could not be corrected. Her marks sat
+    # the one axis that was actually wrong on the co-star could not be corrected. Her marks sat
     # on her inner corner and her outer corner: measured off the face rig close-up, 230
     # screen px apart against pupils 125 apart.
     eye_x = eye_xf * xw
@@ -233,7 +233,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
     # read -0.105, BEHIND her skull. Walk down from the lips until the casts stop
     # landing: that last hit is the point of the jaw.
     # ⛔ "walk down until the mesh ends" only works on a head that IS a separate shell
-    # (reva's stops at y 1.631). kaeli's face runs into her neck and chest without a
+    # (reva's stops at y 1.631). The co-star's face runs into her neck and chest without a
     # break, so the walk kept finding surface and slid 9 rig units down her throat to
     # z -14, behind her own head. The chin is where the face stops REACHING FORWARD:
     # below it the surface plunges under the jaw. Protrusion is measured from the skull
@@ -246,7 +246,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
         y = mouth_y - k * step
         z = surface_z(cx, y, None)
         if z is None: break                           # the head shell ended (reva)
-        if (z - wp[head][2]) < 0.45 * lip_p: break    # gone under the jaw (kaeli)
+        if (z - wp[head][2]) < 0.45 * lip_p: break    # gone under the jaw (the co-star)
         chin_y = y
     if chin_y >= mouth_y - 1e-9:                      # never found an edge: proportion
         chin_y = mouth_y - CHIN_DROP * eyespan
@@ -259,7 +259,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
 
         # THE CORNERS sit on the face, which curves back -- their depth is measured in
         # their own lateral window, not copied from the mouth centre.
-        # ⛔ AND A MOUTH IS NOT ALWAYS LEVEL. kaeli's is a little off kilter on her model:
+        # ⛔ AND A MOUTH IS NOT ALWAYS LEVEL. The co-star's is a little off kilter on her model:
         # it wants lowering and tilting. --mouthtilt
         # rotates the corner pair about the mouth centre in the frontal plane; the
         # engine's aperture reads the angle back off these two marks, and
@@ -272,7 +272,7 @@ def build(path, mouth_dy=0.0, eye_dy=0.0, mouth_dx=0.0, mouth_hw=MOUTH_HW_IOD,
     }
 
     # ⭐ AND A HAND-PLACED FILE WINS OVER EVERY CALCULATION ABOVE. A person places
-    # them more easily, and on a face like kaeli's a person is the only
+    # them more easily, and on a face like the co-star's a person is the only
     # instrument that works: geometry picks her fringe, face_calibrate's darkest-texel rule
     # is defeated by her liner, and I converged on her eyes by bisecting render sweeps.
     # REVA_MARKEDIT=1 lets them be clicked straight onto her and writes this file.

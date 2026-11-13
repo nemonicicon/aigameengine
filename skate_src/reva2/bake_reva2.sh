@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bake_reva2.sh -- the REVA re-ingest, source statue to club body. Run from repo root.
+# bake_reva2.sh -- the REVA re-ingest, source statue to a body in the engine. Run from repo root.
 #
 #   bash skate_src/reva2/bake_reva2.sh
 #

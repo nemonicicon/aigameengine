@@ -1,7 +1,7 @@
 /* THE HEAD LAYER. Heads were not moving. Two bodies standing perfectly still
  * for a minute read as mannequins with a radio playing, however good the voices are.
  * This rides ON TOP of whatever clip is playing, in the bone's own frame (post-multiply
- * = local axes; both club rigs are Mixamo-shaped, so local X is the nod and local Y the
+ * = local axes; both rigs are Mixamo-shaped, so local X is the nod and local Y the
  * turn): a slow drift for both, the SPEAKER moving with her own loudness, the LISTENER
  * nodding on a slower clock of her own. Split across neck and head so the whole column
  * bends rather than the skull swivelling on a fixed neck. */
@@ -35,12 +35,12 @@ static void jawLayer(Pack*P,float Q[][4],int who,float open){
  * line to her eyes -- no target bone to guess at, and it stays right under any clip
  * because the marks ride FK.
  *
- * ⛔ NEITHER CLUB WOMAN CAN AIM AN EYEBALL. reva has 26 vertices within a third of an
- * interocular distance of her eye mark -- her eyes are PAINTED -- and kaeli's eye
+ * ⛔ NEITHER LEAD CAN AIM AN EYEBALL. reva has 26 vertices within a third of an
+ * interocular distance of her eye mark -- her eyes are PAINTED -- and the co-star's eye
  * region is a handful of flat shells (lids and lashes), not spheres. So the aiming
  * that can actually happen here is the HEAD, and that is what this does. The eye-bone
- * path below is live for the six club packs that do carry real eye bones (rabbit,
- * medic, miko, foxy, hina, the toony robot); on a body without them it is skipped
+ * path below is live for the six packs that do carry real eye bones (the rabbit,
+ * the medic, two bought models, the giant, the toony robot); on a body without them it is skipped
  * rather than faked. */
 /* qaxis(off,1,0,0,a) sends forward (0,0,1) to (0,-sin a,cos a): POSITIVE pitch tips
  * the face DOWN, so a target above needs the negative. Derived, not guessed. */
@@ -57,7 +57,7 @@ static int lookTarget(int who,float bodyYaw,float*yawOut,float*pitchOut){
      * body's gaze off, and that -- not the words -- is what carries an argument: she
      * answers without turning her head, and the moment she does turn it lands. */
     if(g_scnT>=0.f&&!g_scnLook[who&1]) return 0;
-    /* ⭐ ep 11: a body riding a half-pipe is pitched into the wall and turning in the air -- this solve is for an
+    /* ⭐ a body riding a half-pipe is pitched into the wall and turning in the air -- this solve is for an
      * UPRIGHT body at bodyYaw, so on a pipe it stands down (the idle drift stays) */
     if(g_prd[who?((g_castI>=1&&g_castI<SCN_MAXCAST)?g_castI:1):0].pon) return 0;
     const float*me   = who? g_partEyeW : g_heroEyeW;

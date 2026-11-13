@@ -296,7 +296,7 @@ def main():
     # (11-12, step 12) A GODOT LIGHT ENDS AT ITS RANGE: its window there is the engine's light reach (the 9th number), and how it falls off inside
     # (energy over distance to the power of its attenuation, 1 by default) is the lamp's reach (the 8th, where it's at half), worked out as
     # where Godot's is half what it is a metre out. ⛔ Written as the 8th number, its range was where it was at half: lanterns 30 units off
-    # lit the Hedge Maze's start as brightly as the ones beside it
+    # lit one level's start as brightly as the ones beside it
     def light_line(l):
         x, y, z = eng(l["xf"]["pos"])
         c = l["color"]

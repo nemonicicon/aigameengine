@@ -4,7 +4,7 @@ planted, for a game that moves the body itself. The text-to-motion lane's last s
 
     z_km.py <pack> <table.json> [--force] [--only z_km_mid] [--sidecar out.json] [--steps-table out_ft.json]
 
-    {"home": os.environ.get("CLUB_KIMODO", "kimodo"), "stand": "GAME_IDLE_OFF", "width": 1.0, "accel": 20.0,   # club-engine kit: machine-independent paths
+    {"home": os.environ.get("CLUB_KIMODO", "kimodo"), "stand": "GAME_IDLE_OFF", "width": 1.0, "accel": 20.0,   # machine-independent paths
      "gaits": {"mid": {"take": "run_s2", "base": "ALIEN_JOG", "base_seconds": 0.625}, ...},
      "sets": {"": {}, "_board": {"stand": "ALIEN_IDLE_CARRY", "from": {"mid": "ALIEN_JOG_CARRY"}}, ...}}
 

@@ -1,6 +1,6 @@
 """clipstrip.py -- one body, its clips, columns of time, THROUGH THE HERO PATH.
 
-09-01: kaeli's base idle was a crouch-to-standing transition played on a loop, and no picture taken here had shown it.
+09-01: the co-star's base idle was a crouch-to-standing transition played on a loop, and no picture taken here had shown it.
 
 The tools I had could not have shown me:
   * modelcheck.py shoots the body as a SET ACTOR with a static clip -- one frame, and

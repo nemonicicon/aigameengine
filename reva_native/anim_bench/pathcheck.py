@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """pathcheck.py -- the same body down every draw path. Do they agree?
 
-    python reva_native/anim_bench/pathcheck.py [--subject kaeli_pj] [--clip idle]
+    python reva_native/anim_bench/pathcheck.py [--subject <body>] [--clip idle]
 
-WHY THIS EXISTS. The club draws a skinned body through THREE separate code paths -- the
+WHY THIS EXISTS. The engine draws a skinned body through THREE separate code paths -- the
 HERO, the scene PARTNER, and a SET ACTOR -- and they have drifted apart repeatedly, because
 a fix goes in where the bug was seen and nowhere else. In one session:
 
   * the ACTOR path had no tint for an untextured mesh, so a blue garment rendered BROWN;
-  * the PARTNER path had the same gap and rendered the same garment INVISIBLE -- kaeli
+  * the PARTNER path had the same gap and rendered the same garment INVISIBLE -- the co-star
     stood in the street in her pyjamas and came back naked, while REVA_CLOTHDBG happily
     reported a garment-sized box in exactly the right place;
   * cloth itself was bolted to the partner only, so neither the hero nor an actor could
@@ -87,7 +87,7 @@ def shoot(name, ctl, out, frame, subject, extra_env=None):
     return out
 
 
-# ⛔ THE TOLERANCE IS TIGHT ON PURPOSE. kaeli has BLUE HAIR, near enough to a blue
+# ⛔ THE TOLERANCE IS TIGHT ON PURPOSE. The co-star has BLUE HAIR, near enough to a blue
 # pyjama that a loose match scored two thousand 'garment' pixels on a body wearing
 # nothing -- the known-bad run failed for the right answer and the wrong reason. Pick a
 # garment tint that does not collide with the body, and keep this narrow.
@@ -95,7 +95,7 @@ def garment_area(with_png, without_png):
     """The garment is WHAT CHANGED when the mesh was hidden.
 
     ⛔ THREE COLOUR-MATCHING ATTEMPTS FAILED BEFORE THIS, each differently: a loose RGB
-    match counted kaeli's BLUE HAIR as garment; a tight one rejected the LIT garment,
+    match counted the co-star's BLUE HAIR as garment; a tight one rejected the LIT garment,
     because shading slides a colour a long way from its base; and matching HUE counted the
     entire SKY, which is the same blue. Colour cannot answer this question on a body whose
     hair, sky and clothes are all blue.

@@ -19,7 +19,7 @@ What goes in the file, and what deliberately does not:
     right side red, rigidly skinned) so the moves can be looked at in Godot or Blender before
     retargeting; delete it.
   * `--mesh`: the pack's OWN meshes instead of the stick figure, for a character that is ours to hand
-    over (09-27). Skinned exactly as the club engine skins them -- each vertex through its
+    over (09-27). Skinned exactly as the engine skins them -- each vertex through its
     mesh's bind matrix, then its bones' world x inverse-bind -- with the pack's textures embedded.
     The materials are what the engine draws: base colour (+ normal map), double-sided (the engine never
     culls), BLEND where the pack blends, a 0.4 alpha cut where the texture has alpha, and an untextured
@@ -28,7 +28,7 @@ What goes in the file, and what deliberately does not:
     matched by GEOMETRY. Morph targets (a face's shapes) are not exported, and it says so.
   * `--board`: a skateboard node (a generated deck + four wheels) driven by each clip's `<clip>_bd`
     channel -- the board frame in the rider's model space (origin the deck-top centre, +X the nose, +Y
-    the deck's up), exactly as the club engine draws it. Clips without a channel leave the board where
+    the deck's up), exactly as the engine draws it. Clips without a channel leave the board where
     it was, so keep boarded and board-less clips in separate files.
   * a SEAMLESS clip (first and last frame within 20 degrees on every bone, the engine's own test) gets
     frame 0 repeated at t = frames/fps, so a looped playback wraps like the engine's does. Which clips
@@ -270,7 +270,7 @@ def export_meshes(R, G, nodes, gi, keep, Wr, jidx, meshes, src_mats, stem):
             print("   mesh %d: not skinned -- the engine does not draw it on a body, left out" % mi)
             continue
         if not m["nidx"]:
-            # ⛔ (11-05) a mesh emptied of its triangles (Kaeli's street outfit empties Anima's bra and panties) draws nothing in the
+            # ⛔ (11-05) a mesh emptied of its triangles (the co-star's street outfit empties the bought character's bra and panties) draws nothing in the
             # engine; written as a primitive with no indices, glTF draws every three of its vertices as a triangle, and Blender showed
             # lines across her (her earring to her forearm, her neck to her foot)
             print("   mesh %d (%s): no triangles -- the engine draws nothing, left out" % (mi, R.sname(m["name"]) or "?"))
@@ -546,7 +546,7 @@ def main():
             path = {0: "rotation", 1: "translation", 2: "scale"}[t]
             samps.append({"input": tin, "output": G.acc(D, "VEC4" if t == 0 else "VEC3"), "interpolation": "LINEAR"})
             chans.append({"sampler": len(samps) - 1, "target": {"node": gi[n], "path": path}})
-        # ⛔ A BONE THE CLIP DOES NOT KEY IS AT REST in the club engine -- and in Blender and Godot it
+        # ⛔ A BONE THE CLIP DOES NOT KEY IS AT REST in the engine -- and in Blender and Godot it
         # KEEPS WHATEVER THE LAST ANIMATION LEFT IT AT. The first export passed 31 of 32 animations to
         # 5 micrometres and failed z_upright by 2.04 m: it keys a few bones, and played after the hand
         # walk its left arm stayed in the air. Every bone gets a track in every animation: the clip's

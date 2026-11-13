@@ -127,11 +127,11 @@ def calibrate(path, dump=None):
         dl9, dr9 = lx9 - hx, hx - rx9
         # ⛔ SYMMETRY IN Y IS NOT SYMMETRY. The old test only asked that the two dark
         # clusters sit at the same HEIGHT, which a fringe and a temple satisfy easily --
-        # kaeli came back with her "eyes" at x 0.2466 and -11.0981, eleven units apart on
+        # the co-star came back with her "eyes" at x 0.2466 and -11.0981, eleven units apart on
         # a head a couple of units wide, because dark hair on both sides of a face is
         # level. A pair of eyes also straddles the midline and is near MIRRORED across it.
-        # With this, kaeli is refused (as the tool always did refuse her) and Anima passes
-        # at an interocular of 0.115 -- a 63 mm human IOD at the club's 1.75x scale.
+        # With this, the co-star is refused (as the tool always did refuse her) and the bought character passes
+        # at an interocular of 0.115 -- a 63 mm human IOD at the engine's 1.75x scale.
         sym9 = (dl9 > 0 and dr9 > 0 and abs(dl9 - dr9) < 0.35 * (dl9 + dr9))
         if sym9 and abs(ly - ry) < 0.25 * abs(pct([e[0][1] for e in front], 0.9) -
                                      pct([e[0][1] for e in front], 0.1)):
@@ -144,7 +144,7 @@ def calibrate(path, dump=None):
         sat = (mx - mn) / (mx or 1)
         return sat * (1.0 if c[0] >= mx else 0.0)
     # THE MOUTH IS NOT DIRECTLY UNDER THE EYES. "Reddest texel below the eye line" put
-    # Anima's mouth 0.0129 below her eyes against an interocular of 0.115 -- about a tenth
+    # the bought character's mouth 0.0129 below her eyes against an interocular of 0.115 -- about a tenth
     # of the way down a face -- because the eye geometry's own iris/sclera paint and the
     # lower lid are the reddest saturated things immediately beneath the eyes.
     # A face has proportions: the mouth sits roughly 0.6-0.9 x interocular below the eye

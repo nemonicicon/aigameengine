@@ -1,11 +1,11 @@
-# THE ZOMBIES ARE THE NEIGHBOURS — Z4 of SEVENTY-FOUR
+# Z4: A ZOMBIE CLIP BANK — ingesting it, and retargeting it onto any body
 
-*(written 2026-08-29. The film's own line: "⭐ **the zombies are the neighbours.** Same
-bodies, retargeted onto the ZAMN zombie clip bank. That is the trope stated correctly, it
-is what the asset situation wants, and it means one ingest serves both crowds.")*
+*(written 2026-08-29. ⭐ The zombies are the townspeople's own bodies, retargeted onto a
+zombie clip bank: it is what the asset situation wants, and it means one ingest serves
+both crowds.)*
 
-Z4's rung was **zombie ingest + retarget onto the citizen skeleton**, ending in *Mrs.
-Parsons at her mailbox*. It landed, and on the way it cashed out a four-day-old defect
+Z4's rung was **zombie ingest + retarget onto the citizen skeleton**, ending in *a
+townsperson at her mailbox*. It landed, and on the way it cashed out a four-day-old defect
 that had been quietly wrecking the whole town's colour.
 
 ---
@@ -18,12 +18,12 @@ that had been quietly wrecking the whole town's colour.
     merge_zombies.py       32 GLBs -> zombies.glb       (one rig, 32 named clips)
     glb2rpack_anim.py --keepnames -> packs/v1_zmoves.rpack   (32 clips, 7.4 MB)
 
-Source: `ZAMNRemake/Content/ZombieAnimationPack/Animations/Mannequin_UE5` — **on C:, not
-D:** (`<Unreal Projects>\ZAMNRemake`, engine 5.6; the 5.8 shim reads
+Source: the zombie prototype's `Content/ZombieAnimationPack/Animations/Mannequin_UE5` — **on C:, not
+D:** (`<Unreal Projects>\<the zombie prototype>`, engine 5.6; the 5.8 shim reads
 its assets fine). Attack ×4, Walk ×3, Run, Idle ×2, Belly_Crawling ×2, Laying_Idle ×2,
 Impaled ×2, Taking_Damage ×6, Burst ×10.
 
-⭐ **THEY ARRIVE IN THE CLUB'S OWN BONE LANGUAGE.** The canonical map in `crowd_kms.c:259`
+⭐ **THEY ARRIVE IN THE ENGINE'S OWN BONE LANGUAGE.** The canonical map in `crowd_kms.c:259`
 is written against UE names — `pelvis`, `spine_`, `clavicle_l`, `upperarm_l`, `thigh_l`,
 `calf_l` — because that is the convention the whole retarget was authored to. The UE5
 mannequin these clips ride is not "a rig to be mapped"; it *is* the reference rig. Loaded:
@@ -34,7 +34,7 @@ of one exporter against one skeleton and measured **identical** — 90 nodes, sa
 same order, 30fps, T/R/S on all 89 joints in every file — so the merge is JSON surgery:
 copy the base's mesh/skin/nodes once, append each animation with its node indices used
 verbatim. It also dodges the FBX traps (the UE scale-compensation convention that crushed
-kaeli's hips to 1e-4).
+the co-star's hips to 1e-4).
 
 **What the merge keeps, decided by measurement not habit:**
 
@@ -43,7 +43,7 @@ kaeli's hips to 1e-4).
 | rotation, all joints | **keep** | this is what the transfer replays |
 | pelvis translation | **keep** | THE HEIGHT SIGNAL — pelvis y is 0.84 standing, 0.82–0.92 walking, **0.11 on the crawls and lays** |
 | root translation | **zero** | the actor system drives travel with `spd`; Walk/Run/Idle are already in place (root moves 0.03/cycle) but the four attacks lunge (Attack_A: z −0.15→1.91) |
-| scale | **drop** | the documented kaeli trap |
+| scale | **drop** | the documented hip-crushing trap |
 | translation, other joints | **drop** | bones do not stretch; rest translations already live in the hierarchy |
 
 ⛔ **CLIP NAMES ARE AN ENGINE CONTRACT.** Everything is `z_`-prefixed so it dodges every
@@ -94,14 +94,14 @@ function returns 0 when the pelvis is at or above its rest).
 ### `include` in the set format
 
 A fifteen-minute film shot on one street needs many sets over the *same* 514 lines of
-suburbia. `include block` pulls a set in wholesale, depth-limited to 2. `parsons.set` is
+suburbia. `include block` pulls a set in wholesale, depth-limited to 2. A street's set is
 a street plus five cast lines.
 
 ---
 
 ## ⛔ AND THE THING THIS RUNG ACTUALLY FOUND: THE TOWN WAS FLIPPED
 
-Mrs. Parsons stood at a **magenta** mailbox beside a **purple-and-orange** pickup, in
+A townsperson stood at a **magenta** mailbox beside a **purple-and-orange** pickup, in
 front of houses whose windows were dark chequerboards of colour swatches.
 
 **The V flip was backwards, and had been since the town was baked.** `bake_town.sh`
@@ -160,7 +160,7 @@ than none.
 ## WHERE Z4 STANDS
 
 **Done:** the ingest, the bank, cross-pack clip resolution, the hip drop, `include`, and
-the Parsons beat rendered. The whole town's colour is fixed as a side effect.
+the mailbox beat rendered. The whole town's colour is fixed as a side effect.
 Regression **15/15, all four strict shots bit-identical**.
 
 **Owed:**
@@ -168,6 +168,6 @@ Regression **15/15, all four strict shots bit-identical**.
 - The distant citizens in a street wide read as dark silhouettes — unexplained.
 - The road does not extend past the generated lots, so a low camera at the street's end
   sees the void under it.
-- Nothing yet turns a neighbour INTO a zombie at a moment in time — Z4 gives the film a
-  cast that is already turned. Act III needs the transition (a `z_hit_*` into a `z_burst_*`
+- Nothing yet turns a neighbour INTO a zombie at a moment in time — Z4 gives a
+  cast that is already turned. A turning needs the transition (a `z_hit_*` into a `z_burst_*`
   into a shamble), which is a behaviour question, not an asset one.

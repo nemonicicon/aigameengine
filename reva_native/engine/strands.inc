@@ -75,7 +75,7 @@ static float g_hsCutM=0.12f; static int g_hsCutSay=0;   /* (11-11) REVA_STRANDJU
 static int g_hsTick=0, g_hsChk=0;   /* (11-11) REVA_STRANDTICK=1: a GPU hair's frame made in a pass that only ticks too, as before (strandPrep). REVA_STRANDCHECK=1: the GPU's copy read back (hsGpuCheck) */
 /* ⛔ (11-11) A LOCK'S LENGTHS ARE THE PACK'S, AND ITS POINTS ARE IN THE WORLD. Each segment's length and each point's tether (S->len, S->geo) are measured in the
  * pack at rest, and the step holds the world's points to them with no word of how big the body is drawn. A body drawn at 2.4 times her size had hair 2.4 times
- * too short for her, two points of each lock held to the haircut on her scalp and the rest pulled in toward them (the Facade video's giants, 11-11). Found by
+ * too short for her, two points of each lock held to the haircut on her scalp and the rest pulled in toward them (the music video's giants, 11-11). Found by
  * reading the hair back from the GPU (REVA_STRANDCHECK, on Mesa's software Vulkan): a settled head's segments 29% of their own length at her size on a giant,
  * 66% on her at true size. The lengths now follow the body's size against her pack's own (S->lenK = how she's drawn over Pack.scale), so a giant's hair is
  * what hers is at true size (66% there too), and at her pack's own size not a number has moved.
@@ -284,7 +284,7 @@ static void hsGpuInit(HStrands*S){
  * how far the first two points may leave the haircut, 75 friction, 76 the skull known, 77 points between a segment's ends, 78 the body grid's cell, 79-84 its box,
  * 85 her body's points, 86 between frames, 87 how far in a middle counts, 88 the step along by an ear, 89 the speed's ceiling, 90 hair against hair, 91 its cell,
  * 92-94 its corner, 95 the settle's dt, 96 its cells a side, 97 hairs, 98 hairs a lock, 99 drawn points a hair */
-/* ⭐ (11-12) A BODY PUT SOMEWHERE WHOLE KEEPS ITS HAIR. The Facade video's copies hop one column on every beat (GHOST's strip of faces slides a
+/* ⭐ (11-12) A BODY PUT SOMEWHERE WHOLE KEEPS ITS HAIR. The music video's copies hop one column on every beat (the original video's strip of faces slides a
  * column a beat), and a head that jumps was hung again: drawn as its haircut is cut for a frame or two while it settled (the settle is a budget
  * shared by every head, HS_SETTLE_FRAME), so the critic saw the hair puff on every beat. When her head's move takes last frame's roots onto this
  * frame's, whole (within 1.5 cm) and turned less than 30 degrees, the hair goes with it instead: its places, last places and speeds by that move,
@@ -861,7 +861,7 @@ static int strandPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4
             const float c9=(D9[0]+D9[5]+D9[10]-1.f)*0.5f; float e9=0.f;
             for(int s=0;s<S->ns;s++){ float p9[3]; hsXf(D9,S->tg0[s*S->np],p9); const float*b9=S->tg1[s*S->np]; const float q0=p9[0]-b9[0],q1=p9[1]-b9[1],q2=p9[2]-b9[2]; const float q=q0*q0+q1*q1+q2*q2; if(q>e9) e9=q; }
             e9=sqrtf(e9);
-            if(c9>0.8660f&&e9<0.015f*sc) carry9=hsCarry(S,D9);   /* within 30 degrees: the Facade wall's wrap-around copy turns 17 */
+            if(c9>0.8660f&&e9<0.015f*sc) carry9=hsCarry(S,D9);   /* within 30 degrees: the music video's wrap-around copy turns 17 */
             { static int said9=0; if(g_hsCutSay||(carry9&&said9<6)||(carry9&&(said9%200)==0)){ printf("[strands] %s: put %.2f u away in a frame, turned %.1f degrees, its roots %.1f mm off a whole move -- %s\n",P->label,jump,57.29578f*acosf(fmaxf(-1.f,fminf(1.f,c9))),1000.f*e9/sc,carry9?"the hair is CARRIED with her":"hung again"); fflush(stdout); } if(carry9) said9++; } }
         if(g_hsBStamp!=g_frameStamp||g_hsBPk!=P||g_hsBSlot!=slot){ const int keep9=hsBodyUse(P,slot); g_hsBStamp=g_frameStamp; g_hsBPk=P; g_hsBSlot=slot; hsBodyFrame(P,world,model,sc,keep9&&!carry9); }
         const int hangAny9=!S->warm||((jump>0.5f*sc||cut9||snap9)&&!carry9);
@@ -871,7 +871,7 @@ static int strandPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4
         if(g_hsCutSay&&hangAny9&&S->warm){ printf("[strands] %s: HUNG AGAIN, frame %u: jump %.3f u (a teleport past %.3f), cut %d, snap %d; a carry needs her head now and last frame (%d, %d), a drawn pass (%d)\n",
                                                   P->label,g_frameStamp,jump,0.5f*sc,cut9,snap9,Ep!=NULL,S->eHave,!(S->gpu&&g_noDraw&&!g_hsTick)); fflush(stdout); }
         if(carry9){ memcpy(S->tg0,S->tg1,(size_t)S->ns*S->np*12); S->eHave=0; }   /* nothing between last frame's pose and this one's: she was put here */
-        /* ⭐ (11-12) A FRAME HER HEAD MOVED FAR TAKES MORE SUBSTEPS: at most 1.25 mm of her roots' move a substep, up to 48. The Facade video's chorus 2 lead
+        /* ⭐ (11-12) A FRAME HER HEAD MOVED FAR TAKES MORE SUBSTEPS: at most 1.25 mm of her roots' move a substep, up to 48. The music video's second-chorus lead
          * snaps her head about 3 cm in one frame on the beat: at the draft's 6 substeps her whole haircut collapsed short for that frame, at 12 her fringe
          * still flicked up spiky (the critic: "the lead still twitches on the beat"). Only that frame pays; on the GPU only (the processor's step is
          * g_hsSub always). REVA_STRANDADAPT=0: g_hsSub every frame */

@@ -7,7 +7,7 @@ The engine ships no bought plants. These are plain ones a set can use the day it
   - a prop whose foot is at its own origin, standing up its own y. The set leans it from there in its wind (`sway=`), so a foot anywhere else slides.
   - a marker node `Open`: nobody walks into a blade of grass. Grass also says `NoCast`: a field's shadow is one grey, and costs the field again.
   - one texture a mesh, dark at the foot and light at the tip: what makes a blade read as a blade.
-Sizes are the club's units (1.7 to a metre): grass to the shin, a bush to the hip, a young tree three metres tall.
+Sizes are the engine's units (1.7 to a metre): grass to the shin, a bush to the hip, a young tree three metres tall.
 Then `python skate_src/author/lod.py reva_native/props/fol_tree.rpack` makes the tree's lighter copies and its far-off picture.
 """
 import math

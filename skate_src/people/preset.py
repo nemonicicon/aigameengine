@@ -12,7 +12,7 @@ It reads a body the way reva_native/anim_bench/bodycheck.py does (skin at rest, 
 The creator starts with R.E.V.A. (11-04): cast.REVA and games/people's first person are this tool's answer
 for props/v1_reva_hi.rpack, pasted in.
 
-⛔ The tables in ENGINE below are engine/people.inc's (peopleBytes), which are cast.py's AMELIA: change them together, or a fitted person isn't the person built.
+⛔ The tables in ENGINE below are engine/people.inc's (peopleBytes), which are fitted to one of the cast's bodies built by code: change them together, or a fitted person isn't the person built.
 ⛔ An EngineBodySpec has one `build` for the whole trunk, a width for hips and shoulders and a size for the waist, so it can't say every body: a narrow chest
 under ordinary shoulders has no number. The fit says what it couldn't reach.
 """
@@ -95,7 +95,7 @@ def measure(path, spec=None):
     hc = S.cut(head_y, parts=(3,))
     side = lambda y: S.girth(float(y), parts=(0, 2), xmin=0.0) / (2.0 * math.pi)   # noqa: E731
     # ⛔ A spec has no word for how a spine curves: its rings stand on one upright axis. Hers don't (her waist is 8 cm forward of her hip joints), so each
-    # ring's whole depth is kept and shared fore and aft the way the builder's own body shares it (cast.AMELIA's rings)
+    # ring's whole depth is kept and shared fore and aft the way the builder's own body shares it (that body's rings)
     share = lambda t, f, b: (t[0], (t[1] + t[2]) * f / (f + b), (t[1] + t[2]) * b / (f + b))   # noqa: E731
     out = {"H": H, "head_h": M["head"], "lm": lm,
            "hip": share((hw, hf, hb_mid), 0.090, 0.108), "waist": share((ww, wf, wb), 0.078, 0.080), "chest": share((cw, cf_mid, cb), 0.084, 0.090),

@@ -1,4 +1,4 @@
-/* setshader.inc -- ⭐ (11-12) A SURFACE'S OWN SHADER, given by a set (the Godot proof of concept's step 12: their Hedge Maze draws its hedges and
+/* setshader.inc -- ⭐ (11-12) A SURFACE'S OWN SHADER, given by a set (the Godot proof of concept's step 12: one of their levels draws its hedges and
  * ground with shaders of its own). A set line
  *     shader <prop> <mesh name> <file.gshd>
  * draws every mesh of that name in that prop with the shader the file describes: a game's surface code, translated and compiled at its cook

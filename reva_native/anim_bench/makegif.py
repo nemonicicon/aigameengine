@@ -9,7 +9,7 @@ judge weight, hang time and snap.
         (40 = ms per frame; use the capture's REVA_SHOTEVERY/60 to keep real time)
 
 --gain multiplies every channel by G before quantising. The lab stage is DARK -- a body
-on the wall measures ~18/255 mean, kaeli and reva2 alike -- and a move cannot be judged
+on the wall measures ~18/255 mean, the co-star and reva2 alike -- and a move cannot be judged
 in pixels nobody can see. The gain is uniform across the whole frame and every frame, so
 it changes exposure and nothing else: no crop, no per-frame levelling, no curve. Poses,
 timing and contacts read exactly as captured.

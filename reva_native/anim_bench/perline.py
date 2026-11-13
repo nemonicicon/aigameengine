@@ -11,7 +11,7 @@ import argparse, glob, os, sys
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scenes")   # club-engine kit: machine-independent paths
+SCN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scenes")   # machine-independent paths
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--fps", type=float, default=2.0)

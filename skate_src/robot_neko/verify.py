@@ -4,8 +4,8 @@
     python skate_src/robot_neko/verify.py ep.mp4 --steps 6,30 --clip 1.3,20,58 \
         --frames 57.3,58.2,59.0 --tones 23.15,53.6 --hz 880,1318
 
-The ledger's rule (ep 2): "done kept being declared from the wrong evidence -- a log line, a sheet
-at 8fps, a whole-frame percentage". Ep 3 had to run each check by hand -- mp4steps, a clipped count,
+The rule: done kept being declared from the wrong evidence -- a log line, a sheet
+at 8fps, a whole-frame percentage. One episode had to run each check by hand -- mp4steps, a clipped count,
 a hand-built frame montage, an ear on the chime -- so they are one tool now.
 
   --steps   mp4steps.py at each time (twos read EhEhEh; ones move on every pair)

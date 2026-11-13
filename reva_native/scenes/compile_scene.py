@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """compile_scene.py -- turn spoken lines into ONE scene the engine can play.
 
-    compile_scene.py club_night.txt [--gap 0.30] [--out club_night]
+    compile_scene.py <scene>.txt [--gap 0.30] [--out <scene>]
 
 Produces, next to the dialogue file:
   <out>.wav    every line mixed into a single track at its scene time
@@ -45,11 +45,11 @@ viseme has the shape, and neither one alone is a mouth.
     hbrow pbrow           -1..1, or `auto`. The brow morph LIFTS, so a NEGATIVE weight
                           furrows it. It is sticky like the rest, which is the point:
                           the listener holds her scowl through the other one's lines.
-    cam camtrack campan   the placed lens, a lens that rides with a body, one that pans after it (ep 8/10)
-    cammove camsecs       (ep 11) ease this line's cam= to cammove= over the line (or camsecs=); an EVENT --
+    cam camtrack campan   the placed lens, a lens that rides with a body, one that pans after it
+    cammove camsecs       ease this line's cam= to cammove= over the line (or camsecs=); an EVENT --
                           the move's end is carried on as the next line's cam=
-    camorbit              (ep 11) circle a body, deg0 -> deg1 of world heading; sticky like camtrack
-    camshake              (ep 11) amp[,hz]: a handheld on top of any placed lens; sticky, 0 = off
+    camorbit              circle a body, deg0 -> deg1 of world heading; sticky like camtrack
+    camshake              amp[,hz]: a handheld on top of any placed lens; sticky, 0 = off
     to                    (10-23) the slot a line is SAID TO: the speaker's head finds them (the engine's
                           PERFORMANCE LAYER); this line only
 
@@ -57,7 +57,7 @@ It is STICKY: a line inherits every value the previous line had, so the file sho
 what CHANGES. The engine eases position and facing toward the new values instead of
 snapping, which is what turns "pyaw=46" into a woman turning her back on someone.
 
-⭐ THE FILM MIX (10-23, THE WORLD AT THE END OF TIME: better voices, some music and atmosphere, better pacing).
+⭐ THE FILM MIX (10-23, the space series: better voices, some music and atmosphere, better pacing).
 A script that says
 
     mix film room=<set> [music=<mood>] [head=<s>] [tail=<s>] [seed=<n>]
@@ -100,7 +100,7 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # z_upright is EIGHT FRAMES -- a static pose, and it was the default
               # every body played in every scene. That is "they are just standing
               # there looking lifeless". All three principals ship a real idle.
-              # ⛔ NOT "idle". kaeli's own `idle` is a GET-UP-OFF-THE-FLOOR loop -- I
+              # ⛔ NOT "idle". The co-star's own `idle` is a GET-UP-OFF-THE-FLOOR loop -- I
               # swapped the static z_upright for it without looking at what it was on her
               # rig. `auto` casts by ROLE instead: the speaker gestures, the listener
               # listens, and it swaps on every line.
@@ -116,17 +116,17 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # none of them -- the engine keeps its own defaults and the .scn stays the
               # size it was.
               p2gap="", p2yaw="", p2side="", p2clip="", p2look="", p2brow="",
-              # ⭐ AND THE FOURTH BODY (ep 7). SCN_MAXCAST went 4 -> 5 so a scene can
+              # ⭐ AND THE FOURTH BODY. SCN_MAXCAST went 4 -> 5 so a scene can
               # seat four bodies plus the off-screen voice; slot 3 is staged exactly
               # like slot 2. Empty by default, so a three-hander emits none of them.
               # ⛔ She is cast EXPLICITLY -- `auto` does not resolve past slot 1.
               p3gap="", p3yaw="", p3side="", p3clip="",
-              # ⭐ ep 10: ONE-SHOT TRICKS. clip@sec[,clip@sec...] -- `sec` into the line the body cuts to
+              # ⭐ ONE-SHOT TRICKS. clip@sec[,clip@sec...] -- `sec` into the line the body cuts to
               # the clip at phase 0, plays it ONCE and cuts back to the line's clip at phase 0.
               # ⛔ NOT STICKY (TRICK_KEYS): a trick is an event like `beat`, and a sticky one would
               # re-fire on every line after the one that asked for it.
               htrick="", ptrick="", p2trick="", p3trick="",
-              # ⭐ ep 12: EXHALES. sec[,sec...] -- `sec` into the line, that body breathes a cloud of smoke off
+              # ⭐ EXHALES. sec[,sec...] -- `sec` into the line, that body breathes a cloud of smoke off
               # its mouth mark along its head's forward (~1.2 s). NOT sticky (PUFF_KEYS), like a trick. The
               # smoke off a cigarette's tip is the prop's own business: `@smoke` on its hprop= spec.
               hpuff="", ppuff="", p2puff="", p3puff="",
@@ -134,11 +134,11 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # points falling under gravity into the floor, the furniture and the walls -- or `off` hands
               # it back to its clip. NOT sticky (DOLL_KEYS): a fall is an event, like a trick.
               hdoll="", pdoll="", p2doll="", p3doll="",
-              # ⭐ ep 8: where HOLLY is, and which way up. x,y,z,yaw,pitch,w,h --
+              # ⭐ where the SCREEN is, and which way up. x,y,z,yaw,pitch,w,h --
               # sticky, and on a `snap=1` line it lands on the cut, because righting a
               # telly in stop motion is the animator picking it up between exposures.
               screen="",
-              # ⭐ THE FREE CAMERA (ep 8). cam=ex,ey,ez,ax,ay,az[,fov] places the lens
+              # ⭐ THE FREE CAMERA. cam=ex,ey,ez,ax,ay,az[,fov] places the lens
               # for THIS LINE; cam=off hands it back to the shot ladder. Not sticky --
               # a pin that outlives its line is how a scene loses its coverage.
               cam="",
@@ -146,7 +146,7 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # be able to put a coffee down. Empty by default so a scene that holds
               # nothing emits nothing.
               hprop="", pprop="", p2prop="",
-              # ⭐ AND THE OTHER HAND (ep 5). A body holds TWO things now. Same spec, same
+              # ⭐ AND THE OTHER HAND. A body holds TWO things now. Same spec, same
               # parser. ⛔ STAGE0 IS A WHITELIST -- an unknown key is a hard SystemExit --
               # so a scene could not have said `hprop2=` at all until these three existed.
               # With no `@where` the second prop takes the hand the first one did not.
@@ -154,10 +154,10 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # ⭐ ON A PROP. A named `mark` in the .set carries a HEIGHT, so a body sent
               # to one sits ON the chair instead of beside it. `off` hands her back to
               # the pair relation.
-              # ⭐ ep 9: and slot 3. A changed mark is WALKED to now (rolled, for a body with
+              # ⭐ and slot 3. A changed mark is WALKED to now (rolled, for a body with
               # wheels or on a @deck); `snap=1` still lands it on the cut.
               pmark="", p2mark="", p3mark="",
-              # ⭐ ep 10: PATHS -- `hpath=a,b,c` (ppath/p2path/p3path) rolls a body AROUND the set on a
+              # ⭐ PATHS -- `hpath=a,b,c` (ppath/p2path/p3path) rolls a body AROUND the set on a
               # centripetal Catmull-Rom from where it stands through those marks, at hspd/pspd/p2spd/
               # p3spd u/s (3.0). Sticky; a CHANGED value starts it. A path and a mark cannot both be in
               # force for one body, so a path line drops the mark (the path ends on its own last one),
@@ -167,16 +167,16 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # circling a CLOSED route (its last mark is its first) with no braking, until a line changes
               # the path or says 0. A mark line or `off` drops the loop with the path.
               hloop="", ploop="", p2loop="", p3loop="",
-              # ⭐ ep 11: THE HALF-PIPE. hpipe=<name>[,<air>] (ppipe/p2pipe/p3pipe) rides a set's `halfpipe`:
+              # ⭐ THE HALF-PIPE. hpipe=<name>[,<air>] (ppipe/p2pipe/p3pipe) rides a set's `halfpipe`:
               # drop in off the nearer coping and run the vert cycle, `air` u above the coping (2.0), until the
               # value changes. hair=<clip>[,<clip>...] (pair/p2air/p3air) is a one-shot fired at the START of each
               # air, cycling the list. Both sticky; `off` is said on its own line and never carried.
               hpipe="", ppipe="", p2pipe="", p3pipe="", hair="", pair="", p2air="", p3air="",
-              # ⭐ ep 10: THE TRACKING LENS. camtrack=slot,dist,height,azim,fov[,aimh] follows a body off
+              # ⭐ THE TRACKING LENS. camtrack=slot,dist,height,azim,fov[,aimh] follows a body off
               # its travel (azim 0 chases, 180 leads, 90 rides beside); campan=slot[,aimh] keeps the
               # cam= eye and aims at it. Sticky until camtrack=off / campan=off or a line saying cam=.
               camtrack="", campan="",
-              # ⭐ ep 11: THE MOVING LENSES. cammove=ex,ey,ez,ax,ay,az[,fov] eases the line's cam= (the START)
+              # ⭐ THE MOVING LENSES. cammove=ex,ey,ez,ax,ay,az[,fov] eases the line's cam= (the START)
               # to this pose (the END) -- a dolly, a crane, a push-in -- and the END is carried on as the next
               # line's cam=, so the lens stays where the move put it (with no cam= it moves from the lens it has).
               # camorbit=slot,radius,height,deg0,deg1[,fov[,aimh]] circles a body round its continuous spot, the
@@ -189,20 +189,20 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               cammove="", camorbit="", camsecs="", camshake="",
               # ⭐ 10-22: camat=x,y,z (u) is a camorbit's CENTRE when it circles a world point -- a ship -- and not a
               # body; it rides with the orbit (carried while it is, dropped with it). set=<name> plays THIS line on
-              # another set -- a CUTAWAY, the ship outside the sick bay -- with that set's own light; NOT sticky:
+              # another set -- a CUTAWAY, a ship seen from outside -- with that set's own light; NOT sticky:
               # the next line without one is back on the set the scene was staged on, in the light it had.
               camat="", set="",
-              # ⭐ 10-22: home=<set> -- the scene's HOME set from this line on (sticky: the boys put into his pan once
-              # he is out of it). houtfit= poutfit= p2outfit= p3outfit= -- dress a body on the cut (sticky; its own
-              # pack's outfit names: Viktor's are freezer and tunic).
+              # ⭐ 10-22: home=<set> -- the scene's HOME set from this line on (sticky: a scene that moves to
+              # another room stays there). houtfit= poutfit= p2outfit= p3outfit= -- dress a body on the cut (sticky; its own
+              # pack's outfit names).
               home="", houtfit="", poutfit="", p2outfit="", p3outfit="",
               # ⭐ 10-22: hroll= proll= p2roll= p3roll=ax,ay,az,dx,dy,dz,degps[,deg0] -- the body carried round an axis
-              # (Viktor round the treadmill drum); sticky, `off` hands it back.
+              # (a body round a treadmill drum); sticky, `off` hands it back.
               hroll="", proll="", p2roll="", p3roll="",
               # (step 23) heyes= peyes= p2eyes= p3eyes=r,g,b[,amount] -- that body's eyes glow that colour from this line on; sticky, `off` puts them out.
               # Past 1 the amount is brighter than the colour, for the bloom. It needs eyes the engine can find: meshes of their own, or a built person's.
               heyes="", peyes="", p2eyes="", p3eyes="",
-              # ⭐ ep 10: dur=<sec> makes a line with NOTHING after `|` an ACTION line: no voice, no
+              # ⭐ dur=<sec> makes a line with NOTHING after `|` an ACTION line: no voice, no
               # subtitle, no mouth, that long in the timeline. NOT sticky (it is an event, like beat).
               dur="",
               # ⭐ AND THE HERO ON ONE (09-11): reva on the bed, not beside it.
@@ -211,7 +211,7 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # while walking, wave while talking. <clip>[@weight]; sticky; `off` clears.
               hover="", pover="", p2over="",
               hbrow="auto", pbrow="auto", hgt="0",
-              # ⭐ CROSSING THE LINE ON PURPOSE (ep 4), and the puppet jaw's gain. Both sticky,
+              # ⭐ CROSSING THE LINE ON PURPOSE, and the puppet jaw's gain. Both sticky,
               # both empty by default so a scene that never says them emits nothing.
               reverse="", jawgain="",
               # ⭐ STOP MOTION. Exposures per second from this line on -- sticky like the lens,
@@ -221,9 +221,9 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # changes on the cut) and `tone=` is the highlight knee (0 = off).
               # (`snap=1` is deliberately NOT here: a jump is an event, like `beat`.)
               camhold="",
-              # ⭐ ep 2: WHOSE CAMERA THIS IS. feed=1 puts the shot inside the camera reva is holding
+              # ⭐ WHOSE CAMERA THIS IS. feed=1 puts the shot inside the camera reva is holding
               # (4:3, vignette, tape grain, a REC dot) and fish= is the lens on the front of it (0 = the
-              # club's own glass, ~0.55 a fisheye). Both sticky, both land on the cut.
+              # engine's own glass, ~0.55 a fisheye). Both sticky, both land on the cut.
               feed="", fish="",
               # (step 25, 11-05) THE LENS'S ROLL, ITS FOCUS AND SHUTTER, AND FILM'S SEPIA AND GRAIN: sticky, landing on the cut.
               # camroll=DEG; focus=<distance>|aim|off[,soft]; shutter=0..1; sepia=0..1; grain=0..1 (engine/post.inc)
@@ -239,16 +239,16 @@ STAGE0 = dict(pgap="1.15", pyaw="180", pside="0.12", hlook="1", plook="1",
               # (10-23) WHO A LINE IS SAID TO, a slot 0-3: the speaker's head finds them. NOT sticky.
               to="")
 VOICE_KEYS = ("rate", "var", "pitch", "voice", "with")   # with=N: a second voice in unison (say_piper.py, 10-22)   # the voicers' keys, ignored here (voice= is say_kokoro's)
-TRICK_KEYS = ("htrick", "ptrick", "p2trick", "p3trick")   # ⭐ ep 10: in STAGE0 (the whitelist) but NOT sticky
-PUFF_KEYS = ("hpuff", "ppuff", "p2puff", "p3puff")         # ⭐ ep 12: in STAGE0 but NOT sticky; the engine keeps 8, 63 chars
+TRICK_KEYS = ("htrick", "ptrick", "p2trick", "p3trick")   # ⭐ in STAGE0 (the whitelist) but NOT sticky
+PUFF_KEYS = ("hpuff", "ppuff", "p2puff", "p3puff")         # ⭐ in STAGE0 but NOT sticky; the engine keeps 8, 63 chars
 DOLL_KEYS = ("hdoll", "pdoll", "p2doll", "p3doll")         # ⭐ the fall: in STAGE0 but NOT sticky
-# ⭐ THE LENS KEYS' SHAPES (ep 10/11): how many numbers each takes, which field may be written `=h` (an ABSOLUTE
+# ⭐ THE LENS KEYS' SHAPES: how many numbers each takes, which field may be written `=h` (an ABSOLUTE
 # world height; -1 = none), and what to say when it is wrong. Checked here so a bad lens stops the compile rather
 # than coming back as a `[lens] ... needs` line in a take's log.
 LENS_FMT = {
     "camtrack": ((5, 6), 2, "slot,dist,height,azim,fov[,aimh]  (height `=h` = absolute world y)"),
     "campan":   ((1, 2), -1, "slot[,aimh]"),
-    # ⭐ THE FILMER'S OWN CAMERA (ep 2 of the skate promo): the lens rides one body's hand and watches
+    # ⭐ THE FILMER'S OWN CAMERA (the skate promo): the lens rides one body's hand and watches
     # another. Everything the filmer's body does is in the picture, which is what skate footage IS.
     "camhold":  ((2, 3, 4, 5), -1, "filmer,subject[,fov[,aimh[,drop]]]  (drop = u below her hand: 0.6 is a phone by the knee)"),
     "camorbit": ((5, 6, 7), 2, "slot,radius,height,deg0,deg1[,fov[,aimh]]  (height `=h` = absolute world y)"),
@@ -268,8 +268,8 @@ def lens_nums(v, absat=-1):
     return out
 
 
-PIPE_KEYS = ("hpipe", "ppipe", "p2pipe", "p3pipe")        # ⭐ ep 11: sticky until `off`
-PIPE_AIR_KEYS = ("hair", "pair", "p2air", "p3air")        # ⭐ ep 11: sticky until `off`
+PIPE_KEYS = ("hpipe", "ppipe", "p2pipe", "p3pipe")        # ⭐ sticky until `off`
+PIPE_AIR_KEYS = ("hair", "pair", "p2air", "p3air")        # ⭐ sticky until `off`
 # ⛔ A SHOT NAME IS CHECKED HERE AS WELL AS IN THE ENGINE. The engine now says
 # "[scene] line N: unknown shot 'x' -- using ots" instead of falling to OTS in silence --
 # but that is a line in a log read after a take. This costs nothing and is read first.
@@ -579,11 +579,11 @@ def main(script, gap=0.42, out=None):
     for raw in open(script, encoding="utf-8"):
         s = raw.strip()
         if not s or s.startswith("#"): continue
-        # `cast 0=kaeli 1=susan` names who is in the scene; it is say_piper's business
+        # `cast 0=<person> 1=<person>` names who is in the scene; it is say_piper's business
         # (which VOICE each slot gets), not the timeline's, and it carries no dialogue.
         # ⭐ A SOUND EFFECT. `sfx <t> <name> [gain]`, in ABSOLUTE scene seconds -- a sound
         # is placed against the cut, not against whoever is speaking, so re-voicing a line
-        # cannot drag the knock at the end of act V somewhere else.
+        # cannot drag a knock at the end of a scene somewhere else.
         if s.startswith("sfx "):
             bits = s.split()
             if len(bits) >= 3:
@@ -603,8 +603,8 @@ def main(script, gap=0.42, out=None):
             continue
         if s.startswith("cast "):
             # The cast reaches the SCREEN as well as the voices: the engine's caption was
-            # hard-wired to REVA/KAELI by speaker index, so susan's dialogue came up over
-            # kaeli's name.
+            # hard-wired to the first two names by speaker index, so a third speaker's dialogue came up over
+            # the second's name.
             for bb in s.split()[1:]:
                 if "=" in bb:
                     sl, who = bb.split("=", 1)
@@ -617,7 +617,7 @@ def main(script, gap=0.42, out=None):
         # keys belong to say_piper.py and are skipped.
         beat = 0.0
         snap = ""
-        once = {}        # ⭐ ep 10: this line's tricks, never carried to the next
+        once = {}        # ⭐ this line's tricks, never carried to the next
         for b in bits[1:]:
             if "=" not in b: continue
             k, v = b.split("=", 1)
@@ -626,7 +626,7 @@ def main(script, gap=0.42, out=None):
             if k == "snap": snap = v; continue      # NOT sticky: this line's marks land on the cut
             if k not in STAGE0:
                 raise SystemExit("unknown key '%s=' on: %s" % (k, s[:60]))
-            if k in TRICK_KEYS:   # ⭐ ep 10: THIS line only -- and a malformed one stops the compile here
+            if k in TRICK_KEYS:   # ⭐ THIS line only -- and a malformed one stops the compile here
                 for ev in v.split(","):
                     nm, _, at = ev.partition("@")
                     try:
@@ -650,7 +650,7 @@ def main(script, gap=0.42, out=None):
                                      % (k, v, s[:60]))
                 once[k] = v
                 continue
-            if k in PUFF_KEYS:    # ⭐ ep 12: THIS line only, and checked here rather than in a take's log
+            if k in PUFF_KEYS:    # ⭐ THIS line only, and checked here rather than in a take's log
                 try:
                     secs = [float(x) for x in v.split(",")]
                     ok = all(x >= 0.0 for x in secs) and len(secs) <= 8 and len(v) <= 63
@@ -682,7 +682,7 @@ def main(script, gap=0.42, out=None):
                 raise SystemExit("unknown shot '%s' on: %s\n    it is one of: %s"
                                  % (v, s[:60], " ".join(SHOTS)))
             stage[k] = v          # STICKY: it holds until something changes it
-        # ⭐ ep 10 --------------------------------------------------------------------------------
+        # ⭐ --------------------------------------------------------------------------------
         # WHAT THIS LINE SAID, as opposed to what it carried: the rules below are about the script.
         said = set(b.split("=", 1)[0] for b in bits[1:] if "=" in b)
         # dur= is this line's own length (never carried) and makes it an ACTION line.
@@ -726,7 +726,7 @@ def main(script, gap=0.42, out=None):
                     raise SystemExit("%s= wants u/s, on: %s" % (sk, s[:60]))
         # THE LENS: camtrack / campan hold until `off` or a line that says cam=. cam= is sticky here,
         # so a tracking line drops the carried pin -- and a pan KEEPS it, because the pin is its eye.
-        # ⭐ ep 11: camorbit holds the same way; cammove and camsecs are events; camshake is sticky.
+        # ⭐ camorbit holds the same way; cammove and camsecs are events; camshake is sticky.
         if "camshake" in said and stage["camshake"] == "off":
             stage["camshake"] = "0"
         for lk, (want, absat, fmt) in LENS_FMT.items():
@@ -793,7 +793,7 @@ def main(script, gap=0.42, out=None):
                 stage["campan"] = ""
             if "camorbit" not in said:
                 stage["camorbit"] = ""
-        # ⭐ ep 11: THE HALF-PIPE -- checked here, where a typo stops the compile instead of a take
+        # ⭐ THE HALF-PIPE -- checked here, where a typo stops the compile instead of a take
         for pk in PIPE_KEYS:
             if pk in said and stage[pk] != "off":
                 nm, _, air = stage[pk].partition(",")
@@ -824,7 +824,7 @@ def main(script, gap=0.42, out=None):
         for lk in ("camtrack", "campan", "camorbit") + PIPE_KEYS + PIPE_AIR_KEYS:
             if stage[lk] == "off":
                 stage[lk] = ""        # `off` is said on its own line; after it nothing is carried
-        # ⭐ ep 11: THE EVENTS. A move's END is carried on as the next line's cam= -- with the start's fov when the end
+        # ⭐ THE EVENTS. A move's END is carried on as the next line's cam= -- with the start's fov when the end
         # names none, exactly as the engine holds it -- so the lens stays where the move put it instead of snapping
         # back to where it began. camsecs= and camshake=0 are this line's only.
         if stage["cammove"]:
@@ -852,7 +852,7 @@ def main(script, gap=0.42, out=None):
     for i, (spk, text, stg, beat) in enumerate(lines):
         t += beat
         if stg.get("dur"):
-            # ⭐ ep 10: AN ACTION LINE. No wav, no envelope, no visemes: a stretch of the timeline the
+            # ⭐ AN ACTION LINE. No wav, no envelope, no visemes: a stretch of the timeline the
             # bodies and the lens own. It keeps its number, so every later line_NN.wav still lines up.
             dd = float(stg["dur"])
             tracks.append((t, spk, text, b"", dd, [], stg, []))
@@ -872,7 +872,7 @@ def main(script, gap=0.42, out=None):
         t += dur + gap
     total = t - gap
     span_secs([(tr[0], tr[6]) for tr in tracks], total)
-    if sr is None:      # ⭐ ep 10: a scene of nothing but action lines has no wav to take a format from
+    if sr is None:      # ⭐ a scene of nothing but action lines has no wav to take a format from
         sr, nch, sw = 24000, 1, 2
     # mix: one buffer, every line written at its own offset
     n = int(total * sr) + sr // 2
@@ -932,7 +932,7 @@ def main(script, gap=0.42, out=None):
     wo.close()
     with open(os.path.join(here, out + ".scn"), "w", encoding="utf-8") as f:
         f.write("scene 1 %s.wav %.3f %d\n" % (out, total, len(tracks)))
-        # ⭐ UP TO FIVE NAMES (ep 7: four bodies + the voice). The engine captions by SLOT, so a third speaker's
+        # ⭐ UP TO FIVE NAMES (four bodies + the voice). The engine captions by SLOT, so a third speaker's
         # dialogue no longer comes up over the second speaker's name.
         f.write("cast %s\n" % " ".join(
             cast_names.get(str(i), ("REVA", "KAELI", "SUSAN", "ARCHIVE", "-")[i]) for i in range(5)))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_gest.py -- THE GESTURE SET, composed over REST via rig_map (like z_armsup), so it resolves on any
-rig the canon knows -- written for ROBOT NEKO ep 16, whose two bodies (Mixamo-named,
-built by code) carry fourteen skate clips and nothing a talking body can do.
+rig the canon knows -- written for two bodies (Mixamo-named,
+built by code) that carried fourteen skate clips and nothing a talking body can do.
 
     z_gest.py <pack> [--only z_idle,z_hello,...] [--force]
 
@@ -16,9 +16,9 @@ built by code) carry fourteen skate clips and nothing a talking body can do.
   z_think   2.6 s       the right hand to the chin, held, back (a hand-to-face move; the face is a box)
 
 Every clip ends where it starts (first == last), so in a scene it loops rather than holds (the
-transition rule: a >20 degree first-to-last gap plays once and holds). Axes: the club's forward is +z
+transition rule: a >20 degree first-to-last gap plays once and holds). Axes: the engine's forward is +z
 (Mixamo rigs face +z), up +y, the body's left +x. Signs were MEASURED on the lab bench before the first
-episode line was written (ep 15's ledger: a facing is measured, never guessed twice).
+line was written (an earlier ledger: a facing is measured, never guessed twice).
 """
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,7 +33,7 @@ def ramp(t, t0, t1):
     if t1 <= t0: return 1.0 if t >= t1 else 0.0
     return ease_smooth(max(0.0, min(1.0, (t - t0) / (t1 - t0))))
 
-# ⭐ (10-22, reva) --hang DEG: a body that RESTS in an A-pose (the WATEOT cast) would idle, wave and walk with its arms
+# ⭐ (10-22, reva) --hang DEG: a body that RESTS in an A-pose (the space series' cast) would idle, wave and walk with its arms
 # held out; every move starts instead from the arms hanging DEG degrees off the body, the elbows soft
 HANG, BASE = None, {}
 

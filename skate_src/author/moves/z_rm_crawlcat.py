@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """z_rm_crawlcat.py -- P4b: the cat-crawl. The first request, first half.
 
-kaeli crawls about like a cat, and cutely -- the CYCLE-class prover from the plan's
+The co-star crawls about like a cat, and cutely -- the CYCLE-class prover from the plan's
 worked shapes: phase-scheduled limbs, duty factors, and the loop-closure requirement
 that only cycles have. Structure: settle from the stand into all-fours, THREE crawl
 cycles traveling forward (diagonal 2-beat -- left hand with right foot, like a trot),
@@ -12,7 +12,7 @@ shoulders (cats slink low in front), a +/-7 deg hip sway at cycle rate, the head
 up and forward, and knees steered DOWN by the pole so the legs fold under the body.
 
 Played on manny (the reference rig) until P5 carries authored moves to every body --
-kaeli inherits this exact score then.
+the co-star inherits this exact score then.
 
 usage: z_rm_crawlcat.py <moves-pack>
 """

@@ -17,7 +17,7 @@ tools, without a tool built specifically for it.)*
 ## §0 The principle
 
 Every wound this campaign has taken happened **crossing between tools**, never inside
-one: kaeli's unit chimera (artery bake), the dropped materials (FBX import), the
+one: the co-star's unit chimera (artery bake), the dropped materials (FBX import), the
 backwards statue (export axis mapping), the 63-char name truncations, MAX_PATH, the
 exporter that re-reads disk instead of memory. The export boundary is where truth dies.
 Therefore: **anything in the daily loop lives in the house.** External tools are
@@ -47,7 +47,7 @@ stiffness toward the animated rest direction. ~100–150 lines in the engine + a
 (`chains=0/1`, `chainstiff=`) for the bench.
 - **Yields to authorship**: a clip that animates a chain bone wins — the sim blends in
   only where the clip holds rest (the crowd's dancing tails must not be overwritten).
-- **Pays**: all 133 packs, every mode, forever. Kaeli's twin tails, reva's ponytail,
+- **Pays**: all 133 packs, every mode, forever. The co-star's twin tails, reva's ponytail,
   the cow, the dragon — and the purr scene's ear twitch becomes sim + one authored nudge.
 - **Gate**: the wall, subject spinning (lab state RUN then idle): the ponytail LAGS the
   turn and SETTLES within ~1.5s, never explodes (max chain-link speed bounded); GIF at
@@ -64,7 +64,7 @@ bone uniform instead of a mat4 — the palette upload shrinks.
   wrists and shoulders fill the frame.
 - **Gate**: a twist-pose test clip (forearm 120° twist, shoulder raise) shot on the
   close-up wall, LBS vs DQS side by side; numeric: silhouette width at the mid-forearm
-  in the twist pose (LBS pinches, DQS holds); club-wide soak: no pack visually breaks
+  in the twist pose (LBS pinches, DQS holds); engine-wide soak: no pack visually breaks
   (the nine-angle wall on 6 spot-check bodies).
 - **Risk**: scale in rigs (DQS dislikes non-uniform scale — our rest scales are
   uniform, assert it at load); performance on the Pi lineage (keep an LBS fallback
@@ -77,7 +77,7 @@ The ability matters, not a dedicated tool. Two paths, try in order:
 2. **Fallback: pure-python QEM** (quadric error metrics, ~200 lines) in the baker —
    slower (minutes on 400k tris) but once-per-asset and dependency-free.
 - **Pays**: the statue-to-body recipe stops needing Blender for its heaviest job;
-  any GLB source (Meshy direct) can be brought to club budget in-house.
+  any GLB source (Meshy direct) can be brought to engine budget in-house.
 - **Gate**: reva2 re-ingested end-to-end with NO Blender in the chain (GLB source →
   baker decimate → rpack): tri count ≤ 24k, silhouette diff vs the Blender-decimated
   body ≤ noise on the wall, UVs intact (texture reads clean on the close-up column).
@@ -149,6 +149,6 @@ A person's eyes gate every rung's wall GIF as always.
 - H1 must not fight the crowd-clocks-out law: sim chains are idle-motion, allowed
   everywhere (they are physics, not dancing); exceptions are named case by case.
 - H2 keeps an LBS fallback: the Pi ancestor and any weak GPU stay bootable.
-- H6's CPU morph blend must not hitch the club: blend only the HERO + partner unless
+- H6's CPU morph blend must not hitch the engine: blend only the HERO + partner unless
   profiling clears the crowd.
 - Every gate above is falsifiable on pixels or a number — none reads "looks better."

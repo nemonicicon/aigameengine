@@ -3,7 +3,7 @@
 
     python skate_src/robot_neko/foley.py clap
 
-ROBOT NEKO needs sounds the shelf does not have, and a clapperboard is two slabs of wood
+The stop-motion show needs sounds the shelf does not have, and a clapperboard is two slabs of wood
 meeting: a hard broadband crack with almost no tail and a short woody ring. That is a few
 lines of synthesis, not an asset hunt. Written in the shelf's own format (22050 Hz, mono,
 16-bit); compile_scene.py resamples to whatever the scene speaks at.
@@ -34,8 +34,8 @@ def clap():
 
 def update_chime():
     """A device's two-tone 'update' notification, and its second note STUTTERS -- a bit-crushed
-    attack twice before it rings. ROBOT NEKO ep 3: reva is getting a firmware update, and the
-    audience has to learn the sound before the last one arrives unannounced."""
+    attack twice before it rings. A sound the audience has to learn before it comes back
+    unannounced."""
     def tone(f, dur):
         o = []
         for i in range(int(SR * dur)):
@@ -51,8 +51,7 @@ def update_chime():
 
 
 def click():
-    """A STILLS CAMERA'S SHUTTER, for ROBOT NEKO ep 6: every stillness test is a verdict, and a
-    verdict wants the sound of the thing that judged it. A shutter is not one click -- it is two
+    """A STILLS CAMERA'S SHUTTER, for the stop-motion show. A shutter is not one click -- it is two
     mechanical events a few tens of milliseconds apart (the blade opening, the blade closing)
     with a small metal body ringing around them. One click reads as a switch; two read as a
     camera, and the gap is what does it.
@@ -110,7 +109,7 @@ def _whoop(rnd, out, t0, wl, amp, f0, f1):
 
 
 def crowd():
-    """A STADIUM CROWD for ROBOT NEKO ep 11 (the half-pipe): ~8s, LOOPABLE. Three layers --
+    """A STADIUM CROWD for a half-pipe scene: ~8s, LOOPABLE. Three layers --
     band-limited noise with slow swells (the murmur/roar bed), hundreds of short random
     claps (applause, the same crack-not-thud shape as clap() but tiny), and a handful of
     pitched whoops rising out of it. Looped by rendering an extra crossfade tail and
@@ -173,7 +172,7 @@ def crowdpop():
     return out
 
 
-# ============================ EP 12: 1AM BEDROOM ====================================
+# ============================ A 1AM BEDROOM ==========================================
 # Sound is half of a show's quality. Every maker below stays under the
 # clap/click/crowd house style (filtered noise + envelopes) and deliberately AVOIDS a bare
 # oscillator standing alone in the mix: even the clock's knock and the lighter's whoomph are
@@ -194,12 +193,12 @@ def _onepole_hp(rnd, n, coeff=0.9):
 
 
 def roomtone():
-    """A QUIET NIGHT-ROOM BED for ep 12 (1am, the bedroom): ~10s, LOOPABLE. This sits under
+    """A QUIET NIGHT-ROOM BED (1am, a bedroom): ~10s, LOOPABLE. This sits under
     dialogue at roughly -40dB, so nothing here is meant to be noticed on its own -- three
     very restrained layers: a low fridge/HVAC motor (mostly a narrow band of filtered noise
     -- the difference of two low-pass stages -- with the faintest steady tone under it, not
     a pure hum), very distant traffic (heavily low-passed noise, slow random swells, much
-    quieter and slower than the ep11 stadium crowd), and a thin steady hiss of 'air'. Looped
+    quieter and slower than the stadium crowd), and a thin steady hiss of 'air'. Looped
     like crowd(): rendered with an extra crossfade tail folded back over the head."""
     rnd = random.Random(100112)
     dur, xfade = 10.0, 0.6
@@ -238,7 +237,7 @@ def roomtone():
 
 
 def clock():
-    """A SOFT ANALOGUE WALL-CLOCK TICK for ep 12: 1 Hz, LOOPABLE, ~8s (8 beats). Alternates
+    """A SOFT ANALOGUE WALL-CLOCK TICK: 1 Hz, LOOPABLE, ~8s (8 beats). Alternates
     'tick'/'tock' a little (a real escapement's two strokes are not identical) -- a short
     high-passed click plus a soft wooden knock underneath, both fully decayed well inside
     the 1s gap, so the loop needs no crossfade: it is silence at both ends by construction."""
@@ -264,7 +263,7 @@ def clock():
 
 
 def sheets():
-    """~1.5s of BEDSHEET RUSTLE (someone rolling over) for ep 12. Real fabric noise is
+    """~1.5s of BEDSHEET RUSTLE (someone rolling over). Real fabric noise is
     hundreds of tiny friction grains, not one texture, so this sums ~260 short high-passed
     noise grains at random times/amplitudes inside one overall rise-and-settle envelope --
     a single shoulder of movement, not a loop."""
@@ -291,7 +290,7 @@ def sheets():
 
 
 def lighter():
-    """A ZIPPO-ISH FLICK AND CATCH, ~0.8s, for ep 12 (kaeli at the window). Three small
+    """A ZIPPO-ISH FLICK AND CATCH, ~0.8s. Three small
     events, not one 'fire' sound: the flint wheel's dry scrape (noise through a high-pass
     whose cutoff creeps up as the wheel spins faster), a couple of individual flint sparks
     inside it, then -- a beat later -- the catch: a soft low-passed whoosh with the
@@ -331,7 +330,7 @@ def lighter():
 
 
 def drag():
-    """~1.0s of a CIGARETTE being drawn on for ep 12: a thin hiss of air under sparse,
+    """~1.0s of a CIGARETTE being drawn on: a thin hiss of air under sparse,
     tiny paper/tobacco crackle-pops that thicken toward the middle of the draw (when it's
     burning hottest) and thin out again as it eases off."""
     rnd = random.Random(170100)
@@ -361,7 +360,7 @@ def drag():
 
 
 def exhale():
-    """~1.6s SOFT BREATHY EXHALE for ep 12: band-passed noise (the difference of two
+    """~1.6s SOFT BREATHY EXHALE: band-passed noise (the difference of two
     low-pass stages, so it has the mouth/throat's body rather than a full hiss) under one
     smooth swell-and-fade envelope -- no attack transient, no click, just air leaving."""
     rnd = random.Random(180100)
@@ -381,8 +380,8 @@ def exhale():
 
 
 def steps():
-    """TWO OR THREE BARE-FOOT STEPS on a wooden floor, ~1.5s, for ep 12 (kaeli crossing to
-    the window). Soft and low -- skin, not a heel -- so each step is low-passed noise plus
+    """TWO OR THREE BARE-FOOT STEPS on a wooden floor, ~1.5s (someone crossing to
+    a window). Soft and low -- skin, not a heel -- so each step is low-passed noise plus
     a couple of quiet wood-resonance partials under a fast, gentle decay, never a hard
     click."""
     rnd = random.Random(190100)
@@ -407,7 +406,7 @@ def steps():
 
 
 def crickets():
-    """A DISTANT CRICKET CHORUS through an open door, for ep 12 (ONE AM: low energy,
+    """A DISTANT CRICKET CHORUS through an open door (ONE AM: low energy,
     relaxed, dreamy): ~8s, LOOPABLE by construction. A field cricket's chirp is a short train of
     pulses (3-4 here, ~14 ms apart) on a carrier near 4.5 kHz, repeated at its own steady period;
     five of them at different pitches, periods and distances. Every chirp is placed MODULO the
@@ -446,7 +445,7 @@ def crickets():
 
 
 
-# ---- THE SKATE FOLEY (ROBOT NEKO ep 13, GOT IT) -------------------------------------------------------------------
+# ---- THE SKATE FOLEY ---------------------------------------------------------------------------------------------
 # A skate clip is half sound: the wheels never stop, a pop is the tail hitting concrete, a landing is two trucks a
 # few tens of milliseconds apart, and a slam is a body, a slide and a board getting away on its own. None of it
 # was on the shelf. Four makers, same format as the rest (22050 Hz mono), placed by `sfx` against the compiled
@@ -568,7 +567,7 @@ MAKERS = {"clap": clap, "update_chime": update_chime, "click": click,
           "crowd": crowd, "crowdpop": crowdpop,
           "roomtone": roomtone, "clock": clock, "sheets": sheets, "lighter": lighter,
           "drag": drag, "exhale": exhale, "steps": steps, "crickets": crickets,
-          "roll": roll, "pop": pop, "land": land, "slam": slam}   # ep 13: the skate foley
+          "roll": roll, "pop": pop, "land": land, "slam": slam}   # the skate foley
 
 
 def write(name, samples):

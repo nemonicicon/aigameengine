@@ -2,10 +2,10 @@
 
 `skate_src/citymap/` turns OpenStreetMap data and USGS one-metre elevation into the engine's streaming world: a `cell` line
 and a pack for each square of the map (`engine/stream.inc`), a far stand-in for the horizon, and marks. It knows no city.
-The box, the origin, the files and the style come from a small JSON file the game owns; Bike Lane Bash's is
-`map/seattle_start.json` in its own repository. Nothing here downloads anything, and it needs only numpy and Pillow.
+The box, the origin, the files and the style come from a small JSON file the game owns; the street game's is
+`map/seattle_start.json` in its own folder. Nothing here downloads anything, and it needs only numpy and Pillow.
 
-It's Bike Lane Bash's map plan, "THE MAP: HOW SEATTLE GETS BUILT", steps 1, 2, 3, 4, 5, 6 (in a first form) and 7.
+It's the street game's map plan, steps 1, 2, 3, 4, 5, 6 (in a first form) and 7.
 
 ## Running it
 
@@ -151,8 +151,7 @@ Seattle:
   - (11-06) The config's `hotspots` (a node, a radius, how many people, how many tents) are laid out as `spot` lines in the game layers
     (`layers.py`): on the sidewalks within the radius, the same every cook, more by a bus stop, along a fence and by a shop (a corner store most),
     none on a crossing, a kerb's ramp or inside a bus shelter, fewer further out; in groups talking, alone standing, folded, crouched, kneeling over goods,
-    sitting, lying, at a cart, and a tent. Each says where, which way it faces, what, and its group; the game puts people there (Bike Lane Bash's
-    `blb_street.inc`).
+    sitting, lying, at a cart, and a tent. Each says where, which way it faces, what, and its group; the game puts people there.
   - (11-06) A fence is what the map says it's made of: chain link (`fence_type` chain_link, wire, electric, or nothing said and not wood) and bars
     (railing, bars, metal) are see-through, a two-sided panel with texture coordinates along it carrying a weave made by code (`weave_texture`: holes clear),
     written as its own textured mesh in the cell's pack and drawn blended by the texture's alpha (`weave_blend`), so it's a veil at a distance and not gone or
@@ -162,7 +161,7 @@ Seattle:
   - (11-06) What a source shows that the map doesn't, in the config with its `_source`: `tags` can set `crossing:mural` (a crosswalk painted as a
     mural: one picture laid across it, our own design, `mural_texture`), and `crossing:markings=surface` is a band in `crossing:markings:colour`;
     `features` places a chain-link `fence` along points, or a `bin_pen` (a chain-link pen of wheeled bins, its gate on its south side, trash
-    heaped in front). 12th and Jackson's come from the city's traffic camera there (Bike Lane Bash's `map/seattle_start.json`).
+    heaped in front). 12th and Jackson's come from the city's traffic camera there (the street game's `map/seattle_start.json`).
     A `shopfront` names a building (`way`) and a point by one of its walls (`wall_at`), and lays that wall's front as the source shows it instead of
     the rule's: `bays` from its end toward `from` (north, south, east, west), each `m` long, a window or `boarded` (plywood painted with a mural of
     our own design, `boards_texture`: three in turn, a texture a 4.88 m run) or `plain` (bare wall), with its `sign` ([words, background,
@@ -193,9 +192,9 @@ Seattle:
   - (11-06) A hot spot's `band` (`people`, `step_m`, `second_row`): along every fence within its radius (the map's and a source's, a bin pen's sides),
     on the fence's street side (the side a street is on, never a service road: a lot's aisle can be nearer), a place every `step_m` on the sidewalk or
     the paved strip behind it, nearest the hot spot's node first; the first row against the fence in a mix read off photos of 12th and Jackson
-    (sitting on the ground most, hunched over the hands, standing, crouched, folded, a wheelchair, goods, lying), a second row in places, neighbours a
+    (sitting on the ground most, hunched, standing, crouched, folded, a wheelchair, goods, lying), a second row in places, neighbours a
     group turned to each other; the groups elsewhere keep 4 m off it. One or two by each stop's pole face the street (waiting for a bus), and a canopy
-    someone sells under stands by each stop the hot spot's `canopy_stops` names (by its `ref`). The cook says how many places the band had and why it
+    stands by each stop the hot spot's `canopy_stops` names (by its `ref`). The cook says how many places the band had and why it
     turned the others down.
   - The ground's grass in three tones and paving in two, in slow patches.
   - `light` in the config goes into the set: `fog` (density a unit [r g b]: the city ends in air), `sky`, `ground`, `haze`, `exposure`, and `sun`
@@ -205,7 +204,7 @@ Seattle:
 
 ## For a Godot game (11-11)
 
-For the skate game `dont get dropped`, which runs in Godot: `CITYMAP_GODOT=<folder>` (and
+For the skate game, which runs in Godot: `CITYMAP_GODOT=<folder>` (and
 `CITYMAP_GODOT_NAME`, default Seattle) makes the cook also write `SM_<name>.glb` and `SM_<name>.park.json` there (`godot.py`). In METRES, x east, y
 up from the box's lowest ground, z south: glTF's and Godot's own handedness. The meshes are gathered by what they are, in blocks of 4 x 4 cells, and
 named the way that game's park loader (`addons/skate_system/skatepark_loader.gd`) reads names: `SM_<name>_Terrain_*`, `_Roads_*` and `_Skate_Walks_*`
@@ -221,7 +220,7 @@ anywhere. The slice: 81 MB, 1.54 million triangles, 193 colours, 54 rails. Credi
 pictures of the field, a metre a pixel, how far inside the nearest road's edge each place is, bridges against their own decks). A face between
 `audit_low_m` (0.35) and `audit_high_m` (2.2) over the road's surface, more than 0.2 m inside its edge, is something standing in the roadway. The
 report's line counts the places in a travel lane (more than `audit_lane_m`, 3.0, in from the edge) and in a curb lane, by kind; `<prefix>_roadways.txt`
-lists each with its place, its depth and its road. ⛔ Read it after any change to what the cook stands along a street: Bike Lane Bash's slice had 145
+lists each with its place, its depth and its road. ⛔ Read it after any change to what the cook stands along a street: the street game's slice had 145
 places in travel lanes before anyone looked.
 
 The rules it led to, all by `in_road()`, `road_in()`, `deck_over()` and `junctions()`:

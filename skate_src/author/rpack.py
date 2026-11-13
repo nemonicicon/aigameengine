@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rpack.py -- read and APPEND-WRITE the club's RPK1 v2 packs.
+"""rpack.py -- read and APPEND-WRITE the engine's RPK1 v2 packs.
 
 The authoring spine's bottom rung (P0 of design/animation_authoring.md): the first path
 that exists from motion data I generate to a pack the engine plays. Everything here is

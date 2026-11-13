@@ -18,7 +18,7 @@ NOT rig space on these packs), flipped there, and carried back:
 Normals get the rotation part. Skinning algebra stays untouched -- at rest the foot
 now shows flipped, and every animated ankle rotation poses a forward foot, because
 the flip lives in the geometry the bones act on. The toe joint's PIVOT still sits at
-its old spot (toe curls would hinge slightly off); no clip in the club animates toes
+its old spot (toe curls would hinge slightly off); no clip in the engine animates toes
 on these packs, and the honest fix for that is a re-ingest, not deeper surgery.
 """
 import sys, struct, math

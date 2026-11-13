@@ -2,18 +2,18 @@
 """z_kiss.py -- THE KISS. The tightest shared contact yet: two LIP POINTS meeting at
 one world point, with the noses passing on complementary head tilts.
 
-reva and kaeli kiss.
+reva and the co-star kiss.
 
 What is new here, on top of the hug's machinery:
 
 THE FACE IS MEASURED. authorlib.face_points reads mouth/nose/forehead from the mesh
 verts weighted to the head family, anchored to the nose bump of the front profile
-(hair owns the crown on both club faces; no hairstyle owns the nose). The lip then
+(hair owns the crown on both lead faces; no hairstyle owns the nose). The lip then
 rides the head bone rigidly: its rest offset is taken into head-local space once and
 carried through every posed frame.
 
 THE MEETING HEIGHT IS NEGOTIATED, NOT ASSUMED. reva2's mouth stands 0.43u above
-kaeli's. Each body solves lean L, neck pitch P, neck yaw and a HEIGHT MECHANISM H
+the co-star's. Each body solves lean L, neck pitch P, neck yaw and a HEIGHT MECHANISM H
 (positive = rise onto the toes, z_tiptoe's solved mechanism; negative = a knee dip)
 to bring its lip to the shared point (0, meetY, PGAP/2). meetY itself is found by
 solving BOTH bodies over a center-out ladder and keeping the first height both can
@@ -77,7 +77,7 @@ class Body:
         self.dims = body_dims(self.p, self.RM)
         self.caps = body_capsules(self.p, self.RM)
         # face landmarks as HEAD-LOCAL offsets, rigid with the skull. Cumulative rest
-        # scale at the head is honored both directions (kaeli's rig is not unit-1).
+        # scale at the head is honored both directions (the co-star's rig is not unit-1).
         hb = self.RM["head"]
         ws = [1.0, 1.0, 1.0]
         a = hb

@@ -1,8 +1,8 @@
 """foley.py -- THE SOUND OF WHAT THE BODIES DO, from a take (10-23, the film pass, round 4).
 
-    python foley.py <scene.txt> <take.log> [--child viktor,billy,freddy] [--head 1.0]
+    python foley.py <scene.txt> <take.log> [--child <person>,<person>] [--head 1.0]
 
-The film mix had voices, a place's room tone and music, and nothing for what the bodies DO: Viktor crossed his cabin
+The film mix had voices, a place's room tone and music, and nothing for what the bodies DO: a man crossed his cabin
 and sat on his bunk in silence. Where a body walks is the ENGINE's business (its walking grid routes round the
 furniture, so a walk's length is not the marks' distance), so the timing comes from a TAKE: the engine logs every
 walk's start and its arrival with the scene time (`[walk] t <s> slot <n> -> mark ...` / `... arrived on ...`). This
@@ -105,7 +105,7 @@ def main(a):
     txt = open(log, encoding="utf-8", errors="replace").read()
     if not walks and re.search(r"\[walk\] slot \d+ -> mark", txt):     # walks, but none of them timed: an old engine
         raise SystemExit("foley: %s has walks with no times -- a take from an engine before 10-23's `[walk] t` lines" % log)
-    # (no walks at all is a scene where nobody walks -- 2.2's drum is run on a roll, not between marks: nothing to add)
+    # (no walks at all is a scene where nobody walks -- a body run round a drum is on a roll, not between marks: nothing to add)
     out = ["", MARK + " -- written by foley.py from %s: footsteps where the engine walked, a sit where it sat"
            % os.path.basename(log)]
     rng = np.random.default_rng(7)

@@ -166,7 +166,7 @@ static void vkMesh(Pack*P,unsigned mi,const float*model,const float*bind,const f
     if(m.tex){ m.tint[0]=tint[0]; m.tint[1]=tint[1]; m.tint[2]=tint[2]; m.useTex=use; }
     else { float c9[3]; meshTintOf(P,mi,c9); m.tint[0]=c9[0]; m.tint[1]=c9[1]; m.tint[2]=c9[2]; m.useTex=0.f; }
     /* (11-11) A BODY WASHED WITH A COLOUR (g_bodyWash: r g b and how much, 0 none). Its own colour, texture and tint together, is mixed that far toward the
-     * wash: the Facade video's chorus, where each copy behind the lead sinks into the colour of the card behind her as GHOST's are drawn in one colour-way
+     * wash: the music video's chorus, where each copy behind the lead sinks into the colour of the card behind her as the original video's faces are drawn in one colour-way
      * (a set's `slotwash` line, engine/set.inc). Her hair is drawn by its own road above and keeps its colour; her eyes' glow below is set after this */
     if(g_bodyWash[3]>0.f&&!(flags&GFX_SHADOW)&&(g_bodyWashHair||!hsIsHair(P,mi))){ const float a9=g_bodyWash[3]>1.f?1.f:g_bodyWash[3], u9=m.useTex, d9=1.f-u9+u9*a9;   /* (her hair drawn as its locks' ribbons comes this way too, and keeps its colour) */
         if(d9>1e-6f) for(int k=0;k<3;k++) m.tint[k]=(m.tint[k]*(1.f-u9)*(1.f-a9)+a9*g_bodyWash[k])/d9;

@@ -1,4 +1,4 @@
-/* mathcheck.c -- the club's own math (club_math.c) against this machine's C library, over the ranges a game uses. Prints the largest error in units in the last place, the double result
+/* mathcheck.c -- the engine's own math (club_math.c) against this machine's C library, over the ranges a game uses. Prints the largest error in units in the last place, the double result
  * and the float result, for each function. Run it on any machine; the numbers should be small on all of them, and that's all it's for: the engine's contract is that club_math gives the
  * same bits everywhere, which hashcheck.py proves.
  * Build (from reva_native): gcc -O2 -std=gnu17 -ffp-contract=off -o mathcheck anim_bench/mathcheck.c club_math.c -lSDL2 -lm    (on Windows: -Dmain=SDL_main -lmingw32 -lSDL2main -lSDL2 -lm) */

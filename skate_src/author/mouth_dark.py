@@ -3,10 +3,10 @@
 
     mouth_dark.py <pack> [--amount 0.72] [--dry]
 
-kaeli's first working jaw opened on something monstrous, where the inside
+The co-star's first working jaw opened on something monstrous, where the inside
 of a mouth is dark, or in shadow.
 
-It should, and there was nothing in there to be dark. Both club mouths are SEALED --
+It should, and there was nothing in there to be dark. Both leads' mouths are SEALED --
 lips modelled shut, no interior, no teeth, no tongue. When the jaw opens, the surface
 that comes into view is the inner lip, and it is painted the same pink as the outer
 lip, so a mouth opening looks like flesh unfolding rather than a cavity appearing.

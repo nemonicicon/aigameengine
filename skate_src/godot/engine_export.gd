@@ -384,7 +384,7 @@ func _tex_out(t: Texture2D) -> String:
 
 ## an array's layers. ⛔ The renderer --headless runs on (the dummy one) keeps no array's layers: get_layer_data is null for one built while
 ## the scene ran. Then it's made again from what it was cut from: a script in the scene that holds it in a variable, with a picture among
-## its constants that shares a word with that variable's name and is a whole grid of the array's cells, cut row by row (the Hedge Maze's
+## its constants that shares a word with that variable's name and is a whole grid of the array's cells, cut row by row (one level's
 ## night_garden.gd: _foliage from FOLIAGE_ATLAS, 2 x 2). The manifest says when it was, so the guess can be checked
 func _layers_out(t: TextureLayered, rec: Dictionary) -> Dictionary:
 	var files := []

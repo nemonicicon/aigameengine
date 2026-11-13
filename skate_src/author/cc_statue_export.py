@@ -1,9 +1,9 @@
-"""cc_statue_export.py -- export a Character Creator .blend as a club-ready STATUE glb.
+"""cc_statue_export.py -- export a Character Creator .blend as an engine-ready STATUE glb.
 
 Run INSIDE Blender:
 
     blender -b "<file>.blend" --python skate_src/author/cc_statue_export.py -- \\
-        --out models/_out/camilia_statue.glb --keep Body,Bra,Underwear_Bottoms,Teeth,Eye,Tongue
+        --out models/_out/<body>_statue.glb --keep Body,Bra,Underwear_Bottoms,Teeth,Eye,Tongue
 
 ⭐ WHY THIS EXISTS: HER SKIN CAME OUT GREY. A plain glTF export of a Character Creator body
 writes the SUBSURFACE MAP as base colour --
@@ -54,7 +54,7 @@ def load_matmap(path):
     """Read `slot  colour  alpha` produced by skate_src/anima/ue_dump_materials.py.
 
     WHY AN EXPLICIT MAP AND NOT NAME MATCHING. pick_diffuse below serves a Character
-    Creator export, where the texture is named after the material. Anima is not that: her
+    Creator export, where the texture is named after the material. The bought character is not that: her
     HiPoly skin slots are Std_Skin_Body / Std_Skin_Head against maps called T_Body_Diffuse
     and T_Head_Diffuse, her panties slot is `Material__1`, her Eyelets and Buckles both
     sample T_Metal_Diffuse, and her boot Sole and Straps both sample T_Boot_Diffuse.
@@ -94,7 +94,7 @@ def pick_diffuse(mat_name):
     want = mat_name.lower()
     exact, loose = [], []
     for im in bpy.data.images:
-        # ⛔ AN IMAGE DATABLOCK IS NOT AN IMAGE. Selina's .blend names her textures but
+        # ⛔ AN IMAGE DATABLOCK IS NOT AN IMAGE. A bought model's .blend names her textures but
         # the files were never shipped, so the datablocks exist with size 0x0 and the exporter
         # dies trying to read them off disk. Matching on NAME alone found one and re-armed the
         # same crash. Require actual pixels.
@@ -102,7 +102,7 @@ def pick_diffuse(mat_name):
             continue
         n = im.name.lower()
         # ⛔ NOT EVERY PIPELINE SAYS "Diffuse". Character Creator does; Unreal exports say
-        # BaseColor, and Selina's are Cloth_BaseColor.1001.png. Accept both.
+        # BaseColor, and that model's are Cloth_BaseColor.1001.png. Accept both.
         if "diffuse" not in n and "basecolor" not in n and "base_color" not in n:
             continue
         if any(n.startswith(want + k) or n.endswith(want + k)
@@ -134,7 +134,7 @@ def rewire(mat):
     if img is None and not mapped:
         img = pick_diffuse(mat.name)
     if img is None:
-        # A mapped slot whose colour is a flat utility map (Anima's Scalp samples plain
+        # A mapped slot whose colour is a flat utility map (the bought character's Scalp samples plain
         # white) has no texture to wire and keeps its mesh tint -- report it, do not
         # silently pretend it was matched.
         return False, None
@@ -153,7 +153,7 @@ def rewire(mat):
     # it they export as opaque rectangles across the face.
     # A MAPPED SLOT'S ALPHA IS FINAL, INCLUDING WHEN IT IS "NONE".
     # pick_named is a substring search, and `EyeL` is a substring of `T_EyeLash_Opacity`:
-    # falling back to it gave Anima's LEFT eye the eyelash cut-out and left the right eye
+    # falling back to it gave the bought character's LEFT eye the eyelash cut-out and left the right eye
     # alone, so her face was asymmetrically transparent and nothing symmetric would catch
     # it. The map is read off her UE materials and says EyeL has no opacity -- so it has
     # none. Only an UNMAPPED slot may guess.
@@ -225,7 +225,7 @@ def main():
 
     # ⛔ PURGE IMAGE DATABLOCKS WITH NO PIXELS BEFORE ANYTHING ELSE. Replacing every
     # material with a clean BSDF was not enough -- the exporter still gathers images from the
-    # file and dies on the missing ones ("Cannot read ...Cloth_BaseColor.1001.png"). Selina
+    # file and dies on the missing ones ("Cannot read ...Cloth_BaseColor.1001.png"). That model
     # shipped as a .blend and a thumbnail with no Textures folder at all, so every one of her
     # image datablocks is a 0x0 promise. Remove them and she exports untextured, which is a
     # usable base body; leave them and she does not export at all.
@@ -240,7 +240,7 @@ def main():
 
     if texdir:
         # RECOVERED MAPS COME IN AS FRESH DATABLOCKS, NAMED WITHOUT THE EXTENSION.
-        # Anima shipped from Fab as an FBX and a .max and NO texture folder: all 66 of her
+        # The bought character shipped from Fab as an FBX and a .max and NO texture folder: all 66 of her
         # image datablocks are 0x0 promises, purged just above, so there is nothing to
         # relink to -- the images have to be loaded anew and matched by name.
         # The extension MATTERS. pick_diffuse tests `name.endswith(material + "_diffuse")`,
@@ -263,7 +263,7 @@ def main():
 
     # WHICH MESH WEARS WHICH SLOT, BEFORE ANYTHING IS REWIRED. A slot that finds no
     # colour is reported by NAME further down, and a name on its own ("Material") does not
-    # say what will render untextured -- Anima's HiPoly body carries a slot called exactly
+    # say what will render untextured -- the bought character's HiPoly body carries a slot called exactly
     # that. Printing the mesh alongside it turns an unmatched material into a known part.
     for o in bpy.data.objects:
         if o.type == 'MESH':
@@ -275,7 +275,7 @@ def main():
 
     if morphkeep:
         # KEEP THE SHAPES WE WILL ACTUALLY DRIVE, DROP THE REST.
-        # Anima carries 107 shape keys and glTF repeats every target on every PRIMITIVE --
+        # The bought character carries 107 shape keys and glTF repeats every target on every PRIMITIVE --
         # her body is 15 primitives by material, so exporting the lot wrote 1,590 targets
         # and 712 MB into an 805 MB file. A face that acts needs the visemes, the brows,
         # the blinks, the eye-look directions and a jaw; it does not need Cheek_Blow_R.
@@ -327,8 +327,8 @@ def main():
             kept.append(o.name)
             bpy.context.view_layer.objects.active = o
             # ⛔ THE EXPORTER WRITES THE MESH *DATA* NAME, NOT THE OBJECT NAME, and an FBX
-            # import usually leaves the data called `Mesh.001`. Anima came through as
-            # Mesh..Mesh.013 and Selina as Cube/Plane/Amelia_FaceMesh -- which throws away the
+            # import usually leaves the data called `Mesh.001`. The bought character came through as
+            # Mesh..Mesh.013 and another bought model as Cube/Plane/<name>_FaceMesh -- which throws away the
             # whole point of a modular character, because REVA_HIDEMESH matches on that name.
             # Copying the object's name onto its data is what keeps `anima_bra` addressable.
             try:
@@ -408,7 +408,7 @@ def main():
     # (it collapses the armature modifier and destroys the skinning). And export_yup must be
     # OFF on the rigged path: the data is already Y-up, so converting would rotate it away.
     # ⛔ export_yup BELONGS TO THE SOURCE, NOT TO `rigged`. Tying it to rigged was wrong
-    # and Camilia proved it immediately: an FBX arrives Y-UP (imported at identity above, so
+    # and a bought model proved it immediately: an FBX arrives Y-UP (imported at identity above, so
     # converting again would rotate it away) while a .blend is Z-UP and does need the
     # conversion. Same flag, opposite answers, decided by where the data came from.
     # ⛔ export_apply applies MODIFIERS -- fine for a statue, fatal for a rigged body,
@@ -417,10 +417,10 @@ def main():
                               export_apply=not rigged, export_yup=(src_fbx is None),
                               export_skins=rigged, export_animations=False,
                               # MORPH TARGETS ARE OPT-IN, AND THEY DOMINATE THE FILE.
-                              # Anima's HiPoly body carries 106 facial blendshapes, and
+                              # The bought character's HiPoly body carries 106 facial blendshapes, and
                               # glTF repeats every target on every primitive -- across her
                               # 15 material primitives that is 1,590 targets and 712 MB of
-                              # a 805 MB export, 454 MB of it morph NORMALS alone. The club
+                              # a 805 MB export, 454 MB of it morph NORMALS alone. The engine
                               # drives a face from a jaw BONE and authored marks, so the
                               # film needs none of it. Pass --morphs when the expressions
                               # are actually wanted (rpack v3 carries morphs; see morphs.py)

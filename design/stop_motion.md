@@ -1,6 +1,6 @@
 # STOP MOTION — the Robot Chicken mode
 
-*(banked 2026-08-28. The CLUB NIGHT conversation on the new face rig read like Robot
+*(banked 2026-08-28. A conversation on the dance floor, on the new face rig, read like Robot
 Chicken, and the look was banked as a possible special mode.)*
 
 An accident worth keeping. The first talking-face pass read as stop-motion animation —
@@ -16,8 +16,8 @@ know all four:
    amplitude per frame, so the mouth opens and shuts on volume with no lip shaping — no
    closure on /m/ /b/ /p/, no rounding on /o/ /u/, no spread on /i/. A puppet's hinged
    jaw does exactly this.
-2. **The eyes do not move.** Neither club woman can aim an eyeball — reva's are painted
-   and kaeli's are flat lid/lash shells (see `faces.md`) — so the gaze is carried by the
+2. **The eyes do not move.** Neither of the two women can aim an eyeball — reva's are painted
+   and the co-star's are flat lid/lash shells (see `faces.md`) — so the gaze is carried by the
    head alone. Dead eyes over a moving mouth is the single strongest puppet cue.
 3. **The bodies are nearly still.** Both were standing in `z_upright` with only a head
    layer over the top; no weight shift, no gesture, no breath at conversational scale.
@@ -79,9 +79,9 @@ nothing: `now_ms()` IS `now_raw_ms()`.
 1e-4, and the inertia term keeps the hair swinging between exposures while the body stands
 still. Chains and cloth skip integration on a held frame (the write-back still runs).
 
-⛔ **AND NEITHER DOES A FEEDBACK LOOP** (ROBOT NEKO ep 6). The rule above was written for the
+⛔ **AND NEITHER DOES A FEEDBACK LOOP**. The rule above was written for the
 chains and the cloth, and the FACE was never brought under it. Not for a clock reason — the
-head layer has run on `scnBodyT()` since ep 1 — but because `lookTarget()` aims each head at
+head layer has run on `scnBodyT()` since the mode was built — but because `lookTarget()` aims each head at
 the OTHER body's **published eye mark**, and that mark is republished out of last frame's FK.
 One rendered frame is one more iteration of that solve, so a held exposure goes on converging
 a pose the shutter has already photographed: a fraction of a degree at the neck, which on a
@@ -89,14 +89,14 @@ close-up is a visibly crawling hairline. So the face solve is **latched to the e
 owns it** — on a held frame `scnHeadLayer` replays that exposure's own result verbatim, joints
 and morph weights both, which catches the gaze loop, the eye aim, the eye shapes, the jaw and
 the joint boil in one statement. Keyed **per cast slot** (`g_castI`), never per `who`: the
-function is called with `who=1` for every cast member, so a `who`-keyed cache is ep 2's
-kaeli-and-Parsons collision wearing a fix's clothes. `REVA_NOHOLDLATCH=1` is the control run,
+function is called with `who=1` for every cast member, so a `who`-keyed cache is the
+two-partner collision below (state shared between bodies) wearing a fix's clothes. `REVA_NOHOLDLATCH=1` is the control run,
 and the latch announces itself (`[hold] slot N: face solve replayed on … held exposure
 frame(s)`) so a control take can be told from a dead feature.
 
-⚠ **Measured honestly: on today's bodies this changes nothing.** Re-shooting ep 5's own scene
-with the latch OFF gives held pairs of **0.01–0.24%**, against the delivered ep 5's
-**1.57–2.88%**. The residue lived in the OLD BAKED PACKS — reva and kaeli were rebuilt from
+⚠ **Measured honestly: on today's bodies this changes nothing.** Re-shooting one episode's own scene
+with the latch OFF gives held pairs of **0.01–0.24%**, against the delivered episode's
+**1.57–2.88%**. The residue lived in the OLD BAKED PACKS — reva and the co-star were rebuilt from
 source between the two takes — and the rebake is what removed it. The latch is kept because
 the reasoning is right and the loop is real, not because it was shown to help.
 
@@ -113,18 +113,16 @@ every pair. (The lens is pinned on purpose — a smooth camera would make every 
 and hide whether the bodies held.)
 
 **Still owed from the list above:** the crossfade bypass (pose snapping) and a variant
-door. The first thing shot on it is `scenes/twelve.txt`.
+door. The first thing shot on it was a short scene.
 
-### ⭐ ROBOT NEKO, episode 1: TWELVE (2026-09-10)
+### ⭐ THE FIRST SHORT ON THE STEPPED CLOCK (2026-09-10)
 
-The first showing was funny enough to be an episode — the mode has a show now. **ROBOT NEKO** is the name; TWELVE is episode 1.
+The first showing became the first episode of the stop-motion show.
 
-54 seconds, `<data>\sketch\twelve.mp4`. Reva and kaeli notice they are on twelve frames a
-second ("Dancers get sixty. Leads get twelve. The crowd gets a photograph."), and the button is
-the mode itself: a car alarm, the neighbours turn, `step=24` lands on the cut and the zombies
-charge in the first smooth motion of the piece — then `step=12` again on "Put us back on
-twelve." Set `sets/twelve.set` (parsons + nine neighbours with cues and paths), mark
-`34,-17.8,270`, kaeli cast as `anima_outfit`, reva on `z_upright`.
+54 seconds, `<data>\<take>.mp4`. Two bodies talk on twelve frames a second, and the mode
+itself is the payoff: `step=24` lands on a cut and a crowd moves in the first smooth motion
+of the piece — then `step=12` again. A street set with nine extras on cues and paths, mark
+`34,-17.8,270`, the co-star (a bought character) cast in her dressed pack, reva on `z_upright`.
 
 **Receipt, off the delivered mp4** (% of pixels changed between consecutive frames, >10/255):
 
@@ -139,13 +137,13 @@ the rule: the camera is not a puppet.)
 
 ⛔ **What shooting it exposed, none of it stop-motion's fault:** the film's mark stands reva in
 a bench; `x_convo1/2` bow reva2's head onto her chest; the two/wide lens cut the taller head
-(now a guarantee — `cinematography.md`); `anima_fx` is the nude fitting base. A verdict by eye
+(now a guarantee — `cinematography.md`); the co-star's first pack cast was her nude fitting base. A verdict by eye
 is owed on the sketch.
 
-### ⭐ ROBOT NEKO, episode 2: CONTINUITY (2026-09-10)
+### ⭐ THE SECOND SHORT: CONTINUITY (2026-09-10)
 
 The cartoon is meant to get better every episode as the skills and tools develop, so the
-episode shipped with its pipeline: `.claude/skills/robot-neko/`
+episode shipped with its pipeline: a skill of its own
 (the process and a LESSONS LEDGER) and `skate_src/robot_neko/` (title card + sting, foley,
 per-line contact sheet, on-twos checker).
 
@@ -164,15 +162,15 @@ and — the ones that decide whether it LOOKS like stop motion:
 
 Receipt, off the delivered mp4 (% pixels changed between consecutive frames): 16s
 `9.32 · 0.23 · 9.03 · 0.19 · 7.52 · 0.10`, 46s `7.92 · 0.24 · 7.58 · 0.25 · 5.60 · 0.24` —
-held pairs under half a percent. Clipped highlights 0.0% (ep 1: 25–41%).
+held pairs under half a percent. Clipped highlights 0.0% (the first short: 25–41%).
 
-### ⭐ ROBOT NEKO, episode 3: UPDATE (2026-09-10)
+### ⭐ THE THIRD SHORT: A REBUILD (2026-09-10)
 
 *(Mid-episode, against her original Meshy files, reva's model was found to have gone wrong at
 some point — her shoulders, her texture — and on the first A/B the rebuilt reva read much
-better.)* So the episode became her firmware update. reva had never moved because her
-rig really was broken; everyone's voice comes out of her locked body until "Update complete.", and
-the payoff is the one move a broken shoulder could not make — both arms over her head.
+better.)* So the short was built round the rebuild: her
+rig really was broken, and its last shot is the one move a broken shoulder could not make — both
+arms over her head.
 
 Built for it:
 - ⭐ **reva rebuilt from source** (`skate_src/reva2/rig_reva.py`): the recipe had hung her arm joints
@@ -199,7 +197,7 @@ Built for it:
   and sfx inventory and traced her pack's provenance. Engine work, GPU takes and every visual
   verdict stayed in the main session.
 
-Receipt, off the delivered mp4 (`verify.py`, exit 0; 77 s, `<data>\robot_neko\episodes\ep03_update.mp4`):
+Receipt, off the delivered mp4 (`verify.py`, exit 0; 77 s, `<data>\<take>.mp4`):
 consecutive-frame change at 6 s `4.95 · 0.17 · 19.82 · 1.36 · 5.54 · 0.05`, at 58.5 s (the payoff)
 `1.85 · 0.05 · 1.85 · 0.02 · 2.59 · 0.03` — on twos throughout (70 s is the lens settling after a cut,
 then `EhEh` again); clipped highlights 0.00% in all three channels at 1.3 / 20 / 45 / 58.5 s; all three

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""z_bed.py -- ROBOT NEKO ep 12: 1 AM, reva and kaeli CUDDLING IN BED, talking. Authored as a PAIR.
+"""z_bed.py -- reva and the co-star CUDDLING IN BED, talking. Authored as a PAIR.
 
-  z_rm_bed_back    (reva,  v1_r2moves)      on her back, head on the pillow, her right arm under kaeli's shoulders,
-                                            left hand on her own belly; breathing; a head turn toward kaeli that
+  z_rm_bed_back    (reva,  v1_r2moves)      on her back, head on the pillow, her right arm under the co-star's shoulders,
+                                            left hand on her own belly; breathing; a head turn toward the co-star that
                                             comes and goes (LOOP 4.8 s, first frame == last)
-  z_rm_bed_nestle  (kaeli, v1_anima_outfit) on her left side facing reva, head on reva's upper chest, her right arm
+  z_rm_bed_nestle  (the co-star, v1_<body>) on her left side facing reva, head on reva's upper chest, her right arm
                                             across reva's waist, her right knee over reva's right thigh; breathing
                                             OUT OF PHASE with reva's; a small head lift now and then (LOOP 4.8 s,
                                             PHASE-LOCKED to z_rm_bed_back: same 145 frames, frame i against frame i)
-  z_rm_bed_alone   (reva,  v1_r2moves)      the same body and breath after kaeli has gone: the hugging arm rests
+  z_rm_bed_alone   (reva,  v1_r2moves)      the same body and breath after the co-star has gone: the hugging arm rests
                                             palm-down on the sheet at her side (LOOP 4.8 s, same mark)
 
-ONE WORLD FRAME. Both bodies are posed, placed and gated in kaeli_house.set's own coordinates, and the script
+ONE WORLD FRAME. Both bodies are posed, placed and gated in the bedroom set's own coordinates, and the script
 PRINTS the two set marks that make the contact true (yaw 0: each clip lies down inside itself, so its model
 axes ARE the world's). THE ENGINE'S RULE FOR A `hips` MARK (crowd_kms.c, hero and partner alike): the model origin
 goes to the mark's x/z, the body turns by the mark's yaw about Y, and the PELVIS JOINT is pinned at the mark's
@@ -26,7 +26,7 @@ body-against-body, and the SKINNED MESH (numpy LBS, checked against rpack.skinne
 a body lies on its lowest vertex, not on a proxy's guess. The pair gate runs over EVERY combination of the two
 loops' frames (on a stride), because the engine does not promise to start them together.
 
-usage: z_bed.py <reva_pack> <kaeli_pack> [--dry] [--dump DIR] [--live]
+usage: z_bed.py <reva_pack> <costar_pack> [--dry] [--dump DIR] [--live]
   ⛔ packs in reva_native/packs are REFUSED unless --live (author against copies; the director installs).
 """
 import sys, os, math, json, struct
@@ -50,8 +50,8 @@ INCLINE = 7.0               # deg: she lies a little propped on the pillow (her 
 PILLOWS = [((2.95, 1.18, 4.85), (0.62, 0.16, 0.42)), ((2.95, 1.18, 6.45), (0.62, 0.16, 0.42))]
 REVA_Z = 4.85               # her body line: the centre of the near pillow
 SHOULDER_X = 3.60           # her shoulder joints at the pillow's foot edge (x 3.57)
-TOL_PAIR = 0.020            # club u: two bodies may press into each other's capsules this far, no further
-TOL_MAT = 0.030             # club u: a resting contact is this close to the mattress top
+TOL_PAIR = 0.020            # engine u: two bodies may press into each other's capsules this far, no further
+TOL_MAT = 0.030             # engine u: a resting contact is this close to the mattress top
 CAP_EXTRA = 0.030           # rig u: a body's own capsules deeper into each other than at the stand
 UP = [0.0, 1.0, 0.0]
 X, Y, Z = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
@@ -179,7 +179,7 @@ class Body:
 
     def recentre_torso(self):
         """⛔ A TORSO IS NOT A CYLINDER ROUND ITS SPINE. body_capsules measures each radius from the BONE line, so
-        a chest's capsule is as deep behind the spine as the bust is in front of it: kaeli's spine_03 read 0.31 u
+        a chest's capsule is as deep behind the spine as the bust is in front of it: the co-star's spine_03 read 0.31 u
         all round, and reva's forearm lying ON her back measured 0.12 u "inside" her. Two bodies touching back to
         arm are exactly this scene. Each torso capsule's axis is moved to the centroid of its own flesh (the
         cross-section's middle, not the bone's) and its radii re-measured from there -- still p90, still the mesh."""
@@ -268,7 +268,7 @@ def reva_keys(t):
         chest=0.5 - 0.5 * math.cos(ph),                       # the breath: the chest leads...
         bob=0.5 - 0.5 * math.cos(ph - 0.55),                  # ...the head follows it...
         sh=0.5 - 0.5 * math.cos(ph - 1.10),                   # ...then the shoulders
-        turn=0.0,                                              # no turn toward kaeli (ep 12 final: capped at 0 deg)
+        turn=0.0,                                              # no turn toward the co-star (final: capped at 0 deg)
         stroke=0.5 - 0.5 * math.cos(2.0 * math.pi * 1.0 * t / D),                              # one unhurried stroke a loop
         d1=math.sin(2.0 * math.pi * 7.0 * t / D), d2=math.sin(2.0 * math.pi * 11.0 * t / D + 1.3),
         d3=math.sin(2.0 * math.pi * 13.0 * t / D + 0.4))
@@ -315,15 +315,15 @@ def reva_pose(Bd, k, flex, arm=None, legs=(0.0, 0.0), alone=None, lhand=None):
     cap = {c[0]: c for c in R.posed_caps(w, wq)}
     sp = cap["spine_02"]
     belly = vadd(lerp(sp[1], sp[2], 0.35), vadd(vmul(U_, sp[4] + 0.016), vmul(LR, 0.05)))
-    if lhand is not None:                                   # over kaeli's hand on her belly: they hold hands
+    if lhand is not None:                                   # over the co-star's hand on her belly: they hold hands
         hand_to(R, qo, to, "l", lhand[0], lhand[1], pole=vnorm([0.25, -0.55, -1.0]))
     else:
         hand_to(R, qo, to, "l", belly, vnorm([0.15, -0.30, 1.0]), pole=vnorm([0.25, -0.55, -1.0]))
-    if alone is not None:                                   # kaeli has gone: the arm rests on the sheet at her side
+    if alone is not None:                                   # the co-star has gone: the arm rests on the sheet at her side
         palm, d = alone
         hand_to(R, qo, to, "r", palm, d, pole=vnorm([0.35, -0.55, 1.0]))
         return qo, to
-    # her RIGHT arm out ALONG THE MATTRESS under kaeli's head, the forearm up behind kaeli's back
+    # her RIGHT arm out ALONG THE MATTRESS under the co-star's head, the forearm up behind the co-star's back
     ua_dir = Bd.ua_dir if getattr(Bd, "ua_dir", None) else vnorm([0.12, -0.20, 1.0])
     qo[RM["upperarm_r"]] = aim_bone(nodes, RM["upperarm_r"], RM["lowerarm_r"], ua_dir, qo, to)
     if arm is not None:
@@ -347,7 +347,7 @@ def hand_to(R, qo, to, s, palm, d, pole):
     aim_virtual(nodes, qo, to, ha, R.grip[s], d)
 
 
-# ---- KAELI: on her left side, facing reva ------------------------------------------------------------------------
+# ---- THE CO-STAR: on her left side, facing reva ------------------------------------------------------------------
 HK, LK, FK = [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]         # head-ward, her left (down), her front
 
 
@@ -424,11 +424,11 @@ def lowest(mw, mask):
 
 
 def pair_pens(ca, cb):
-    """{(nameA, nameB): penetration} over all capsule pairs of two bodies (world club units)."""
+    """{(nameA, nameB): penetration} over all capsule pairs of two bodies (world engine units)."""
     return {(a[0], b[0]): cap_pen(a, b) for a in ca for b in cb}
 
 
-SINK = 0.02                   # club u: a lying body sinks this far into the mattress (the bedding hides it)
+SINK = 0.02                   # engine u: a lying body sinks this far into the mattress (the bedding hides it)
 
 
 def place_reva(rv, k0):
@@ -451,7 +451,7 @@ def place_reva(rv, k0):
 
 
 def kaeli_targets(rv, w, wq, kv, kz_side):
-    """Every kaeli contact derived from reva's measured, posed body (world)."""
+    """Every co-star contact derived from reva's measured, posed body (world)."""
     rc = {c[0]: c for c in rv.world_caps(w, wq)}
     tg = {}
     # the head: on reva's right shoulder / upper chest, pressed in by the weight of it
@@ -483,7 +483,7 @@ def kaeli_targets(rv, w, wq, kv, kz_side):
 
 
 def knee_on_thigh(kv, qo0, to0, tg, pel_y, press=0.002):
-    """The point on top of reva's right thigh at exactly kaeli's thigh length from her right hip."""
+    """The point on top of reva's right thigh at exactly the co-star's thigh length from her right hip."""
     R = kv.R
     w, _ = fk_world(R.nodes, qo0, to0)
     hip = kv.to_world(w[R.RM["thigh_r"]], pel_y)
@@ -561,7 +561,7 @@ def mesh_gap(A, B):
 def run(rv, kv, rp, kp, dump, argv):
     R, K = rv.R, kv.R
     kr0, kk0 = reva_keys(0.0), kaeli_keys(0.0)
-    krm = dict(kr0, chest=0.5, bob=0.5, sh=0.5)                # reva at MID-breath: what kaeli rests on
+    krm = dict(kr0, chest=0.5, bob=0.5, sh=0.5)                # reva at MID-breath: what the co-star rests on
     flex = place_reva(rv, kr0)
     print("z_bed: reva  neck curl onto the pillow %.1f deg -> mark %s" % (flex, ["%.3f" % v for v in rv.mark]))
     # SETTLE each of her legs onto the mattress: the hip angle that puts the leg's lowest skin at the top, sunk a hair
@@ -610,7 +610,7 @@ def run(rv, kv, rp, kp, dump, argv):
     print("z_bed: reva  near arm tucked along her side for the pair (palm target %.3f above the mattress)" % hi_)
     qm, tm = reva_pose(rv, krm, flex, legs=legs, alone=BACKARM)
     wm, wqm = fk_world(R.nodes, qm, tm)
-    # ---- kaeli: y from her side on the mattress, x from her head's reach, z the closest that does not go through ----
+    # ---- the co-star: y from her side on the mattress, x from her head's reach, z the closest that does not go through ----
     qb, tb = kaeli_base(kv)
     wb, _ = fk_world(K.nodes, qb, tb)
     kv.mark = [0.0, 0.0, 0.0]
@@ -622,7 +622,7 @@ def run(rv, kv, rp, kp, dump, argv):
     Lfa = rv.sc * vlen(vsub(R.wp0[R.RM["hand_r"]], R.wp0[R.RM["lowerarm_r"]])) + rv.sc * R.glen["r"] * 0.85
 
     def reva_arm_for(ck_, k):
-        """The palm on kaeli's TOP shoulder / upper back, at whatever point on it reva's forearm actually reaches
+        """The palm on the co-star's TOP shoulder / upper back, at whatever point on it reva's forearm actually reaches
         from where her elbow lies -- searched, so the hand lands ON her instead of short of or inside her."""
         best_ = None
         for cn, us in (("upperarm_r", (0.0, 0.1, 0.2, 0.3, 0.4)), ("spine_03", (0.3, 0.5, 0.7))):
@@ -671,8 +671,8 @@ def run(rv, kv, rp, kp, dump, argv):
     foreRr = (rv.skin.region == 2) & (rv.skin.side == -1)
 
     def place_reva_hand(qk_, tk_, wk_):
-        """Reva's palm on kaeli's real skin (shoulder cap / upper back) within forearm reach, lifted along the skin
-        normal until it only touches. Returns the lift, the anchor, and what her hand and forearm do to kaeli."""
+        """Reva's palm on the co-star's real skin (shoulder cap / upper back) within forearm reach, lifted along the skin
+        normal until it only touches. Returns the lift, the anchor, and what her hand and forearm do to the co-star."""
         Bk_, Bkn_ = kv.mesh_world_n(qk_, tk_, wk_)
         thick_ = (kv.skin.region == 0) | ((kv.skin.region == 2) & (kv.skin.side == -1))
         sh_ = np.array(kv.to_world(wk_[K.RM["upperarm_r"]], wk_[K.pel][1]))
@@ -854,7 +854,7 @@ def run(rv, kv, rp, kp, dump, argv):
         if fg <= 0.02: break
     drape(best_dr[2], best_dr[1])                            # keep the drape that lies closest, not the last one tried
     print("z_bed:   the drape kept: hand down %.2f, forearm %.4f off her skin" % (best_dr[1], best_dr[0]))
-    # reva's right hand onto kaeli's TOP (right) shoulder, from kaeli's reference pose
+    # reva's right hand onto the co-star's TOP (right) shoulder, from the co-star's reference pose
     qk0, tk0 = kaeli_pose(kv, kk0, tg)
     wk0, wqk0 = fk_world(K.nodes, qk0, tk0)
     ck0 = {c[0]: c for c in kv.world_caps(wk0, wqk0)}
@@ -894,7 +894,7 @@ def run(rv, kv, rp, kp, dump, argv):
     def reva_arm(k):
         return None
 
-    # FIX 1: kaeli's bottom arm, folded up clear of BOTH bodies -- every fold scored on the skin
+    # FIX 1: the co-star's bottom arm, folded up clear of BOTH bodies -- every fold scored on the skin
     qr_, tr_ = reva_pose(rv, krm, flex, legs=legs, alone=BACKARM, lhand=lhand(kr0, LH))
     wr_, _wqr = fk_world(R.nodes, qr_, tr_)
     Ar, Arn = rv.mesh_world_n(qr_, tr_, wr_)
@@ -927,11 +927,11 @@ def run(rv, kv, rp, kp, dump, argv):
     print("z_bed: kaeli bottom arm UP beside her head: into herself %.4f, into reva %.4f, reva into it %.4f u, elbow %.0f deg"
           % best_arm[3:])
 
-    # z_rm_bed_alone: kaeli has gone -- the same body, the same near arm on the sheet (ALONE, settled above)
+    # z_rm_bed_alone: the co-star has gone -- the same body, the same near arm on the sheet (ALONE, settled above)
 
     # ---- bake the loops: PHASE-LOCKED, frame i of hers against frame i of reva's ----
-    # Kaeli's draped forearm and hand are solved PER FRAME against reva's belly AT THE SAME FRAME, so they rest on it
-    # and ride her breath (target 0.005, band 0.000-0.010 into); reva's hand-hold is then placed on kaeli's forearm
+    # The co-star's draped forearm and hand are solved PER FRAME against reva's belly AT THE SAME FRAME, so they rest on it
+    # and ride her breath (target 0.005, band 0.000-0.010 into); reva's hand-hold is then placed on the co-star's forearm
     # as it is at that frame, the stroke toward her elbow and back. A fixed search range per frame: frame 0 and the
     # last frame (the same instant of the loop) solve identically, so both clips still close exactly.
     kfore = ((kv.skin.region == 2) | (kv.skin.region == 5)) & (kv.skin.side == -1)   # her draped arm + hand
@@ -1078,7 +1078,7 @@ def run(rv, kv, rp, kp, dump, argv):
             A_, An = rv.mesh_world_n(*out["reva"][fr][1:4])
             B_, Bn = kv.mesh_world_n(*out["kaeli"][fk_][1:4])
             ra = ((rv.skin.region == 2) | (rv.skin.region == 5))            # reva's arms + hands
-            ka = ((kv.skin.region == 2) | (kv.skin.region == 5))            # kaeli's arms + hands
+            ka = ((kv.skin.region == 2) | (kv.skin.region == 5))            # the co-star's arms + hands
             # whole bodies, thinned, WITHOUT the arms (they are done densely below)
             for (P1, P2, N2, lbl, reg1, reg2, sd1, m1, m2) in (
                     (A_, B_, Bn, "reva into kaeli", rv.skin.region, kv.skin.region, rv.skin.side, ~ra, ~ka),
@@ -1156,7 +1156,7 @@ def run(rv, kv, rp, kp, dump, argv):
         print("z_bed: GATES FAILED -- nothing written\n    " + "\n    ".join(fails))
         return 1
     if fails:
-        # the call on ep 12 (it was taking too long for the spirit of the show):
+        # an earlier call (it was taking too long for the spirit of the show):
         # bake past the named failures, and say exactly which ones shipped
         print("z_bed: ⛔ FORCED past %d failing gate(s) -- these ship:\n    " % len(fails) + "\n    ".join(fails))
     if "--dry" in argv:

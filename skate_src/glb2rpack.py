@@ -151,7 +151,7 @@ def main():
     ap.add_argument('--tex', default=None, help='external image to embed instead of the GLB one')
     ap.add_argument('--ground', action='store_true', help='shift so min Y sits at 0')
     ap.add_argument('--center', action='store_true', help='center on X/Z')
-    # a MARKER is a node the engine reads by name (loadPack): ToonStyle (the WATEOT toon look), ToonSet (that look
+    # a MARKER is a node the engine reads by name (loadPack): ToonStyle (the space series' toon look), ToonSet (that look
     # lit as a room is lit), Glow (unlit at its own colour), NoCast (out of the sun's shadow map). Each is a kind-1
     # node at the origin under root, so the bounds (span 0, scale 1) and the grounding are what they were.
     ap.add_argument('--marker', action='append', default=[], help='a named marker node (repeatable)')

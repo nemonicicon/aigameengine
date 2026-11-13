@@ -1,5 +1,5 @@
 #!/bin/bash
-# build_linux.sh -- THE CLUB on Linux: the Vulkan renderer on SDL2's window, or no display at all. Step 18 of the engine plan (11-04)
+# build_linux.sh -- THE ENGINE on Linux: the Vulkan renderer on SDL2's window, or no display at all. Step 18 of the engine plan (11-04)
 # took the old renderer out, so there's one picture everywhere: gfx_vk.c draws the frame gfx_packet.c carries as data.
 #   ./build_linux.sh            -> crowd_linux    desktop: REVA_WINDOWED=1 ./crowd_linux 400 packs select;  no desktop: SDL_VIDEODRIVER=kmsdrm ./crowd_linux 400 packs select
 #   ./build_linux.sh headless   -> crowd_headless no display, no GPU: the sim only. Then: python3 anim_bench/hashcheck.py

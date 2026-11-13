@@ -1,8 +1,8 @@
-# THE FACE — talking heads in the club
+# THE FACE — talking heads in the engine
 
-*(written 2026-08-28, out of the CLUB NIGHT conversation scene. Verdicts by eye drove
+*(written 2026-08-28, out of a conversation scene on the dance floor. Verdicts by eye drove
 every rung: mouths, eyes and heads not moving → reva's eyebrows moving where her mouth
-should open → the eye and mouth positions not actually known → kaeli's open mouth looking
+should open → the eye and mouth positions not actually known → the co-star's open mouth looking
 like an eldritch monster instead of black inside → find models with working mouths,
 skeleton and all, to learn how it should work.)*
 
@@ -28,7 +28,7 @@ skeleton and all, to learn how it should work.)*
 ## THE REFERENCE: what the goblin could and could NOT teach
 
 `v1_crowd_goblin.rpack` carries a full Character Creator face rig. Found by scanning all
-133 packs for facial bones - the club also has `rabbit` (jaw_07), the toony robot
+133 packs for facial bones - the packs also hold `rabbit` (jaw_07), the toony robot
 (eyelid controls) and six packs with teeth and eye bones.
 
     CC_Base_FacialBone
@@ -56,7 +56,7 @@ What it *does* give, and what the tools now use:
     tongue       root 0.192 span below, tip 0.696 span below and further forward
 
 **THE WEIGHT BAND COMES FROM THE RABBIT**, because the goblin has none.
-`v1_crowd_rabbit.rpack` is the club's only body whose jaw bone is actually skinned
+`v1_crowd_rabbit.rpack` is the engine's only body whose jaw bone is actually skinned
 (`jaw_07`, 805 vertices). Measured: full weight out at the far chin, falling off toward
 the hinge and above it, tapering laterally to about a quarter at the head's own
 half-width, and **46% gradient**. A jaw is a soft band with a solid core - a first pass
@@ -67,17 +67,17 @@ The three lessons still stand, with the geometry one now owed to us rather than 
 1. **The jaw is a BONE with the lower face skinned to it** - not a morph. It works at any
    mesh density and cannot be mis-banded.
 2. **There must be GEOMETRY INSIDE the mouth.** Teeth and a tongue are why an open mouth
-   reads. Neither club woman had anything in there, which is why every opening looked
+   reads. Neither of the two women had anything in there, which is why every opening looked
    like a hole, a void, or flesh unfolding - and once the jaw really opened, like a hole
    straight through to the hair behind her skull.
-3. **Eyes are bones**, so they can aim. But neither club woman *has* eyes to aim: reva has
-   26 vertices within a third of an IOD of her eye mark (hers are painted) and kaeli's eye
+3. **Eyes are bones**, so they can aim. But neither of the two women *has* eyes to aim: reva has
+   26 vertices within a third of an IOD of her eye mark (hers are painted) and the co-star's eye
    region is flat lid/lash shells, not spheres. On these two the head is what can aim, and
    that is what the look-at layer moves.
 
 ## THE RUNG THAT LANDED (08-28)
 
-All six steps are in the club, each verified on the face rig and by looking:
+All six steps are in the engine, each verified on the face rig and by looking:
 
 1. **Measured mouth corners.** `face_marks.py` bakes `face_mouth_l` / `face_mouth_r`, and
    the engine sizes the aperture as the distance between them instead of `0.42 x IOD` (a
@@ -115,7 +115,7 @@ Calibration is now a loop: `face_marks.py <pack> --mouthdy D --eyedy D --mouthhw
 shoot, look, repeat. Marks that already exist are MOVED in place. The values that landed:
 
     reva2   --mouthdy -0.0571 --eyedy -0.0755 --mouthhw 0.254     (the OLD body -- superseded 2026-09-10)
-    kaeli   --mouthdy  0.252  --eyedy -1.67   --mouthhw 0.205
+    co-star --mouthdy  0.252  --eyedy -1.67   --mouthhw 0.205
 
 ⭐ **The rebuilt reva (2026-09-10)** — her body was re-ingested from the Meshy source
 (`skate_src/reva2/rig_reva.py`), so every mark was re-derived, from a FILE rather than offsets:
@@ -140,7 +140,7 @@ file depth that sits behind the face is re-projected, loudly.
 - A person's eyes on every one of the six steps - the verdicts are all mine so far.
 - The teeth are authored primitives and read a little bright and a little large; that is
   a presentation call, not a mechanism one.
-- Real eye bones for the six packs that carry them (rabbit, medic, miko, foxy, hina, the
+- Real eye bones for the six packs that carry them (the rabbit, a medic, a fox, two of the crowd's girls, the
   toony robot); the engine's look-at would drive them, but the two women cannot use it.
 
 ## THE EYES GATE, 08-28 — the first real verdicts on the face
@@ -149,7 +149,7 @@ The face rig went in front of a viewer one item at a time. What came back, in or
 what each cost:
 
 **reva reads well, but needs lips, not gums** · **the teeth want a little more detail** ·
-**kaeli's model is a little off kilter: lower her mouth a little, tilt it, and make it
+**the co-star's model is a little off kilter: lower her mouth a little, tilt it, and make it
 wider** · **the dark belongs on the interior of the mouth, not around the teeth** · **the
 meshes ALREADY have lips; they need no authored ones** · **the black around the lips and
 teeth is undesirable** · **a frame that showed what broken looks like** · **a regression
@@ -163,7 +163,7 @@ had broken reva's mouth a few turns earlier**
   takes the angle the CORNER MARKS make, shipped in the spare w of uMouthP and applied
   as a 2D rotation before the ellipse test, so `face_marks.py --mouthtilt` rotates the
   opening, the cavity, the teeth and the tongue together.
-- ⭐ **kaeli is not a calibration reference.** Her model is a little rough, not one to
+- ⭐ **The co-star is not a calibration reference.** Her model is a little rough, not one to
   calibrate every model against. She is the one body carrying an explicit tilt, and
   her numbers are not to be read as general. Landed: `--mouthdy -0.20 --mouthhw 0.25
   --mouthtilt 5`.
@@ -219,7 +219,7 @@ running a static comparison mid-investigation **overwrote the scene setup** and 
 
 ### Still owed on the face
 
-- kaeli's EYE marks are visibly wrong — the crosses sit on her brow and temple. They were
+- The co-star's EYE marks are visibly wrong — the crosses sit on her brow and temple. They were
   placed by proportion and never calibrated, unlike her mouth.
 - The stop-motion look that came out of it is banked separately in `stop_motion.md`.
 
@@ -237,7 +237,7 @@ running a static comparison mid-investigation **overwrote the scene setup** and 
   of the face.
 - The character shader sees the **raw mesh buffer** (bind is identity), which is not rig
   space on a UE export.
-- ⛔ The pack morph blend was hero-only and capped at 80k verts; kaeli's mesh is 294k.
+- ⛔ The pack morph blend was hero-only and capped at 80k verts; the co-star's mesh is 294k.
 - ⛔ THE BIG ONE, unrelated but found here: the hero's model matrix was uploaded once
   above the two-target pass loop, so after `labDrawPartner` bound hers, the hero drew with
   the PARTNER's matrix and vanished from the main view. Every pair move since the high
@@ -261,12 +261,12 @@ running a static comparison mid-investigation **overwrote the scene setup** and 
 - **The skull bone is not the face's midline.** reva's sits 0.032 rig to one side of her
   face's own frontmost ridge - the mouth camera had been framing her cheek.
 - **"Walk down until the mesh ends" only finds a chin on a head that is a separate shell.**
-  kaeli's face runs into her neck without a break and the walk slid 9 rig units down her
+  The co-star's face runs into her neck without a break and the walk slid 9 rig units down her
   throat. The chin is where the face stops reaching FORWARD.
 - **Weight quantisation overflow.** "Round each weight, give the last slot the remainder"
   does not sum to 255: when rounding-up pushes the earlier slots to 256 between them the
   remainder clamps to zero and the vertex carries 256/255 of itself - not the identity at
-  rest. It moved 7 of kaeli's 293,760 vertices and the rest-pose gate refused the write.
+  rest. It moved 7 of the co-star's 293,760 vertices and the rest-pose gate refused the write.
   Largest-remainder instead - floor everything, hand the leftover units to the biggest
   fractions - and it now lives ONCE, as `authorlib.quantise4`, which jaw.py and fingers.py
   both call and which `authorlib.py --selftest` sweeps (the sweep catches the old pattern
@@ -278,13 +278,13 @@ running a static comparison mid-investigation **overwrote the scene setup** and 
 - **The aperture must never be armed for the interior mesh** - it discards by rest position
   and the interior sits exactly where the hole is. Depth cannot separate them.
 - **Which way V runs is not knowable from the pack.** The same UV gave reva a dark cavity
-  and kaeli a TAN one; neither was landing on the palette patch at all and reva's texture
+  and the co-star a TAN one; neither was landing on the palette patch at all and reva's texture
   corner merely happened to be dark. Paint both ends of the sheet.
 - **A cavity rim at constant depth bursts out through the CHEEKS**, because a face recedes
   from the midline. The rim ray-casts the real surface at every ring point.
 - **The pack scan matched ".rpack" as a SUBSTRING**, so every `.rpack.marks.bak` and
-  `.tex.bak` the authoring tools leave behind was loaded as a crowd member - the club
-  carried stale twins of every edited body, kaeli's 294k-vertex mesh twice over.
+  `.tex.bak` the authoring tools leave behind was loaded as a crowd member - the engine
+  carried stale twins of every edited body, the co-star's 294k-vertex mesh twice over.
 - **Two runs at the same frame number are not the same instant** when a scene is playing:
   the scene clock runs on wall time. A look=0/look=1 comparison shot that way showed a
   head-angle difference that was pure drift. Verify a gaze by the ANGLE between the face's
@@ -294,10 +294,10 @@ running a static comparison mid-investigation **overwrote the scene setup** and 
 
 ---
 
-## THE THIRD FACE — SUSAN, and what a body that WASN'T reva2 taught the tools
+## THE THIRD FACE — a crowd body, and what a body that WASN'T reva2 taught the tools
 
-*(2026-08-29, Z5 of SEVENTY-FOUR. The film needs a third speaking neighbour, and
-`v1_crowd_susan` is the first body the face pipeline has met that it was not written for.
+*(2026-08-29, Z5. A scene needed a third speaker, and
+a crowd body (`v1_crowd_<body>`) is the first body the face pipeline has met that it was not written for.
 Four of the six things below were the tools being too narrow, not the body being wrong.)*
 
 **The build, for the record:**
@@ -307,7 +307,7 @@ Four of the six things below were the tools being too narrow, not the body being
     # and NOTHING else -- see below
 
 ⭐ **`face_calibrate.py` IS THE CALIBRATION, not the eye.** The doc's loop was "shoot, look,
-adjust `--mouthdy`, repeat". Susan's offsets were instead READ OFF HER PAINT — eyes are the
+adjust `--mouthdy`, repeat". Her offsets were instead READ OFF HER PAINT — eyes are the
 darkest texels, lips the reddest — and the numbers it gave (eyes y 1.5520, mouth y 1.4923)
 matched the render's error exactly: the marks sat 0.0078 BELOW her eyes and 0.0066 ABOVE
 her lips, which is precisely what the mark gizmo showed. Two independent sources agreeing
@@ -343,7 +343,7 @@ own geometry closes the back of her mouth. Her lower teeth ride `face_jaw` for f
 the band is geometric and they are below the lip line.
 
 ⭐ **So `facecheck` learned the difference.** INTERIOR used to test for a mesh called
-`mouth_interior`. What an interior has to DELIVER is "you cannot see through her head", and
+`mouth_interior`. What an interior has to DELIVER is that nothing shows through her head, and
 SEETHRU measures exactly that — so a body with no authored mesh now defers to SEETHRU
 instead of failing for a missing name. *An interior is a job, not a mesh name.*
 
@@ -354,7 +354,7 @@ off to 0.13. A face recedes fast below the lips — the documented depth trap, o
 **Where she stands:** all eight facecheck rows pass. The only failure across the three
 faces is reva2's own long-standing `face_chin: no face surface anywhere near it`.
 
-### ⛔ The verdict on Susan: not good work, while reva looks good.
+### ⛔ The verdict on the third face: not good work, while reva looks good.
 
 **Rejected at the eyes gate (2026-08-29), and the instrument had passed her 8/8.** That is
 the finding worth keeping: `facecheck` measures the rig AGAINST ITSELF — is the hinge the
@@ -371,8 +371,8 @@ a suburban neighbour reads as gormless rather than natural.
 
 The lesson is not "add an interior" — that was tried and produced two rows of teeth in one
 skull. It is that **a body that arrives with its own mouth needs its own recipe**, and
-Susan's has not been written. Parked here rather than iterated: two wrong declarations in a
+hers has not been written. Parked here rather than iterated: two wrong declarations in a
 row is the bench's limit and this was the second.
 
-reva2's face is the one that reads, and is the reference to measure Susan against when this
+reva2's face is the one that reads, and is the reference to measure her against when this
 is picked back up.

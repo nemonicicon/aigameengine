@@ -1,7 +1,7 @@
-"""mouths.py -- THE WORLD AT THE END OF TIME's faces TALK: a `jaw` morph on every cast member's pack, and `blink` (the
+"""mouths.py -- the space series' faces TALK: a `jaw` morph on every cast member's pack, and `blink` (the
 name the scene's blink clock drives) over both lids.
 
-10-18: the mouths first, then a rough cut of scene 2.1 on temporary voices. The scene system opens the
+10-18: the mouths first, then a rough cut of one scene on temporary voices. The scene system opens the
 speaker's mouth by setting the morph NAMED `jaw` to the speech envelope (crowd_kms.c, the scene's per-line mouth; a body
 with a jaw BONE takes the bone instead). The toon face (toonface.py) draws its mouth as ONE INK LINE along the lips a
 hair above the skin, so an open mouth, drawn that way, is that line opened into a dark lens -- the morph moves points,
@@ -10,17 +10,17 @@ it adds none:
   - the mouth's ink line (0.0012 out): its LOWER edge drops by the opening at that point and its upper edge rises a
     fifth of it; the opening is deepest at the middle and nothing at the corners, so the line opens into a lens;
   - the lower lip's shadow stroke (0.0010 out) rides down with the lower edge;
-  - filled lips (Wanda's `lip_fill`, 0.0009 out): the lower lip drops with the jaw, the upper lifts a fifth;
+  - filled lips (one face's `lip_fill`, 0.0009 out): the lower lip drops with the jaw, the upper lifts a fifth;
   - the brows, the eyes, the nose's stroke, the lines of age: untouched.
 
-The layers are told apart by their OFFSET (eyelids.py learnt that on Billy's brow) and by where they sit in face
+The layers are told apart by their OFFSET (eyelids.py learnt that on a boy's brow) and by where they sit in face
 coordinates (a = degrees round the head, u = share of head height): each face vertex is put back into face coordinates
 by inverting person.face_xyz numerically, moved there, and mapped forward again, so an open mouth lies on the head's
 own surface at its own offset.
 
-    blender --background --factory-startup --python-exit-code 1 --python skate_src/people/mouths.py -- [--only viktor] [--redo 1]
+    blender --background --factory-startup --python-exit-code 1 --python skate_src/people/mouths.py -- [--only <name>] [--redo 1]
 
-A pack carrying the cast's authored clips is first put back to its clipless base (skate_src/people/moves/bake.py
+A pack carrying the cast's authored clips is first put back to its clipless base (the cast's own clip bake
 re-appends them -- run it after this). `--redo 1` drops `jaw` and `blink` and builds them again.
 """
 import math, os, shutil, struct, sys
@@ -38,7 +38,7 @@ from rpack import Rpack                                       # noqa: E402
 import morphs                                                 # noqa: E402
 
 PACKS = os.path.join(REPO, "reva_native", "packs")
-ENGINE = os.path.join(os.environ.get("CLUB_OUT", "out"), "engine")   # club-engine kit: machine-independent paths
+ENGINE = os.path.join(os.environ.get("CLUB_OUT", "out"), "engine")   # machine-independent paths
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 opt = {argv[i]: argv[i + 1] for i in range(0, len(argv) - 1, 2)}
 NAMES = opt.get("--only", ",".join(cast.LINEUP)).split(",")

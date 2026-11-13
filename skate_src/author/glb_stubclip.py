@@ -2,7 +2,7 @@
 
 glb2rpack_anim measures body height from clip motion and dies with
 "max() iterable argument is empty" on a pack with no animations. Most rigged exports carry
-one; some do not -- Selina's .blend has eight actions and none assigned to her armature, and
+one; some do not -- a bought model's .blend has eight actions and none assigned to her armature, and
 the Daz vampire's 405-bone rig CRASHES Blender's glTF animation exporter outright
 (KeyError: None in sampling_cache.py resolving parent_bone_uuid, in the animation path, so
 it only bites once there is a clip to sample).

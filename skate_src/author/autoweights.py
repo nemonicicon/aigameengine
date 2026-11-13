@@ -57,7 +57,7 @@ def main():
     src, dst = sys.argv[1], sys.argv[2]
     gj, bin_ = read_glb(src)
     # \u26d4 EVERY PRIMITIVE OF EVERY MESH, NOT meshes[0].primitives[0]. Binding one
-    # primitive left Camilia's teeth, tongue, eyes and every limb on the zeroed default
+    # primitive left a bought model's teeth, tongue, eyes and every limb on the zeroed default
     # (joint 0, weight 1) -- her face hung off her HIPS, and her head
     # looked detached. Fourth instance of this same assumption in the artery.
     # \u2b50 The vertices are CONCATENATED into one array and the occluder BVH is built over

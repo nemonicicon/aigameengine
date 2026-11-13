@@ -9,7 +9,7 @@ Blender then merges the actions onto the one armature and emits a single GLB.
 """
 import unreal, os
 
-OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "kaeli")   # club-engine kit: machine-independent paths
+OUT = os.path.join(os.environ.get("CLUB_OUT", "out"), "kaeli")   # machine-independent paths
 ROOT = "/Game/TopDown/Models/ZAMN_Cleo"
 MESH_DONOR = "Animation_Walking_withSkin"   # every folder carries the same skin; one donor is enough
 

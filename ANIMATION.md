@@ -54,7 +54,7 @@ rider's own clip: pop, kickflip, shove-it, manual, drop-in, bail, the catch-up p
 Over REST, for ANY rig the canon resolves (no base clip needed): `z_gest.py` (idle, hello, bow, point, shrug, nod,
 no, think -- the talking body's bank, every clip a loop) and `z_walk.py` (`w_walk`, a two-bone-IK walk cycle: the
 name the engine's walk election looks for, so `hmark=`/`pmark=` walk a body). Both bury a rigid `skateboard` node
-under the floor; the skate clips bring it back. Written for the code-built bodies (ROBOT NEKO ep 16).
+under the floor; the skate clips bring it back. Written for the code-built bodies.
 `glb2rpack_anim.py` keeps a RIGID mesh on an animated node (a skateboard on its own node) as a one-bone skinned
 mesh; `--norigid` restores the skinned-only bake.
 Also: `sliceclip.py` (cut a real LOOP out of a transition), `restclip.py`, `fingers.py`, `unbake.py`.

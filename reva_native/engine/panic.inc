@@ -101,10 +101,10 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
      * early returns (the shot-9 arrival hold), so a pin at the shot switch is dead code
      * on exactly the frames the director is busy. Action modes ride the follow cam, the
      * RTS looks straight down at its cursor, the platformer stands side-on to the lane.
-     * The showcase keeps the club for DANCE and ARCADE. */
+     * The showcase keeps the dance floor for DANCE and ARCADE. */
     if(GAME_ON) CAMD.shot=22;   /* a game: the lens its tuning sets */
     else if(g_mode==MODE_ANIM) CAMD.shot=23;   /* the lab: side-on, tracking, so the gait reads */
-    /* ⭐ ep 10: A TRACKING LENS IS A PLACED LENS. It pins the shot that owns g_camOn, and it is gated out of
+    /* ⭐ A TRACKING LENS IS A PLACED LENS. It pins the shot that owns g_camOn, and it is gated out of
      * first person and the F310 chase cam below -- both fire BEFORE the shot switch, and the camera law
      * (CLAUDE.md) is that the chase cam has already eaten three game lenses. */
     int trk10=(g_camTrk.mode&&g_camOn);
@@ -162,7 +162,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
         g_fpvNow=1; CAMD.t=0;
         { static int nf=0; if(++nf==30){ printf("[fpv] eye %.2f,%.2f,%.2f head %s\n",eye[0],eye[1],eye[2],g_heroHeadOK?"published":"ESTIMATED (no head mark)"); fflush(stdout); } }   /* the 30th frame: the draw has published by then; frame 1 is always ESTIMATED */
         return; }
-    if(g_manual&&!trk10&&!DOOR_OWNS_LENS&&g_mode!=MODE_ANIM&&!GAME_ON){   /* F310 chase cam: glued behind her; right stick orbits + tilts. The platformer, the RTS and the ZAMN cab own their lens outright -- the chase cam fires before the shot switch and eats their cases (three victims now: pin any new game lens HERE first). */
+    if(g_manual&&!trk10&&!DOOR_OWNS_LENS&&g_mode!=MODE_ANIM&&!GAME_ON){   /* F310 chase cam: glued behind her; right stick orbits + tilts. The platformer, the RTS and the zombie cab own their lens outright -- the chase cam fires before the shot switch and eats their cases (three victims now: pin any new game lens HERE first). */
         float az=g_rvHead+g_rx*1.35f;
         float hgt=2.6f+g_rvAlt*0.85f-g_ry*2.0f; if(hgt<0.8f)hgt=0.8f;
         static float se[3],sc[3]; static int ini=0;
@@ -239,9 +239,9 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                     g_camPos[k]=g_camA[k]+(g_camB[k]-g_camA[k])*e;
                     g_camAim[k]=g_camAimA[k]+(g_camAimB[k]-g_camAimA[k])*e; }
                 if(g_camFovA>0.f&&g_camFovB>0.f) g_camFov=g_camFovA+(g_camFovB-g_camFovA)*e; }
-            camTrackTick((float)((g_stepFps>0.f)?g_camDt:g_chDt));   /* ⭐ ep 10: a tracking lens rewrites the placed one */
+            camTrackTick((float)((g_stepFps>0.f)?g_camDt:g_chDt));   /* ⭐ a tracking lens rewrites the placed one */
             memcpy(eye,g_camPos,12); memcpy(ctr,g_camAim,12);
-            camShakeApply((float)((g_stepFps>0.f)?g_camDt:g_chDt),eye,ctr);   /* ⭐ ep 11: on top of ANY placed lens */
+            camShakeApply((float)((g_stepFps>0.f)?g_camDt:g_chDt),eye,ctr);   /* ⭐ on top of ANY placed lens */
             memcpy(g_lastE,eye,12); memcpy(g_lastC,ctr,12); return; }
         /* THE ANIM LAB: locked side-on and tracking, the angle a gait is judged from.
                   * REVA_ANIMCAM=front|3q|top swings it; the lab is for LOOKING, so it is fixed
@@ -257,7 +257,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
          * faces of two differently-sized bodies. */
         /* ⛔ AND IF THE HEAD MARKS ARE NOT THERE, FRAME THE MARK. The solver below is
          * gated on both faces having been MEASURED, and when either is missing the whole
-         * block is skipped -- so the lens simply stays wherever the club's own director
+         * block is skipped -- so the lens simply stays wherever the dance floor's own director
          * last left it, which is an empty horizon with a shadow at the bottom of it. Five
          * of fourteen takes in the first full shoot came back like that, and nothing
          * logged a word: porch and boarding entirely, denial and it_starts for their
@@ -320,7 +320,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
              * keeps its own consistent axis and no cut crosses the line -- which is the
              * grammar the two-body version was written to protect. */
             float sd9=(spk9<lis9)?1.f:-1.f;
-            /* ⭐ CROSS THE LINE ON PURPOSE (ROBOT NEKO ep 4). The camera always sits on ONE
+            /* ⭐ CROSS THE LINE ON PURPOSE. The camera always sits on ONE
              * side of the pair's axis -- that is the whole eyeline grammar above, and it is
              * correct. `reverse=1` mirrors it to the other side: who is on screen-left swaps and
              * a different background comes up behind them. One sign carries the position, the
@@ -350,7 +350,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                 float my9=(SE[1]+LE[1])*0.5f;
                 float R9;
                 if(shot9==SHOT_MEDIUM){
-                    /* ⭐ MEDIUM: A HIPS-UP TWO-SHOT, SOLVED FROM BOTH EDGES (ROBOT NEKO ep 4).
+                    /* ⭐ MEDIUM: A HIPS-UP TWO-SHOT, SOLVED FROM BOTH EDGES.
                      * `two` and `wide` pick a distance off the lens and then CHECK the top of
                      * frame. A medium is defined by both edges at once -- the bottom sits at the
                      * lower pair of hips, which is what puts the hands and whatever is in them
@@ -368,7 +368,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                     if(!nb9){ bot9=((SE[1]<LE[1])?SE[1]:LE[1])-1.15f;
                         static int saidM9=-99; if(saidM9!=held9){ saidM9=held9;
                             printf("[lens] line %d medium: neither body published a hip -- the bottom edge is a guess 1.15 below the lower eye\n",held9); fflush(stdout); } }
-                    bot9-=0.75f;                 /* MID-THIGH, a cowboy (ep 4 take 1 measured hip-0.20 as the same frame as `two`: the two is already hips-up; the hands hang ~0.45 below the pelvis bone and want room under them) */
+                    bot9-=0.75f;                 /* MID-THIGH, a cowboy (a first take measured hip-0.20 as the same frame as `two`: the two is already hips-up; the hands hang ~0.45 below the pelvis bone and want room under them) */
                     float top9=((SE[1]>LE[1])?SE[1]:LE[1])+SCN_HEADTOP;
                     for(int b9=0;b9<2;b9++){ int s9=ms9[b9]; if(s9<0||s9>=SCN_MAXCAST) continue;
                         if(g_castAttOK[s9][ATT_HAND]&&g_castAttM[s9][ATT_HAND][13]+SCN_HANDTOP>top9)   top9=g_castAttM[s9][ATT_HAND][13]+SCN_HANDTOP;
@@ -398,7 +398,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                  * head room "varies with combinations of players"). The drop below the
                  * mid-eye height puts eyes on the upper third -- correct for two people of
                  * similar height on the same floor, and WRONG the moment they are not.
-                 * ⛔ The cold open is exactly that case: kaeli is LYING ON A BED and reva
+                 * ⛔ A two-person bed scene is exactly that case: the co-star is LYING ON A BED and reva
                  * is STANDING, their eyes ~1.5 units apart, so the midpoint is already low
                  * and dropping a further 1.30 aimed the lens at the bedspread and cut BOTH
                  * their heads off the top of the frame. Found by fixing the shot grammar --
@@ -409,7 +409,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                   /* ⛔ AND A WIDE MUST GET HIGHER, NOT JUST AIM LOWER. Two people at very
                    * different heights are usually that way because one is ON something --
                    * a bed, a step, the ground -- and the thing they are on sits between the
-                   * lens and them. The cold open's wide came back with the bed across the
+                   * lens and them. A bed scene's wide came back with the bed across the
                    * bottom third of frame. Rise with the spread and look down over it. */
                   if(shot9==SHOT_WIDE) hi9+=spread9*0.62f;
                   float room9=lo9-spread9*0.55f;
@@ -428,7 +428,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                  * a frame edge -- design/cinematography.md listed head room as "nothing
                  * measures this yet".) Everything above AIMS the lens; nothing checked that
                  * the frame it made CONTAINS a head. ⛔ On a sunlit street a standing reva2
-                 * beside the shorter anima lost the top of her head in every two-shot and
+                 * beside the shorter co-star lost the top of her head in every two-shot and
                  * both women lost theirs in every wide (2026-09-10): the drop
                  * below mid-eye is sized for two people of a height, and the spread terms for
                  * someone lying in a bed.
@@ -439,7 +439,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                  * space round them, so it keeps its feet). Says so once per cut. */
                 { float hf9=SHOT_FOV[shot9&7]*0.5f*0.0174532925f;
                   float want9=((SE[1]>LE[1])?SE[1]:LE[1])+SCN_HEADTOP;
-                  /* ⭐ AND WHATEVER THEY RAISE ABOVE THEIR HEADS (ROBOT NEKO ep 3). UPDATE ends on reva
+                  /* ⭐ AND WHATEVER THEY RAISE ABOVE THEIR HEADS. UPDATE ends on reva
                    * throwing both arms over her head, and the wide kept her EYES in frame and cut her
                    * hands off at the forearm for the whole line: head room measured the head. Both
                    * hands of both bodies are already published (g_castAttM, for held props), so the
@@ -468,7 +468,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                              shot9==SHOT_TWO?"aim":"distance",shot9==SHOT_TWO?c0:r0,
                              shot9==SHOT_TWO?ctr[1]:R9); fflush(stdout); } } }
             } else if(shot9==SHOT_SOLO){
-                /* ⭐ SOLO IS THE LISTENER'S POINT OF VIEW (ROBOT NEKO ep 4).
+                /* ⭐ SOLO IS THE LISTENER'S POINT OF VIEW.
                  *
                  * ⛔ IT WAS NOT A SINGLE AT ALL. The comment two branches down admits it: at
                  * 4.10 out and 54 deg round, with two people standing a metre apart, the
@@ -542,9 +542,9 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                 /* CLEAN SINGLES -- no foreground body at all, which is what separates
                  * these two from the over-the-shoulder.
                  *
-                 * ⛔ THE UNITS ARE THE CLUB'S, NOT METRES. Sized first the way you would
+                 * ⛔ THE UNITS ARE THE ENGINE'S, NOT METRES. Sized first the way you would
                  * size a close-up on a human-scale set (0.52 back, 0.46 across), and the
-                 * club is about 1.75x metric -- heads sit at y 2.62 and 3.08 -- so the
+                 * engine is about 1.75x metric -- heads sit at y 2.62 and 3.08 -- so the
                  * lens landed 0.70 from a head: inside the hair, and inside the near
                  * plane. Whole shots came back as an empty horizon and nothing logged a
                  * word about it.
@@ -592,7 +592,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
             } else {
                 /* THE LENS LIVED INSIDE HER HAIR. At 0.90 behind the listener the
                  * near head is 0.28u of hair at arm's length: it filled the frame and
-                 * hid the speaker completely on every one of kaeli's listening lines.
+                 * hid the speaker completely on every one of the co-star's listening lines.
                  * An over-the-shoulder needs the near shoulder as a FOREGROUND EDGE,
                  * which means standing well back of it and further off the axis. */
                 /* tighter: faces have to be big enough that a 2cm jaw and a
@@ -621,17 +621,17 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
              * setups is a whip pan, not a cut. */
             { static float smE[3],smC[3]; static int smL=-999; static float shotT9=0.f, wantLock9=-1e9f;
               float stp=(float)dt; if(stp<=0.f||stp>0.25f) stp=1.f/60.f;
-              /* ⭐ UNDER STOP MOTION THE LENS IS ON A TRIPOD (ROBOT NEKO ep 2). A stop-motion camera
+              /* ⭐ UNDER STOP MOTION THE LENS IS ON A TRIPOD. A stop-motion camera
                * is locked off between cuts; this one kept easing toward the speaker's eye mark, and
                * every exposure moved that mark (the head layer, the joint boil, a head turning away)
                * -- so the lens moved on EVERY frame and the twelve-a-second image underneath read as
-               * a moving one. Measured: background band 1.2-6.9% per frame against ep 1's 0.5-0.8%.
+               * a moving one. Measured: background band 1.2-6.9% per frame against the first shoot's 0.5-0.8%.
                * So: settle for 0.45s after the cut, then HOLD until the next cut -- unless somebody
                * is actually travelling (a walk-in), when it follows as before. Off stop motion,
                * nothing changes. */
               if(smL!=held9){ smL=held9; shotT9=0.f; memcpy(smE,eye,12); memcpy(smC,ctr,12); wantLock9=g_scnWant; }
               else { shotT9+=stp;
-                     /* ⭐ THE TRIPOD LETS GO FOR A RAISED ARM (ROBOT NEKO ep 3). It locks 0.45s after the
+                     /* ⭐ THE TRIPOD LETS GO FOR A RAISED ARM. It locks 0.45s after the
                       * cut, and revas arms reach the top of frame after that -- the head room above could
                       * re-aim the TARGET all it liked while the drawn lens held the old frame. When the
                       * frame a shot needs has GROWN since the lock, the lens eases out to it and locks
@@ -673,15 +673,15 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
         eye[0]=ex; eye[1]=ey; eye[2]=ez;
         ctr[0]=bx; ctr[1]=1.0f+g_rvAlt*0.8f; ctr[2]=bz;
         memcpy(g_lastE,eye,12); memcpy(g_lastC,ctr,12); return; }
-    case 22: {   /* ZAMN cab: tight top-down on the hero, the whole yard in frame.
-         * 11-01 REVA VS ZOMBIES M0: the GDD's eye is TOP-DOWN 3/4 (ZAMN's own angle), not
+    case 22: {   /* the zombie cab: tight top-down on the hero, the whole yard in frame.
+         * 11-01, the zombie game's M0: the GDD's eye is TOP-DOWN 3/4 (the zombie prototype's own angle), not
          * straight down -- bodies read as people, not as cut-outs. REVA_ZAMNCAM=height,back
          * tunes it without a rebuild; the old lens is 24,8.5. Default 19,13 (~56 degrees). */
         static float zh=-1.f, zb=13.f; if(zh<0){ zh=19.f; const char*e=getenv("REVA_ZAMNCAM");
             if(e&&e[0]){ float a=0,b=0; if(sscanf(e,"%f,%f",&a,&b)==2){ zh=a; zb=b; } } }
         eye[0]=rx; eye[1]=zh; eye[2]=rz+zb;
         ctr[0]=rx; ctr[1]=0.8f; ctr[2]=rz-1.0f;
-        /* ⭐ the rules' lens (ZAMNC's arm, 11-02): from her chest, at a pitch, never turning. REVA_ZAMNCAM still wins; lens_arm 0 is the old one */
+        /* ⭐ the rules' lens (the zombie prototype's arm, 11-02): from her chest, at a pitch, never turning. REVA_ZAMNCAM still wins; lens_arm 0 is the old one */
         if(g_tune.lensArm>0.f&&!getenv("REVA_ZAMNCAM")){ float pr9=g_tune.lensPitch*0.0174533f;
             eye[1]=g_tune.lensAimY+g_feet.y+g_tune.lensArm*sinf(pr9); eye[2]=rz+g_tune.lensArm*cosf(pr9);
             ctr[1]=g_tune.lensAimY+g_feet.y; ctr[2]=rz; }

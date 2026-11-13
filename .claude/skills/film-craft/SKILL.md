@@ -1,6 +1,6 @@
 ---
 name: film-craft
-description: The reference shelf and its rules — shot grammar, coverage, cutting, framing, and animation weight for SEVENTY-FOUR and any scene. Use when blocking or re-blocking a scene, choosing shot sizes or camera angles, writing or editing an EDL, deciding where to cut, judging whether a take reads, staging two or three people, adding b-roll coverage, or when animation looks floaty, weightless or posed.
+description: The reference shelf and its rules — shot grammar, coverage, cutting, framing, and animation weight for a film and any scene. Use when blocking or re-blocking a scene, choosing shot sizes or camera angles, writing or editing an EDL, deciding where to cut, judging whether a take reads, staging two or three people, adding b-roll coverage, or when animation looks floaty, weightless or posed.
 ---
 
 # The reference shelf
@@ -47,9 +47,9 @@ in the file and the checker records the choice as deliberate rather than nagging
 | **CUT ON ACTION** | The movement at the end of a shot repeats at the head of the next, so the cut can land mid-move. |
 | **ACTION AXIS** | Cross it and the audience loses which way people face. |
 
-⭐ **The cold-open pattern — reach for this when a scene must open tight.** `coldopen.txt`
-opens tight on a nightmare *on purpose*: the withhold is the scene. But reva's next line is
-*"You're in the house. It's Saturday. Nothing is wrong."* — **that line IS the establishing
+⭐ **The cold-open pattern — reach for this when a scene must open tight.** A cold open
+opens tight on a nightmare *on purpose*: the withhold is the scene. But when reva's next line
+says where they are and what day it is, **that line IS the establishing
 beat**, so the camera widens on the line that does the establishing, then comes back in.
 `tight → wide → two → ots → tight`. Let the dialogue tell you where the establish goes.
 

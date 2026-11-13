@@ -1,5 +1,5 @@
 /* club_audio.c -- THE AUDIO MIXER. Split out of crowd_kms.c 2026-09-30 (stage 2 of the split).
- * Self-contained: SDL audio, its own bank and voices, nothing of the club's but the six calls in club.h. */
+ * Self-contained: SDL audio, its own bank and voices, nothing of the engine's but the six calls in club.h. */
 #include "club.h"
 #define STB_VORBIS_NO_PUSHDATA_API
 #pragma GCC diagnostic push
@@ -12,7 +12,7 @@
 #undef R
 /* ================= THE AUDIO MIXER (09-11) =========================================
  * The audit ranked "a runtime audio mixer" sixth: the engine had ZERO sound effects outside
- * a scene and played one queued wav; no door made a sound; Act V is entirely sound design.
+ * a scene and played one queued wav; no door made a sound; a whole act of the film is sound design.
  * One SDL device (44.1 kHz stereo s16), 32 voices mixed in float with a soft knee, a wav
  * bank loaded by NAME from scenes/sfx (foley.py / foley_game.py fill it), per-voice gain,
  * pan, loop, and an optional world position: distance attenuation and pan against the
@@ -257,7 +257,7 @@ float musicLeft(void){ musReap(); MusDeck*M=&g_mus[g_musCur];
 double musicSeconds(void){ return (double)SDL_AtomicGet(&g_musOut)/(double)SFX_RATE; }
 void musicStop(float fadeSeconds){ if(fadeSeconds>0.f){ sfxBus(BUS_MUSIC,0.f,fadeSeconds); return; } musHalt(&g_mus[0]); musHalt(&g_mus[1]); }
 void sfxInit(void){
-    if(g_mixDev) return;   /* idempotent: door 11 opens the mixer before the club does (reva 10-12) */
+    if(g_mixDev) return;   /* idempotent: door 11 opens the mixer before the engine does (reva 10-12) */
     if(getenv("REVA_NOAUDIO")){ printf("[sfx] REVA_NOAUDIO: no mixer\n"); return; }
     { const char*e=getenv("REVA_SFXDBG"); g_sfxDbg=(e&&e[0]!='0')?1:0; }
     /* [pi] the KMS build never calls SDL_Init: the mixer owns its subsystem (refcounted, a no-op on SDL video builds) */

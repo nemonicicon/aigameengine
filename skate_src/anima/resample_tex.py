@@ -1,11 +1,11 @@
-"""resample_tex.py -- bring a recovered UE texture set down to club size, power-of-two.
+"""resample_tex.py -- bring a recovered UE texture set down to the engine's size, power-of-two.
 
-WHY: Anima's maps come out of UE at their authoring size -- her skin is four 4096x4096
+WHY: The bought character's maps come out of UE at their authoring size -- her skin is four 4096x4096
 sheets and her armstraps/boots/sleeves are 4000x4000. Exported straight into a GLB that is
 a 907 MB file, and every one of those sheets is 64 MB of RGBA once the engine uploads it.
 
 TWO SEPARATE REASONS TO RESAMPLE, and the second is the one that is easy to miss:
-  1. SIZE. A club body is looked at from a metre away in a close-up and from across a
+  1. SIZE. A body in the engine is looked at from a metre away in a close-up and from across a
      street the rest of the time. 4096 buys nothing at either distance.
   2. POWER OF TWO. 4000x4000 is NOT a power of two, and the engine's mipmap generation is
      POT-guarded (GLES2 only guarantees mipmaps and repeat wrapping for POT). So her boots

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""glbwrite.py -- the club's scene shape (rpackwrite.py) as a binary glTF 2.0 (.glb) (2026-10-05).
+"""glbwrite.py -- the engine's scene shape (rpackwrite.py) as a binary glTF 2.0 (.glb) (2026-10-05).
 
     write_glb(path, nodes, meshes, clips, textures, names)
 

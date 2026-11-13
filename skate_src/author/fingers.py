@@ -6,7 +6,7 @@
 
 Both rigs were fingerless, and a hand needs fingers.
 
-Most club bodies arrive with a hand bone and nothing past it: the donor rigs stop at the
+Most bodies in the engine arrive with a hand bone and nothing past it: the donor rigs stop at the
 wrist, so every authored hand is a paddle. The geometry, though, is usually all there --
 a dense character mesh HAS modelled fingers, they simply have no bones. This tool finds
 them in the mesh and rigs them:
@@ -43,10 +43,10 @@ THREE influences (the hand bone plus two finger joints) and with three slots the
 "give the last the remainder" pattern cannot exceed 255 -- but it is one call site away
 from four, so the exact helper is what it uses.
 
-⛔ WHO THIS CAN EVEN RUN ON (censused 08-28): of the club's 107 single-mesh packs,
+⛔ WHO THIS CAN EVEN RUN ON (censused 08-28): of the engine's 107 single-mesh packs,
 exactly ONE -- v1_reva2 -- passes the IBM formula check above; every other pack's stored
 inverse binds do not follow inverse(bone rest) x mesh world, and the tool rightly refuses
-to guess. kaeli is out on a different count: mouth_interior.py gave her a second mesh.
+to guess. The co-star is out on a different count: mouth_interior.py gave her a second mesh.
 So the census, not the finger detector, is what currently gates this tool.
 
 A hand whose fingers are NOT modelled (a low-poly mitten -- reva2's is 249 verts) cannot
@@ -444,7 +444,7 @@ def main(path, report=False):
     # ---- THE GATE: the body must not have moved. IT RUNS BEFORE THE PACK IS
     # REPLACED -- writing first and asserting after leaves the broken pack on disk and
     # the operator has to know to restore the .bak (which is exactly what a failed gate
-    # cost on kaeli's first jaw run). ----
+    # cost on the co-star's first jaw run). ----
     tmp = path + ".tmpfingers"
     save_pack(tmp, bytes(out), like=path)
     try:

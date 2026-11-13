@@ -6,7 +6,7 @@ are queue.)*
 
 ## The diagnosis, with the code receipt
 
-The club's dancers CANNOT be on the beat except by luck. The dance path samples clips
+The dance floor's dancers CANNOT be on the beat except by luck. The dance path samples clips
 at `tsec * clip->fps + phase` (crowd_kms.c, slot dance sampling) — wall-clock at the
 clip's native rate — while `beatPLL()` runs two hundred lines away feeding the FLOOR
 shader and the camera's bar-cuts. The floor pulses on the beat, the camera cuts on the
@@ -62,7 +62,7 @@ always the product.
 
 ## Asset repairs surfaced by looking at dancers
 
-- miko's feet: a constant ~100° ankle-axis error in ALL 18 dance clips (mocap
+- one dancer's feet: a constant ~100° ankle-axis error in ALL 18 dance clips (mocap
   transplant era), fixed by `fixankles.py` — clip-space corrective conjugated
   per-frame through the parent. THE LAW IT COST: measure the pose that RENDERS, not
   the pose that rests (the first fix operated on her never-rendered rest pose).

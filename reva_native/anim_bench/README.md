@@ -31,7 +31,7 @@ Telemetry comes from `REVA_POSEDUMP=<slot|-1 hero|-5 nearest>`.
    of the first three "defects" found here were bugs in the measuring tools: summing
    per-frame slip punished fast clips (reported a good walk as 2.06 FAIL), and "thigh"
    was measured across two joints so it changed honestly with leg swing.
-2. **Judge on a clean plate.** A translucent body under coloured club movers reads
+2. **Judge on a clean plate.** A translucent body under the dance floor's coloured movers reads
    magenta from the front and blue from the side. The lab renders solid, on its own
    fixed three-point white rig, framed identically from every angle.
 
@@ -41,7 +41,7 @@ Telemetry comes from `REVA_POSEDUMP=<slot|-1 hero|-5 nearest>`.
 
 Partly. Worth writing down so it is not re-litigated:
 
-**The gait math is not reinvention, but it was 16% wrong.** The club plays IN-PLACE
+**The gait math is not reinvention, but it was 16% wrong.** The engine plays IN-PLACE
 cycles, so playback rate must be derived: `rate = desired speed / the speed the cycle was
 authored at`. `gaitRate()` estimated that with forward kinematics. MoCap Online ships a
 ROOT-MOTION sibling of every in-place clip, and its root displacement is that speed as a
@@ -91,7 +91,7 @@ record: ten of ten stand, one asset defect outstanding.
 ### What the sweep found, and what it cost to believe it
 Four defects, each caught by a number and confirmed on the wall before being touched:
 
-1. **crowd_susan slept through IDLE, face down.** She ships `idle`, `laying_idle` and
+1. **A crowd body slept through IDLE, face down.** She ships `idle`, `laying_idle` and
    `sleeping_idle`; the hero's role scan had no first-wins guard, so the LAST substring
    match won. The pack-side mining had the guard. Fixed both ways -- `floorClipName()`
    refuses names that describe the floor, and the stand now gets the same `clipUpright()`
@@ -128,7 +128,7 @@ Thresholds here were first reasoned from anatomy and were wrong in the expensive
 direction -- BALANCE at 0.10 failed nine of ten subjects the wall showed standing fine. A
 test that fails almost everything is usually a bad threshold, not a bad fleet. Each band
 is now set from the population confirmed upright on the wall, widened past the worst good
-one, and re-checked to still catch susan and reva. That is calibration, not grading on a
+one, and re-checked to still catch that crowd body and reva. That is calibration, not grading on a
 curve: both known-bads are still caught.
 
 ### Open
@@ -168,7 +168,7 @@ line of the capture run; full-frame GIF; done.
 
 ## grid=13: the wall grows a close-up column (2026-08-27)
 
-"you need close ups of the body from 4 more angels. add them to the grid." grid=13
+The nine angles weren't close enough to judge a body by. grid=13
 keeps the nine-angle wall on the left 3/4 and adds a right-hand column of FOUR
 CLOSE-UPS: a third the orbit distance, on the diagonals between the wall's cardinals,
 aimed at chest height -- where hands meet bodies. With a partner loaded the close-ups

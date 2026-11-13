@@ -1,5 +1,5 @@
-/* club_math.h -- THE CLUB'S OWN MATH (11-02), in club_math.c: one answer on every machine, because each C library rounds its own way.
- * The engine's calls come here, and so do a game's: engine.h includes this, and nothing else of the club's, so a game's rules are the same on any machine (step 20, 11-04).
+/* club_math.h -- THE ENGINE'S OWN MATH (11-02), in club_math.c: one answer on every machine, because each C library rounds its own way.
+ * The engine's calls come here, and so do a game's: engine.h includes this, and nothing else of the engine's, so a game's rules are the same on any machine (step 20, 11-04).
  * floor, ceil, fabs, sqrt and fmod have one right answer already. */
 #ifndef CLUB_MATH_H
 #define CLUB_MATH_H

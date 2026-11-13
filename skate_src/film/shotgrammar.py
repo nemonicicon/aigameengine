@@ -5,7 +5,7 @@
 
 WHY THIS EXISTS. Mascelli's *The Five C's of Cinematography* is a reference here the same way
 Richard Williams is, and Williams became a measurable animation layer. This is the
-equivalent for the camera. The QC pass (design/406_qc_pass.md) had already found the
+equivalent for the camera. The film's QC pass had already found the
 symptom -- "six of seven takes were the conversation camera, so the whole film was two
 women in medium shots" -- but had no principle to name it. Mascelli does, in one sentence:
 
@@ -23,7 +23,7 @@ THE RULES CHECKED, all of them from the book:
               viewer spends the whole scene reconstructing the room instead of watching it.
 
   PROGRESS    Sizes move INWARD as the scene tightens: wide -> medium -> two -> ots -> tight.
-              (`medium` -- ROBOT NEKO ep 4 -- is the hips-up two-shot: both bodies, the frame's
+              (`medium` is the hips-up two-shot: both bodies, the frame's
               bottom edge at hip/thigh height, so hands and whatever is in them are large.) Going
               outward mid-scene is legal (a reveal, a character leaving) but going outward
               because the scene never established is the same bug wearing a different hat.
@@ -79,7 +79,7 @@ def audit(path):
     # coverage of an argument -- came back as "wanders: 5 moves". Alternating between
     # adjacent sizes is how a dialogue is cut. Only a JUMP back out (two ranks or more, or
     # all the way to a master) is the scene losing its place.
-    # (the ladder grew a rung in ep 4, so "all the way back to a master" is now x >= 3 --
+    # (the ladder grew a rung, so "all the way back to a master" is now x >= 3 --
     #  ots or tighter -- which is the same sentence it always was.)
     out = sum(1 for x, y in zip(ranks, ranks[1:]) if y < x - 1 or (y == 0 and x >= 3))
     if out > 1:

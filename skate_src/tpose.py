@@ -52,7 +52,7 @@ EXTRA_KEYS = ['hand_l', 'hand_r', 'foot_l', 'foot_r', 'ball_l', 'ball_r']
 
 # ----------------------------------------------------------------- which bone is which
 def _side_and_part(name):
-    """Nintendo and generic families the club's canon does not know. Returns (canon, side) or None.
+    """Nintendo and generic families the engine's canon does not know. Returns (canon, side) or None.
     Side 'l'/'r'/'' ; canon one of CANON_KEYS/EXTRA_KEYS without its side suffix."""
     n = name
     lo = n.lower()
@@ -92,7 +92,7 @@ def _side_and_part(name):
 
 
 def canon_map(nodes, names, override=None, report=print):
-    """{'pelvis': node, 'upperarm_l': node, ...}; -1 where nothing resolved. The club's canon
+    """{'pelvis': node, 'upperarm_l': node, ...}; -1 where nothing resolved. The engine's canon
     (retarget.canon_of) first, the Nintendo/generic matcher second, --map overrides last."""
     m = {k: -1 for k in CANON_KEYS + EXTRA_KEYS}
     for i, nm in enumerate(names):

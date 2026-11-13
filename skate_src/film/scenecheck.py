@@ -21,7 +21,7 @@ per second of take. It needs no model of a body and no idea what a clip is calle
     a hard cut              -- one enormous spike (excluded from the stillness test)
     a locked-off empty shot -- also flat, which is why FLATNESS is reported beside it
 
-⛔ AND STILLNESS IS NOT ALWAYS A BUG. The lull is seven HELD shots and act V opens on
+⛔ AND STILLNESS IS NOT ALWAYS A BUG. The lull is seven HELD shots and the last scene opens on
 three seconds of nothing; both are supposed to be still. This prints WHERE the stillness
 is so it can be judged, and never says "fail" on its own -- the same rule as framecheck.
 It is a summons to look, not a verdict.

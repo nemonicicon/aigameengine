@@ -806,7 +806,7 @@ static void envBind(void) {
  * Gaussians: their widths in square millimetres, and a weight each for red, green and blue, red travelling furthest). On a surface curved to a radius r, what leaves a point is the
  * plain falloff at every point round the ring, weighted by that profile at the distance between them. So the table is: across, the cosine of the angle to the light, -1 to 1; down,
  * 1/r from 0 (flat: the plain falloff, exactly) to SKIN_TIGHT per millimetre. Each Gaussian is summed over its own width, because the narrow ones would fall between the steps of any
- * one grid and be lost, and they're most of blue. Square roots are stored, for the dark end's sake. The club's own sin, cos and exp, so it's the same bytes on every machine.
+ * one grid and be lost, and they're most of blue. Square roots are stored, for the dark end's sake. The engine's own sin, cos and exp, so it's the same bytes on every machine.
  * Made only where the skin setting's on: a machine without it binds one white texel. */
 #define SKIN_LW 64
 #define SKIN_LH 32
@@ -1377,7 +1377,7 @@ static void drawList(Frame *f, VkCommandBuffer cb, uint32_t viewOff, int shadowP
         if (gl9 && (d->flags & GFX_TOON) && g_cfg.hdr && !g_filmPost) { p = g_pipe[P_TOON_GLOSS_A]; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p); cur = p; streamsBind(f, cb, ba, d, shadowPass); } }   /* a toon floor stands off the post pass as the rest of the toon does: its alpha's the blend's, so that's written after */
 }
 /* ⭐ (11-07) THE WORLD'S SOLID SURFACES LAY THEIR DEPTH FIRST (the setting `zpre`, on at the pi rung).
- * The Pi's GPU spends its frame on pixels, and at 12th and Jackson the city shaded 298,000 a frame that something nearer then covered (the own rasterizer's count,
+ * The Pi's GPU spends its frame on pixels, and on the street game's corner the city shaded 298,000 a frame that something nearer then covered (the own rasterizer's count,
  * REVA_SOFTSAY=2), more than the 256,000 of it that's seen. The opaque list's static, solid batches are drawn once here with no colour, through the same vertex shader
  * with the same constants as P_STATIC, so the depth is exactly what the lit pass will draw; the lit pass then shades each pixel once whatever order it's in, and
  * anything behind (a body, a far stand-in, a hair) is turned away before its shader runs. What a texture cuts, a body, a toon, a mirror's copy, water and fur are
@@ -1627,7 +1627,7 @@ int gfxPointer(float u, float v, float *px, float *py) {   /* (11-12) the window
     *px = (gx - x0) / dw * (float)g_W; *py = (gy - y0) / dh * (float)g_H; return 1; }
 /* ⭐ (11-11) THE GPU'S DUTY INSIDE A FRAME, for a graphics card that mustn't be run flat out. A capture's frame went in as one submission and its work came in one
  * burst: a REVA at 3840 x 2160 with eight samples a pixel is about a quarter of a second of the card flat out, so whatever the duty, the card read 90 to 100%
- * while each frame was drawn and rested after (the Facade lecture's take: 55 of 624 seconds over 80% at a duty of 0.4). A capture's frame is now submitted in
+ * while each frame was drawn and rested after (a lecture take: 55 of 624 seconds over 80% at a duty of 0.4). A capture's frame is now submitted in
  * slices at the edges of its passes, and each slice is waited for, timed, and followed by its own rest (REVA_GPUDUTY, read as dutyRest reads it), so no stretch
  * of the card's work is longer than a pass and the engine's own rest has nothing left to do (gfxDutyOwn). REVA_GPUSLICE=0 is the control: one submission a
  * frame, rested after. Every 150 frames a capture says what each slice took */
@@ -1673,7 +1673,7 @@ int gfxDutyOwn(void) { return 0; }
 #define sliceLast(f, t0) ((void)(t0))
 #endif
 /* (11-11) THE HDR PICTURE'S BLOOM, how strong: everything over about white (bloom.frag's 0.9 to 1.6) is spread at 0.35 over every level, and in
- * the Facade video every white glowed with it (her coat's shoulders, the glasses, a rider in the light). REVA_HDRBLOOM=<strength> sets it for a
+ * the music video every white glowed with it (her coat's shoulders, the glasses, a rider in the light). REVA_HDRBLOOM=<strength> sets it for a
  * run; 0.35 is what it always was */
 static float hdrBloom(void) { static float b = -1.f; if (b < 0.f) { const char *e = getenv("REVA_HDRBLOOM"); b = (e && *e) ? (float)atof(e) : 0.35f; if (b < 0.f) b = 0.f;
         if (e && *e) { printf("[post] the HDR picture's bloom at %.2f (REVA_HDRBLOOM; 0.35 without it)\n", b); fflush(stdout); } } return b; }

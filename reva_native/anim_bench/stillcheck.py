@@ -2,14 +2,14 @@
 length, its motion (the mean absolute difference between frames, 0..255 grey at 192x108, the caption band left out) and
 how many seconds of it did not change at all. A shot that holds still for seconds is dead air.
 Not motioncheck.py, which asks whether a body's motion obeys physics; this asks whether anything moves.
-The number that went UP: the film pass's second sample was 68% still in 2.4 and 43% in 2.3 (only mouths moved, no
+The number that went UP: the film pass's second sample was 68% still in one scene and 43% in another (only mouths moved, no
 lens moved); THE PERFORMANCE LAYER and push_holds took them to 9% and 18%.
 ⛔ It UNDERCOUNTS a sparse dark frame: a star field's slow zoom moves a few points a frame, under the threshold, while
-the picture plainly changes (chapter 3's probing fire: "DEAD" here, a flare every few seconds on the frames). Look."""
+the picture plainly changes (a scene of flares in a star field: "DEAD" here, a flare every few seconds on the frames). Look."""
 import glob, subprocess, sys
 import numpy as np
 
-FF = __import__("shutil").which("ffmpeg") or sorted(glob.glob(__import__("os").path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg*\ffmpeg*\bin\ffmpeg.exe")))[0]   # club-engine kit: machine-independent paths
+FF = __import__("shutil").which("ffmpeg") or sorted(glob.glob(__import__("os").path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg*\ffmpeg*\bin\ffmpeg.exe")))[0]   # machine-independent paths
 W, H = 192, 108
 
 

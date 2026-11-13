@@ -403,7 +403,7 @@ def tracks(notes, voice, seed=1):
 
     # where each note's pitch starts to move (as its onset begins). ⛔ 11-05: a phrase's closing fall was set after the NEXT note's
     # start when the rest between was shorter than that note's opening consonants, and held it 45 cents under its key for the whole
-    # note ("Stars", Pathological Facade: a semitone and a half flat). A fall now always ends before the next note moves.
+    # note (in a cover song: a semitone and a half flat). A fall now always ends before the next note moves.
     moves = [ix(n["t0"] + pre + lag - lead_len(n["onset"], n["lead_sc"]) - 0.01) for n in notes]
 
     def fall_at(i, idx):
@@ -622,7 +622,7 @@ def _render(notes, voice, seed=1, share=0.6, laid=False):
 
 def even_out(x, tr, notes, amount, over=3.0):
     """her ear on her own level: a note whose vowel comes out more than `over` dB above her median note is brought `amount` of the
-    excess back. ⛔ 11-05, at the written pitch of Pathological Facade (to D#6): FLEECE and DRESS from A#5 up landed their few
+    excess back. ⛔ 11-05, at the written pitch of a cover song (to D#6): FLEECE and DRESS from A#5 up landed their few
     harmonics on F2/F3's peaks and came out 12 dB over her median note, and set the whole track's level."""
     lag = tr["pre"]; spans, lv = [], []
     for n in notes:

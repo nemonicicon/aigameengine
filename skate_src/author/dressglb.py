@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """dressglb.py -- put a PREMADE garment on a body, inside the GLB, ready to bake.
 
-    python skate_src/author/dressglb.py models/_out/anima_hi_fx.glb \
+    python skate_src/author/dressglb.py models/_out/<body>.glb \
         models/Female_cargo_outfit-2e0b443f/glb/converted/female_cargo_outfit.glb \
-        --mesh Pants_army --kind pants --name anima_cargo~cloth --out models/_out/anima_cargo.glb
+        --mesh Pants_army --kind pants --name <body>_cargo~cloth --out models/_out/<body>_cargo.glb
 
 09-11: no generated clothing had come out well.
 So this takes a garment somebody MODELLED -- a Sketchfab/Fab GLB, unrigged, in
-whatever units it came in -- and fits it to a body the club already has:
+whatever units it came in -- and fits it to a body the engine already has:
 
   1. the garment is taken to WORLD space through its own node chain (Sketchfab GLBs carry a
      Z-up rotation and a cm scale in the parents, and a mesh read raw is on its side);
@@ -209,7 +209,7 @@ def body_measure(gj, bin_, body_sub):
             continue
         # ⛔ A SKINNED MESH'S VERTICES ARE ALREADY IN THE SKIN'S SPACE (the bind pose, at the
         # scene root); its node transform is ignored by glTF and must be ignored here. Applied,
-        # Anima's body collapsed to 8 mm and the hip band found no vertex at all.
+        # the bought character's body collapsed to 8 mm and the hip band found no vertex at all.
         skinned = "skin" in n
         for pr in m["primitives"]:
             pos = acc_read(gj, bin_, pr["attributes"]["POSITION"])
@@ -239,7 +239,7 @@ def body_normals(gj, bin_, body_sub):
 def half_width(verts, y, band, axis=0):
     """the MEAN radius about the vertical axis through the band's centre. Not the max |x|:
     the cargo pants' waistband is 0.185 half-wide but only 0.144 in mean radius (they are
-    shallower front-to-back than Anima's hips), and the max fit them 2.3 cm INSIDE her.
+    shallower front-to-back than the bought character's hips), and the max fit them 2.3 cm INSIDE her.
     fitcheck measures a mean radius per bone, so the fit is made in the same currency."""
     sel = [v for v in verts if abs(v[1] - y) < band]
     if not sel:
@@ -392,7 +392,7 @@ def main():
     accJ = add_acc(gj, bvJ, 5121, "VEC4", len(J))
     accW = add_acc(gj, bvW, 5126, "VEC4", len(Wt))
     accI = add_acc(gj, bvI, 5125, "SCALAR", len(I))
-    # the material: base colour only, the club's shader reads nothing else yet
+    # the material: base colour only, the engine's shader reads nothing else yet
     mat_index = None
     if a.material:
         hits = [i for i, m in enumerate(gg.get("materials", [])) if a.material.lower() in m.get("name", "").lower()]

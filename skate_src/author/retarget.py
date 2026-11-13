@@ -27,7 +27,7 @@ def canon_of(name):
     EX = {"pelvis": 0, "neck_": 4, "clavicle_l": 6, "upperarm_l": 7, "lowerarm_l": 8,
           "clavicle_r": 9, "upperarm_r": 10, "lowerarm_r": 11, "thigh_l": 12,
           "calf_l": 13, "thigh_r": 14, "calf_r": 15, "chest": 2,
-          # snake_case with the side trailing: the DontGetDropped alien (upper_arm_L, forearm_L, shin_L). Half of it matched UE's
+          # snake_case with the side trailing: the skate game's alien (upper_arm_L, forearm_L, shin_L). Half of it matched UE's
           # thigh_l and the rest fell through to -1, so no score could solve an arm or a knee on it (11-02).
           "shoulder_l": 6, "upper_arm_l": 7, "forearm_l": 8, "shoulder_r": 9, "upper_arm_r": 10, "forearm_r": 11,
           "shin_l": 13, "shin_r": 15}
@@ -50,7 +50,7 @@ def resolve(p):
         c = canon_of(nm)
         if c >= 0 and pb[c] < 0: pb[c] = i
     # SPINE CHAIN BY TOPOLOGY: name digits lie in both directions (UE spine_01/02/03
-    # all collapse to "spine"; kaeli's Spine02 is the LOWEST bone). Walk the real
+    # all collapse to "spine"; the co-star's Spine02 is the LOWEST bone). Walk the real
     # parent chain from the neck down to the hips: every spine-ish node between them
     # gets canon 1,2,3 in parent->child order. Identity z_bow measured the cost of not
     # doing this: two of three spine bones dropped, 45 deg of lean arriving as 27.
@@ -135,7 +135,7 @@ class Basis:
         fwd = norm(cross(lat, [0, 1, 0]))
         self.fwd = fwd
         # ONE Z SEMANTIC: rig-forward, for every bone. Bend-plane normals were the
-        # plan's known degeneracy and it bit immediately: kaeli's near-straight rest
+        # plan's known degeneracy and it bit immediately: the co-star's near-straight rest
         # arms gave numerically arbitrary planes (armR read 53 for an authored 35).
         # Forward is measurable on every humanoid and means the same thing on all of
         # them; the parallel fallback below covers bones that point forward.
@@ -188,7 +188,7 @@ def transfer(dB, d_world_q, tB):
     ABSOLUTE canonical semantics: the target bone's canonical frame is posed WHERE THE
     DONOR'S IS (facing-normalized), not displaced by the donor's delta from its own
     rest. Delta semantics read 'raise your arm 31 deg from wherever your rest is' --
-    kaeli (arms hanging at 11) landed at 42 for an authored 120. A move means the same
+    the co-star (arms hanging at 11) landed at 42 for an authored 120. A move means the same
     POSE on every body:
 
         W_t' = G_t * inv(G_d) * D * A_d * inv(A_t) * W_t

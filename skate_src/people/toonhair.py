@@ -1,5 +1,5 @@
-"""toonhair.py -- THE WORLD AT THE END OF TIME's hair: sculpted masses that MOVE (10-18, on the engine's
-hair physics). A swinging lock carries its own Hair_* chain and a bob hangs on a ring of them; the club engine
+"""toonhair.py -- the space series' hair: sculpted masses that MOVE (10-18, on the engine's
+hair physics). A swinging lock carries its own Hair_* chain and a bob hangs on a ring of them; the engine
 and Godot's ClubHair mine any bone named *hair* whose parent is not (crowd_kms.c H1: 32 chains a body, 14 bones a
 chain), and swing them with inertia, drag and world-down gravity.
 
@@ -226,8 +226,7 @@ def curl_bangs(person, P):
 
 def beard(person, P):
     """spec hair["beard"] = {n, spread, len, width, thick, chin_u}: a WISPY beard -- n thin strands from the chin
-    (spread degrees either side of the middle), the middle longest, each on a two-bone chain so it flies about
-    (Captain Bu in the drum, p32: "laughing and shouting, his wispy beard flying about")"""
+    (spread degrees either side of the middle), the middle longest, each on a two-bone chain so it flies about"""
     b = person.S["hair"].get("beard")
     if not b: return
     n, sp, ln = b["n"], b["spread"], b["len"]

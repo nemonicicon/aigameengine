@@ -118,7 +118,7 @@ static void sclStep(SetCloth*S,float dtFull){
     if(NSUB>16) NSUB=16;
     for(int ss=0;ss<NSUB;ss++){
     float dt=dtFull/(float)NSUB;
-    /* club units are ~1.75x metric, so gravity is too */
+    /* engine units are ~1.75x metric, so gravity is too */
     float g=-9.81f*1.75f*dt*dt;
     float gust=1.f+g_windGust*sinf(g_sclT*1.9f+S->phase)*0.6f
                   +g_windGust*sinf(g_sclT*0.7f+S->phase*2.f)*0.4f;
@@ -231,7 +231,7 @@ static void sclDraw(void){
       }
 
 static int setParse(const char*name,int depth);
-/* ⭐ ep 11: THE HALF-PIPE ----------------------------------------------------------------------------------
+/* ⭐ THE HALF-PIPE ----------------------------------------------------------------------------------
  *     halfpipe <name> x y z yaw W F R V D [r g b]
  * X-Games vert: two quarter pipes facing each other across a flat. (x,y,z) is the centre of the flat bottom and
  * yaw is the pipe's AXIS (the prop convention: forward = (sin Y, cos Y)); riders go ACROSS it. W runs along the
@@ -370,7 +370,7 @@ static float pipeDepth(const HalfPipe*H,const float*p,float rad,int riding,int*k
            if(!riding) *kind=1; }
     if(dEnd<d) d=dEnd;
     return (*kind)?d+rad:d; }
-/* ⭐ ep 10: A ROUTE -- `route <name> <mark> <mark> ...` in a .set NAMES a path through its marks, so a scene
+/* ⭐ A ROUTE -- `route <name> <mark> <mark> ...` in a .set NAMES a path through its marks, so a scene
  * line says `hpath=@loopA` instead of 28 mark names. A new verb: `path` is already the actor waypoint. The
  * marks are looked up when a path STARTS, so a route may name marks from an include or from further down.
  * A route whose last mark is its first is CLOSED: its laps join seamlessly, and hloop=1 keeps a body on it. */
@@ -396,24 +396,24 @@ static int setLoad(const char*name){
     g_setNI=0; g_setNA=0; g_setNMk=0; g_nCol=0; g_setCur[0]=0; stClear(); spClear(); trClear(); trAddClear(); setLookClear();   /* (11-12) a game's own triangles go with the set */
     { static int once=-1; if(once<0){ once=1; g_colOff=getenv("REVA_NOCOLLIDE")?1:0; } }
     g_setT=0.f;              /* Z7a: every load restarts the shot */
-    g_setNRt=0;              /* ⭐ ep 10: a set's routes go with it */
-    pipeClear();             /* ⭐ ep 11: and its half-pipes */
+    g_setNRt=0;              /* ⭐ a set's routes go with it */
+    pipeClear();             /* ⭐ and its half-pipes */
     g_setNL=0; g_setNLX=0;
     ptSetClear(); dcSetClear(); lensClear(); g_stkNC=g_stkNP=0; g_stkNS=0; memset(g_stkCam,0,sizeof g_stkCam); g_beamLight=6.f; g_setSpace=0; g_skyYaw=g_skyPitch=0.f; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0; g_gloss.on=0; if(g_stk){ free(g_stk); g_stk=NULL; } g_stkFrames=0; g_stkLast=-1; g_nMover=0;
     g_slotWashOn=0; memset(g_slotWashA,0,sizeof g_slotWashA); g_bodyWash[3]=0.f;   /* (11-11) and no body is washed with a mover's colour */
     g_stkNK=0; memset(g_stkLook,0,sizeof g_stkLook); g_clipStartS=0.f; stkSheetsDrop();   /* (step 21) and what the timeline gave: the looks, the pictures, where clips start */
     artDrop();   /* (11-11) and its drawings */
     g_setEnvOn=0;   /* (step 22) and where its surroundings are baked from */
-    memset(&g_stb,0,sizeof g_stb);   /* ⭐ 10-22: and Wan-To's star */   /* ⭐ 10-22: and its space */
+    memset(&g_stb,0,sizeof g_stb);   /* ⭐ 10-22: and its star */   /* ⭐ 10-22: and its space */
     /* ⛔ A SET OWNS ITS CLOTH. Leaving the last level's curtains up is the same class of
-     * bug as the club's own lamp sprites hanging over the road in a day sheet. */
+     * bug as the dance floor's own lamp sprites hanging over the road in a day sheet. */
     for(int q=0;q<g_nScl;q++) g_scl[q].used=0;
     for(int q=0;q<g_nWat;q++) g_wat[q].used=0;
     g_nScl=0; g_nSclBox=0; g_nWat=0;
     g_windV[0]=g_windV[1]=g_windV[2]=0.f; g_windGust=0.f; g_sclT=0.f;
     { static int once9=-1; if(once9<0){ once9=1; g_sclOff=getenv("REVA_NOCLOTH")?1:0; } }
     g_setNL=g_setNL;
-    memset(g_setLk,0,sizeof g_setLk);   /* ⭐ ep 12 */
+    memset(g_setLk,0,sizeof g_setLk);
     for(int k=0;k<NLIGHT;k++){ g_setLp[k*3]=0.f; g_setLp[k*3+1]=-99.f; g_setLp[k*3+2]=0.f;
                           g_setLc[k*3]=g_setLc[k*3+1]=g_setLc[k*3+2]=0.f; }
     if(!name||!name[0]||!strcmp(name,"off")){ printf("[set] off\n"); fflush(stdout); return 1; }
@@ -430,11 +430,11 @@ static int setLoad(const char*name){
             probesLoad(name);
             envLoad(name);   /* (step 22) and its surroundings, for reflections */
 #endif
-            clipAuditSetLoaded();   /* ⭐ ep 10: the clipping audit's world grid, when the audit is on */
+            clipAuditSetLoaded();   /* ⭐ the clipping audit's world grid, when the audit is on */
             printf("[set] %s: %d props + %d actors + %d cloth + %d water from %d packs\n",
                    name,g_setNI,g_setNA,g_nScl,g_nWat,g_setNP);
             /* ⛔ AND THE PRACTICALS ARE SAID OUT LOUD, AGAINST THE SKY THEY WILL BE SEEN UNDER.
-             * This is the bug that cost ROBOT NEKO ep 5 a shooting day: other_side.set's lamps
+             * This is the bug that cost the stop-motion show a shooting day: a street set's lamps
              * were authored at `tod=10.0` and re-used at `tod=21.5`, where they deliver ~30x the
              * sky ambient and the street renders in full daylight however dark the sun is set.
              * NOTHING said a word -- [sun] and [tod] both reported correct values, because they
@@ -462,9 +462,9 @@ static int setParse(const char*name,int depth){
     FILE*f=fopen(pth,"rb");
     if(f) netSigFile(pth);   /* (step 29) a session's machines must have read the same set */
     if(!f){ printf("[set] %s NOT FOUND\n",pth); fflush(stdout); return 0; }
-    char ln[2048]; int nline=0, miss=0;   /* ⭐ ep 10: 512 -> 2048 -- a route of 28 marks is ~240 chars */
+    char ln[2048]; int nline=0, miss=0;   /* ⭐ 512 -> 2048 -- a route of 28 marks is ~240 chars */
     while(fgets(ln,sizeof ln,f)){
-        /* ⛔ ep 10: a line longer than the buffer used to come back as TWO lines, its tail parsed as a verb */
+        /* ⛔ a line longer than the buffer used to come back as TWO lines, its tail parsed as a verb */
         if(!strchr(ln,'\n')&&!feof(f)){ int c9; while((c9=fgetc(f))!=EOF&&c9!='\n'){ }
             printf("[set] %s: a line longer than %d chars was CUT -- its tail is dropped\n",pth,(int)sizeof ln-1); fflush(stdout); }
         if(ln[0]=='#'||ln[0]=='\n'||ln[0]=='\r') continue;
@@ -478,7 +478,7 @@ static int setParse(const char*name,int depth){
                 if(depth>=2) printf("[set] include %s IGNORED (too deep)\n",inc);
                 else setParse(inc,depth+1); }
             continue; }
-        /* ⭐ ep 10: route <name> <mark> <mark> ... (commas allowed) -- a scene's hpath=@name. Said out loud. */
+        /* ⭐ route <name> <mark> <mark> ... (commas allowed) -- a scene's hpath=@name. Said out loud. */
         if(!strncmp(ln,"route ",6)){
             char rn[32]; int used=0;
             if(sscanf(ln,"route %31s %n",rn,&used)>=1&&used>0){
@@ -525,7 +525,7 @@ static int setParse(const char*name,int depth){
                           &x,&y,&z,&cw,&ch,&yaw,&col[0],&col[1],&col[2]);
             if(nf>=6) sclAdd(kind,x,y,z,cw,ch,yaw,col,mv9);
             continue; }
-        /* ⭐ ep 11: halfpipe <name> x y z yaw W F R V D [r g b] -- a vert ramp you can ride (hpipe=) */
+        /* ⭐ halfpipe <name> x y z yaw W F R V D [r g b] -- a vert ramp you can ride (hpipe=) */
         if(!strncmp(ln,"halfpipe ",9)){
             char pn[32]; float v9[9], col9[3]={0.f,0.f,0.f};
             int nf=sscanf(ln,"halfpipe %31s %f %f %f %f %f %f %f %f %f %f %f %f",pn,&v9[0],&v9[1],&v9[2],&v9[3],
@@ -651,7 +651,7 @@ static int setParse(const char*name,int depth){
                 g_nStar++; }
             else if(n9>=7&&g_nStar>=8) printf("[set] star cap is 8 -- ignoring\n");
             continue; }
-        /* ⭐ 10-22: WAN-TO'S STAR (see starDraw) */
+        /* ⭐ 10-22: THE STAR (see starDraw) */
         if(!strncmp(ln,"starbody ",9)){ float v9[8]={0.f,0.f,0.f,0.f,6500.f,0.f,180.f,1.f};
             int n9=sscanf(ln,"starbody %f %f %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5,v9+6,v9+7);
             if(n9>=4&&v9[3]>0.f){ g_stb.on=1; memcpy(g_stb.c,v9,12); g_stb.R=v9[3]; g_stb.T=v9[4];
@@ -804,11 +804,11 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"light ",6)){
             float lx,ly,lz,lr,lg,lb,lpw=1.f,lrc=0.f,lend=0.f;
             int nl=sscanf(ln,"light %f %f %f %f %f %f %f %f %f",&lx,&ly,&lz,&lr,&lg,&lb,&lpw,&lrc,&lend);
-            /* ⛔ THE TOP SLOT IS RESERVED FOR A HELD LIGHT (ep 4), so a set takes NLIGHT-1. */
+            /* ⛔ THE TOP SLOT IS RESERVED FOR A HELD LIGHT, so a set takes NLIGHT-1. */
             if(nl>=6&&g_setNL<NLIGHT-1){
                 g_setLp[g_setNL*3]=lx; g_setLp[g_setNL*3+1]=ly; g_setLp[g_setNL*3+2]=lz;
                 g_setLc[g_setNL*3]=lr*lpw; g_setLc[g_setNL*3+1]=lg*lpw; g_setLc[g_setNL*3+2]=lb*lpw;
-                g_setLk[g_setNL]=(nl>=8)?lightReachK(lrc):0.f;   /* ⭐ ep 12: the lamp's reach */
+                g_setLk[g_setNL]=(nl>=8)?lightReachK(lrc):0.f;   /* ⭐ the lamp's reach */
                 g_setLr[g_setNL]=(nl>=9&&lend>0.f)?lend:0.f;   /* (11-12) and where it ends */
                 g_setNL++; }
             else if(nl>=6&&g_setNLX<SETL_MORE){   /* (11-12) past the practicals: straight into the frame's lights */
@@ -821,7 +821,7 @@ static int setParse(const char*name,int depth){
             char ap[64],ac[64],ab[64]; float ax,ay,az,ayw,asc,art=1.f,asp=0.f,aln=0.f;
             ab[0]=0;
             /* ⭐ (10-23) `outfit=<name>` anywhere on the line is what this actor WEARS -- an extra wore her pack's first
-             * outfit (Billy in his freezer shift beside Freddy in day clothes, 2.22). Taken out of the line before the
+             * outfit (one boy in his freezer shift beside the other in day clothes). Taken out of the line before the
              * positional read, where an 11th token is the board's name. */
             char lb9[2048], of9[32]; of9[0]=0; snprintf(lb9,sizeof lb9,"%s",ln);
             { char*q9=strstr(lb9," outfit="); if(q9){ char*v9=q9+8; int k9=0;
@@ -881,7 +881,7 @@ static int setParse(const char*name,int depth){
              * TOGETHER (the boys' huddle: an arm over the other's back) must play in step */
             if(!strncmp(ac,"z_rm_",5)) A->phase=0.0;
             continue; }
-        /* ⭐ screen x y z yaw pitch w h -- a live Holly panel in the world (ep 8) */
+        /* ⭐ screen x y z yaw pitch w h -- a live Holly panel in the world */
         if(!strncmp(ln,"screen ",7)){
             float s9[7]={0,0,0,0,0,1.f,0.75f};
             int ns9=sscanf(ln,"screen %f %f %f %f %f %f %f",
@@ -898,9 +898,9 @@ static int setParse(const char*name,int depth){
          * lies flat or has been nailed across a window. */
         float pit=0.f, rol=0.f; int isr=0;
         int n;
-        /* ⭐ room <stem> x y z yaw pitch roll scale (ROBOT NEKO ep 9) -- a propr that is a PLACE.
+        /* ⭐ room <stem> x y z yaw pitch roll scale -- a propr that is a PLACE.
          * propSolid() decides by NAME and a photogrammetry scan is named for where it is: the
-         * Southbank Undercroft came back SOLID, and its circle collider -- sized off the pack's
+         * skatepark's scan came back SOLID, and its circle collider -- sized off the pack's
          * footprint -- would have been ~31 units across the middle of the park, ejecting every
          * body standing in it. A room draws exactly like propr and never becomes a circle. */
         int isRoom9=!strncmp(ln,"room ",5);
@@ -918,7 +918,7 @@ static int setParse(const char*name,int depth){
         if(g_setNI>=SET_MAXI){ printf("[set] instance cap %d hit\n",SET_MAXI); break; }
         SetInst*I=&g_setI[g_setNI++];
         I->pk=pi; I->mover=-1; I->hid=0; I->wash=I->fade=0.f; I->pic=0; I->sway=I->swayPh=0.f;
-        /* The pack's OWN scale rides along -- a town prop is baked at club scale and
+        /* The pack's OWN scale rides along -- a town prop is baked at the engine's scale and
          * reports 1.0, but a character reports the factor that takes its rig units to
          * the world, and -mny*scale is what stands it on the floor instead of burying
          * or floating it. */

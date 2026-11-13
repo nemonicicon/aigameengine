@@ -126,7 +126,7 @@ def main(pack_path, SCALE, ARMW, PGAP, PPACK, PSCALE):
     RX2 = max(max(abs(c[1][0]), abs(c[2][0])) + c[3] for c in tor)
     # THE CHEST GATE uses the DIRECTIONAL band measure, not the capsules: a torso's
     # cross-section is not a circle, and a radius that must cover the wide sides
-    # overstates the front by ~50% (kaeli read 0.31 front by capsule vs 0.19 by band).
+    # overstates the front by ~50% (the co-star read 0.31 front by capsule vs 0.19 by band).
     # Capsules keep the job they are honest at -- the wrap goes around the SIDES and
     # BACK, where the radius is real.
     from authorlib import body_dims as _bd
@@ -162,7 +162,7 @@ def main(pack_path, SCALE, ARMW, PGAP, PPACK, PSCALE):
     over  = [0.0, mny + (PSH - 0.06) / SCALE, (ZC + PBK2) / SCALE]
     under = [0.0, mny + PMID / SCALE,         (ZC + PBK2) / SCALE]
 
-    # HOW FAR ACROSS CAN THIS ARM WRAP? Not a constant: kaeli's 0.84u arm cannot lie
+    # HOW FAR ACROSS CAN THIS ARM WRAP? Not a constant: the co-star's 0.84u arm cannot lie
     # flat to the far side of reva's back -- at any fixed far target her forearm chords
     # through the torso (the gate measured 0.083u through the mid-back). So the
     # crossing is SOLVED: try candidate under-arm landing spots from far-side to

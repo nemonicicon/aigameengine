@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """z_fold.py -- THE FOLD: standing bent over at the hips, the knees giving, the head hung below the shoulders and the arms hanging, the way someone
-high on fentanyl stands on a sidewalk for minutes at a time. The back sinks lower and lower for several seconds, catches itself and comes part of the
+can stand folded over on a sidewalk for minutes at a time. The back sinks lower and lower for several seconds, catches itself and comes part of the
 way up, and sinks again. On any rig
 the canon maps (authorlib.rig_map), over a stand clip of its own.
 

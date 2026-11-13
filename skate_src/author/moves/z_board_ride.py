@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""z_board_ride.py -- ROBOT NEKO ep 9: standing on a skateboard, badly, then less badly.
+"""z_board_ride.py -- standing on a skateboard, badly, then less badly.
 
   z_board_stepon  front foot up onto the board, then the back foot -- HOLD on the deck
   z_board_wobble  the first time on a board: knees nearly locked, arms windmilling, hips hunting (loop)
-  z_board_steady  after "knees.": bent, arms out, small corrections (loop)
+  z_board_steady  after a correction: bent, arms out, small corrections (loop)
   z_board_push    one push: back foot down to the floor, sweep, back up onto the deck (loop)
   z_board_bail    the board goes and she sits down hard -- HOLD
 
 Authored from each rig's own proportions (rig_map), over the same stand as z_board.py.
 
-THE DECK CONTRACT (crowd_kms.c, ep 9). `@deck` draws the board at the body's ROOT with its long
+THE DECK CONTRACT (crowd_kms.c). `@deck` draws the board at the body's ROOT with its long
 axis ACROSS the body, and LIFTS THE WHOLE BODY by the board's measured height. So:
   * a riding clip keeps a foot that is ON the deck at the rig's own stand-ankle height;
   * a foot that reaches the real FLOOR goes BELOW that by the deck height in rig units --
@@ -35,7 +35,7 @@ from authorlib import (rig_map, fk_world, aim_bone, solve_limb, rotate_bone_worl
 import z_board as ZB
 
 FPS = 30.0
-DECK_H_WORLD = 0.223        # skateboard.rpack held @1.4: its measured height, club units
+DECK_H_WORLD = 0.223        # skateboard.rpack held @1.4: its measured height, engine units
 STANCE_HALF = 0.24          # each foot's distance from the board's centre along it, in LEGS
 DECK_Z = -0.03              # the ankles sit this far behind the root (rig u): the feet straddle the deck's centreline
 STEP_F = 0.32               # rig u the board lies ahead of the root before the step-on (clear of her toes)

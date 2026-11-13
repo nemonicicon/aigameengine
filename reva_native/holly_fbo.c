@@ -29,7 +29,7 @@ int holly_fbo_init(int w, int h, const char *model_path) {
   H.h = h > 0 ? h : 120;
 
   /* [2026-09-30] holly.hlm is CONTENT (not in the repo). load_model() die()s on a missing file,
-   * which took the whole club down on a checkout that has the engine and no head -- while every
+   * which took the whole engine down on a checkout that has the engine and no head -- while every
    * caller already treats a failed init as "no screens tonight" (holly_fbo_texture()==0). Say it
    * loudly and let the floor run. */
   { const char *mp = model_path ? model_path : "holly.hlm";
@@ -99,7 +99,7 @@ int holly_fbo_init(int w, int h, const char *model_path) {
   return 1;
 }
 
-/* ep 9 probe: how many times the head has actually been drawn into the target */
+/* a probe: how many times the head has actually been drawn into the target */
 static unsigned H_renders = 0;
 unsigned holly_fbo_renders(void) { return H_renders; }
 

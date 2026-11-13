@@ -1,5 +1,5 @@
 @echo off
-REM ---- THE CLUB. Boots into GAME MODE select (ten doors: dance, skate, battle royale,
+REM ---- THE ENGINE. Boots into GAME MODE select (ten doors: dance, skate, battle royale,
 REM arena, rts, scooter, arpg, platformer, narrative rpg, arcade), then CHARACTER select
 REM (chars.txt roster). Set REVA_MODE=<index|name> to skip the mode menu; put a pack
 REM name in place of "select" to skip the character menu.

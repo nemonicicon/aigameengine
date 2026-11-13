@@ -4,8 +4,8 @@
 #   ./build_linux.sh            -> crowd_linux    desktop: REVA_WINDOWED=1 ./crowd_linux 400 packs select;  no desktop: SDL_VIDEODRIVER=kmsdrm ./crowd_linux 400 packs select
 #   ./build_linux.sh headless   -> crowd_headless no display, no GPU: the sim only. Then: python3 anim_bench/hashcheck.py
 #   ./build_linux.sh soft       -> crowd_soft     the engine's own rasterizer (queue step 27): 320 x 240 on the processor, nothing links Vulkan. REVA_WINDOWED=1 ./crowd_soft 400 packs select;
-#                                                 REVA_NOWINDOW=1 draws with no window, which is the receipt's pixels: python3 anim_bench/hashcheck.py --soft ./crowd_soft
-# Deps: libsdl2-dev libvulkan-dev libstb-dev. Pixels with no GPU come from Mesa's lavapipe (mesa-vulkan-drivers), the receipt's test layer, step 19.
+#                                                 REVA_NOWINDOW=1 draws with no window
+# Deps: libsdl2-dev libvulkan-dev libstb-dev. Pixels with no GPU come from Mesa's lavapipe (mesa-vulkan-drivers), a test layer, step 19.
 # GAME=games/<name>/<name>.c picks the game; the sample stands in when the zombie game isn't in this tree.
 set -e
 cd "$(dirname "$0")"

@@ -22,7 +22,7 @@ Quick start builds and plays a game in two commands), `CLAUDE.md` (the build, th
 | task | read | then |
 |---|---|---|
 | start a game | `reva_native/engine.h` (everything a game sees of the engine), then `reva_native/games/sample/sample.c` (TAG, 3D, one body built by code) or `games/rocks/rocks.c` (2D, no bodies) | a game is a folder in `reva_native/games/` with one C file of the same name: `python .claude/skills/run-reva/driver.py buildvk --game <name>`, then its `play.bat` |
-| know a change broke nothing | `CLAUDE.md`, "The tick, the receipt, the dice, the ladder" | `driver.py check --game sample`: the rules' hashes and the frame's against the blessed ones, no window, seconds. A new game adds its scenarios to `reva_native/anim_bench/hashcheck.py` and blesses them once; after that, `--bless` only when you know why a hash changed |
+| know a game still keeps its own time | `CLAUDE.md`, "The tick, the check, the dice, the ladder" | `driver.py check --game sample`: the game against itself, the same hashes at odd frame pacings, no window, seconds. Nothing is stored or blessed. A new game adds its scenarios to `reva_native/anim_bench/hashcheck.py` |
 | play it across machines | `reva_native/games/rally/rally.c`, and the first comment of `reva_native/club_net.c` | `REVA_NET=host` on one machine, `REVA_NET=join:<address>` on the others. ⛔ A game's tick never reads anything of the session. `python reva_native/anim_bench/netcheck.py` is the check |
 | run it with no graphics driver | `README.md`, "No graphics driver?" | `driver.py buildsoft --game <name>` |
 | show the person a picture, or play the game yourself, with no window | `CLAUDE.md`, "Headless verification instruments" | the `buildsoft` build with `REVA_NOWINDOW=1` and `REVA_SHOT`, and the bridge (`REVA_BRIDGE`, `reva_native/anim_bench/bridge.py`) |
@@ -66,8 +66,8 @@ under her feet; (2) the tripod and the tracking lens; (3) the hand-held phone ri
    contact that keeps moving is a pose that should change.
 9. **Keep a ledger:** every mistake becomes a one-line rule for next time. The ⛔ lines in `CLAUDE.md` and
    `design/engine_capabilities.md` (every capability, with the failure that exposed it) are this engine's.
-10. **A check says nothing has changed, not that anything is right.** The receipt's hashes hold a game to
-    what it did yesterday; how the picture looks is still eyes on a full frame.
+10. **A check doesn't say anything is right.** `check` holds a game against itself, not against what it did
+    yesterday: the engine isn't finished and keeps changing. How the picture looks is still eyes on a full frame.
 
 ## Paste-ready starter (for a chat assistant that cannot read the repo)
 

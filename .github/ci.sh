@@ -2,12 +2,13 @@
 # ci.sh -- what this repository's CI runs, as one script, so the same lines can be run on any Linux machine:
 #     bash .github/ci.sh            everything, in order
 #     bash .github/ci.sh build      every way the engine is built off Windows, and every game with no display
-#     bash .github/ci.sh receipts   each game's receipt: the rules' hashes and the frame's, against the blessed ones
+#     bash .github/ci.sh steady     each game against itself: the same hashes at odd frame pacings, and the sample from another pack format
 #     bash .github/ci.sh online     two to four engines in one session on this machine's loopback
-#     bash .github/ci.sh memory     the receipt again with fresh memory filled two different ways
+#     bash .github/ci.sh memory     the sample game twice, with fresh memory filled two different ways: the same hashes
 # It needs gcc, python3 and libsdl2-dev libvulkan-dev libstb-dev libdrm-dev. No GPU, no display, no window.
 # What it does NOT do: run the Vulkan build (it is compiled and linked, never started: a runner has no driver
-# for it), look at a picture, or touch a Raspberry Pi. The pixels it checks are the engine's own rasterizer's.
+# for it), look at a picture, touch a Raspberry Pi, or compare anything with a kept copy of what the engine printed
+# before: the engine isn't finished, and that changes with every improvement. Every check here holds the engine against itself.
 # JOBS=<n> is how many compiles run at once (4: each is one big file, about 45 s and half a gigabyte).
 set -u
 cd "$(dirname "$0")/../reva_native" || exit 1
@@ -28,7 +29,7 @@ build() {
   rm -f "$OUT"/build_*.ok
   one linux        ./build_linux.sh "$OUT/crowd_linux"                  # Vulkan on SDL's window
   one linux_soft   ./build_linux.sh soft                                # the engine's own rasterizer, the sample game in it
-  one linux_bare   ./build_linux.sh headless                            # no display: the sample game's receipt
+  one linux_bare   ./build_linux.sh headless                            # no display: what the checks below run
   one pi_road      env OUTDIR="$OUT" ./build_pi.sh vk                   # the Pi's direct road, built for this machine
   one pi_dev       env OUTDIR="$OUT" ./build_pi.sh dev                  # the engine with no game in it, and the sample as a library
   for g in $GAMES; do
@@ -44,12 +45,12 @@ build() {
   return $bad
 }
 
-receipts() {
+steady() {
   local bad=0 g
   for g in $GAMES; do
     echo "== $g"
     if [ "$g" = sample ]; then
-      python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft || bad=1
+      python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless || bad=1
     else
       python3 anim_bench/hashcheck.py --game "$g" --exe "$OUT/$g/crowd_headless" || bad=1
     fi
@@ -70,18 +71,23 @@ memory() {
   a=$(MALLOC_PERTURB_=85 "$OUT/fill"); b=$(MALLOC_PERTURB_=170 "$OUT/fill")
   if [ "$a" = "$b" ]; then echo "this C library ignored MALLOC_PERTURB_ (fresh memory read $a both times): the test would prove nothing"; return 1; fi
   echo "fresh memory reads $a with one fill and $b with the other: the C library does as it's asked"
-  # The sample game's receipt with each fill. Anything the rules read before writing it would change a hash.
+  # The sample game with each fill, its lines kept. Anything the rules read before writing it would change a hash, and the two files would part.
   for P in 85 170; do
     echo "== fill $P"
-    MALLOC_PERTURB_=$P python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless || return 1
+    MALLOC_PERTURB_=$P python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --lines "$OUT/fill_$P.txt" || return 1
   done
+  if cmp -s "$OUT/fill_85.txt" "$OUT/fill_170.txt"; then
+    echo "the two fills print the same $(wc -l < "$OUT/fill_85.txt") lines"
+  else
+    echo "the two fills part:"; diff "$OUT/fill_85.txt" "$OUT/fill_170.txt" | head -6; return 1
+  fi
 }
 
 case "${1:-all}" in
   build)    build ;;
-  receipts) receipts ;;
+  steady)   steady ;;
   online)   online ;;
   memory)   memory ;;
-  all)      build && receipts && online && memory ;;
-  *)        echo "ci.sh: build | receipts | online | memory | all"; exit 2 ;;
+  all)      build && steady && online && memory ;;
+  *)        echo "ci.sh: build | steady | online | memory | all"; exit 2 ;;
 esac

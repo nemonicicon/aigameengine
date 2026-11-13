@@ -3,14 +3,14 @@
  * picture, not Vulkan's and not matched to it pixel for pixel. Build with -DREVA_SOFT and this file in gfx_vk.c's place (driver.py buildsoft): nothing links Vulkan.
  *
  * ⭐ THE SAME PIXELS ON EVERY MACHINE. That's the other half of what it's for. The sim's hash is the same on a PC and a Pi, and so is this picture, so a frame's hash
- * is a receipt that crosses machines, which a GPU's pixels never are (anim_bench/hashcheck.py --soft). What keeps it so:
+ * is one that crosses machines, which a GPU's pixels never are. What keeps it so:
  *   - on floats, only + - * / and sqrt, each of which IEEE 754 rounds one way, and never contracted into one another (-ffp-contract=off, as every build line has);
  *   - exp, sin, cos and pow are the club's own (club_math.c), never the C library's, and what the pixel loops need of them is tables made from those;
  *   - a triangle's coverage is whole-number arithmetic on positions snapped to a sixteenth of a pixel, with the top-left rule, so no pixel hangs on a rounding;
  *   - colours are mixed as whole numbers;
  *   - a float that isn't a number never reaches a float-to-int conversion, which is where machines differ: f2i and the checks beside it turn it into 0 first;
  *   - one thread, the packet's own order, and nothing here reads a clock for anything it draws.
- * ⛔ Anything added here keeps to that list, or the receipt parts on the first machine that rounds another way.
+ * ⛔ Anything added here keeps to that list, or its pixels part on the first machine that rounds another way.
  *
  * WHAT IT DRAWS: meshes with and without bones (skinned here), a texture with its smaller copies chosen a triangle at a time, a cutout's holes, blended and glowing
  * meshes, a hologram, water as a tinted sheet, the sun, the sky's light and the strongest lamps near each mesh worked out at each vertex, fog, the toon pass's two
@@ -30,7 +30,7 @@
 #endif
 #include <SDL2/SDL.h>
 
-static int g_W = 320, g_H = 240;            /* the picture. REVA_SOFTRES=WxH tries another; the receipt's is this one */
+static int g_W = 320, g_H = 240;            /* the picture. REVA_SOFTRES=WxH tries another */
 static uint32_t *g_fb;                      /* 0x00RRGGBB a pixel, the top row first */
 static float *g_zb;                         /* depth, 0 at the lens's near plane to 1 */
 static GfxConfig g_cfg;

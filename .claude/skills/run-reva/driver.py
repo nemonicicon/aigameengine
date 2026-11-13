@@ -2,7 +2,7 @@
 """driver.py -- build, launch and DRIVE the club (reva_native/crowd.exe) headlessly.
 
 The club is a fullscreen Vulkan game, and how it looks only ever comes out as PIXELS (what it
-decides has a receipt with no window: `check`). This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
+decides has a check with no window: `check`). This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
 on disk that you are expected to LOOK at -- the engine's own law is "pixels or it
 didn't happen", and a log line is not a receipt.
 
@@ -14,8 +14,8 @@ didn't happen", and a log line is not a receipt.
                                X is a folder name in games/, or a PATH: a game's .c file, or a folder holding one,
                                anywhere on the disk. That game includes "engine.h", found through -I, and its exe
                                is written beside its .c file
-    check [--game X]           THE RECEIPT: the rules' hashes and the frame's against anim_bench/hash_refs,
-                               no window (--bless writes them, once you know why they changed)
+    check [--game X]           THE SAME ANSWER: a game held against itself (the same hashes at odd frame pacings,
+                               and from another pack format), no window. Nothing is stored
     promote                    crowd_new.exe -> crowd.exe (after you've looked)
     kill                       kill any running instance (only one may run)
     up / down                  leave ONE window running for a run of shots (--live on lab, face, looks), close it
@@ -167,27 +167,17 @@ def buildvk(a):
 
 
 def check(a):
-    """⭐ THE SIM'S RECEIPT (11-02, engine plan Phase 1). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window, the same answer on any machine.
-    It says whether the sim still does exactly what it did, and whether it asks for the same picture. Since step 19 (11-04) it also draws one frame on Mesa's software
-    Vulkan (lavapipe) when that's on the machine, and hashes it: the same pixels every run, a window for a few seconds. It still says nothing about how the picture looks."""
+    """⭐ THE SAME ANSWER (11-02; nothing stored since 2026-11-13). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window. It holds a game
+    against itself: the same hashes at odd frame pacings, from the same body in another pack format, with other letters on the screen. Nothing is kept from one run
+    to the next: the engine isn't finished, and what it prints changes with every improvement. It says nothing about how the picture looks."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
-    # --nodoors: the engine as the kit gets it, with no old game modes. It must print the same hashes. --game NAME: the same with that game, against its own hashes.
+    # --nodoors: the engine with no old game modes. --game NAME: that game.
     name = other_game(a)
     exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"
     src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
     cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
-    # ⭐ THE PIXELS (step 19, 11-04): with Mesa's software Vulkan (lavapipe) on this machine, the Vulkan engine is built too and hashcheck draws one frame on it.
-    # REVA_LAVAPIPE=<the lvp_icd json> names it; without it the pixels are skipped and said so.
-    icd = os.environ.get("REVA_LAVAPIPE") or os.path.normpath(os.path.join(ROOT, "..", "tools", "mesa-lavapipe", "x64", "lvp_icd.x86_64.json"))   # beside the checkout, unless it's named
-    vk = f"crowd_{name}_vk.exe" if name else "crowd_nodoors_vk.exe" if a.nodoors else "crowd_check_vk.exe"
-    builds = [cmd] + ([[os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", vk] + src + RENDER + LIBS] if os.path.exists(icd) else [])
-    # ⭐ THE ENGINE'S OWN RASTERIZER (step 27, 11-05): built too, for the games whose receipt has its pixels, and hashcheck hashes three of its frames with no window.
-    # Those are the same on every machine, so they need no driver's name beside them
-    soft = (f"crowd_{name}_soft.exe" if name else "crowd_nodoors_soft.exe" if a.nodoors else "crowd_check_soft.exe") if (name or "rvz") in ("rvz", "sample") else None
-    if soft:
-        builds.append([os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", soft] + src + SOFT_RENDER + SOFT_LIBS)
-    # every build at once: each is one compile of the one big file, so three take as long as one
+    builds = [cmd]
     procs = [subprocess.Popen(c, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") for c in builds]
     failed = 0
     for pr in procs:
@@ -199,14 +189,12 @@ def check(a):
             failed = 1
     if failed:
         return 1
-    if not os.path.exists(icd):
-        print("check: no lavapipe at %s (REVA_LAVAPIPE names it): the pixels are skipped" % icd)
-    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--vk", os.path.join(NATIVE, vk)] if os.path.exists(icd) else []) + (["--soft", os.path.join(NATIVE, soft)] if soft else []) + (["--game", name] if name else []) + (["--bless"] if a.bless else []), cwd=NATIVE).returncode
+    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--game", name] if name else []), cwd=NATIVE).returncode
 
 
 def buildsoft(a):
     """⭐ THE ENGINE WITH NO DRIVER AT ALL (queue step 27): crowd_soft.exe, or crowd_<game>_soft.exe for one game with no old game modes. The engine's own rasterizer draws the
-    packet on the processor at 320 x 240 and puts it in a plain window. REVA_NOWINDOW=1 runs it with no window at all, which is how the receipt hashes its picture."""
+    packet on the processor at 320 x 240 and puts it in a plain window. REVA_NOWINDOW=1 runs it with no window at all."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
     name, src, outdir, inc = game_unit(a)
@@ -944,7 +932,7 @@ def main():
     sub.add_parser("build").set_defaults(fn=build)
     sp = sub.add_parser("buildvk"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildvk)
     sp = sub.add_parser("buildsoft"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildsoft)
-    sp = sub.add_parser("check"); sp.add_argument("--bless", action="store_true"); sp.add_argument("--nodoors", action="store_true"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=check)
+    sp = sub.add_parser("check"); sp.add_argument("--nodoors", action="store_true"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=check)
     sub.add_parser("promote").set_defaults(fn=promote)
 
     sp = sub.add_parser("packs"); sp.add_argument("name", nargs="?"); sp.set_defaults(fn=packs)

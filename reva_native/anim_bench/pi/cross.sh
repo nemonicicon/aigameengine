@@ -4,7 +4,7 @@
 #
 # usage: cross.sh vk|headless [game] [data]
 #   game   a folder in games/, default rvz, which keeps the old doors in as build_pi.sh does; any other game builds without them
-#   data   also send what a run reads: the games, rules, voice and the receipts' references
+#   data   also send what a run reads: the games, rules, voice and the checks' tapes
 # It lands on the Pi as crowd_vk and crowd_headless for rvz, crowd_<game>_vk and crowd_<game>_h otherwise.
 # First time, in the container: dpkg --add-architecture arm64; apt-get update; apt-get install --no-install-recommends gcc-aarch64-linux-gnu libsdl2-dev:arm64 libvulkan-dev:arm64 libdrm-dev:arm64
 set -e

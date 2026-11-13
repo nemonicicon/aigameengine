@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""toolcheck.py -- THE PINNED TOOLCHAIN (queue step 28). What the engine was last built and blessed with, by exact version, and whether this machine still has it.
+"""toolcheck.py -- THE PINNED TOOLCHAIN (queue step 28). What the engine was last built and checked with, by exact version, and whether this machine still has it.
 
     toolcheck.py                 this machine against reva_native/toolchain.lock: what's the same, what's moved
     toolcheck.py --write         pin this machine as it stands today (its own section of the lock; the others are left alone)
@@ -7,9 +7,9 @@
     toolcheck.py --copy DIR      Windows: the pinned packages' own files, out of the package manager's cache into DIR. A dated copy, to build from if a version is ever gone
     toolcheck.py --print         this machine's section as it would be written (what --container asks the container for)
 
-The receipts are the proof that a build is right. This is the other half: when a receipt parts and nothing in the tree changed, the first question is whether the
+When two machines' hashes part and nothing in the tree is different between them, the first question is whether the
 compiler did, and this answers it in a second. A difference isn't a failure, so this exits 0 unless the lock has no section for this machine; it's a reason to run the
-receipts again and, once they hold, to pin again. Every build line already says -std=gnu17 -ffp-contract=off, which is the part of the pin that's in the code.
+checks again and, once they hold, to pin again. Every build line already says -std=gnu17 -ffp-contract=off, which is the part of the pin that's in the code.
 """
 import datetime
 import os
@@ -98,9 +98,9 @@ def read_lock():
 
 def write_lock(secs):
     with open(LOCK, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# toolchain.lock -- what the engine was last built and blessed with, by exact version. anim_bench/toolcheck.py writes it and reads it:\n"
-                "# `toolcheck.py` says what's moved on this machine, `--write` pins it again once the receipts hold. A section a machine, a name and a tab and its version a line.\n"
-                "# Every build line also says -std=gnu17 -ffp-contract=off, and the receipts (driver.py check) are what a pin is for: the same hashes, from the same compiler.\n")
+        f.write("# toolchain.lock -- what the engine was last built and checked with, by exact version. anim_bench/toolcheck.py writes it and reads it:\n"
+                "# `toolcheck.py` says what's moved on this machine, `--write` pins it again once the checks hold. A section a machine, a name and a tab and its version a line.\n"
+                "# Every build line also says -std=gnu17 -ffp-contract=off, and that's what a pin is for: the same hashes on every machine, from the same compiler.\n")
         for k in sorted(secs):
             f.write("\n[%s]%s\n" % (k, (" " + secs[k]["note"]) if secs[k]["note"] else ""))
             for name, ver in secs[k]["lines"]:
@@ -175,7 +175,7 @@ def main(argv):
         print("  %-24s %s  (pinned: %s)" % (n, v, w or "not pinned"))
     for n in gone:
         print("  %-24s not here  (pinned: %s)" % (n, want[n]))
-    print("%s: %s" % (k, "the same as %s" % secs[k]["note"] if not moved and not gone else "%d moved since it was %s. Run the receipts; pin again once they hold" % (len(moved) + len(gone), secs[k]["note"])))
+    print("%s: %s" % (k, "the same as %s" % secs[k]["note"] if not moved and not gone else "%d moved since it was %s. Run the checks; pin again once they hold" % (len(moved) + len(gone), secs[k]["note"])))
     return 0
 
 

@@ -23,7 +23,7 @@ over it.
 - `.claude/skills/run-reva/driver.py` carries every build line (`SRC`, `RENDER`, `DEFS`, `LIBS` in one place):
   `build` → `crowd_new.exe` (what the lab, bench and scene commands run, once promoted), `buildvk [--game X]` → `crowd_vk.exe` or `crowd_X_vk.exe` (one game),
   `buildsoft [--game X]` → `crowd_soft.exe` or `crowd_X_soft.exe` (the same on the engine's own rasterizer),
-  `check [--game X]` → the receipt (no `--game` here is the sample), `promote` → `crowd_new.exe` over `crowd.exe`.
+  `check [--game X]` → a game held against itself, with no window (no `--game` here is the sample), `promote` → `crowd_new.exe` over `crowd.exe`.
   It makes `crowd_win_rc.o` (the UTF-8 manifest; without it `fopen` dies on a pack with a non-ASCII name) when
   it's missing.
 - By hand: `gcc -O2 -std=gnu17 -ffp-contract=off -DREVA_VK -DREVA_NODOORS -o crowd_rocks_vk.exe crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c games/rocks/rocks.c crowd_win_rc.o gfx_packet.c gfx_vk.c -Dmain=SDL_main -lws2_32 -lmingw32 -lSDL2main -lSDL2 -lvulkan-1 -lm`
@@ -41,7 +41,7 @@ over it.
 - Python: a real Python 3 with numpy + Pillow (`CLUB_PYTHON` points the tools at it). ⛔ Never the
   Microsoft Store `python` alias. ⛔ The Windows console is cp1252: a script that prints a non-ASCII
   glyph dies unless it reconfigures stdout to UTF-8.
-- `reva_native/toolchain.lock` is the compilers and libraries the receipts were last blessed with, by exact
+- `reva_native/toolchain.lock` is the compilers and libraries the engine was last built and checked with, by exact
   version; `python reva_native/anim_bench/toolcheck.py` says what's different on this machine.
 
 ## Build & run (Linux)
@@ -50,9 +50,9 @@ over it.
   `GAME=games/<name>/<name>.c` picks the game (the sample when none is named). Deps: `libsdl2-dev libvulkan-dev
   libstb-dev`; with no GPU, `mesa-vulkan-drivers` (lavapipe, Vulkan on the CPU: every pass the renderer has, the same
   pixels every run) and `xvfb`.
-- The receipt: `cd reva_native && python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft`.
+- The check: `cd reva_native && python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless`.
   `bash .github/ci.sh` is everything this repository's CI runs, on your own machine: every build here and the
-  Pi's, five games' receipts, `netcheck.py`, and the fill-byte test with its control.
+  Pi's, five games' checks, `netcheck.py`, and the fill-byte test with its control.
 - Run: `VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json REVA_WINDOWED=1 xvfb-run -a -s "-screen 0 1280x720x24" stdbuf -o0 ./crowd_linux 400 packs select`.
   ⛔ Without `stdbuf -o0` a piped log is block-buffered and ends at the kill with nothing in it.
   ⛔ As of 11-05 the Vulkan build compiles and links on Linux and has NOT been run there since the old renderer
@@ -69,7 +69,7 @@ over it.
 - `reva_native/build_pi.sh vk|headless|soft|dev|game` (64-bit OS, `dtoverlay=vc4-kms-v3d`; `devconsole/setup_pi.sh`
   installs what it links against: `libdrm-dev libsdl2-dev libstb-dev libvulkan-dev`). `vk` → `crowd_vk`: the
   direct road, DRM master on the display card and Vulkan straight into its scanout buffers, flipped by the engine
-  at the video clock (the kernel's flip timestamps are the `[frames]` ledger). `headless` → the receipt. `soft` →
+  at the video clock (the kernel's flip timestamps are the `[frames]` ledger). `headless` → the check. `soft` →
   the own rasterizer, under a desktop or with no window. `dev` → the engine with no game in it; `game` → a game as
   a library a running `crowd_dev` picks up between ticks (`devconsole/`). From a PC, `anim_bench/pi/cross.sh
   vk|headless [game]` builds it in a container in about a minute and copies it over (`NOCOPY=1` leaves it there;
@@ -83,24 +83,23 @@ over it.
   ARM builds of 11-05 compile, and ran only under an emulator. Performance is the plan's last phase: no number
   here is a target yet.
 
-## The tick, the receipt, the dice, the ladder (`design/platform_tiers.md`)
+## The tick, the check, the dice, the ladder (`design/platform_tiers.md`)
 - **The sim runs one whole tick at a time.** `REVA_TICK=<hz>` (default 60); a frame owes 1..4 ticks from the
   wall time, snapped against vsync jitter, capped. A frame that owes k passes through the whole loop k times, one
   tick each, and only the last pass draws (`clockFrame`, `g_noDraw`), so the rules don't change with the frame
   rate. `simStepS()` is one tick, always. `REVA_FIXEDSTEP` is one tick per frame with the tick equal to the step;
   `REVA_CADENCE=1,1,1,1,2` forces a pattern of ticks per frame under it, and any cadence must print the same
   hashes. The stat line's `fps`/`work` and the HUD fps read `wall_ms()`; `now_ms()` is the tick clock, always.
-- **The receipt: `driver.py check [--game X]`** (on Linux and the Pi: the headless build, then
-  `python3 anim_bench/hashcheck.py [--game X]`). It runs the game with no input, with a tape, and at odd tick
-  patterns, and compares every `[simhash]` line (the rules) and `[packet]` line (what's asked to be drawn)
-  against `anim_bench/hash_refs/`. Seconds, no window, the same answer on any machine; Windows x86 and the Pi
-  agree bit for bit. `--bless` only once you know why it changed. It says nothing has changed, not that anything
-  is right, and nothing about how the picture looks: that's still eyes.
-- **The receipt's pixels, two kinds.** `--soft <build>`: three frames of the engine's own rasterizer, drawn with
-  no window (`*_soft` in `hash_refs/`). No driver is named beside them, because those pixels are the same on every
-  machine: a difference anywhere is a difference. `--vk <build>`: one frame of the Vulkan build on Mesa's lavapipe
-  (`REVA_LAVAPIPE=<its lvp_icd json>`, or the usual places), hashed (`*_pixels`, each naming the driver it was
-  blessed on; another driver is reported, not failed). Without lavapipe that line is skipped and says so.
+- **The check: `driver.py check [--game X]`** (on Linux and the Pi: the headless build, then
+  `python3 anim_bench/hashcheck.py [--game X]`). It runs the game with no input and with a tape (the tapes are in
+  `anim_bench/hash_refs/`), and each of those again at odd tick patterns, which must print the same `[simhash]`
+  lines (the rules) and `[packet]` lines (what's asked to be drawn). The sample is also run from another pack
+  format, which must match line for line, and with bigger letters, which must match in its rules. Seconds, no window.
+- ⛔ **Nothing is stored and nothing is blessed (2026-11-13).** The engine isn't finished, and what it prints
+  changes with every improvement, so a kept copy of last week's lines only ever said that it had. `check` holds a
+  game against itself: it doesn't say the game is what it was, that anything is right, or how the picture looks.
+  `--lines FILE` writes a run's lines, for comparing two runs made differently (another machine, another fill of
+  fresh memory: `.github/ci.sh memory`).
 - **`REVA_SIMHASH=<every N frames>`** prints `[simhash] tick N exact … coarse …` and `[packet] tick N …` (and
   every `REVA_SHOT` frame does). Same inputs must print the same hashes. Build with `-ffp-contract=off` (the
   scripts do) or x86 and ARM disagree on the last bit. When a hash parts: `REVA_SIMHASH=1` finds the tick,
@@ -143,8 +142,8 @@ over it.
   a language (`E->word`, below) and a session (`E->netHost`, `E->netJoin`, below).
 - A game with cooked packs lists every file it loads in a `game.txt`, with a budget per kind, and
   `anim_bench/cookcheck.py` holds it to that. None of the games here has one: everything in them is made by code.
-- A game's receipt is a list of scenarios in `anim_bench/hashcheck.py`, by the game's name: a new game adds its
-  own there and blesses it once.
+- A game's check is a list of scenarios in `anim_bench/hashcheck.py`, by the game's name: a new game adds its
+  own there.
 - `design/pack_format.md` is what's on disk; `anim_bench/packdump.py --check` holds a pack to it.
 
 ## Online play (`club_net.c`, `engine/net.inc`)
@@ -187,7 +186,7 @@ over it.
 ## A game to hand to someone
 `python reva_native/package.py --game X [--target pi|linux] [--version V]` writes `reva_native/dist/<game>-<version>-<machine>/`
 and its archive: both renderers, exactly the files the game reads, the licences and a sha256 of every file, and
-it replays the receipt's tape from inside the package before it's zipped. ⛔ It never packs a `*.tvw`, a save or
+it replays a recorded game (the game's tape) from inside the package before it's zipped. ⛔ It never packs a `*.tvw`, a save or
 a source file. `devconsole/make_image.sh` writes a Pi OS image that boots into a packaged game: no card it wrote
 has been booted yet.
 
@@ -228,8 +227,7 @@ minutes and gives up.
   path, build it as a general mechanism, make its failure LOUD.
 - **Look at every tile before blessing a sheet.**
 - **No compiler warnings, in any way it's built** (`anim_bench/warncheck.py`): a new one fails and says where.
-- **A game's own receipt is run in the step that changes its file**, and a step that changes how a set is drawn
-  runs the receipt of every game that draws one (`roam`, `tower`, `talk`, `herd`).
+- **A game's own check is run in the step that changes its rules.** It takes seconds.
 - ⛔ **A rebake keeps what's authored** now (clips, morphs and marks ride as chunks after the new body); what
   can't be kept, such as a garment, is listed out loud. Tools that change a finished pack append to it.
 - ⛔ **Never scaffold the gitignored dirs** (`packs/ props/ aud/ aud2/ save/ shelf/`): creating them "to set

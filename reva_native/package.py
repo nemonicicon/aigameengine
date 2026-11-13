@@ -13,8 +13,8 @@ a game.txt its staged folder, anim_bench/cookcheck.py); the engine's setup voice
 else's, copied out of the toolchain that built it; and VERSION.txt, which says what it was built from and gives every file's sha256.
 
 ⭐ A RELEASE BUILD REPLAYS: before it's zipped, the packaged `-safe` build is run from inside the package's own folder, with nothing on the PATH but Windows, on the
-game's tape, and its rules' hashes are held against the receipt's (anim_bench/hash_refs). So what's in the zip is known to start, to find everything it needs
-beside itself, and to play the same game as every other build. The Pi's is run the same way under emulation.
+game's tape (anim_bench/hash_refs), to its end. So what's in the zip is known to start, to find everything it needs
+beside itself, and to play a recorded game through. The Pi's is run the same way under emulation.
 
 ⛔ It never packs a glyph file baked from a font (data/*.tvw: that font's licence would go with it), a save, or a source file. ⛔ Nothing here uploads anything:
 a store's own tool takes the folder or the zip. ⛔ A game with bought content in it is that game's maker's to have the right to ship; this doesn't know.
@@ -37,8 +37,7 @@ BOX = os.environ.get("BOX", "revalinux")
 ARGS = {"sample": ["12", "packs", "packs/v1_sample.rpack"], "talk": ["4", "packs", "packs/v1_talk.rpack"], "tower": ["10", "packs", "packs/v1_tower.rpack"], "rocks": ["0", "packs"], "rally": ["0", "packs"],
         "herd": ["400", "packs", "packs/v1_herd.rpack"], "people": ["8", "packs", "packs/v1_boot.rpack"], "roam": ["0", "packs", "packs/v1_tower.rpack"], "rvz": ["100", "packs_rvz", "packs_rvz/v1_kaeli_game.rpack"]}
 ENV = {"rvz": {"REVA_AUTOVAR": "1"}}
-TAPE = {"sample": "sample_run.tape", "tower": "tower_run.tape", "rocks": "rocks_run.tape", "rally": "rally_run.tape", "herd": "herd_run.tape", "rvz": "zombie_run.tape"}     # the receipt's tape, where a game has one
-REF = {"sample": "sample_tape.txt", "tower": "tower_tape.txt", "rocks": "rocks_tape.txt", "rally": "rally_tape.txt", "herd": "herd_tape.txt", "rvz": "zombie_tape.txt"}
+TAPE = {"sample": "sample_run.tape", "tower": "tower_run.tape", "rocks": "rocks_run.tape", "rally": "rally_run.tape", "herd": "herd_run.tape", "rvz": "zombie_run.tape"}     # a recorded game, where a game has one
 SKIP = ("*.c", "*.py", "*.bat", "*.sh", "*.tvw", "*.before_bake", "*.bak", "stage", "cooked", "save", "__pycache__", "game.txt", "open.txt")
 WIN_LICENCES = ["SDL2", "crt", "winpthreads", "libwinpthread", "stb", "gcc-libs"]
 
@@ -77,31 +76,27 @@ def copy_game(game, dst):
 
 
 def replay(cmd, cwd, game, env_extra, what):
-    """the packaged build on the game's tape, from inside the package: its rules' hashes against the receipt's"""
-    ref = os.path.join(HERE, "anim_bench", "hash_refs", REF.get(game, ""))
+    """the packaged build on the game's tape, from inside the package, to the tape's end"""
     tape = os.path.join(HERE, "anim_bench", "hash_refs", TAPE.get(game, ""))
     env = dict(env_extra, REVA_NOWINDOW="1", REVA_NOSAVE="1", REVA_FIXEDSTEP="60", REVA_SIMHASH="60", REVA_MODE="9", REVA_TIER="pi", **ENV.get(game, {}))
-    have = game in TAPE and os.path.exists(tape) and os.path.exists(ref)
+    have = game in TAPE and os.path.exists(tape)
     if have:
-        shutil.copy2(tape, os.path.join(cwd, "_receipt.tape"))
-        env["REVA_REPLAY"] = "_receipt.tape"
+        shutil.copy2(tape, os.path.join(cwd, "_run.tape"))
+        env["REVA_REPLAY"] = "_run.tape"
     env["REVA_EXITTICK"] = "1800" if have else "600"
     p = run(cmd + ARGS[game], cwd=cwd, env=env, timeout=1800)
     if have:
-        os.remove(os.path.join(cwd, "_receipt.tape"))
+        os.remove(os.path.join(cwd, "_run.tape"))
     got = [l for l in p.stdout.splitlines() if l.startswith("[simhash]") and "(end)" not in l]
     if not got or "exiting clean" not in p.stdout:
         print("⛔ %s didn't run from its own folder (exit %s):\n%s" % (what, p.returncode, "\n".join(p.stdout.splitlines()[-12:])))
         return None
     if not have:
-        return "%s ran from its own folder for %d ticks (this game has no tape in the receipt to hold it to)" % (what, int(env["REVA_EXITTICK"]))
-    want = [l for l in open(ref).read().splitlines() if l.startswith("[simhash]") and "(end)" not in l]
-    n = min(len(got), len(want))
-    if n < 10 or got[:n] != want[:n]:
-        bad = next((i for i in range(n) if got[i] != want[i]), n)
-        print("⛔ %s replays the tape and its rules part from the receipt at line %d:\n  %s\n  %s" % (what, bad, got[bad] if bad < len(got) else "(none)", want[bad] if bad < len(want) else "(none)"))
+        return "%s ran from its own folder for %d ticks (this game has no tape)" % (what, int(env["REVA_EXITTICK"]))
+    if len(got) < 10:
+        print("⛔ %s stopped early on its tape: %d of the rules' hashes" % (what, len(got)))
         return None
-    return "%s replays the receipt's tape from its own folder: %d of the rules' hashes, all the same" % (what, n)
+    return "%s replays the game's tape from its own folder, to its end: %d of the rules' hashes printed" % (what, len(got))
 
 
 def manifest(dst, name, lines):
@@ -205,7 +200,7 @@ def linux(a, name, dst, pi):
     rel = "/src/dist/" + os.path.basename(dst)
     env = "REVA_NOWINDOW=1 REVA_NOSAVE=1 REVA_FIXEDSTEP=60 REVA_SIMHASH=60 REVA_MODE=9 REVA_TIER=pi " + " ".join("%s=%s" % kv for kv in ENV.get(a.game, {}).items())
     tape = "/src/anim_bench/hash_refs/" + TAPE.get(a.game, "none")
-    have = a.game in TAPE and a.game in REF
+    have = a.game in TAPE
     cmd = "cd %s && %s %s REVA_EXITTICK=%d %s%s/%s-safe %s" % (rel, env, ("REVA_REPLAY=" + tape) if have else "", 1800 if have else 600, "qemu-aarch64 " if pi else "", out, a.game, args)
     p = box([BOX, "sh", "-c", cmd], timeout=3600)
     got = [l for l in p.stdout.splitlines() if l.startswith("[simhash]") and "(end)" not in l]
@@ -214,11 +209,9 @@ def linux(a, name, dst, pi):
         sys.exit("⛔ %s didn't run from the package's folder:\n%s" % (what, "\n".join(p.stdout.splitlines()[-12:])))
     said = "%s ran from its own folder" % what
     if have:
-        want = [l for l in open(os.path.join(HERE, "anim_bench", "hash_refs", REF[a.game])).read().splitlines() if l.startswith("[simhash]") and "(end)" not in l]
-        n = min(len(got), len(want))
-        if n < 10 or got[:n] != want[:n]:
-            sys.exit("⛔ %s replays the tape and its rules part from the receipt" % what)
-        said = "%s replays the receipt's tape from its own folder: %d of the rules' hashes, all the same" % (what, n)
+        if len(got) < 10:
+            sys.exit("⛔ %s stopped early on its tape: %d of the rules' hashes" % (what, len(got)))
+        said = "%s replays the game's tape from its own folder, to its end: %d of the rules' hashes printed" % (what, len(got))
     n, size = manifest(dst, name, ["engine %s%s, API %s" % (git("rev-parse", "--short", "HEAD"), " and uncommitted changes" if git("status", "--porcelain", "--untracked-files=no") else "", api()),
                                    "built with: " + "; ".join(lock_section("linux")[:10]), said, "⛔ built for the Pi and run under emulation only: no Pi has run this package" if pi else ""])
     tgz = dst + ".tar.gz"

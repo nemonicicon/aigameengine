@@ -1,19 +1,18 @@
-"""hashcheck.py -- does the sim still do exactly what it did, and does it still ask for the same picture? Runs the no-display engine (crowd_headless) through a short list of scenarios
-and compares each [simhash] and [packet] line against the blessed copy in hash_refs/. Seconds, not minutes, no window, and the same answer on Windows, Linux and the Pi: that's the engine's
-contract (engine plan, Phases 1 and 2). A [packet] line that parts with the [simhash] line holding says the rules are the same and what's drawn changed: REVA_PACKETDUMP=<tick>:<file> gives both runs' frames as text to diff.
+"""hashcheck.py -- does a game give the same answer however it's run? Runs the no-display engine (crowd_headless) through a short list of scenarios and holds each
+one against ITSELF: the same lines at odd tick patterns, from the same body in another pack format, and with other letters on the screen. Seconds, no window.
+⛔ Nothing is stored and nothing is blessed (2026-11-13). The engine isn't finished: what it prints changes with every improvement, and a kept copy of last week's
+lines would only ever say so. What's held here stays true while the engine changes: the rules don't depend on how fast frames come or on what's drawn.
 
-usage: hashcheck.py                  compare with hash_refs/
-       hashcheck.py --bless          adopt this run, after you know why it changed
+usage: hashcheck.py                  every scenario of the game
        hashcheck.py --only NAME      one scenario
        hashcheck.py --exe PATH       a different build
-       hashcheck.py --vk PATH        and the pixels: that Vulkan build on Mesa's software driver (lavapipe), one frame hashed (step 19)
+       hashcheck.py --lines FILE     also write every scenario's lines to FILE: two runs made differently (another machine, fresh memory filled another way)
+                                     are compared by comparing their files, which is what .github/ci.sh memory does
 Run from reva_native. Build first: -DREVA_HEADLESS, see CLAUDE.md. packs_rvz/ must exist: the 77 packs of the zombie game, v1_Character* and v1_moves (made on request with --links).
 --game sample checks the sample game instead, which is what the kit has: built with games/sample/sample.c, and run from its own folder so it sees no content but its own body. --game rocks is the 2D game, --game tower the 3D action one, --game herd the crowd one and --game roam the streaming world, the same way. Roam's cells are made by its make_assets.py, not kept in git.
 A scenario marked `cadence` also runs at odd tick patterns, which must print the same lines (a packet exists only for a tick that draws, so those compare on the ticks both have).
-A mismatch prints the first tick that parted; REVA_SIMDUMP=<tick>:<file> then names the value.
-⭐ THE PIXELS (step 19, 11-04): with --vk, the Vulkan build is run on lavapipe, Mesa's Vulkan on the CPU, which draws the same pixels every run, and the frame at one tick is
-hashed beside the sim's lines. The driver's file is REVA_LAVAPIPE=<lvp_icd json>, or the usual places; without it the pixels are skipped and said so, never failed. The
-reference names the driver it was blessed on, and a different driver (another machine's build of lavapipe) is reported, not failed, until it's blessed there."""
+A mismatch prints the first tick that parted; REVA_SIMDUMP=<tick>:<file> then names the value. A [packet] line that parts with the [simhash] line
+holding says the rules are the same and what's drawn changed: REVA_PACKETDUMP=<tick>:<file> gives both runs' frames as text to diff."""
 import argparse
 import glob
 import math
@@ -53,11 +52,6 @@ SCENARIOS_SAMPLE = [
     ("sample_setup", dict(SG, REVA_SETUP="1", REVA_REPLAY="../../anim_bench/hash_refs/sample_setup.tape"), ["12", "packs", BODY], 1800, []),
     ("sample_read", dict(SG, REVA_READING="large"), ["12", "packs", BODY], 1800, []),
 ]
-# the pixels: name, env, argv, the tick the frame is taken at
-PIXELS = {"rvz": [("zombie_pixels", dict(Z), ["100", "packs_rvz", HERO], 300)], "sample": [("sample_pixels", dict(SG), ["12", "packs", BODY], 300)]}
-# ⭐ THE ENGINE'S OWN RASTERIZER (queue step 27): name, env, argv, and its frames' ticks as first, every, how many. No driver is named with these, because none draws them:
-# gfx_soft.c's pixels are the same on every machine, so one reference serves a PC, a Linux box and a Pi, and a difference on any of them is a difference
-SOFT = {"rvz": [("zombie_soft", dict(Z), ["100", "packs_rvz", HERO], (300, 120, 3))], "sample": [("sample_soft", dict(SG), ["12", "packs", BODY], (300, 120, 3))]}
 SAME_AS = {"sample_rpk2": "sample_noinput", "sample_chunks": "sample_noinput"}
 SIM_AS = {"zombie_read": "zombie_noinput", "sample_read": "sample_noinput"}   # the same rules, whatever's drawn
 # the 2D game, from its own folder: no bodies and no packs
@@ -215,52 +209,6 @@ def run(exe, env_extra, args, ticks, cwd=ROOT):
     return lines, time.time() - t0, p
 
 
-def lavapipe():
-    """the software driver's ICD file, or None"""
-    e = os.environ.get("REVA_LAVAPIPE")
-    cands = [e] if e else ([os.path.normpath(os.path.join(ROOT, "..", "..", "tools", "mesa-lavapipe", "x64", "lvp_icd.x86_64.json"))] if os.name == "nt" else ["/usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "/usr/share/vulkan/icd.d/lvp_icd.aarch64.json"])
-    return next((c for c in cands if c and os.path.exists(c)), None)
-
-
-def pixels(exe, env_extra, args, tick, icd, cwd):
-    """one frame of the Vulkan build on lavapipe: its sha256, the device's name, the seconds, the process"""
-    import hashlib
-    ppm = os.path.join(cwd, "_pixels.ppm")
-    if os.path.exists(ppm):
-        os.remove(ppm)
-    env = dict(os.environ, REVA_NOSAVE="1", REVA_FIXEDSTEP="60", REVA_WINDOWED="1", REVA_SHOT=str(tick), REVA_SHOTN="1", REVA_SHOT_PATH=ppm, VK_DRIVER_FILES=icd, VK_ICD_FILENAMES=icd, **env_extra)
-    if os.name == "nt":
-        env["PATH"] = r"C:\msys64\mingw64\bin;" + env["PATH"]
-    t0 = time.time()
-    p = subprocess.run([exe] + args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=900)
-    dev = next((l[6:].split(", Vulkan")[0].strip() for l in p.stdout.splitlines() if l.startswith("[gfx] ") and ", Vulkan" in l), "?")
-    h = hashlib.sha256(open(ppm, "rb").read()).hexdigest() if os.path.exists(ppm) else None
-    if os.path.exists(ppm):
-        os.remove(ppm)
-    return h, dev, time.time() - t0, p
-
-
-def soft_frames(cmd, env_extra, args, first, every, n, cwd):
-    """the build on the engine's own rasterizer, with no window: n frames, a line each of its tick and its sha256. Its frames go to a folder of their own, so the game's folder can be read-only"""
-    import hashlib
-    import shutil
-    import tempfile
-    d = tempfile.mkdtemp(prefix="reva_soft_")
-    env = dict(os.environ, REVA_NOSAVE="1", REVA_FIXEDSTEP="60", REVA_NOWINDOW="1", REVA_SHOT=str(first), REVA_SHOTN=str(n), REVA_SHOTEVERY=str(every),
-               REVA_SHOT_PATH=os.path.join(d, "f.ppm"), REVA_EXITTICK=str(first + every * (n - 1) + 2), **env_extra)
-    if os.name == "nt":
-        env["PATH"] = r"C:\msys64\mingw64\bin;" + env["PATH"]
-    t0 = time.time()
-    p = subprocess.run(cmd + args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=1800)
-    lines = []
-    for k in range(n):
-        f = os.path.join(d, "f_%05d.ppm" % k) if n > 1 else os.path.join(d, "f.ppm")
-        if os.path.exists(f):
-            lines.append("tick %d %s" % (first + every * k, hashlib.sha256(open(f, "rb").read()).hexdigest()))
-    shutil.rmtree(d, ignore_errors=True)
-    return lines, time.time() - t0, p
-
-
 def first_part(a, b):
     for x, y in zip(a, b):
         if x != y:
@@ -292,18 +240,14 @@ def links():
 
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--bless", action="store_true")
 ap.add_argument("--only")
 ap.add_argument("--links", action="store_true")
 ap.add_argument("--make-tape", action="store_true")
 ap.add_argument("--exe", default=os.path.join(ROOT, "crowd_headless.exe" if os.name == "nt" else "crowd_headless"))
 ap.add_argument("--game", default="rvz" if os.path.exists(os.path.join(ROOT, "games", "rvz", "rvz.c")) else "sample")
-ap.add_argument("--vk", help="the Vulkan build, for the pixels on lavapipe")
-ap.add_argument("--soft", help="the build on the engine's own rasterizer (driver.py buildsoft, build_linux.sh soft), for pixels that are the same on every machine. A command, so an emulator can go in front: 'qemu-aarch64 ./crowd_soft'")
+ap.add_argument("--lines", help="also write every scenario's lines to this file, to compare with another run's")
 a = ap.parse_args()
 a.exe = os.path.abspath(a.exe)
-if a.vk:
-    a.vk = os.path.abspath(a.vk)
 CWD = ROOT if a.game == "rvz" else os.path.join(ROOT, "games", a.game)
 if a.links:
     links()
@@ -325,6 +269,7 @@ if a.make_tape:
         make_tape(os.path.join(REFS, ("sample_run" if a.game == "sample" else "zombie_run") + ".tape"))
         make_setup_tape(os.path.join(REFS, "sample_setup.tape"))
 bad = 0
+ran = {}   # each scenario's lines, by name: what the others are held against
 for name, env, args, ticks, cadences in {"rvz": SCENARIOS, "sample": SCENARIOS_SAMPLE, "rocks": SCENARIOS_ROCKS, "rally": SCENARIOS_RALLY, "tower": SCENARIOS_TOWER, "talk": SCENARIOS_TALK, "people": SCENARIOS_PEOPLE, "roam": SCENARIOS_ROAM, "herd": SCENARIOS_HERD}[a.game]:
     if a.only and a.only != name:
         continue
@@ -332,87 +277,32 @@ for name, env, args, ticks, cadences in {"rvz": SCENARIOS, "sample": SCENARIOS_S
         print(f"{name}: SKIPPED, no tape at {env['REVA_REPLAY']}")
         continue
     lines, secs, p = run(a.exe, env, args, ticks, CWD)
-    ref = os.path.join(REFS, SAME_AS.get(name, name) + ".txt")
     if not lines:
         print(f"{name}: NO HASH LINES, exit {p.returncode}\n" + "\n".join(p.stdout.splitlines()[-8:]))
         bad += 1
         continue
-    if a.bless and name not in SAME_AS:
-        with open(ref, "w", newline="\n") as f:
-            f.write("\n".join(lines) + "\n")
-        print(f"{name}: blessed, {len(lines)} lines to tick {ticks}, {secs:.1f} s")
-    elif not os.path.exists(ref):
-        print(f"{name}: no reference yet, run --bless")
-        bad += 1
-    else:
-        want = open(ref).read().splitlines()
-        part = first_part(lines, want)
-        print(f"{name}: " + ("same" if part is None else f"⛔ DIFFERS, first at tick {part}") + f", {len(lines)} lines, {secs:.1f} s")
-        bad += part is not None
-    if name in SIM_AS:
+    ran[name] = lines
+    print(f"{name}: {len(lines)} lines to tick {ticks}, {secs:.1f} s")
+    # the same body from another pack answers to the other scenario's every line; other letters on the screen, to its rules
+    for other, rules_only in ((SAME_AS.get(name), False), (SIM_AS.get(name), True)):
+        if not other:
+            continue
+        if other not in ran:
+            print(f"  against {other}: not held, {other} didn't run (leave --only off)")
+            continue
         sim = lambda ls: [l for l in ls if l.startswith("[simhash]") and "(end)" not in l]
-        mine = sim(lines)
-        part = first_part(mine, sim(open(os.path.join(REFS, SIM_AS[name] + ".txt")).read().splitlines())[:len(mine)])
-        print(f"  the rules against {SIM_AS[name]}: " + ("same" if part is None else f"⛔ DIFFER, first at tick {part}"))
+        mine, theirs = (sim(lines), sim(ran[other])) if rules_only else (lines, ran[other])
+        part = first_part(mine, theirs[:len(mine)] if rules_only else theirs)
+        print(f"  {'the rules' if rules_only else 'every line'} against {other}: " + ("same" if part is None else f"⛔ DIFFERS, first at tick {part}"))
         bad += part is not None
     for c in cadences:
         l2, s2, _ = run(a.exe, dict(env, REVA_CADENCE=c), args, ticks, CWD)
         part = cadence_part(l2, lines)
         print(f"  cadence {c}: " + ("same" if part is None else f"⛔ DIFFERS, first at tick {part}") + f", {s2:.1f} s")
         bad += part is not None
-if a.vk:
-    icd = lavapipe()
-    for name, env, args, tick in PIXELS.get(a.game, []):
-        if a.only and a.only != name:
-            continue
-        if not icd:
-            print(f"{name}: SKIPPED, no lavapipe (REVA_LAVAPIPE=<the lvp_icd json>, or Mesa in the usual place)")
-            continue
-        if not os.path.exists(a.vk):
-            print(f"{name}: SKIPPED, no {a.vk}")
-            continue
-        h, dev, secs, p = pixels(a.vk, env, args, tick, icd, CWD)
-        ref = os.path.join(REFS, name + ".txt")
-        if not h:
-            print(f"{name}: NO FRAME, exit {p.returncode}\n" + "\n".join(p.stdout.splitlines()[-6:]))
-            bad += 1
-            continue
-        if a.bless:
-            with open(ref, "w", newline="\n") as f:
-                f.write(f"{h} tick {tick} on {dev}\n")
-            print(f"{name}: blessed, on {dev}, {secs:.1f} s")
-        elif not os.path.exists(ref):
-            print(f"{name}: no reference yet, run --bless")
-            bad += 1
-        else:
-            want = open(ref).read().strip()
-            wh, wdev = want.split(" ")[0], want.split(" on ", 1)[-1]
-            if wdev != dev:
-                print(f"{name}: not compared, a different software driver (on {dev}, blessed on {wdev}), {secs:.1f} s")
-            else:
-                print(f"{name}: " + ("same" if wh == h else "⛔ DIFFERS") + f" on {dev}, {secs:.1f} s")
-                bad += wh != h
-if a.soft:
-    import shlex
-    cmd = [os.path.abspath(a.soft)] if os.path.exists(a.soft) else [os.path.abspath(c) if os.path.exists(c) else c for c in shlex.split(a.soft)]
-    for name, env, args, (first, every, n) in SOFT.get(a.game, []):
-        if a.only and a.only != name:
-            continue
-        lines, secs, p = soft_frames(cmd, env, args, first, every, n, CWD)
-        ref = os.path.join(REFS, name + ".txt")
-        if len(lines) != n:
-            print(f"{name}: {len(lines)} FRAMES OF {n}, exit {p.returncode}\n" + "\n".join(p.stdout.splitlines()[-6:]))
-            bad += 1
-        elif a.bless:
-            with open(ref, "w", newline="\n") as f:
-                f.write("\n".join(lines) + "\n")
-            print(f"{name}: blessed, {n} frames of the engine's own rasterizer, {secs:.1f} s")
-        elif not os.path.exists(ref):
-            print(f"{name}: no reference yet, run --bless")
-            bad += 1
-        else:
-            part = first_part(lines, open(ref).read().splitlines())
-            print(f"{name}: " + ("same on the engine's own rasterizer" if part is None else f"⛔ DIFFERS, first at {part}") + f", {n} frames, {secs:.1f} s")
-            bad += part is not None
+if a.lines:
+    with open(a.lines, "w", newline="\n") as f:
+        for name, ls in ran.items():
+            f.write("== %s\n%s\n" % (name, "\n".join(ls)))
 print("⛔ %d difference(s)" % bad if bad else "all same")
 sys.exit(1 if bad else 0)

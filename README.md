@@ -49,14 +49,16 @@ reva_native/games/rocks/play.bat
 That builds and starts `rocks`, a 2D shooter. A and D or the stick move, Space or the A button shoots. Leave
 it alone and it plays itself.
 
-Now check that your build is the same game as everyone else's:
+Now check that the game keeps its own time:
 
 ```bash
 python .claude/skills/run-reva/driver.py check --game rocks
 ```
 
-It plays the game with no window and compares what happened, tick by tick, with the recorded answer.
-`all same` means your machine plays exactly the game ours does. The notes call this check **the receipt**.
+It plays the game with no window several times over, at even and at uneven frame pacing, and compares what
+happened tick by tick. `all same` means the rules gave the same answer every time, which is what a replay and
+online play depend on. Nothing is compared with a recorded answer: the engine isn't finished, and what it
+prints changes as it's improved.
 
 ### The eight games
 
@@ -108,7 +110,7 @@ Then ask in your own words. These work today, and this is what the engine gives 
 |---|---|
 | "Build rocks and show me a picture of it." | the engine's own renderer, which draws with no window |
 | "Play ten seconds holding right and shooting, and show me where it ends up." | the bridge: a running game takes commands |
-| "I changed the rocks' speed. Did anything else change?" | the receipt |
+| "Does rocks still play the same at any frame rate?" | the check: the game run at several frame pacings, with no window |
 | "Add a second kind of rock." | one C file, and one header that lists everything the engine offers |
 
 You don't type the commands below. They are here so you know what your assistant can do.
@@ -145,8 +147,8 @@ A game is one C file that includes one header.
 3. Change the game. `tick` runs sixty times a second and changes the game's state. `draw` and `hud` put
    that state on the screen and cannot change it. [reva_native/engine.h](reva_native/engine.h) is
    everything the engine offers a game, and a game uses nothing else.
-4. When it's worth protecting, give it a receipt: a few lines in `reva_native/anim_bench/hashcheck.py`
-   beside the other games', recorded once. Your assistant can add them.
+4. When it's worth protecting, add it to the check: a few lines in `reva_native/anim_bench/hashcheck.py`
+   beside the other games'. Your assistant can add them.
 
 Start from `rocks` for 2D and from `rally` for a game played across machines.
 
@@ -156,7 +158,7 @@ Start from `rocks` for 2D and from `rally` for a game played across machines.
 |---|---|
 | `reva_native/` | the engine. `engine.h` is what a game sees, and `engine/` with the `.c` files beside it is the engine |
 | `reva_native/games/` | the eight games |
-| `reva_native/anim_bench/` | the checks: the receipt, the online check, the file-reader fuzzer and more |
+| `reva_native/anim_bench/` | the checks: a game against itself, the online check, the file-reader fuzzer and more |
 | `reva_native/devconsole/` | making a game on a Raspberry Pi with only a TV |
 | `skate_src/` | the tools: bringing characters in, writing animation in code, building levels |
 | `godot/` | what a Godot 4 project can take: characters, moves, camera rigs |
@@ -193,8 +195,8 @@ sudo apt-get install libsdl2-dev libvulkan-dev libstb-dev libdrm-dev
 cd reva_native
 ./build_linux.sh                  # the Vulkan build: crowd_linux
 ./build_linux.sh soft             # the engine's own renderer: crowd_soft
-./build_linux.sh headless         # no display at all, for the receipt: crowd_headless
-python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless --soft ./crowd_soft
+./build_linux.sh headless         # no display at all, for the check: crowd_headless
+python3 anim_bench/hashcheck.py --game sample --exe ./crowd_headless
 ```
 
 `GAME=games/rocks/rocks.c` in front of a build picks the game. `bash .github/ci.sh` from the top folder runs
@@ -208,7 +210,7 @@ On a fresh 64-bit Raspberry Pi OS Lite, from `reva_native`:
 sudo bash devconsole/setup_pi.sh
 ```
 
-It installs what the engine needs, builds it, builds the sample game and runs its receipt. The script is
+It installs what the engine needs, builds it, builds the sample game and runs its check. The script is
 written and has not yet been tried on a fresh card. `build_pi.sh` has the builds one at a time. The Pi draws straight to the screen with no desktop under it.
 It has been run on a composite tube TV, at 240p and 480i: `setup_pi.sh --composite` turns that output on, and
 HDMI off. On its first start the engine asks about your screen, out loud.
@@ -235,7 +237,7 @@ python reva_native/package.py --game rocks
 ```
 
 It writes a folder and a zip under `reva_native/dist/`: the game on both renderers, exactly the files it
-reads, and the licences. Before it zips, it replays the game's receipt from inside the folder.
+reads, and the licences. Before it zips, it replays a recorded game from inside the folder.
 
 `--target linux` and `--target pi` do the same for those machines. They build inside a Docker container
 called `revalinux`: Debian 13 with the ARM cross compiler, and `reva_native` mounted at `/src`. Making that
@@ -290,8 +292,8 @@ Plainly, as of 2026-11-05.
 
 | | What has been run | What has not |
 |---|---|---|
-| **Windows PC** | every game's receipt, online play between engines on one PC, and the pictures looked at | two real machines playing each other |
-| **Linux PC** | five games' receipts, the online check and the own renderer's pixels, on every push | the Vulkan build: it compiles and links, and nobody has started it on Linux since Vulkan became the engine's only GPU renderer on 2026-11-04 |
+| **Windows PC** | every game's check, online play between engines on one PC, and the pictures looked at | two real machines playing each other |
+| **Linux PC** | five games' checks and the online check, on every push | the Vulkan build: it compiles and links, and nobody has started it on Linux since Vulkan became the engine's only GPU renderer on 2026-11-04 |
 | **Raspberry Pi 4** | the engine as it was on 2026-11-04, on a real Pi and a tube TV at 240p and 480i | anything built since, which has only run under an ARM emulator. `setup_pi.sh` on a fresh card, and the card image builder |
 | **Godot 4 hand-off** | the cameras and characters in Godot 4.7.2, when each was made. Its scripts were loaded again on 2026-11-05 | the demo itself, which was not run again for this update |
 
@@ -304,7 +306,7 @@ performance on the Pi is the plan's last phase, which hasn't started.
 | Word | What it means here |
 |---|---|
 | **tick** | one step of a game's rules. Sixty a second, and the same on every machine |
-| **the receipt** | the check that a game still does exactly what it did: a fingerprint of its rules and of each frame, compared with a recorded one |
+| **the check** | a game run several times with no window, at even and uneven frame pacing: a fingerprint of its rules and of each frame, which has to come out the same every time. Nothing recorded is compared |
 | **tape** | a recording of the pads, tick by tick. Playing it back replays a session exactly |
 | **pack** | a character or a prop baked into the engine's own file (`.rpack`): mesh, skeleton, animation, textures |
 | **set** | a level, as a text file (`.set`) |

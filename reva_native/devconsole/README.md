@@ -66,5 +66,5 @@ For an AI to drive the game, start it with `REVA_BRIDGE=7766` and use `anim_benc
 
 ## What's checked
 
-- `python3 anim_bench/hashcheck.py` says whether the game still does exactly what it did, in seconds, with no display.
+- `python3 anim_bench/hashcheck.py` says whether the game gives the same answer at any frame pacing, in seconds, with no display.
 - `python3 anim_bench/packdump.py --check <folder>` says whether a pack is what `design/pack_format.md` says a pack is.

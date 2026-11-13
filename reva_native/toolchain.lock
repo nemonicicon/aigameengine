@@ -1,6 +1,6 @@
-# toolchain.lock -- what the engine was last built and blessed with, by exact version. anim_bench/toolcheck.py writes it and reads it:
-# `toolcheck.py` says what's moved on this machine, `--write` pins it again once the receipts hold. A section a machine, a name and a tab and its version a line.
-# Every build line also says -std=gnu17 -ffp-contract=off, and the receipts (driver.py check) are what a pin is for: the same hashes, from the same compiler.
+# toolchain.lock -- what the engine was last built and checked with, by exact version. anim_bench/toolcheck.py writes it and reads it:
+# `toolcheck.py` says what's moved on this machine, `--write` pins it again once the checks hold. A section a machine, a name and a tab and its version a line.
+# Every build line also says -std=gnu17 -ffp-contract=off, and that's what a pin is for: the same hashes on every machine, from the same compiler.
 
 [linux debian 13 x86_64] pinned 2026-11-05, the build container revalinux
 image	debian:trixie-slim sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4

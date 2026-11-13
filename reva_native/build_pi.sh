@@ -6,7 +6,7 @@
 #                             REVA_MODE=9 REVA_AUTOVAR=1 REVA_TIER=pi ./crowd_vk 100 packs_rvz packs/v1_Character_17_Female_Police.rpack
 #   headless  crowd_headless  no display, no GPU: the sim only. Then: python3 anim_bench/hashcheck.py
 #   soft      crowd_soft      the engine's own rasterizer (queue step 27): 320 x 240 on the processor, no driver. On the SDL road, so under a desktop; with no window at all
-#                             it's the receipt's pixels, the same on every machine: python3 anim_bench/hashcheck.py --soft ./crowd_soft
+#                             its pixels are the same on every machine
 #   dev       crowd_dev       the engine with no game linked, rebuilt only when it changes (Phase 5); then `game`
 #   game      <game>/game.so  the game as a library a running crowd_dev picks up between ticks
 # CC, OUTDIR, SRCDIR and EXTRA are for anim_bench/pi/cross.sh, which runs this in the revalinux container on the PC, about 45 seconds
@@ -28,7 +28,7 @@ elif [ "$WHICH" = headless ]; then
   echo "built crowd_headless (no display, no GPU: the sim only; python3 anim_bench/hashcheck.py)"
 elif [ "$WHICH" = soft ]; then
   $CC -O2 -std=gnu17 -ffp-contract=off $EXTRA -DREVA_SDL -DREVA_SOFT -o "$OUTDIR/crowd_soft" crowd_kms.c club_math.c club_audio.c club_save.c holly_fbo.c club_bridge.c club_net.c $GAME gfx_packet.c gfx_soft.c -lSDL2 -lm
-  echo "built crowd_soft     (the engine's own rasterizer, no driver; under a desktop: REVA_WINDOWED=1 ./crowd_soft ...; no window: REVA_NOWINDOW=1; python3 anim_bench/hashcheck.py --soft ./crowd_soft)"
+  echo "built crowd_soft     (the engine's own rasterizer, no driver; under a desktop: REVA_WINDOWED=1 ./crowd_soft ...; no window: REVA_NOWINDOW=1)"
 elif [ "$WHICH" = dev ] || [ "$WHICH" = game ]; then
   if [ "$WHICH" = dev ]; then
     if [ -z "$(find . -maxdepth 2 \( -name '*.c' -o -name '*.h' -o -name '*.inc' \) -not -path './games/*' -newer "$OUTDIR/crowd_dev" 2>/dev/null | head -1)" ] && [ -f "$OUTDIR/crowd_dev" ]; then

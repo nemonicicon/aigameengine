@@ -7,7 +7,7 @@ description: Build, launch, screenshot and drive the engine (reva_native/crowd.e
 
 One C file (`reva_native/crowd_kms.c`, a table of contents over `engine/*.inc`) compiled to a fullscreen Vulkan
 game. **How it looks only ever comes out as pixels**: there's no `--version`, and no test that proves
-anything about what you'd see. (What it *decides* has a receipt, with no window: `driver.py check`, under Test.)
+anything about what you'd see. (What it *decides* has a check, with no window: `driver.py check`, under Test.)
 
 So the harness is a screenshot driver: **`.claude/skills/run-reva/driver.py`**. It
 builds, launches, drives the menus / the lab / a set / a scene via a control file,
@@ -231,7 +231,7 @@ this also steers a **running** window.
 | `REVA_INTERP=1` · `REVA_BTWDBG=<folder>` | the pictures between ticks on a display faster than 60, in the lab too; and a count a second with eight refreshes saved |
 | `REVA_FAIR=1.3333` | a game's picture held to a fair shape on a wider screen |
 | `REVA_NOWINDOW=1` · `REVA_SOFTSAY=1` | (11-05, `crowd_soft.exe` only) the engine's own rasterizer with no window at all · a line every 120 frames: meshes, triangles asked for and drawn, pixels, ms a frame |
-| `REVA_SOFTRES=WxH` · `REVA_SOFTTEX=<side>` · `REVA_SOFTSMOOTH=1` · `REVA_SOFTLIGHTS=<0..8>` | (11-05) its picture's size (the receipt's is 320x240), its textures' biggest side (512), smoothed texels, lamps a mesh (4) |
+| `REVA_SOFTRES=WxH` · `REVA_SOFTTEX=<side>` · `REVA_SOFTSMOOTH=1` · `REVA_SOFTLIGHTS=<0..8>` | (11-05) its picture's size (320x240 unless it's set), its textures' biggest side (512), smoothed texels, lamps a mesh (4) |
 | `REVA_LANG=<code>` | (11-05) a game in another language's words for one run: `lang/<code>.txt` beside the game. Off unless asked; `scenes/everything.py --words OUT.png [--lang ja]` is the look |
 | `REVA_ACT=0` · `REVA_ACTDBG=1` | (10-23, round 3) THE PERFORMANCE LAYER off (the old head layer, the control) · each slot's look target as it changes, and once a second the clip's head, the correction and the head |
 
@@ -280,19 +280,19 @@ the driver does *not* need that.
 
 ## Test
 
-⭐ **Start with the sim's receipt** (11-02): about 10 seconds, no window, the same answer on any machine.
+⭐ **Start with the sim's check** (11-02): about 10 seconds, no window. It holds a game against itself and stores nothing.
 
 ```bash
 $PY $D check                                           # builds the no-display engine, runs anim_bench/hashcheck.py
 $PY reva_native/anim_bench/warncheck.py                # the warning ratchet: new warnings fail
 ```
 
-`check` says whether the sim still does exactly what it did. It says nothing about the picture. Otherwise the bench instruments are the tests:
+`check` says whether a game gives the same answer at any frame pacing. It doesn't say the game is what it was yesterday, and it says nothing about the picture. Otherwise the bench instruments are the tests:
 
 ⭐ **Online play** (queue step 29, 11-05): two to four machines, one game. `games/rally` is the game to try it with.
 
 ```bash
-$PY $D check --game rally                              # builds crowd_rally_h.exe and runs the game's own receipt
+$PY $D check --game rally                              # builds crowd_rally_h.exe and runs the game's own check
 $PY reva_native/anim_bench/netcheck.py                 # every case of online play on this machine, no window: about a minute
 $PY reva_native/scenes/everything.py --net /tmp/net.png   # two machines' pictures side by side, no window
 ```

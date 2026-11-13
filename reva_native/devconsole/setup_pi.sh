@@ -22,6 +22,6 @@ sudo -u "$U" env GAME=games/sample/sample.c bash build_pi.sh dev
 sudo -u "$U" env GAME=games/sample/sample.c EXTRA=-DREVA_NODOORS bash build_pi.sh headless
 sudo -u "$U" python3 anim_bench/hashcheck.py --game sample
 echo
-echo "The sample game's hashes say this Pi runs the same game as every other machine."
+echo "The sample game ran on this Pi, and gave the same answer at every frame pacing."
 echo "Next: python3 devconsole/chat.py <your AI's command> {} on the TV, or bash devconsole/agent.sh <your AI's command> over SSH, and devconsole/README.md for the rest."
 if [ "$1" = --composite ]; then echo "Rebooting into the TV output in 10 seconds."; sleep 10; reboot; fi

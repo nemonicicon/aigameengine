@@ -26,7 +26,7 @@ Change the rules or the config and cook again; the same input always gives the s
 
 | What | Where | Notes |
 |---|---|---|
-| The aigameengine repo | `github.com/nemonicicon/aigameengine` (private: ask for access) | The cook is `skate_src/citymap/` |
+| The aigameengine repo | `github.com/nemonicicon/aigameengine` | The cook is `skate_src/citymap/` |
 | Python 3.11 or newer | python.org | 3.14 is what it's built on |
 | numpy and Pillow | `pip install numpy pillow` | The only two libraries it uses |
 | The map data | downloaded once, below | About 610 MB on disk |

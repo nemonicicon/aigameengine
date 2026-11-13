@@ -1,7 +1,7 @@
 /* ---- (11-06) HAIR, LOCK BY LOCK ----------------------------------------------------------------------------------------------------------------------------------
  * REVA's hair hung on the engine's hair chains moved a few strands and worked on the hair in sections, where physics belongs on the whole head, strand by strand.
  * The standard is a high one, for animation: it can be scaled back to run live in a game.
- * A hair mesh built as ribbons -- each lock 2 x N vertices in a row, the two edges of its N points, root first (skate_src/reva/build_reva.py hair()) -- on a pack
+ * A hair mesh built as ribbons -- each lock 2 x N vertices in a row, the two edges of its N points, root first -- on a pack
  * with a `HairStrandsN` node (skate_src/author/strand_hair.py) is moved here, EVERY LOCK ON ITS OWN (hers: 2,362 locks of 10 points):
  *   * its points live in the world, so the body's own motion swings them (inertia, and the air's drag on what moves);
  *   * the root is pinned where her scalp carries it;
@@ -11,7 +11,7 @@
  *   * it is kept off her skull (never nearer its middle, in the measured head ellipsoid's own frame, than it lies at rest: engine/body.inc's rule), and out of
  *     her body: every surface round her neck, shoulders, back and upper arms -- skin, the choker, the top, the android's plates -- skinned each frame and pushed
  *     out of along its own normal, with a little friction so a lock rests on a shoulder instead of sliding off. ⛔ Not round capsules: a capsule round a shoulder
- *     that isn't round left the chained hair floating 2 cm off it (design/facade_band.md).
+ *     that isn't round left the chained hair floating 2 cm off it.
  * Drawn from its own buffers, already in the world, as the hanging skirt's are (engine/cloth.inc: clothPrep's answer 2): each ribbon rebuilt round its lock's new
  * line, its width and its normal turned with it. A hair mesh and its opaque core (the same locks) are simulated once. A held exposure doesn't integrate; the first
  * frame, or a cut, hangs it from her pose and lets it settle first. It's picture: nothing in the rules reads it.

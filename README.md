@@ -160,7 +160,8 @@ Start from `rocks` for 2D and from `rally` for a game played across machines.
 | `reva_native/games/` | the eight games |
 | `reva_native/anim_bench/` | the checks: a game against itself, the online check, the file-reader fuzzer and more |
 | `reva_native/devconsole/` | making a game on a Raspberry Pi with only a TV |
-| `skate_src/` | the tools: bringing characters in, writing animation in code, building levels |
+| `reva_native/android/` | a game as an Android APK: the two scripts and SDL2's Java |
+| `skate_src/` | the tools: bringing characters in, writing animation in code, building levels, and bringing a Godot project's scenes and shaders across (`skate_src/godot/`) |
 | `godot/` | what a Godot 4 project can take: characters, moves, camera rigs |
 | `design/` | the notes: the engine's plan step by step, the file formats, and the craft of animation and film |
 | `.claude/skills/` | what an AI assistant loads: how to build, run and photograph the engine, and film craft |
@@ -216,6 +217,18 @@ It has been run on a composite tube TV, at 240p and 480i: `setup_pi.sh --composi
 HDMI off. On its first start the engine asks about your screen, out loud.
 [reva_native/devconsole/README.md](reva_native/devconsole/README.md) is about making a game on the Pi itself,
 with your assistant in a chat box on the TV.
+
+### Android
+
+```bash
+python reva_native/android/make_apk.py --game sample --image IMAGE --sdk-volume SDKVOL --sdl-volume SDLVOL
+```
+
+It makes a signed test APK under `reva_native/dist/android/`: the engine and the game on SDL2, with the
+game's data inside. It builds in a Docker container that you provide, holding the Android SDK and NDK and
+SDL2 built for Android. No script here makes that container:
+[reva_native/android/README.md](reva_native/android/README.md) says what it must hold, and what the engine
+does on a phone. The APKs build. None has been started on a phone since the scripts took their present form.
 
 ## Two machines, one game
 
@@ -278,24 +291,30 @@ The engine does not run inside Godot. What a Godot 4 project can take from `godo
   example. [skate_src/citymap/MAP_GUIDE.md](skate_src/citymap/MAP_GUIDE.md) says what to download and how to
   cook and change it, first for people and then for an AI.
 
+The other way, from a Godot project into the engine, is `skate_src/godot/`. `engine_export.gd`, run in
+Godot, writes a scene out. `godot2set.py` makes that a level and a pack. `godot_shader.py` turns a Godot
+spatial or sky shader into one the engine draws with. `gd_tuning2c.py` turns exported numbers into a C
+struct, and `reva_native/godot/gd_math.h` is Godot's math types in C, for game code brought across.
+
 ## What isn't here
 
 - **Characters, props, levels and audio** from the studio's games. They were bought assets or the studio's
-  own. The exceptions are ours and made by code: the eight games' small files and the four Godot characters.
+  own. The exceptions are ours and made by code: the eight games' small files and the one Godot character.
 - **Fonts.** The only typeface is the engine's own TV font. The wide glyphs that Chinese, Japanese and Korean
   need are baked from a font you have the right to use (`skate_src/author/fontbake.py`), and none ships.
 - **The studio's game designs and stories.**
 
 ## How far it has been checked
 
-Plainly, as of 2026-11-05.
+Plainly, as of 2026-11-13.
 
 | | What has been run | What has not |
 |---|---|---|
 | **Windows PC** | every game's check, online play between engines on one PC, and the pictures looked at | two real machines playing each other |
 | **Linux PC** | five games' checks and the online check, on every push | the Vulkan build: it compiles and links, and nobody has started it on Linux since Vulkan became the engine's only GPU renderer on 2026-11-04 |
-| **Raspberry Pi 4** | the engine as it was on 2026-11-04, on a real Pi and a tube TV at 240p and 480i | anything built since, which has only run under an ARM emulator. `setup_pi.sh` on a fresh card, and the card image builder |
-| **Godot 4 hand-off** | the cameras and characters in Godot 4.7.2, when each was made. Its scripts were loaded again on 2026-11-05 | the demo itself, which was not run again for this update |
+| **Raspberry Pi 4** | the engine as it was on 2026-11-04, on a real Pi and a tube TV at 240p and 480i | what has changed since, which has run under an ARM emulator at most. `setup_pi.sh` on a fresh card, and the card image builder |
+| **Android** | the sample game built into a signed APK for `arm64-v8a` and `x86_64`, on 2026-11-13 | either APK started. One game's APK ran on an emulator on 2026-11-06, before the scripts and the phone's start-up took their present form. Nothing has run on a real phone |
+| **Godot 4 hand-off** | the demo in Godot 4.7.2 on 2026-11-13: R.E.V.A. 902 riding, filmed by the tracking camera, 150 frames with no script error | the demo's other cameras that day. The tools in `skate_src/godot/` on any project but the one they were written for |
 
 Two more things to know. The Spanish and Japanese words in the games' `lang/` folders were written by an AI
 and no reader of those languages has checked them, which is why languages are built and switched off. And

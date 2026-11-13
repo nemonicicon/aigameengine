@@ -333,7 +333,7 @@ static void perfLayer(Pack*P,float Q[][4],int who,int li,float t){
       if(ch>=0){ qaxis(off,1,0,0,-0.014f*br); qmul(Q[ch],Q[ch],off);
                  if(sway!=0.f){ qaxis(off,0,1,0,0.22f*sway); qmul(Q[ch],Q[ch],off); } } } }
 /* ⭐ (11-06) A LINE'S OWN SHAPES ON ITS SPEAKER (`shp <shape> N v..` records: engine/scene.inc). Seeing REVA talk helps a listener understand her.
- * Her voice is made by an animated mouth (scenes/speak_math.py), and the
+ * Her voice is made by an animated mouth, and the
  * shapes that made each sound come out beside it, so a line can carry the mouth that said it instead of a jaw guessed from loudness.
  * Each track is read at the body's clock, between its 30-a-second values, and set by NAME on every mesh that has the shape, after the
  * scene block's jaw and the eyes: the last word on the shapes it names, and no other is touched. `jaw` has a second home: on a body

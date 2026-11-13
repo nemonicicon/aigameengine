@@ -11,7 +11,7 @@ opens is a game that runs on the same files.
 ## THE ARTERY, again
 
 `skate_src/town/{ue_export_town.py, bake_town.sh}` pull AssetsvilleTown out of
-`D:\Unreal projects\ZAMNC` through UE 5.8 headless — the same shim-project pattern that
+`<Unreal projects>\ZAMNC` through UE 5.8 headless — the same shim-project pattern that
 took 16 weapons through in ~40s. **112 meshes and 15 textures in about two minutes, 0
 failures.** Ground tiles, the wall/roof/door/window kit, 34 yard and street props, trees,
 six vehicles, and enough interior for the night the windows get boarded. 124 prop rpacks

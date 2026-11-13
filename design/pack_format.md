@@ -67,7 +67,7 @@ All names are indices into one table: a `u32` count, then count pairs of (`u32` 
 
 ## Materials
 
-36 bytes each, and most of it unused. `u32 mesh` at 0 (**checked**), `u32 flags` at 16 (1 nearest filter, 2 flip V, 4 its texture's alpha cuts it out, 8 set by older writers on 112 of the packs here (the crowd's merged meshes, the Character_* cast) and read by nothing, 16 its texture's alpha from 128 up is how much of the room each point sees, 128 none of it and 255 all, which the engine takes off the room's light and not the colour: `GFX_OCCLUSION`, written by `skate_src/reva/mouth_ao.py` for the inside of a mouth), `i32 tex` at 24 (-1 for none), and `i32` at 28, the normal map's texture slot plus 1 (0 for none, so old packs read as none). Both texture slots are in range (**checked**). A mesh takes the first material row naming it.
+36 bytes each, and most of it unused. `u32 mesh` at 0 (**checked**), `u32 flags` at 16 (1 nearest filter, 2 flip V, 4 its texture's alpha cuts it out, 8 set by older writers on 112 of the packs here (the crowd's merged meshes, the Character_* cast) and read by nothing, 16 its texture's alpha from 128 up is how much of the room each point sees, 128 none of it and 255 all, which the engine takes off the room's light and not the colour: `GFX_OCCLUSION`, written by a character's builder for the inside of a mouth), `i32 tex` at 24 (-1 for none), and `i32` at 28, the normal map's texture slot plus 1 (0 for none, so old packs read as none). Both texture slots are in range (**checked**). A mesh takes the first material row naming it.
 
 ## Clips
 

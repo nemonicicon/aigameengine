@@ -18,7 +18,7 @@ extends Node
 ##   print(w.outfits(), w.pieces(), w.worn_pieces())
 ##
 ## Physics rides the skeleton, not the meshes: ClubHair.attach(reva) swings every hair and cloth chain and springs
-## the soft mass, whatever she is wearing. Built for REVA (skate_src/reva902/atelier.py, the engine's tailor): any
+## the soft mass, whatever she is wearing. Built for REVA (by the tailor that sewed her clothes): any
 ## character whose builder tags its meshes this way gets the same wardrobe.
 
 signal changed             # what he's wearing changed

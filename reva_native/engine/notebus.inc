@@ -1,4 +1,4 @@
-/* ---- (11-08) THE NOTE BUS (THE REVA BAND: design/reva_band_gdd.md, section 14) ------------------------------------------------------------------------
+/* ---- (11-08) THE NOTE BUS (THE REVA BAND) ------------------------------------------------------------------------
  * Timed notes from outside, as a band brain makes them, for a game to play: REVA_NOTES=<port> opens
  * a UDP port on this machine (club_net.c's notesOpen: 127.0.0.1 only). A packet is text, a line each:
  *     now <T>                          the sender's clock as it sent, seconds
@@ -13,8 +13,8 @@ static EngineNote g_nbQ[NB_MAX]; static int g_nbN = 0, g_nbOn = -1;
 static double g_nbOff = 1e30;                                         /* the wall's seconds minus the sender's, the smallest seen */
 static double nbWall(void){ return wall_ms() / 1000.0; }
 static double apiNoteTime(void){ return nbWall(); }
-/* (11-08) THE POSE STREAM, on the same port: a solver beside the engine (games/reva_band/solver_live.py: z_band's own drummer and keyboard player, the
- * takes' solver) sends each frame of a player's pose before it's due, a line each:
+/* (11-08) THE POSE STREAM, on the same port: a solver beside the engine (a band's drummer and keyboard player,
+ * solved live) sends each frame of a player's pose before it's due, a line each:
  *     p <name> <t> <nq> <i qx qy qz qw>... <nt> <i x y z>...     a node's turn (as the pack keeps it) and a node's place, at the sender's time t
  * kept by name, in time order, for engine/perform.inc to play on the body the game named for it (E->perfStream): what a clip's tracks would have said */
 #define PS_STREAMS 4

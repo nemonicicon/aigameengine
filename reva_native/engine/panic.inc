@@ -203,7 +203,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
     /* ⛔ M0 (11-01): THE PARADE'S CUT RUNS ON ITS BAR CLOCK IN EVERY MODE -- it set shot 9 over the lens the zombie cab
      * pinned at the top, so every few bars a frame (and the fly back from it) showed a spotlight on a stranger's lawn
      * mid-game: two frames of a twelve-frame burst. The cab's pin wins here too. (The RTS, the platformer and the action
-     * modes pin the same way at the top and are open to the same cut -- unverified, design/reva_vs_zombies_m0.md.) */
+     * modes pin the same way at the top and are open to the same cut -- unverified.) */
     if(GAME_ON) CAMD.shot=22;
     float p=(float)(CAMD.t/(CAMD.dur>0.001?CAMD.dur:0.001));
     float rx=RVX, rz=RVZ;
@@ -429,7 +429,7 @@ static void camDirector(double tsec,double dt,int NS,void*slots_,float*eye,float
                  * measures this yet".) Everything above AIMS the lens; nothing checked that
                  * the frame it made CONTAINS a head. ⛔ On a sunlit street a standing reva2
                  * beside the shorter anima lost the top of her head in every two-shot and
-                 * both women lost theirs in every wide (scenes/twelve, 2026-09-10): the drop
+                 * both women lost theirs in every wide (2026-09-10): the drop
                  * below mid-eye is sized for two people of a height, and the spread terms for
                  * someone lying in a bed.
                  * So measure the frame: its TOP LINE at the pair's distance, from the eye

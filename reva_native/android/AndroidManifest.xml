@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (11-06) a game on an Android phone: SDL2's own activity starts the engine (libmain.so's SDL_main). build_apk.sh makes the APK, with the game's own id and name put in for the two placeholders below. A test build:
+     debuggable, its own key, landscape, and Vulkan 1.3 asked for but not required, so it installs anywhere and says in its log if the phone can't run it -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.game"
+    android:installLocation="auto">
+    <uses-feature android:glEsVersion="0x00020000" android:required="false" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x403000" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <application
+        android:label="game"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:hardwareAccelerated="true"
+        android:extractNativeLibs="true"
+        android:appCategory="game"
+        android:isGame="true">
+        <activity
+            android:name="org.libsdl.app.SDLActivity"
+            android:label="game"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleInstance"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:screenOrientation="sensorLandscape"
+            android:preferMinimalPostProcessing="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,4 +1,4 @@
-/* ---- (11-08) THE PERFORMER: a body playing an instrument, live (THE REVA BAND: design/reva_band_gdd.md, section 14) ---------------------------------------
+/* ---- (11-08) THE PERFORMER: a body playing an instrument, live (THE REVA BAND) ---------------------------------------
  * A game gives a body's limbs TARGETS in time, as notes come in (the note bus), and the engine poses
  * the body to meet them, over whatever its clip gives (a drummer seated, a keyboard player standing):
  *   perfLimb(body, limb, x, y, z, t, lift): limb 0 the left hand, 1 the right, 2 the left foot, 3 the right. (x, y, z) is in the body's own frame, in metres: x to

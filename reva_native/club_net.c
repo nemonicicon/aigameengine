@@ -521,7 +521,7 @@ void netClose(void) {
     for (int i = 0; i < NET_SAVES; i++) { free(N.save[i].d); N.save[i].d = NULL; }
     CLOSESOCK((int)N.sock); N.sock = -1; N.state = NET_OFF; }
 
-/* ---- (11-08) THE NOTE BUS'S PORT (THE REVA BAND, design/reva_band_gdd.md section 14; engine/notebus.inc reads it) ----
+/* ---- (11-08) THE NOTE BUS'S PORT (THE REVA BAND; engine/notebus.inc reads it) ----
  * A UDP port on this machine only (127.0.0.1), not blocking: a band brain beside the engine sends it timed notes as text. Nothing of a
  * session; its own socket. notesOpen gives 1 if it opened; notesRecv one packet's bytes (0 if none's waiting), at most cap-1, ended by 0. */
 static long g_notesSock = -1;

@@ -1,4 +1,4 @@
-/* ---- THE SCREEN (11-03, engine plan Phase 4; the research is research_notes/.../designing_for_all_tvs.md) ------------------------------------------------------------------
+/* ---- THE SCREEN (11-03, engine plan Phase 4) ------------------------------------------------------------------
  * The screen is designed for every TV, never tuned to one set, and must never harm one. Nothing can ask a TV what it is, so the player is the sensor:
  * the first boot shows the one signal its region's sets are built for, and a short setup asks about the rest. What it learns is one small text file, which a person can read and
  * edit from any PC, or delete. Recovery needs no picture: hold a button at power-on, or cut the power twice within 30 seconds of starting, and it asks again.

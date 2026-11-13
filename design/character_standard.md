@@ -89,7 +89,7 @@ Read across: REVA has the body, the hands, the hair on chains and the wardrobe, 
 
 ## REVA's rebuild: on what
 
-Two ways were open. On our own code (`skate_src/reva902/`) every vertex is ours and she can go in this repository, and her face has to be modelled by hand in code, which is where she's weakest. On Anima's body she has Anima's face, eyes, lashes, teeth, face shapes and hands from the first day, she can ship in every game and film of ours and never in this repository, and the mesh under her stays Anima's maker's.
+Two ways were open. On our own code every vertex is ours and she can go in this repository, and her face has to be modelled by hand in code, which is where she's weakest. On Anima's body she has Anima's face, eyes, lashes, teeth, face shapes and hands from the first day, she can ship in every game and film of ours and never in this repository, and the mesh under her stays Anima's maker's.
 
 The choice, 11-04: Anima's body, with some adjustments, and the high-poly model, to work with on a PC. Then, with her holographic sheet (`sheet5.png`), that sheet's body type, and the rest below.
 
@@ -101,7 +101,7 @@ So, for REVA:
 - **She never wears a bra.** No outfit of hers has one.
 - **Her underwear is made with our own tools**, not taken from Anima.
 
-She's `props/v1_reva_hi.rpack`, made by `skate_src/reva/build_reva.py` from Anima's pack, every time, with nothing done by hand. She is never committed. Her name is `reva_hi` because she's the high-poly body for a PC, and because `reva` is her September pack's name, which the menus and several scenes still use.
+She's `props/v1_reva_hi.rpack`, made by her own builder (kept with her, not in this repository) from Anima's pack, every time, with nothing done by hand. She is never committed. Her name is `reva_hi` because she's the high-poly body for a PC, and because `reva` is her September pack's name, which the menus and several scenes still use.
 
 ## A body's measurements
 
@@ -154,9 +154,7 @@ Her hips and thighs stay Anima's. If her outline is ever to change, the numbers 
 
 11-05: how she would look with her anatomy set to that study's average.
 
-```bash
-python skate_src/reva/build_reva.py --anatomy survey --out reva_native/props/v1_reva_avg.rpack
-```
+Her builder made it with `--anatomy survey`, into `props/v1_reva_avg.rpack`.
 
 `skate_src/author/anatomy.py` sets a rigged body's anatomy from a table of measurements, with nothing rebaked. Every bone gets a size of its own (a trunk bone a breadth, a height and a depth; a limb a length and a girth), a joint goes where its parent's size takes it, and a vertex goes where its own bones take it in the shares it already rides them by, so the skin stays one skin and every clip still plays. A fit moves the sizes until the body measures what the table says. Her head isn't touched. Her cup is put back by measuring, on the new ribs. Her limbs, hair and both outfits were then rebuilt on that body by the same script that builds her.
 

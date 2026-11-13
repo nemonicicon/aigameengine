@@ -175,7 +175,7 @@ static ScnCap g_scnCap[SCN_MAXCAP]; static int g_scnCapN=0;
 typedef struct { int line,at,n; char name[32]; } ScnShp;
 static ScnShp g_scnShp[SCN_SHPMAX]; static int g_scnShpN=0, g_scnShpUsed=0;
 static short g_scnShpV[SCN_SHPPOOL];
-/* ⭐ (11-06) HER AIRWAY, DRAWN INSIDE HER (scenes/reva_talks.py --xray): the physics of her voice, seen on her as she talks or sings.
+/* ⭐ (11-06) HER AIRWAY, DRAWN INSIDE HER: the physics of her voice, seen on her as she talks or sings.
  * A scene can carry the tube her voice is made in (sing_tube's
  * 40 sections, glottis first): where each lies in her (`tractsec k <bone> wall3 in3 floor3`, in that bone's own frame: the wall that
  * doesn't move, the unit way into the airway, the far side of the flesh under it; `tractnose n p3..` her nose's passage) and, beside the

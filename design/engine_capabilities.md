@@ -485,7 +485,7 @@ the pack scale; no hair-vs-body collision (the spring keeps it near its pose).
 ### 31 · A wardrobe: clothes as separate pieces, skin that hides under them -- DONE (09-29)
 **The gap.** REVA's street sheet wanted modular clothing: she is a seamstress, and makes new clothes. Every body in the engine was one fixed set of meshes: a garment was either baked in (a region of
 the skin) or dresspack'd on with the skin under it REMOVED (§28) -- never taken off again.
-**The fix.** The atelier (`skate_src/reva902/atelier.py`, design: `design/atelier.md`) builds each garment as its own
+**The fix.** The atelier (`skate_src/atelier/atelier.py`, design: `design/atelier.md`) builds each garment as its own
 mesh on the one skeleton and MEASURES which skin it covers (a ray from every skin vertex along its normal; a face is
 covered only when all its corners are). The skin splits into groups by the set of garments over them, and the mesh
 names carry it all: `wear~<slot>~<piece>~<outfit>+<outfit>` and `skin~h=<pieces>`. The engine reads the tags AFTER the

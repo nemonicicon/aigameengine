@@ -76,7 +76,7 @@ typedef struct {
  * also repeats every target on every PRIMITIVE, and her body splits into 15 by material,
  * so even a curated 28 shapes lands well past 8 once the non-empty pairs are counted. */
 /* (11-11) 256: REVA 902 wears Anima's high-poly face with 92 shapes, and the ARKit set carried onto it from Anima's low-poly model
- * (skate_src/author/face_from_anima.py: each side's smile, the cheeks, the upper lip, the dimples, for her laugh and her singing) is 40 more, each
+ * (each side's smile, the cheeks, the upper lip, the dimples, for her laugh and her singing) is 40 more, each
  * counted once per mesh it moves. A cap nobody measured, as the note above says; the arrays it sizes are small */
 #define MORPH_MAX 256
 
@@ -98,7 +98,7 @@ typedef struct {
     int fmInterior;                        /* the mouth-interior MESH (teeth/tongue/cavity) */
     float mouthBind[6];   /* lip line in BIND space (x,y,z) + half-width + face height + TILT */
     /* ⭐ THE WARDROBE (09-29): clothing is modular. A body built
-     * by the atelier (skate_src/reva902) tags its meshes: `wear~<slot>~<piece>~<outfit>+<outfit>` is a piece of
+     * by the atelier (skate_src/atelier) tags its meshes: `wear~<slot>~<piece>~<outfit>+<outfit>` is a piece of
      * clothing or a hairstyle, `skin~h=a,b` is skin that pieces a and b cover. meshOff[] is what the pack's outfit
      * leaves undrawn: pieces not worn, and skin under pieces that are (nothing pokes through a worn garment, and
      * nothing is missing when it comes off). NULL on every body without tags. One outfit per PACK: two slots
@@ -110,8 +110,8 @@ typedef struct {
      * bone the people builder adds) is drawn in the show's look -- a cel ramp into a cool shadow tint and an ink
      * line (an inverted hull). Every other body in the club is untouched. REVA_NOTOON=1 is the control. */
     int toon;
-    /* ⭐ THE SHIP'S SETS (10-18, THE WORLD AT THE END OF TIME): markers a SET PROP carries (skate_src/ship/
-     * build_sickbay.py -> glb2rpack.py --marker). ToonSet: the toon look lit as a ROOM is lit -- from above, every
+    /* ⭐ THE SHIP'S SETS (10-18, THE WORLD AT THE END OF TIME): markers a SET PROP carries (a set's builder ->
+     * glb2rpack.py --marker). ToonSet: the toon look lit as a ROOM is lit -- from above, every
      * wall in the light, every underside in the shadow tone, cast shadows from the sun's map (toon = 2). Glow: drawn
      * unlit at its own colour (a light panel, a screen, an emitter), no ink. NoCast: never in the sun's shadow map
      * (a ceiling over everyone, a room's walls -- an interior's key is a cheat from the lens's side, and a wall that

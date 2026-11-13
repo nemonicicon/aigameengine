@@ -5,12 +5,12 @@ and a pack for each square of the map (`engine/stream.inc`), a far stand-in for 
 The box, the origin, the files and the style come from a small JSON file the game owns; Bike Lane Bash's is
 `map/seattle_start.json` in its own repository. Nothing here downloads anything, and it needs only numpy and Pillow.
 
-It's the plan in `design/bike_lane_bash.md`, "THE MAP: HOW SEATTLE GETS BUILT", steps 1, 2, 3, 4, 5, 6 (in a first form) and 7.
+It's Bike Lane Bash's map plan, "THE MAP: HOW SEATTLE GETS BUILT", steps 1, 2, 3, 4, 5, 6 (in a first form) and 7.
 
 ## Running it
 
 ```
-python -I skate_src/citymap/citymap.py GAME/map/seattle_start.json --raw D:/seattle_map/raw --out GAME
+python -I skate_src/citymap/citymap.py GAME/map/seattle_start.json --raw <raw folder> --out GAME
 ```
 
 `--raw` is the folder the config's file names are relative to (or `CITYMAP_RAW`). The data are downloads, so run it with

@@ -1,4 +1,4 @@
-/* ---- THE SET'S OWN TRIANGLES (11-12, the Godot proof of concept's step 2: design/godot_port_poc.md) -------------------------------------------------------------------------
+/* ---- THE SET'S OWN TRIANGLES (11-12, the Godot proof of concept's step 2) -------------------------------------------------------------------------
  * The walked world (engine/spans.inc) keeps a set's surfaces as columns of spans, which is right for floors, ramps, stairs and the walls a body walks against, and it
  * can't hold what a skater rides: a column has a top and a bottom and no sides, so a quarter pipe's vertical face, a wall to ride and a lip aren't in it. A set line
  * `triangles` keeps its props' real triangles as well, in a tree of boxes (a BVH), for a game to ask:

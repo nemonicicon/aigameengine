@@ -4053,7 +4053,7 @@ int main(int argc,char**argv){
                               else morphSetName(BP,BW,"blink",sinf(3.14159f*(bP9[b9]/0.16f))); }
                           else { bT9[b9]-=st9; if(bT9[b9]<=0.f) bP9[b9]=0.f; } } }
                     /* (11-11) THE HELD FACE: a line's hface= pface= p2face= p3face= hold face shapes by name through it (a laugh's shut eyes
-                     * and its smile), over the speech's mouth and the blink clock (the Facade video: design/facade_video.md). A line
+                     * and its smile), over the speech's mouth and the blink clock (the Facade video). A line
                      * that says none changes nothing. ⛔ The jaw is the BONE's on a body that has one: a held `jaw` here would fight it */
                     { int lf9=scnActive();
                       if(lf9>=0) for(int b9=0;b9<SCN_BODIES;b9++){ const char*s9=g_scnL[lf9].face[b9]; if(!s9[0]) continue;

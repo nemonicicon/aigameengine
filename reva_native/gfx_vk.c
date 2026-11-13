@@ -18,6 +18,13 @@ static PFN_vkCmdBeginRendering g_pBeginRendering; static PFN_vkCmdEndRendering g
 #define vkCmdBeginRendering g_pBeginRendering
 #define vkCmdEndRendering g_pEndRendering
 #define vkCmdSetCullMode g_pSetCullMode
+/* ⛔ (11-13) AND vkResetQueryPool, WHICH IS VULKAN 1.2's: REVA_GPUCOUNT (11-07) calls it, the library an Android 10 build links against has only 1.1's names, and
+ * from that day no APK linked ("undefined symbol: vkResetQueryPool"). Nobody built one between 11-06 and 11-13. Looked up the first time it's wanted, because
+ * pcSetup asks before the three above are looked up; a device without it resets nothing, and the counters aren't asked for on a phone */
+static void gfxResetQueryPool(VkDevice d, VkQueryPool p, uint32_t first, uint32_t n) { static PFN_vkResetQueryPool f; static int tried;
+    if (!tried) { tried = 1; f = (PFN_vkResetQueryPool)vkGetDeviceProcAddr(d, "vkResetQueryPool"); if (!f) f = (PFN_vkResetQueryPool)vkGetDeviceProcAddr(d, "vkResetQueryPoolEXT"); }
+    if (f) f(d, p, first, n); }
+#define vkResetQueryPool gfxResetQueryPool
 #endif
 #if defined(_WIN32) && !defined(REVA_SDL)
 #define REVA_SDL 1
@@ -37,7 +44,7 @@ static PFN_vkCmdBeginRendering g_pBeginRendering; static PFN_vkCmdEndRendering g
 #ifdef __ANDROID__
 /* (11-06) a phone closes a game that exits without a word: a failed call says what it was, in a box to screenshot, first */
 static void gfxAndroidDie(const char *what, int r) { char m[700]; snprintf(m, sizeof m, "The renderer stopped: %s failed (VkResult %d). The phone's Vulkan driver refused it.", what, r);
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Bike Lane Bash: Vulkan", m, NULL); exit(1); }
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Vulkan", m, NULL); exit(1); }   /* (11-13) the box's title named one game: the renderer is every game's */
 #define CK(x) do { VkResult r_ = (x); if (r_ != VK_SUCCESS && r_ != VK_SUBOPTIMAL_KHR) { printf("[gfx] FAILED %s: %d\n", #x, r_); fflush(stdout); gfxAndroidDie(#x, (int)r_); } } while (0)
 #else
 #define CK(x) do { VkResult r_ = (x); if (r_ != VK_SUCCESS && r_ != VK_SUBOPTIMAL_KHR) { printf("[gfx] FAILED %s: %d\n", #x, r_); fflush(stdout); exit(1); } } while (0)

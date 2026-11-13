@@ -25,7 +25,7 @@ A garment is a **design** — data, not a mesh:
 | slot | what it replaces when put on (top, bottom, outer, legs, shoes, hands, neck, ears, hair, …) | `Piece.slot` |
 | outfits | which looks it belongs to (`base`, `street`, …) | `Piece.outfits` |
 
-The **tailor** (`skate_src/reva902/atelier.py`, any character's) sews a design onto a body: each panel is cut on the
+The **tailor** (any character's; its code stays with REVA 902, not in this repository) sews a design onto a body: each panel is cut on the
 form, its outline snapped onto the curve (Newton, in metres along the surface), lifted by its ease, given a LIP where it
 ends (a wall down to the skin — no pose shows a gap under an edge), weighted with the skin's own bone weights (so a
 garment over her bust rides her breast bones). Every piece is its own mesh on her one skeleton.
@@ -76,7 +76,7 @@ In the first film the body read as disconnected and strange. Three lessons, and 
 
 - **A hem over a layer needs room to hang.** Low-poly cloth within a centimetre of low-poly cloth cuts through it in a jagged line as soon as the body leans. The layer under goes with the hips above the hip joint (lower behind, or a thigh swung back lifts it through the hem), a top stands 2 cm clear of it, and a short chain's gravity stays low (0.4 against a stiffness of 1.5).
 
-A hole film checks it: `tools/perf/perf_probe.gd`'s `clothes_holes` plan draws everything hidden in one colour, so whatever shows in a frame is somewhere the clothes opened up.
+A hole film checks it: the skate game's `clothes_holes` probe draws everything hidden in one colour, so whatever shows in a frame is somewhere the clothes opened up.
 
 **Dressing a character that came from somewhere else** (no build script of ours, clips we can't re-export): `meshform.py` measures a dress form off a finished rig, `author/glb_redress.py` swaps its meshes inside its glb with the skeleton, bind matrices and every clip byte for byte.
 A mesh can't take a bone's name: Godot's importer keeps node names unique, renames the bone (his `head` became `head_2`), and the clips made for that character elsewhere go on without it, silently. `redress()` refuses one. `sewing.zip_seams()` makes a garment one surface before it's cut low-poly: panels of different resolutions meet vertex to edge, and the cut opened them (a tee with 5 boundary loops, a sweatshirt with 17, slits at the shoulders, a forearm showing at both cuffs). Check a garment's openings against what it was cut with. `DontGetDropped/tools/anim/alien_fab.py` and `alien_dress.py` are the worked example.
@@ -134,9 +134,8 @@ A mesh can't take a bone's name: Godot's importer keeps node names unique, renam
 
 ## Where things are
 
-`skate_src/reva902/atelier.py` (the tailor) · `reva_body.py` (her body, face, hair, breast bones, rig) ·
-`reva_wardrobe.py` (her designs) · `build_reva.py` (builds everything, splits the skin, bakes one painted, shadowed
-texture, rigs, exports, renders each outfit). Sheets: `<data>/reva_sheet/`.
+REVA 902's own scripts (the tailor; her body, face, hair, breast bones and rig; her designs; and the build that splits the skin, bakes one
+painted, shadowed texture, rigs, exports and renders each outfit) stay with her, not in this repository. Sheets: `<data>/reva_sheet/`.
 
 For a character that came from somewhere else: `skate_src/atelier/meshform.py` (a dress form measured off its finished rig), `sewing.zip_seams`, `skate_src/author/glb_redress.py` (its meshes swapped inside its glb).
 

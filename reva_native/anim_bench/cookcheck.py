@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """cookcheck.py -- a game's manifest, its budgets, its cook (engine plan, Phase 2).
 
-    cookcheck.py rvz                    every file the game lists exists and is within its budget, or this fails
-    cookcheck.py rvz --cook             first, cook whatever is missing or older than its source (skate_src/author/cook_game.py)
-    cookcheck.py rvz --recook           first, cook everything again, as after changing a cook line
-    cookcheck.py rvz --stage            the game's own folder, games/rvz/stage: exactly its files, hard links, no disk used
-    cookcheck.py rvz --verify           the proof, after --stage: boot the no-display engine from that folder, and from the repo with the film bodies.
+    cookcheck.py <game>                 every file the game lists exists and is within its budget, or this fails
+    cookcheck.py <game> --cook          first, cook whatever is missing or older than its source (skate_src/author/cook_game.py)
+    cookcheck.py <game> --recook        first, cook everything again, as after changing a cook line
+    cookcheck.py <game> --stage         the game's own folder, games/<game>/stage: exactly its files, hard links, no disk used
+    cookcheck.py <game> --verify        the proof, after --stage: boot the no-display engine from that folder, and from the repo with the film bodies.
                                         Same hashes, so the cook changed nothing the sim can feel, and what it read is exactly what's listed
 
 11-02: a game loads only what it needs, and budgets hold the frame. games/<game>/game.txt is the list. Run from reva_native.

@@ -1,4 +1,4 @@
-"""layers.py -- the map plan's step 6, the game layers (design/bike_lane_bash.md, "THE MAP: HOW SEATTLE GETS BUILT"): the road graph, the places food
+"""layers.py -- the map plan's step 6, the game layers (Bike Lane Bash's map plan, "THE MAP: HOW SEATTLE GETS BUILT"): the road graph, the places food
 is picked up, and the doors it's taken to, written as one text file a game reads, <prefix>_layers.txt.
 
     units U                                  club units a metre

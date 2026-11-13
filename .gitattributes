@@ -1,0 +1,10 @@
+# Shell scripts stay LF on every checkout and export. Checked out with CRLF on Windows and run in a container or on a Pi,
+# /bin/sh dies at once ("set: Illegal option -").
+*.sh text eol=lf
+
+# What GitHub's language bar counts. The engine is C: engine/*.inc are C source that crowd_kms.c includes, and GitHub takes
+# .inc for C++ by its extension alone. A .tape is a recording of the pads, not a program, and gfx_spv.h is compiled shaders
+# written by shaders/build_spv.py.
+*.inc linguist-language=C
+*.tape -linguist-detectable
+reva_native/gfx_spv.h linguist-generated

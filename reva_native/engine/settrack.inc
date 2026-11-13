@@ -1,4 +1,4 @@
-/* THE SET'S TIMELINE (11-03, design/pdoom_video.md): a set whose lights, beams and props play back against the scene's clock.
+/* THE SET'S TIMELINE (11-03, for a music video): a set whose lights, beams and props play back against the scene's clock.
  * A music video wants a light show on the beat and a meter that climbs with the song, and a set was a thing that
  * sat still once loaded. The show is written by code, frame by frame, and the engine just plays it:
  *
@@ -15,7 +15,7 @@
  * half it's the picture's lens, over a scene's own and the lab's. It's read between the file's frames, so a move written at 30 a second is smooth at 60; a jump of more
  * than 2.5 units in one frame is a cut and isn't eased. THE POST ROW is film's look for the frame (engine/post.inc): exposure, haze and grade under 0 leave the set's
  * own; focus 0 leaves the lens's, and under 0 focuses on the aim. TRK3 had neither row.
- * A mover at scale 0 is not drawn. (x y z) is where the prop's own origin goes. A piece of the show squashes and stretches (design/pdoom_references.md).
+ * A mover at scale 0 is not drawn. (x y z) is where the prop's own origin goes. A piece of the show squashes and stretches.
  * (step 21, 11-04) r g b wash: a colour, and how much of it goes over the mover's own texture or colour, 0 none to 1 all of it. alpha: 1 solid, down to 0 not there,
  * so smoke can thin out and not only shrink. picture: which cell of its sheet, counted along the rows from 0, and -1 is its own texture. A look is a place for scene
  * slot N's head and eyes to go to, while its `on` is over a half: it beats who's talking, and a body told not to look.

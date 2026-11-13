@@ -1,4 +1,4 @@
-/* THE SET'S DRAWINGS (11-11, design/facade_video.md): a set whose pictures are DRAWN, frame by frame, against the scene's clock.
+/* THE SET'S DRAWINGS (11-11, for a music video): a set whose pictures are DRAWN, frame by frame, against the scene's clock.
  * The video this was built for is made the way a "plates" video is made: every frame a function of song time, a whiteboard that gets a creature
  * drawn on it for each line, the line's words written and printed as part of the picture. The engine could place a prop per frame (the
  * set's timeline, settrack.inc) and letter a caption; it could not draw: no pen stroke, no flat shape, no picture laid over the frame or

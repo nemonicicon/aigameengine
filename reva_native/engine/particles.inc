@@ -1,7 +1,7 @@
 /* ---- PARTICLES, A GENERAL SYSTEM (queue step 24, 11-05) ------------------------------------------------------------------------------------------------------------------
  * The engine had three things that weren't one: film's cigarette smoke (engine/smoke.inc, a body's hand and mouth), a game's burst of round dots (engine/gamefx.inc) and line
  * tracers. Film asked for what it couldn't reach: "no real smoke, flame or sparks ... alpha and additive particles it can reach, and an emitter that can ride a mover: a rocket's
- * exhaust, pyro jets, fuse sparks" (design/pdoom_engine_notes.md). This is the one system under all of that.
+ * exhaust, pyro jets, fuse sparks". This is the one system under all of that.
  *
  * A KIND says what an emitter makes (EngineParticles, engine.h): how many a second, how long each lives, how fast and how wide it's thrown, how it falls and how the air stops
  * it, its size and colour at birth and at death, whether it's a round sprite or a streak along its own going, and whether it's laid over the picture (smoke, dust) or added

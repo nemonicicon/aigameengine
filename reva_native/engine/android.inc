@@ -48,7 +48,7 @@ static void andCrash(int sig,siginfo_t*si,void*uc){
 static void andAtExit(void){
     if(g_andRunning) return;
     char p[600],tail[1600]; snprintf(p,sizeof p,"%s/log.txt",g_andBase); fflush(stdout); andTail(p,tail,sizeof tail,14);
-    andBox("Bike Lane Bash stopped while starting",tail[0]?tail:"(the log is empty)"); }
+    andBox("The game stopped while starting",tail[0]?tail:"(the log is empty)"); }
 static int andRm(const char*p,const struct stat*sb,int tf,struct FTW*fw){ (void)sb; (void)tf; (void)fw; return remove(p); }
 static void andMkdirs(char*path){   /* every folder on the way to a file */
     for(char*s=path+1;*s;s++) if(*s=='/'){ *s=0; mkdir(path,0755); *s='/'; } }
@@ -65,7 +65,7 @@ static void androidBoot(int*argc,char***argv){
     { char mk[600]; snprintf(mk,sizeof mk,"%s/crashed.txt",base); FILE*cf=fopen(mk,"rb");
       if(cf){ static char what[2100]; size_t n=fread(what,1,sizeof what-1,cf); what[n]=0; fclose(cf); remove(mk);
           char lp[600],tail[1400]; snprintf(lp,sizeof lp,"%s/log.txt",base); andTail(lp,tail,sizeof tail,10);
-          static char box[3600]; snprintf(box,sizeof box,"%s\nThe log's last lines:\n%s",what,tail); andBox("Bike Lane Bash crashed last time",box); } }
+          static char box[3600]; snprintf(box,sizeof box,"%s\nThe log's last lines:\n%s",what,tail); andBox("The game crashed last time",box); } }
     { char prev[600]; snprintf(p,sizeof p,"%s/log.txt",base); snprintf(prev,sizeof prev,"%s/log_prev.txt",base); rename(p,prev); }
     snprintf(p,sizeof p,"%s/log.txt",base);
     if(freopen(p,"w",stdout)){ setvbuf(stdout,NULL,_IOLBF,0); dup2(fileno(stdout),2); }
@@ -84,7 +84,7 @@ static void androidBoot(int*argc,char***argv){
     char dir[1024]; snprintf(dir,sizeof dir,"%s/v_%s",base,stamp);
     snprintf(p,sizeof p,"%s/.unpacked",dir);
     if(access(p,F_OK)!=0){
-        andBox("Bike Lane Bash: first start","The game's data (about 290 MB) is unpacked onto the phone now. It takes a little while with a black screen: leave it running.");
+        andBox("First start","The game's data is unpacked onto the phone now. It takes a little while with a black screen: leave it running.");
         const Uint32 t0=SDL_GetTicks();
         /* an older build's data goes first: the phone keeps one copy */
         { DIR*dd=opendir(base); struct dirent*de9;
@@ -112,10 +112,15 @@ static void androidBoot(int*argc,char***argv){
     }
     if(chdir(dir)!=0) printf("[android] can't work in %s: %s\n",dir,strerror(errno));
     else printf("[android] working in %s\n",dir);
-    if(*argc<3){   /* play.bat's: the pool of 96, the packs, the rider (Kaeli when she's in hero/, the tower game's body when she isn't) */
-        static char a0[]="bike_lane_bash",a1[]="96",a2[]="packs",a3[64]; static char*av[5];
-        snprintf(a3,sizeof a3,"%s",access("hero/v1_kaeli_street.rpack",F_OK)==0?"hero/v1_kaeli_street.rpack":"packs/v1_tower.rpack");
-        av[0]=a0; av[1]=a1; av[2]=a2; av[3]=a3; av[4]=NULL; *argc=4; *argv=av; }
+    if(*argc<3){   /* (11-13) THE GAME'S OWN START ARGUMENTS, FROM ITS DATA: android_args.txt, one line of what its launcher says after the exe ("12 packs
+                    * packs/v1_sample.rpack"). Until then one game's were written here, so every game's APK started as that one. Without the file: none of the
+                    * pool and the game's packs folder, which is how a game with no bodies of its own starts */
+        static char line[256],a0[]="game",z9[]="0",p9[]="packs"; static char*av[9]; int n=1,had=0; av[0]=a0;
+        FILE*af=fopen("android_args.txt","r");
+        if(af){ had=1; if(fgets(line,sizeof line,af)){ for(char*t=strtok(line," \t\r\n");t&&n<8;t=strtok(NULL," \t\r\n")) av[n++]=t; } fclose(af); }
+        if(n<3){ av[1]=z9; av[2]=p9; n=3; }
+        av[n]=NULL; *argc=n; *argv=av;
+        printf("[android] starting with %d argument(s)%s\n",n-1,had?", from android_args.txt":": no android_args.txt, so none of the pool and the game's packs"); }
     fflush(stdout);
 }
 

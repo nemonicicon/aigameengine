@@ -228,7 +228,7 @@ void main() {
     vec4 t = texture(uT, vec3(uv, vExtra.z));
     if (CUTOUT == 1 && vTint.w >= 0.5 && t.a < 0.5) discard;
     // (11-11) THE INSIDE OF A MOUTH, and anything whose material row has flag 8 (GFX_OCCLUSION, vExtra.y 2): its texture's alpha, from a half up, is how
-    // much of the room each point of it sees (skate_src/reva/mouth_ao.py: rays cast against her head at the mouths her clips hold), and its colour is the
+    // much of the room each point of it sees (rays cast against her head at the mouths her clips hold), and its colour is the
     // paint as bought. That share comes off the light from the room, the hemisphere's and what the surface reflects of it, and never off the paint: paint
     // darkened under a reflection left at full strength is what metal looks like (her side teeth read as braces and her tongue as a pale tray, chorus 3b)
     const bool aoA = vExtra.y > 1.5;

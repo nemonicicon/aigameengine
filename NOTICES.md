@@ -33,7 +33,7 @@ Nothing of raylib's or Wicked Engine's code is in the tree. The plan names both 
 
 | What | Where | Its terms | Shipped with a packaged game? |
 |---|---|---|---|
-| SDL2 | every build (window, pads, sound) | zlib licence, Sam Lantinga | Windows: `SDL2.dll`, with its licence text. Linux and the Pi: the system's |
+| SDL2 | every build (window, pads, sound) | zlib licence, Sam Lantinga | Windows: `SDL2.dll`, with its licence text. Linux and the Pi: the system's. Android: `libSDL2.so` (2.32.10, built for Android) inside the APK |
 | The Vulkan loader | the Vulkan build (`vulkan-1.dll`, `libvulkan.so`) | Apache 2.0, The Khronos Group | No: it comes with the machine's graphics driver. The build on the engine's own rasterizer doesn't link it |
 | The Vulkan headers | at build time only | Apache 2.0 or MIT, The Khronos Group | No |
 | libdrm | the Pi's direct road | MIT | No: the system's |
@@ -49,6 +49,7 @@ Nothing of raylib's or Wicked Engine's code is in the tree. The plan names both 
 |---|---|
 | `reva_native/clubcloth/godot/gdextension_interface.h` | MIT. Copyright (c) 2014-present Godot Engine contributors; Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur. The file carries its notice |
 | `reva_native/third_party/stb_vorbis.c` | as above. The file carries its notice |
+| `reva_native/android/sdl_java/org/libsdl/app/*.java` | SDL 2.32.10's own Android Java, zlib licence, Copyright (C) 1997-2025 Sam Lantinga; compiled into an APK. `sdl_java/README.md` says where it came from |
 
 ## Made with, and not shipped
 

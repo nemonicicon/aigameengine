@@ -67,7 +67,7 @@ static int g_stkNC=0,g_stkNP=0; static float g_stkCam[9],g_stkPost[12];   /* (st
 static int g_stkNK=0; static float g_stkLook[STK_LOOKS][4];             /* x y z and whether it's on, by scene slot */
 /* (11-11) A SCENE'S BODY WASHED WITH A MOVER'S COLOUR: a set line `slotwash <slot> <mover> <amount>` (slot 0 the hero, 1.. the cast; the mover by its
  * number in the timeline). Each frame that body is drawn mixed <amount> of the way toward the colour the timeline gives that mover, so a body before a
- * card that changes colour on the beat changes with it. The Facade video's chorus: design/facade_video.md */
+ * card that changes colour on the beat changes with it. The Facade video's chorus */
 #define SLOTWASH_N 8
 #define SLOTWASH_MOV 64
 static int g_slotWashOn=0, g_slotWashM[SLOTWASH_N]; static float g_slotWashA[SLOTWASH_N], g_stkMovCol[SLOTWASH_MOV][3];

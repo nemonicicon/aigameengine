@@ -187,7 +187,7 @@ void sfxListener(const float*eye,const float*ctr){
     g_lstR[0]=fz/fl; g_lstR[1]=0.f; g_lstR[2]=-fx/fl;      /* right = forward x up */
     if(g_mixDev) SDL_UnlockAudioDevice(g_mixDev); }
 int sfxPlayBus(int bus,const char*name,float gain,const float*pos,int loop){ int id=sfxPlaySlot(sfxLoad(name),gain,pos,loop); if(id>=0&&bus>=0&&bus<BUS_N) g_voice[id>>16].bus=bus; return id; }
-/* (11-09) a sound that starts `seconds` from now, to the sample (the live band's notes, known ahead: games/reva_band) */
+/* (11-09) a sound that starts `seconds` from now, to the sample (the live band's notes, known ahead) */
 int sfxPlayIn(int bus,const char*name,float gain,float seconds){ g_playWait=seconds>0.f?(double)seconds:0.0; const double want=sfxClock()+g_playWait; int id=sfxPlaySlot(sfxLoad(name),gain,NULL,0); g_playWait=0.0;
     if(g_sfxSync<0) g_sfxSync=getenv("REVA_SFXSYNC")?1:0;
     if(g_sfxSync>0&&id>=0&&g_mixDev){ SDL_LockAudioDevice(g_mixDev); int n=g_stN; int gg[256]; long aa[256]; memcpy(gg,g_stGen,sizeof gg); memcpy(aa,g_stAt,sizeof aa); g_stN=0; SDL_UnlockAudioDevice(g_mixDev);

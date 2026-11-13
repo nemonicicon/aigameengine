@@ -8,7 +8,7 @@ that work natively in the engine, with cloth physics and soft-body jiggle. REVA'
 same thing (a holographic dress form, a pattern on the cutting table, fabric layers, embellishments, a live fit preview, a mood
 wardrobe, "DEPLOY OUTFIT?"): her making different outfits.
 
-Used by skate_src/reva902/build_reva.py (Blender 5.1, headless); nothing here is REVA's -- any character's builder
+Used by a character's own builder (Blender 5.1, headless); nothing here is one character's -- any character's builder
 can dress its body with it:
   Part       geometry with bone weights, and per face a material and a paint spec
   Surface    one of a body's parametric surfaces -- the DRESS FORM: pt(u, v), its normal, its weights

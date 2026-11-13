@@ -301,7 +301,7 @@ static Pack loadPack(const char*path){
         if(ntex>=0){ if(fl&2) texFlip[ntex]=1; }
         if(mesh<P.nMeshes&&P.meshTex[mesh]==-1){ P.meshTex[mesh]=tex; P.meshMatFlags[mesh]=fl; P.meshNTex[mesh]=ntex; if(ntex>=0) nNrm++; } }
     if(nNrm) printf("[normal] %s: %d of %u meshes carry a normal map\n",P.label,nNrm,P.nMeshes);
-    { int n9=0; for(unsigned m=0;m<P.nMeshes;m++) if(P.meshMatFlags[m]&16u) n9++;   /* (11-11) GFX_OCCLUSION: a mouth's inside, skate_src/reva/mouth_ao.py */
+    { int n9=0; for(unsigned m=0;m<P.nMeshes;m++) if(P.meshMatFlags[m]&16u) n9++;   /* (11-11) GFX_OCCLUSION: a mouth's inside */
       if(n9&&!g_loadQuiet) printf("[material] %s: %d meshes take their share of the room from their texture's alpha (flag 16)\n",P.label,n9); }
     P.tex=calloc(P.nTex?P.nTex:1,sizeof(unsigned));
     unsigned char*texTab=P.pk+Hd[10];

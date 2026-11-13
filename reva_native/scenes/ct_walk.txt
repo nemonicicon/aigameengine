@@ -1,0 +1,4 @@
+# walk-routing fixture: kaeli walks from in front of the bench to behind it; the straight line goes through it (not an episode)
+cast 0=reva 1=kaeli
+0 dur=0.3 step=60 tod=12 snap=1 hmark=away pmark=wA hclip=z_upright pclip=z_upright hlook=0 plook=0 cam=5.0,11.0,7.9,5.0,0.0,8.0,55 |
+1 dur=7.0 pmark=wB |

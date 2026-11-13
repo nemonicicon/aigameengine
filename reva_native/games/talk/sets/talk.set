@@ -1,0 +1,3 @@
+# the talking game's room. `climb`: its walls stop a ray, so a conversation's lens stays out of them
+climb
+prop tk_room 0 0 0 0 1

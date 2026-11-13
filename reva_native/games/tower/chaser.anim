@@ -1,0 +1,9 @@
+# which clip one of the things chasing you plays. See engine/animgraph.inc. It's read again when it changes. The game sets `near` when someone's in reach, and the grab lands on the event, not on being near.
+state walk w_walk loop gait
+state run  w_run  loop gait
+state grab punch  once 1.1
+when any  grab near
+when grab walk end
+when walk run  speed>3.4
+when run  walk speed<3
+event grab 0.4 grab

@@ -1,0 +1,18 @@
+# smoke_test -- ROBOT NEKO ep 12 S: a FIXTURE, not a scene. 1 AM in kaeli's room: kaeli at the window with a lit
+# cigarette, reva sitting on the edge of the bed.
+# WHAT IT PROVES:
+#   @smoke        the cigarette's FAR TIP gives off a thin wisp that rises, curls in the curtains' wind and fades
+#   the ember     v1_x_cigarette's `#FF6A1E*` mesh glows, and its @light sits on the coal in the coal's colour
+#   ppuff=        three exhales off kaeli's mouth mark, along her head's forward: a dense jet that blooms
+#   the light     smoke by the night light warm, in the streetlight cool (REVA_SMOKEDBG=1 prints the lit colours)
+#   the audit     REVA_CLIPAUDIT=1: reva on `bedside` (a hips mark) RESTS ON bed_01 + its solid box -- clean,
+#                 where it used to read as a body through the bed
+# ⛔ z_rest keeps her cigarette hand at her side, so the DRAG (the ember x3 at the mouth) is not exercised here --
+# that is the smoking loop's job; `REVA_SMOKEDBG=1` prints the hand-to-mouth distance it is measured on.
+# grammar: a test fixture -- one pinned lens, a profile with the glass behind her, room above her head for the smoke
+cast 0=reva 1=kaeli
+mouth hinge
+0 dur=2.5 step=60 tod=1.0 tone=0.66 snap=1 hmark=bedside hclip=x_chairsat@0.55 pmark=window pclip=z_rest pprop=v1_x_cigarette@0.16@0@hand@F2EFE8@light:0.5@smoke cam=7.0,2.6,9.2,7.0,2.5,12.6,55 |
+1 dur=3.0 ppuff=0.4 cam=7.0,2.6,9.2,7.0,2.5,12.6,55 |
+1 dur=3.0 ppuff=0.3 cam=7.0,2.6,9.2,7.0,2.5,12.6,55 |
+1 dur=3.5 ppuff=0.5 cam=7.0,2.6,9.2,7.0,2.5,12.6,55 |

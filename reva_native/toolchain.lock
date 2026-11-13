@@ -1,0 +1,49 @@
+# toolchain.lock -- what the engine was last built and blessed with, by exact version. anim_bench/toolcheck.py writes it and reads it:
+# `toolcheck.py` says what's moved on this machine, `--write` pins it again once the receipts hold. A section a machine, a name and a tab and its version a line.
+# Every build line also says -std=gnu17 -ffp-contract=off, and the receipts (driver.py check) are what a pin is for: the same hashes, from the same compiler.
+
+[linux debian 13 x86_64] pinned 2026-11-05, the build container revalinux
+image	debian:trixie-slim sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
+gcc	4:14.2.0-1
+gcc-14	14.2.0-19
+libc6-dev	2.41-12+deb13u4
+binutils	2.44-3
+gcc-aarch64-linux-gnu	4:14.2.0-1
+gcc-14-aarch64-linux-gnu	14.2.0-19cross1
+libsdl2-dev	2.32.4+dfsg-1
+libsdl2-dev:arm64	2.32.4+dfsg-1
+libvulkan-dev	1.4.309.0-1
+libvulkan-dev:arm64	1.4.309.0-1
+libdrm-dev	2.4.124-2
+libdrm-dev:arm64	2.4.124-2
+libstb-dev	0.0~git20241109.5c20573+ds-1
+qemu-user	1:10.0.13+ds-0+deb13u1
+python3	3.13.5-1
+gcc --version	gcc (Debian 14.2.0-19) 14.2.0
+python	3.13.5
+
+[windows msys2 mingw64] pinned 2026-11-05
+gcc	16.2.0-3
+gcc-libs	16.2.0-3
+binutils	2.47-3
+crt	14.0.0.r283.ga7cb47123-1
+headers	14.0.0.r283.ga7cb47123-1
+winpthreads	14.0.0.r283.ga7cb47123-1
+libwinpthread	14.0.0.r283.ga7cb47123-1
+SDL2	2.32.10-1
+stb	r2216.f1c79c0-2
+vulkan-headers	1~1.4.363.0-1
+vulkan-loader	1~1.4.363.0-1
+glslang	16.6.0-1
+gmp	6.3.0-2
+mpfr	4.2.2-3
+mpc	1.4.1-1
+isl	0.28-1
+zlib	1.3.2-2
+zstd	1.5.7-2
+windows-default-manifest	20260815-1
+gcc --version	gcc.exe (Rev3, Built by MSYS2 project) 16.2.0
+lavapipe	56409600 bytes, 2026-11-01
+python	3.14.5
+PIL	12.2.0
+numpy	2.4.6

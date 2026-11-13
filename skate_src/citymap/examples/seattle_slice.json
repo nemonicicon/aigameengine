@@ -1,0 +1,944 @@
+{
+  "_about": "Bike Lane Bash's first map: the start, a square about 1 km a side with 12th Ave S and S Jackson St at the origin, the whole Jose Rizal Bridge and the ravine under it, the camp on S Dearborn St under I-5, and 12th Ave S south to Pacific Tower. The files are named relative to the raw data's folder (BLB_MAPDATA, or --raw). skate_src/citymap/README.md in the engine says what every key does.",
+  "prefix": "sea",
+  "osm": "osm/box_47.565_-122.335_47.635_-122.295.json",
+  "dem": [
+    "dem/USGS_1M_10_x55y528_WA_KingCounty_2021_B21.tif",
+    "dem/USGS_1M_10_x55y527_WA_KingCounty_2021_B21.tif"
+  ],
+  "utm_zone": 10,
+  "origin": {
+    "node": 53089008,
+    "_what": "12th Ave S and S Jackson St, the traffic signal where the two ways meet"
+  },
+  "area": {
+    "east_m": [
+      -512,
+      512
+    ],
+    "north_m": [
+      -768,
+      256
+    ]
+  },
+  "style": {
+    "colours": {
+      "road": "66676b",
+      "concrete": "9b9993"
+    },
+    "_what": "colours: the roads a sun-faded grey, the way KartaView's photos of 12th and Jackson and Dearborn show them (11-06); concrete lighter"
+  },
+  "marks": {
+    "start": {
+      "lat": 47.595936,
+      "lon": -122.32019,
+      "on": "ground",
+      "above": 0.3,
+      "_what": "the camp (11-06: a tent on the sidewalk between the bridge's supports): S Dearborn St's north sidewalk under I-5, beside the tent"
+    },
+    "deck_mid": {
+      "lat": 47.59552,
+      "lon": -122.31728,
+      "on": "top",
+      "above": 0.05,
+      "_what": "on the Jose Rizal Bridge's deck, over the start"
+    },
+    "jackson_12th": {
+      "lat": 47.59921,
+      "lon": -122.31724,
+      "on": "top",
+      "above": 0.05
+    },
+    "jackson_west": {
+      "lat": 47.59921,
+      "lon": -122.3195,
+      "on": "top",
+      "above": 0.05
+    },
+    "pacific_tower": {
+      "lat": 47.5929,
+      "lon": -122.3164,
+      "on": "ground",
+      "above": 0.05
+    },
+    "bridge_north_end": {
+      "lat": 47.5966,
+      "lon": -122.31724,
+      "on": "top",
+      "above": 0.05
+    },
+    "bridge_south_end": {
+      "lat": 47.59448,
+      "lon": -122.31682,
+      "on": "top",
+      "above": 0.05
+    },
+    "camp_tent": {
+      "lat": 47.595936,
+      "lon": -122.320219,
+      "on": "ground",
+      "above": 0.15,
+      "_what": "the tent's middle, on the sidewalk (its curb's height up) under the middle of I-5's four-lane deck"
+    },
+    "camp_scooter": {
+      "lat": 47.595736,
+      "lon": -122.3201,
+      "on": "ground",
+      "above": 0.05,
+      "_what": "the rental, across the street from the camp on the eastbound carriageway's protected track (way 428246930's right side)"
+    },
+    "camp_east": {
+      "lat": 47.595756,
+      "lon": -122.319,
+      "on": "ground",
+      "above": 0.05,
+      "_what": "east along Dearborn's eastbound carriageway from the camp: where the rental faces"
+    }
+  },
+  "views": {
+    "under": {
+      "eye": {
+        "lat": 47.595757,
+        "lon": -122.320219,
+        "on": "ground",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.595936,
+        "lon": -122.320219,
+        "on": "ground",
+        "above": 1.0
+      }
+    },
+    "deck_south": {
+      "eye": {
+        "lat": 47.5963,
+        "lon": -122.31726,
+        "on": "top",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.5929,
+        "lon": -122.3164,
+        "on": "ground",
+        "above": 30.0
+      }
+    },
+    "deck_north": {
+      "eye": {
+        "lat": 47.595,
+        "lon": -122.31728,
+        "on": "top",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.59921,
+        "lon": -122.31724,
+        "on": "ground",
+        "above": 6.0
+      }
+    },
+    "jackson": {
+      "eye": {
+        "lat": 47.59925,
+        "lon": -122.3154,
+        "on": "top",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.59925,
+        "lon": -122.3205,
+        "on": "ground",
+        "above": 1.7
+      }
+    },
+    "high": {
+      "eye": {
+        "lat": 47.587,
+        "lon": -122.3275,
+        "on": "ground",
+        "above": 450.0
+      },
+      "at": {
+        "lat": 47.596,
+        "lon": -122.3172,
+        "on": "ground",
+        "above": 0.0
+      },
+      "hero": {
+        "lat": 47.596,
+        "lon": -122.3172,
+        "on": "ground",
+        "above": 0.05
+      }
+    },
+    "fault": {
+      "eye": {
+        "lat": 47.59945,
+        "lon": -122.3169,
+        "on": "top",
+        "above": 4.0
+      },
+      "at": {
+        "lat": 47.59915,
+        "lon": -122.31745,
+        "on": "top",
+        "above": 0.0
+      }
+    },
+    "camp_high": {
+      "eye": {
+        "lat": 47.5957,
+        "lon": -122.320219,
+        "on": "ground",
+        "above": 26.0
+      },
+      "at": {
+        "lat": 47.595936,
+        "lon": -122.320219,
+        "on": "ground",
+        "above": 0.0
+      }
+    },
+    "camp_side": {
+      "eye": {
+        "lat": 47.5959,
+        "lon": -122.32048,
+        "on": "ground",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.595936,
+        "lon": -122.3201,
+        "on": "ground",
+        "above": 1.4
+      }
+    },
+    "kv_jackson": {
+      "eye": {
+        "lat": 47.5993,
+        "lon": -122.3174,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.59894,
+        "lon": -122.3174,
+        "on": "top",
+        "above": 1.5
+      }
+    },
+    "kv_dearborn": {
+      "eye": {
+        "lat": 47.59588,
+        "lon": -122.3174,
+        "on": "top",
+        "above": 1.3
+      },
+      "at": {
+        "lat": 47.59588,
+        "lon": -122.31795,
+        "on": "top",
+        "above": 1.3
+      }
+    },
+    "c12_nw": {
+      "eye": {
+        "lat": 47.599341,
+        "lon": -122.317435,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599071,
+        "lon": -122.317035,
+        "on": "top",
+        "above": 1.5
+      },
+      "_what": "12th and Jackson from its northwest corner, across to the southeast"
+    },
+    "c12_ne": {
+      "eye": {
+        "lat": 47.599341,
+        "lon": -122.317035,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599071,
+        "lon": -122.317435,
+        "on": "top",
+        "above": 1.5
+      },
+      "_what": "from the northeast corner, across to the southwest"
+    },
+    "c12_se": {
+      "eye": {
+        "lat": 47.599071,
+        "lon": -122.317035,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599341,
+        "lon": -122.317435,
+        "on": "top",
+        "above": 1.5
+      },
+      "_what": "from the southeast corner, across to the northwest"
+    },
+    "c12_sw": {
+      "eye": {
+        "lat": 47.599071,
+        "lon": -122.317435,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599341,
+        "lon": -122.317035,
+        "on": "top",
+        "above": 1.5
+      },
+      "_what": "from the southwest corner, across to the northeast"
+    },
+    "c12_high": {
+      "eye": {
+        "lat": 47.59869,
+        "lon": -122.31777,
+        "on": "ground",
+        "above": 32.0
+      },
+      "at": {
+        "lat": 47.599206,
+        "lon": -122.317235,
+        "on": "ground",
+        "above": 0.0
+      },
+      "_what": "the corner from 32 m up, to its southwest"
+    },
+    "kv12_north": {
+      "eye": {
+        "lat": 47.599697,
+        "lon": -122.317403,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599337,
+        "lon": -122.317423,
+        "on": "top",
+        "above": 1.4
+      },
+      "_what": "KartaView 2016 frame 5329681's spot: 56 m north on 12th, looking south"
+    },
+    "kv12_south": {
+      "eye": {
+        "lat": 47.598902,
+        "lon": -122.317399,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.598542,
+        "lon": -122.317452,
+        "on": "top",
+        "above": 1.4
+      },
+      "_what": "KartaView 2016 frame 5329999's spot: 36 m south on 12th, looking south"
+    },
+    "p12_ne": {
+      "eye": {
+        "lat": 47.599386,
+        "lon": -122.317208,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599458,
+        "lon": -122.317048,
+        "on": "top",
+        "above": 1.0
+      },
+      "_what": "the bus stop on 12th's east side, north of Jackson, from 12th: a group by the shelter, a seller, a crouch"
+    },
+    "p12_jk": {
+      "eye": {
+        "lat": 47.599242,
+        "lon": -122.316995,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599314,
+        "lon": -122.316889,
+        "on": "top",
+        "above": 1.0
+      },
+      "_what": "Jackson's north sidewalk east of 12th, by the fenced lot: a group of four"
+    },
+    "p12_se": {
+      "eye": {
+        "lat": 47.59917,
+        "lon": -122.317155,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.59908,
+        "lon": -122.316969,
+        "on": "top",
+        "above": 1.0
+      },
+      "_what": "the southeast corner from the junction: two groups talking, a lookout, a seller"
+    },
+    "p12_sw": {
+      "eye": {
+        "lat": 47.598936,
+        "lon": -122.317248,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.598828,
+        "lon": -122.317355,
+        "on": "top",
+        "above": 0.8
+      },
+      "_what": "12th's west sidewalk south of Jackson: a seller, a crouch, the folded"
+    },
+    "p12_lie": {
+      "eye": {
+        "lat": 47.598828,
+        "lon": -122.317202,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.598747,
+        "lon": -122.317108,
+        "on": "top",
+        "above": 0.5
+      },
+      "_what": "12th's east sidewalk south of Jackson: someone lying on cardboard, someone folded"
+    },
+    "p12_mural": {
+      "eye": {
+        "lat": 47.599233,
+        "lon": -122.317215,
+        "on": "top",
+        "above": 3.2
+      },
+      "at": {
+        "lat": 47.5990917,
+        "lon": -122.317235,
+        "on": "top",
+        "above": 0.0
+      },
+      "_what": "the crosswalk painted as a mural, across 12th on the junction's south side, from the junction"
+    },
+    "p12_pen": {
+      "eye": {
+        "lat": 47.599143,
+        "lon": -122.317275,
+        "on": "top",
+        "above": 2.2
+      },
+      "at": {
+        "lat": 47.5990512,
+        "lon": -122.3173989,
+        "on": "top",
+        "above": 0.6
+      },
+      "_what": "the bin pen in the southwest lot's corner, from the junction"
+    },
+    "p12_cam": {
+      "eye": {
+        "lat": 47.59908,
+        "lon": -122.3173949,
+        "on": "ground",
+        "above": 8.0
+      },
+      "at": {
+        "lat": 47.5986661,
+        "lon": -122.3172084,
+        "on": "ground",
+        "above": 0.0
+      },
+      "_what": "about where SDOT's camera CMR-0193 hangs, at the southwest corner, looking south along 12th"
+    },
+    "f12_se_front": {
+      "eye": {
+        "lat": 47.599044,
+        "lon": -122.3173283,
+        "on": "top",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.5988821,
+        "lon": -122.3171124,
+        "on": "top",
+        "above": 2.0
+      }
+    },
+    "f12_sw_front": {
+      "eye": {
+        "lat": 47.599026,
+        "lon": -122.3173149,
+        "on": "top",
+        "above": 1.7
+      },
+      "at": {
+        "lat": 47.5988344,
+        "lon": -122.3175547,
+        "on": "top",
+        "above": 2.6
+      }
+    },
+    "ph_aerial": {
+      "eye": {
+        "lat": 47.59926,
+        "lon": -122.3170485,
+        "on": "ground",
+        "above": 24.0
+      },
+      "at": {
+        "lat": 47.59899,
+        "lon": -122.3174482,
+        "on": "ground",
+        "above": 0.0
+      },
+      "_what": "like an aerial photo of the southwest lot (11-06)"
+    },
+    "ph_jackson": {
+      "eye": {
+        "lat": 47.599287,
+        "lon": -122.3175281,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599008,
+        "lon": -122.3175014,
+        "on": "top",
+        "above": 1.4
+      },
+      "_what": "like a photo across Jackson at the lot's fence (11-06)"
+    },
+    "ph_corner": {
+      "eye": {
+        "lat": 47.599305,
+        "lon": -122.317275,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599026,
+        "lon": -122.3174082,
+        "on": "top",
+        "above": 1.3
+      },
+      "_what": "like a photo across Jackson at the southwest corner (11-06)"
+    },
+    "ph_band": {
+      "eye": {
+        "lat": 47.599098,
+        "lon": -122.3173283,
+        "on": "top",
+        "above": 1.65
+      },
+      "at": {
+        "lat": 47.5990692,
+        "lon": -122.3176347,
+        "on": "top",
+        "above": 0.9
+      },
+      "_what": "along the band at the lot's fence on Jackson, from the corner"
+    },
+    "ph_band12": {
+      "eye": {
+        "lat": 47.5990845,
+        "lon": -122.3173216,
+        "on": "top",
+        "above": 1.65
+      },
+      "at": {
+        "lat": 47.5988461,
+        "lon": -122.3173656,
+        "on": "top",
+        "above": 0.9
+      },
+      "_what": "along the band at the lot's fence on 12th, from the corner"
+    },
+    "ph_dinghow": {
+      "eye": {
+        "lat": 47.599314,
+        "lon": -122.3165156,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.598981,
+        "lon": -122.3165156,
+        "on": "top",
+        "above": 4.0
+      },
+      "_what": "Ding How Shopping Center from across Jackson"
+    },
+    "ph_photo2": {
+      "eye": {
+        "lat": 47.5992915,
+        "lon": -122.3175547,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.598972,
+        "lon": -122.3169419,
+        "on": "top",
+        "above": 3.0
+      },
+      "_what": "like a photo across Jackson, toward the gables"
+    },
+    "ph_gable": {
+      "eye": {
+        "lat": 47.599323,
+        "lon": -122.3166222,
+        "on": "top",
+        "above": 1.6
+      },
+      "at": {
+        "lat": 47.599071,
+        "lon": -122.3168194,
+        "on": "top",
+        "above": 7.5
+      },
+      "_what": "Ding How Shopping Center's west wing and its gable, from across Jackson"
+    }
+  },
+  "checks": {
+    "bridges": [
+      "Jose Rizal Bridge"
+    ],
+    "profile": {
+      "name": "12th Ave S, Jackson to Pacific Tower",
+      "to": {
+        "lat": 47.5929,
+        "lon": -122.3168
+      },
+      "step_m": 50
+    }
+  },
+  "light": {
+    "_what": "the set's air: fog a unit (about a quarter gone at 300 m, most of it at the far plane), its colour the sky's horizon. The sun is the game's (its hour)",
+    "fog": [
+      0.00055
+    ]
+  },
+  "hotspots": [
+    {
+      "name": "12th and Jackson",
+      "node": 53089008,
+      "radius_m": 75,
+      "people": 30,
+      "tents": 2,
+      "_what": "the open-air drug market. The news has it as the epicentre of the drug market and of selling stolen goods on the street, worst at night and at weekends (KOMO, 10-05-2026; Axios, 09-17-2025): people along the sidewalks, by the bus stops and along the fences. skate_src/citymap/layers.py lays them out by rule",
+      "band": {
+        "people": 46,
+        "step_m": 1.1,
+        "second_row": 0.45,
+        "_source": "photos of the corner (11-06, looked at, nothing kept): a band of people along the lot's fences on 12th and on Jackson, a metre or so apart and two deep in places, most against the fence sitting on the ground, hunched over their hands, standing, crouched over bags or folded, among them wheelchairs, walkers, bikes and bags. What's laid out is what each person is doing and how they stand: it is a bus stop, and few of them are waiting for a bus. Packed is its ordinary day: the photos' crowd is the corner as it is, not a bad day"
+      },
+      "canopy_stops": [
+        "8541"
+      ],
+      "_canopy": "a photo of the stop on Jackson (King County Metro 8541, routes 7, 14 and 106): a pop-up canopy with things for sale behind the people at the stop"
+    }
+  ],
+  "tags": {
+    "way/906291534": {
+      "building:levels": "7",
+      "_source": "Daily Journal of Commerce (djc.com/news/co/12142622.html): the BEAM at 1029 S Jackson St is seven storeys"
+    },
+    "way/860292619": {
+      "crossing:markings": "surface",
+      "crossing:mural": "yes",
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), its live picture looked at on 11-06 for what's there (nothing of it kept): the city's camera policy has it for public information. It hangs at the southwest corner and looks south along 12th (confirmed 11-06): the crosswalk across 12th on the junction's south side is painted as a mural (the map says lines). Ours is our own design, not the artist's"
+    },
+    "way/235387739": {
+      "building:colour": "#d5d6d1",
+      "_source": "SDOT's camera CMR-0193 and the King County Assessor's record (parcel 817010-0115, 1201 S Jackson St: a vacant retail/warehouse of one storey, built 1917) with its photo: one tall storey painted light grey (cream in the assessor's older photo), a row of high windows over its shopfronts, lower than Ding How Shopping Center behind it to the east (whose gable shows over its roof)",
+      "height": "6.2",
+      "facade:high_windows": "yes"
+    },
+    "way/235387609": {
+      "building:colour": "#c9ae80",
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), at the junction's southwest corner looking south along 12th (confirmed 11-06), its live picture looked at on 11-06 while working on this corner, nothing of it kept. Sizes and places are my reading of its picture against the map's outlines (open to correction): the southwest building's front, across its lot, is tan over dark piers"
+    },
+    "way/27183397": {
+      "lot:car_share": "0.9",
+      "lot:car_side": "south",
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept) (the aerial) and SDOT's camera CMR-0193, looked at 17:53 on 11-06 (after dark), nothing kept: the southwest lot is nearly empty, three or four cars nose-in at the building's front and nothing along the fences"
+    },
+    "way/235387701": {
+      "building:colour": "#cfd0cc",
+      "facade:cornice": "#dddedb",
+      "facade:band": "yes",
+      "facade:windows": "2.7,1.65,0.95,3.4",
+      "facade:mullions": "2",
+      "_source": "the King County Assessor's records (eReal Property, read 11-06): parcel 817010-0120, 1207 S Jackson St, DING HOW SHOPPING CENTER, two storeys over a basement of parking, very irregular, wood frame, built 1991 (with 817010-0125 and -0135); and photos across Jackson and at the stop on Jackson (looked at, nothing kept): light grey stucco, a deep cornice along the top of its walls and a band under its upper windows, the upper windows wide, in three panes, between broad piers (a photo across Jackson)"
+    }
+  },
+  "features": [
+    {
+      "kind": "bin_pen",
+      "at": {
+        "lat": 47.5990512,
+        "lon": -122.3173989
+      },
+      "size_m": [
+        3.4,
+        2.6
+      ],
+      "yaw_deg": 0,
+      "bins": 7,
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), its live picture looked at on 11-06 for what's there (nothing of it kept): the city's camera policy has it for public information. It hangs at the southwest corner and looks south along 12th (confirmed 11-06): right under it, in the corner of the southwest lot behind the sidewalks, a chain-link pen of wheeled garbage and recycling bins, trash heaped in front of it"
+    },
+    {
+      "kind": "fence",
+      "points": [
+        {
+          "lat": 47.5990638,
+          "lon": -122.3174215
+        },
+        {
+          "lat": 47.5990638,
+          "lon": -122.317672
+        }
+      ],
+      "height_m": 2.4,
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), its live picture looked at on 11-06 for what's there (nothing of it kept): the city's camera policy has it for public information. It hangs at the southwest corner and looks south along 12th (confirmed 11-06): the southwest lot fenced along Jackson's sidewalk, west of the pen (as far as the camera shows) | photos of 12th and Jackson (11-06, looked at, nothing kept): the lot's fence runs its whole length on both streets, to the buildings, higher than a person, coiled razor wire along its top",
+      "razor": true
+    },
+    {
+      "kind": "fence",
+      "points": [
+        {
+          "lat": 47.5990395,
+          "lon": -122.3173749
+        },
+        {
+          "lat": 47.5988389,
+          "lon": -122.3173749
+        }
+      ],
+      "height_m": 1.8,
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), its live picture looked at on 11-06 for what's there (nothing of it kept): the city's camera policy has it for public information. It hangs at the southwest corner and looks south along 12th (confirmed 11-06): and along 12th's sidewalk, south of the pen (as far as the camera shows) | photos of 12th and Jackson (11-06, looked at, nothing kept): the lot's fence runs its whole length on both streets, to the buildings"
+    },
+    {
+      "kind": "shopfront",
+      "way": 235387739,
+      "wall_at": {
+        "lat": 47.5989181,
+        "lon": -122.3171124
+      },
+      "from": "north",
+      "bays": [
+        {
+          "m": 5.4,
+          "sign": [
+            "GROCERY",
+            "f4d03f",
+            "a3161c"
+          ],
+          "awning": "2e8b45"
+        },
+        {
+          "m": 21.6,
+          "boarded": true
+        },
+        {
+          "m": 1.6,
+          "plain": true
+        },
+        {
+          "m": 5.6,
+          "sign": [
+            "BODY MASSAGE",
+            "f2efe6",
+            "b3262a"
+          ]
+        }
+      ],
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), at the junction's southwest corner looking south along 12th (confirmed 11-06), its live picture looked at on 11-06 while working on this corner, nothing of it kept. Sizes and places are my reading of its picture against the map's outlines (open to correction): the southeast corner building's front along 12th, from Jackson south: the corner shop under a green awning with a yellow sign (the map has a convenience store there), then its windows boarded and painted all along (ours are painted with our own design), then a door, and at the south end a white sign with red words where the wall says massage. Our words, not its signs'"
+    },
+    {
+      "kind": "shopfront",
+      "way": 235387609,
+      "wall_at": {
+        "lat": 47.5988344,
+        "lon": -122.3175281
+      },
+      "from": "east",
+      "bays": [
+        {
+          "m": 1.0,
+          "plain": true
+        },
+        {
+          "m": 6.0,
+          "sign": [
+            "TOFU",
+            "f2efe6",
+            "2e7d4f",
+            0.6,
+            3.0
+          ]
+        },
+        {
+          "m": 9.0,
+          "sign": [
+            "BUFFET & PHỞ",
+            "f4f1e6",
+            "c8202a",
+            1.1,
+            6.0
+          ]
+        },
+        {
+          "m": 6.0,
+          "sign": [
+            "BUBBLE TEA",
+            "f4ead0",
+            "c8202a",
+            0.8,
+            4.0
+          ]
+        }
+      ],
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), at the junction's southwest corner looking south along 12th (confirmed 11-06), its live picture looked at on 11-06 while working on this corner, nothing of it kept. Sizes and places are my reading of its picture against the map's outlines (open to correction): the southwest building's front faces north across its lot (its wing along the lot's south side): a small white sign with red words toward 12th, a big one at its west end, dark windows between brown piers. Our words, not its signs' (the map has a vegan tofu deli there) | photos of 12th and Jackson (11-06, looked at, nothing kept): from 12th west, a small white sign with green words, a big white one with red, a red one over the west end. Our words, never the shops' names",
+      "piers": "5a3226"
+    },
+    {
+      "kind": "billboard",
+      "at": {
+        "lat": 47.5987921,
+        "lon": -122.3175281
+      },
+      "faces_deg": 200,
+      "size_m": [
+        14.6,
+        4.3
+      ],
+      "bottom_m": 7.4,
+      "words": [
+        "AVAILABLE",
+        "CALL 206-555-0148"
+      ],
+      "colours": [
+        "1c3a6e",
+        "f4f1e6",
+        "f4d03f"
+      ],
+      "_source": "SDOT's traffic camera CMR-0193 (12th Ave S & S Jackson St), at the junction's southwest corner looking south along 12th (confirmed 11-06), its live picture looked at on 11-06 while working on this corner, nothing of it kept. Sizes and places are my reading of its picture against the map's outlines (open to correction): a billboard stands on the southwest building's roof; the camera sees its grey back, so its face looks away from the junction, to the south-southwest. What its face says is ours (a board for rent, a 555 number)"
+    },
+    {
+      "kind": "litter",
+      "way": 27183397,
+      "count": 140,
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept) (the aerial): paper, cups, cans and bags dropped all over the southwest lot"
+    },
+    {
+      "kind": "sign",
+      "what": "school",
+      "at": {
+        "lat": 47.5990926,
+        "lon": -122.3173469
+      },
+      "faces_deg": 0,
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept), and the city's camera: a school crossing sign with its SCHOOL plate on the pole at the southwest corner, facing north"
+    },
+    {
+      "kind": "bins",
+      "at": {
+        "lat": 47.5990737,
+        "lon": -122.3176213
+      },
+      "faces_deg": 0,
+      "which": [
+        "garbage",
+        "recycle"
+      ],
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept): the city's black Garbage and blue Recycle bins side by side at the stop on Jackson, written on"
+    },
+    {
+      "kind": "bins",
+      "at": {
+        "lat": 47.599089,
+        "lon": -122.3174415
+      },
+      "faces_deg": 0,
+      "which": [
+        "garbage"
+      ],
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept) (the aerial): a black Garbage bin on Jackson's sidewalk by the corner"
+    },
+    {
+      "kind": "crest",
+      "way": 235387701,
+      "items": [
+        {
+          "wall_at": {
+            "lat": 47.5990728,
+            "lon": -122.3168194
+          },
+          "gable": [
+            6.6,
+            3.6
+          ],
+          "emblem": "ji:d42a2a"
+        },
+        {
+          "wall_at": {
+            "lat": 47.599071,
+            "lon": -122.3162145
+          },
+          "gable": [
+            6.6,
+            3.6
+          ],
+          "emblem": "ji:d42a2a"
+        },
+        {
+          "wall_at": {
+            "lat": 47.5989208,
+            "lon": -122.3165156
+          },
+          "lettering": [
+            "SHOPPING CENTER",
+            "c8202a",
+            0.95,
+            13.0
+          ]
+        }
+      ],
+      "_source": "the King County Assessor's records (eReal Property, read 11-06): parcel 817010-0120, 1207 S Jackson St, DING HOW SHOPPING CENTER, two storeys over a basement of parking, very irregular, wood frame, built 1991 (with 817010-0125 and -0135); and photos across Jackson and at the stop on Jackson (looked at, nothing kept): a raised gable over each of its two wings on Jackson with a red emblem on it, and red letters along the front between them (the court between the wings is its parking). Each gable a pediment: a raised block over the cornice, a low triangle on it with a cornice along its shoulders and its rakes, a big red character on the block (the real one says 好, from the building's own name 頂好; ours says 吉, lucky, drawn by code). The words are common ones: never its name"
+    }
+  ],
+  "districts": [
+    {
+      "name": "Chinatown-International District",
+      "relation": 17914850,
+      "buffer_m": 20,
+      "lamps": "lantern",
+      "_source": "The red lamp posts are the neighbourhood's own mark (11-06). The outline is the city's own (OpenStreetMap relation 17914850, admin_level 9), widened 20 m so both sides of a street on its edge (Jackson) have them. Their shape is read off SDOT's camera CMR-0193 on 12th south of Jackson and photos of 12th and Jackson (11-06, looked at, nothing kept); ours, made by code"
+    },
+    {
+      "name": "Little Saigon",
+      "relation": 17914851,
+      "buffer_m": 60,
+      "signs": "vi",
+      "_source": "photos of 12th and Jackson (11-06, looked at, nothing kept): the street-name blades at 12th and Jackson have brown plates in Vietnamese under them (Nam Đường Jackson, Đường Số 12 Nam), and the shops' signs are in Vietnamese and English. The outline is the city's (OpenStreetMap relation 17914851, admin_level 10), widened 60 m to take in the shops across Jackson"
+    }
+  ]
+}

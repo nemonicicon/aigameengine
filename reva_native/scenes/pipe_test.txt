@@ -1,0 +1,25 @@
+# ROBOT NEKO ep 11 -- FIXTURE for the HALF-PIPE (sets/pipe_test.set). Action lines only: no voice.
+# BUILT FOR IT (ep 11): `halfpipe` in a .set (one definition drives the mesh, the ride and the clip audit);
+# hpipe/ppipe=<name>[,<air>] -- drop in off the nearer coping and run the vert cycle, `air` u over the coping,
+# 180 in the air, until the value changes; hair/pair=<clip>[,...] -- a one-shot at the START of each air,
+# cycling, through the trick scheduler. Log: `[halfpipe]`, `[pipe] slot N on ...`, `[pipe] slot N air K apex y=`.
+# reva stands on the +x deck 1.5 u behind the coping, rolls across it (kickturning 180 onto the ride's facing),
+# drops in, and kickflips at the start of every air (air 2.0); kaeli rolls in off the far deck 3 u down the axis,
+# air 1.5, alternating a shove-it and a kickflip.
+# The lens is PINNED side-on, down the axis: the whole cross-section, both decks and every apex in frame;
+# then it rides beside reva (camtrack follows a pipe rider up the wall: locoWhere hands the lenses her torso),
+# then back to the wide as both stop and return to their deck marks.
+# hlook/plook=0 is belt and braces: the look-at already stands down for a body on a pipe.
+cast 0=reva 1=kaeli
+mouth hinge
+
+# --- ON THE DECKS ---------------------------------------------------------------------------------------------
+0 dur=1.5 step=12 tod=13.0 snap=1 hlook=0 plook=0 hmark=pipe_deck pmark=pipe_deck2 hclip=z_rm_sk_ride pclip=z_rm_sk_ride hprop=skateboard@1.4@0@board pprop=skateboard@1.4@0@board cam=0.0,6.0,27.0,0.0,5.5,0.0,55 |
+# --- reva drops in ---------------------------------------------------------------------------------------------
+0 dur=1.4 hpipe=vert,2.0 hair=z_rm_sk_kf cam=0.0,6.0,27.0,0.0,5.5,0.0,55 |
+# --- kaeli drops in off the other wall, half a cycle later ------------------------------------------------------
+1 dur=9.0 ppipe=vert,1.5 pair=z_rm_sk_shove,z_rm_sk_kf cam=0.0,6.0,27.0,0.0,5.5,0.0,55 |
+# --- the lens rides beside reva: side-on, 14 u down the axis, following her up the walls -----------------------
+0 dur=5.0 camtrack=0,14,2.0,90,50,1.6 |
+# --- both stop: back on their decks (the ride ends; a body returns to its mark) ---------------------------------
+0 dur=2.0 hpipe=off ppipe=off hair=off pair=off cam=0.0,6.0,27.0,0.0,5.5,0.0,55 |

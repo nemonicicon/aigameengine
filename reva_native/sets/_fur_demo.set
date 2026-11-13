@@ -1,0 +1,16 @@
+# _fur_demo -- made by scenes/fur_demo.py: fur on animals, four coats side by side, each on its own clips
+sun 40 60 1.3
+sky 0.40 0.46 0.58
+wind 1.6 0.0 0.5 0.6
+prop floor_01    0.00  0.00   0.00   0  1.6   0.62 0.66 0.60
+prop floor_01    7.00  0.00   0.00   0  1.6   0.62 0.66 0.60
+prop floor_01    0.00  0.00   7.00   0  1.6   0.62 0.66 0.60
+prop floor_01    7.00  0.00   7.00   0  1.6   0.62 0.66 0.60
+# standing, in the wind
+actor animal_shiba   Idle   0.0 0 0.0   20 1.0
+actor animal_husky   Idle   1.6 0 0.0   20 1.0
+actor animal_fox     Idle   3.4 0 0.0   20 1.0
+actor animal_alpaca  Idle   5.6 0 0.0   20 1.0
+# running laps, at the speed each clip's own paws go back at (1.83 and 1.31 units a second): the coat trails, and at the lap's end it's a cut
+actor animal_husky   Gallop  -1.0 0 2.6   90 1.0 1.0 1.83 9.0
+actor animal_shiba   Gallop  -1.0 0 3.8   90 1.0 1.0 1.31 9.0

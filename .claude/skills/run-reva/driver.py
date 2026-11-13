@@ -1,0 +1,1051 @@
+#!/usr/bin/env python
+"""driver.py -- build, launch and DRIVE the club (reva_native/crowd.exe) headlessly.
+
+The club is a fullscreen Vulkan game, and how it looks only ever comes out as PIXELS (what it
+decides has a receipt with no window: `check`). This is the handle on it. Every subcommand below leaves a PNG (or an MP4)
+on disk that you are expected to LOOK at -- the engine's own law is "pixels or it
+didn't happen", and a log line is not a receipt.
+
+    python .claude/skills/run-reva/driver.py <command> [...]
+
+    build                      compile to crowd_new.exe (mingw64 PATH handled)
+    buildvk [--game X]         one game, with no old game modes -> crowd_X_vk.exe (no --game: crowd_vk.exe)
+    buildsoft [--game X]       the same on the engine's own rasterizer, no driver -> crowd_X_soft.exe
+                               X is a folder name in games/, or a PATH: a game's .c file, or a folder holding one,
+                               anywhere on the disk. That game includes "engine.h", found through -I, and its exe
+                               is written beside its .c file
+    check [--game X]           THE RECEIPT: the rules' hashes and the frame's against anim_bench/hash_refs,
+                               no window (--bless writes them, once you know why they changed)
+    promote                    crowd_new.exe -> crowd.exe (after you've looked)
+    kill                       kill any running instance (only one may run)
+    up / down                  leave ONE window running for a run of shots (--live on lab, face, looks), close it
+    packs [substr]             list packs, or census one pack's clips/morphs/marks
+    shot OUT.png               boot the club and capture a frame
+    lab OUT.png                the ANIM LAB with a ctl line (--ctl "...")
+    looks OUT.png              ONE SET FROM EVERY CAMERA in one boot (--set, --cams): a PNG a camera, and a sheet
+    face OUT.png               the FACE RIG (8 angles + mouth/eye cams) + mark gizmo
+    scene OUT.mp4              record a conversation scene with its audio muxed in
+    bench OUT.png              ONE BODY, FOUR ANGLES x N frames, nothing else in frame
+    marks                      PLACE THE FACE MARKS BY CLICKING ON HER (interactive)
+
+Run `... driver.py <command> --help` for the flags. Everything takes --subject
+(default r2moves) which names packs/v1_<subject>.rpack.
+
+WHY EACH GUARD IS HERE (all learned the hard way, see SKILL.md Gotchas):
+  * gcc needs mingw64 FIRST on PATH -- the shell's own /mingw64/bin entry is dead.
+  * only ONE instance may run; a second one fights for the GPU and the ctl file.
+  * the engine writes PPM and needs a WINDOWS path for it ("a native exe needs a
+    Windows path" is its own error message), so paths are absolutised here.
+  * a ctl file is only re-read when seq= CHANGES, so seq is stamped per write.
+  * REVA_WINDOWED=1 or it goes fullscreen over whatever you were looking at.
+"""
+import argparse, os, re, shutil, subprocess, sys, time, glob
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # the repo root
+NATIVE = os.path.join(ROOT, "reva_native")
+AUTHOR = os.path.join(ROOT, "skate_src", "author")
+
+# bare `python` is the Microsoft Store alias: it shadows APPDATA and poisons results.
+PY = os.environ.get("CLUB_PYTHON", sys.executable)
+MINGW = r"C:\msys64\mingw64\bin"
+LF = chr(10)
+FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
+    os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
+    "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "ffmpeg*", "bin", "ffmpeg.exe"))), None)   # PATH first (Linux, 09-30), then WinGet
+
+GAME = "games/rvz/rvz.c" if os.path.exists(os.path.join(NATIVE, "games", "rvz", "rvz.c")) else "games/sample/sample.c"   # the game's one file; the kit has only the sample
+SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", GAME, "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
+LIBS = ["-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lvulkan-1", "-lm"]   # step 18 (11-04): the old renderer is gone, so every build is the Vulkan engine
+RENDER = ["gfx_packet.c", "gfx_vk.c"]   # the frame as data, and what draws it. The no-display build takes the first alone
+DEFS = ["-DREVA_VK"]
+# ⭐ THE ENGINE'S OWN RASTERIZER (queue step 27, 11-05): gfx_soft.c in gfx_vk.c's place, and nothing links Vulkan. 320 x 240 on the processor, the same pixels on every machine
+SOFT_RENDER = ["gfx_packet.c", "gfx_soft.c"]
+SOFT_DEFS = ["-DREVA_SOFT"]
+SOFT_LIBS = [l for l in LIBS if l != "-lvulkan-1"]
+
+# the face rig's panel rectangles in the saved 1280x720 image (crowd_kms.c, g_labFace):
+# eight heads across the top half, then the mouth and the eyes big across the bottom.
+PANELS = {"mouth": (0, 360, 640, 720), "eyes": (640, 360, 1280, 720),
+          "front": (0, 0, 320, 180), "profile": (640, 0, 960, 180),
+          "full": None}
+
+
+def sh(cmd, **kw):
+    return subprocess.run(cmd, shell=isinstance(cmd, str), **kw)
+
+
+def win(p):
+    """the engine is a native exe: it cannot open /c/... or a relative path"""
+    return os.path.abspath(p).replace("/", "\\")
+
+
+def kill(_a=None):
+    for exe in ("crowd.exe", "crowd_new.exe", "crowd_band.exe", "crowd_vk.exe", "crowd_soft.exe"):
+        subprocess.run(["taskkill", "/IM", exe, "/F"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0
+
+
+def build(a):
+    """⛔ THE BUILD DIES WITHOUT MINGW64 ON PATH. The login shell's PATH carries a
+    /mingw64/bin entry that does not resolve, so gcc is simply absent; the repo also
+    warns it can fail SILENTLY with exit 1 and no output. Either way the fix is this
+    prepend, so it is not optional and not left to the caller."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
+    out = "crowd_new.exe"
+    # ⛔ (10-22) A RUNNING crowd_new.exe CANNOT BE OVERWRITTEN: `looks` / `up` leave a live window holding it, and the
+    # link then dies with nothing but "ld returned 1 exit status". Close it first.
+    if os.path.exists(LIVE):
+        down(a)
+    # ⛔ On Windows, subprocess resolves the EXE from the PARENT's PATH -- the env=
+    # you hand it is only inherited by the child. Passing "gcc" here fails with
+    # WinError 2 even though env["PATH"] starts with mingw64. Name it absolutely; the
+    # env PATH still matters, because the linker looks up its DLLs through it.
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + ["-o", out] + SRC + RENDER + LIBS
+    print("build: " + " ".join(cmd))
+    r = subprocess.run(cmd, cwd=NATIVE, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    errs = [l for l in r.stdout.splitlines() if " error" in l or l.startswith("cc1")]
+    if r.returncode != 0 or errs:
+        print("\n".join(errs[:40]) or r.stdout[-4000:])
+        print("build FAILED rc=%d" % r.returncode)
+        return 1
+    p = os.path.join(NATIVE, out)
+    print("build OK -> %s (%d bytes)" % (p, os.path.getsize(p)))
+    return 0
+
+
+def rc_object(env):
+    """crowd_win_rc.o is the UTF-8 manifest, built from crowd_win.rc: a fresh clone has the .rc and not the .o (git ignores *.o), and without it
+    fopen dies on a non-ASCII pack name. The kit's first build failed at the link for want of it (11-04), so every build makes it when it's missing."""
+    if os.path.exists(os.path.join(NATIVE, "crowd_win_rc.o")) or not os.path.exists(os.path.join(NATIVE, "crowd_win.rc")):
+        return
+    r = subprocess.run([os.path.join(MINGW, "windres.exe"), "crowd_win.rc", "-O", "coff", "-o", "crowd_win_rc.o"], cwd=NATIVE, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    print("windres: crowd_win_rc.o " + ("built" if r.returncode == 0 else "FAILED: " + r.stdout[-400:]))
+
+def other_game(a):
+    """the game asked for on the command line, when it isn't the one this tree builds by default"""
+    return a.game or ("sample" if a.sample else None)
+
+
+def game_unit(a):
+    """--game NAME is games/NAME/NAME.c, which includes "../../engine.h". --game PATH (a .c file, or a folder with one .c file in it) is a game in a folder
+    of its own anywhere: it includes "engine.h", which -I finds here, and its exe goes beside its .c file. Gives (name, the source list, where the exe goes, the -I)"""
+    name = other_game(a)
+    if not name:
+        return None, SRC, NATIVE, []
+    path = os.path.abspath(name)
+    if os.path.isdir(path) or (name.endswith(".c") and os.path.isfile(path)):
+        if os.path.isdir(path):
+            cs = sorted(glob.glob(os.path.join(path, "*.c")))
+            if len(cs) != 1:
+                sys.exit("--game %s: a game's folder holds one .c file, and this has %d" % (name, len(cs)))
+            path = cs[0]
+        stem = os.path.splitext(os.path.basename(path))[0]
+        return stem, [(path if f == GAME else f) for f in SRC], os.path.dirname(path), ["-I", NATIVE]
+    return name, [(f"games/{name}/{name}.c" if f == GAME else f) for f in SRC], NATIVE, []
+
+
+def buildvk(a):
+    """⭐ THE ENGINE ON VULKAN (11-02, engine plan Phase 2): crowd_vk.exe, or crowd_<game>_vk.exe for one game with no old game modes. Since step 18 (11-04) `build` makes the same engine as crowd_new.exe; this stays for the games. reva_native/rvz_vk.bat plays it."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
+    name, src, outdir, inc = game_unit(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it. Or --game PATH
+    exe = os.path.join(outdir, f"crowd_{name}_vk.exe" if name else "crowd_vk.exe")
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + RENDER + LIBS
+    r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
+    if r.returncode != 0 or errs:
+        print("\n".join(errs[:40]) or r.stdout[-4000:])
+        print("buildvk FAILED rc=%d" % r.returncode)
+        return 1
+    print("buildvk OK -> %s" % exe)
+    return 0
+
+
+def check(a):
+    """⭐ THE SIM'S RECEIPT (11-02, engine plan Phase 1). Builds the no-display engine and runs anim_bench/hashcheck.py: seconds, no window, the same answer on any machine.
+    It says whether the sim still does exactly what it did, and whether it asks for the same picture. Since step 19 (11-04) it also draws one frame on Mesa's software
+    Vulkan (lavapipe) when that's on the machine, and hashes it: the same pixels every run, a window for a few seconds. It still says nothing about how the picture looks."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
+    # --nodoors: the engine as the kit gets it, with no old game modes. It must print the same hashes. --game NAME: the same with that game, against its own hashes.
+    name = other_game(a)
+    exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"
+    src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
+    # ⭐ THE PIXELS (step 19, 11-04): with Mesa's software Vulkan (lavapipe) on this machine, the Vulkan engine is built too and hashcheck draws one frame on it.
+    # REVA_LAVAPIPE=<the lvp_icd json> names it; without it the pixels are skipped and said so.
+    icd = os.environ.get("REVA_LAVAPIPE") or os.path.normpath(os.path.join(ROOT, "..", "tools", "mesa-lavapipe", "x64", "lvp_icd.x86_64.json"))   # beside the checkout, unless it's named
+    vk = f"crowd_{name}_vk.exe" if name else "crowd_nodoors_vk.exe" if a.nodoors else "crowd_check_vk.exe"
+    builds = [cmd] + ([[os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", vk] + src + RENDER + LIBS] if os.path.exists(icd) else [])
+    # ⭐ THE ENGINE'S OWN RASTERIZER (step 27, 11-05): built too, for the games whose receipt has its pixels, and hashcheck hashes three of its frames with no window.
+    # Those are the same on every machine, so they need no driver's name beside them
+    soft = (f"crowd_{name}_soft.exe" if name else "crowd_nodoors_soft.exe" if a.nodoors else "crowd_check_soft.exe") if (name or "rvz") in ("rvz", "sample") else None
+    if soft:
+        builds.append([os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", soft] + src + SOFT_RENDER + SOFT_LIBS)
+    # every build at once: each is one compile of the one big file, so three take as long as one
+    procs = [subprocess.Popen(c, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") for c in builds]
+    failed = 0
+    for pr in procs:
+        out = pr.communicate()[0]
+        errs = [l for l in out.splitlines() if " error" in l or "undefined reference" in l or l.startswith("cc1")]
+        if pr.returncode != 0 or errs:
+            print("\n".join(errs[:40]) or out[-4000:])
+            print("check: build FAILED rc=%d" % pr.returncode)
+            failed = 1
+    if failed:
+        return 1
+    if not os.path.exists(icd):
+        print("check: no lavapipe at %s (REVA_LAVAPIPE names it): the pixels are skipped" % icd)
+    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--vk", os.path.join(NATIVE, vk)] if os.path.exists(icd) else []) + (["--soft", os.path.join(NATIVE, soft)] if soft else []) + (["--game", name] if name else []) + (["--bless"] if a.bless else []), cwd=NATIVE).returncode
+
+
+def buildsoft(a):
+    """⭐ THE ENGINE WITH NO DRIVER AT ALL (queue step 27): crowd_soft.exe, or crowd_<game>_soft.exe for one game with no old game modes. The engine's own rasterizer draws the
+    packet on the processor at 320 x 240 and puts it in a plain window. REVA_NOWINDOW=1 runs it with no window at all, which is how the receipt hashes its picture."""
+    env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
+    rc_object(env)
+    name, src, outdir, inc = game_unit(a)
+    exe = os.path.join(outdir, f"crowd_{name}_soft.exe" if name else "crowd_soft.exe")
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + SOFT_RENDER + SOFT_LIBS
+    r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
+    if r.returncode != 0 or errs:
+        print("\n".join(errs[:40]) or r.stdout[-4000:])
+        print("buildsoft FAILED rc=%d" % r.returncode)
+        return 1
+    print("buildsoft OK -> %s" % exe)
+    return 0
+
+
+def promote(_a):
+    """crowd_new.exe is what you test; crowd.exe is what dance.bat and the live window
+    run. The repo's law is: verify on pixels FIRST, then promote."""
+    shutil.copy2(os.path.join(NATIVE, "crowd_new.exe"), os.path.join(NATIVE, "crowd.exe"))
+    print("promoted crowd_new.exe -> crowd.exe")
+    return 0
+
+
+def _rx(pat):
+    try:
+        return re.compile(pat, re.I)
+    except re.error:
+        return re.compile(re.escape(pat), re.I)
+
+
+def _ctl(text):
+    """a ctl file is only re-read when seq= CHANGES, so stamp a fresh one every write"""
+    path = os.path.join(NATIVE, "anim_bench", "lab_ctl.txt")
+    seq = int(time.time()) % 100000
+    # ⛔ AND NEVER THE SAME ONE TWICE. A seconds clock repeats inside a second, and a live
+    # window is written to twice in one (the ctl, then the shot) -- the second write was lost.
+    try:
+        old = re.search(r"seq=(\d+)", open(path).read())
+        if old and int(old.group(1)) >= seq: seq = int(old.group(1)) + 1
+    except Exception:
+        pass
+    body = "seq=%d %s\n" % (seq, text.strip())
+    open(path, "w").write(body)
+    return path, body
+
+
+def _exe(a):
+    """which engine: --soft is the engine's own rasterizer (driver.py buildsoft), --new the build being tested, else the promoted one"""
+    return "crowd_soft.exe" if getattr(a, "soft", False) else "crowd_new.exe" if a.new else "crowd.exe"
+
+
+def _run(env_extra, exe, args, timeout=300, quiet=True):
+    kill()
+    exe_path = os.path.join(NATIVE, exe)
+    if not os.path.exists(exe_path):
+        print("no %s -- run `driver.py build` first" % exe); return None
+    env = dict(os.environ, REVA_WINDOWED="1", **env_extra)
+    if exe.endswith("_soft.exe"):
+        env["REVA_NOWINDOW"] = "1"   # the rasterizer draws in memory: a shot needs no window, so none is put on anyone's screen
+    r = subprocess.run([exe_path] + args, cwd=NATIVE, env=env, timeout=timeout,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    if not quiet:
+        print(r.stdout[-3000:])
+    return r
+
+
+def _ppm2png(ppm, png, crop=None, scale=None):
+    from PIL import Image
+    if not os.path.exists(ppm):
+        print("NO FRAME WRITTEN at %s" % ppm); return False
+    im = Image.open(ppm).convert("RGB")
+    if crop: im = im.crop(crop)
+    if scale: im = im.resize((int(im.size[0] * scale), int(im.size[1] * scale)), Image.LANCZOS)
+    im.save(png)
+    os.remove(ppm)
+    print("wrote %s  %dx%d   <-- LOOK AT IT" % (png, im.size[0], im.size[1]))
+    return True
+
+
+def _capture(a, ctl_text, env_extra, crop=None, scale=None, argv3=None):
+    exe = _exe(a)
+    if ctl_text is not None:
+        _, body = _ctl(ctl_text)
+        print("ctl: " + body.strip())
+        env_extra["REVA_LABCTL"] = "anim_bench/lab_ctl.txt"
+    ppm = os.path.splitext(os.path.abspath(a.out))[0] + ".ppm"
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
+    env_extra.update(REVA_SHOT=str(a.frame), REVA_SHOTN="1", REVA_SHOT_PATH=win(ppm))
+    for kv in (a.env or []):
+        k, _, v = kv.partition("="); env_extra[k] = v
+    r = _run(env_extra, exe, ["400", "packs", argv3 or a.subject], quiet=not a.verbose)
+    if r is None: return 1
+    if a.grep:
+        for line in r.stdout.splitlines():
+            # ⛔ THIS WAS A PLAIN SUBSTRING MATCH, so `--grep "cloth|set]"` silently
+            # matched NOTHING and read as "the engine printed nothing". Anyone typing
+            # --grep expects a regex; fall back to a literal if it will not compile.
+            if _rx(a.grep).search(line): print("  | " + line)
+    return 0 if _ppm2png(ppm, a.out, crop, scale) else 1
+
+
+LIVE = os.path.join(NATIVE, "anim_bench", "live.json")
+LIVELOG = os.path.join(NATIVE, "anim_bench", "live.log")
+
+
+def _pid_alive(pid):
+    r = subprocess.run(["tasklist", "/FI", "PID eq %d" % int(pid), "/NH"],
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace")
+    return str(int(pid)) in r.stdout
+
+
+def _live_rec():
+    import json
+    try:
+        rec = json.load(open(LIVE))
+    except Exception:
+        return None
+    return rec if _pid_alive(rec.get("pid", -1)) else None
+
+
+def _wait_file(p, timeout, pid=None):
+    """a frame is written when its size stops changing; give up if the engine died"""
+    t0, last, n = time.time(), -1, 0
+    while time.time() - t0 < timeout:
+        n += 1
+        if pid is not None and n % 12 == 0 and not _pid_alive(pid):
+            return False
+        if os.path.exists(p):
+            sz = os.path.getsize(p)
+            if sz > 0 and sz == last:
+                return True
+            last = sz
+        time.sleep(0.25)
+    return False
+
+
+def up(a):
+    """ONE WINDOW, KEPT UP. The engine opened and closed for every shot,
+    and it never had to. ctl `shot=<path>` has always
+    written the next frame of a RUNNING window and kept going (the LIVE SHOT branch of the frame
+    loop); the driver just never used it, so every lab/face shot paid a ~1 minute boot through
+    140+ packs. `up` boots once; `lab --live` / `face --live` steer that window through the ctl
+    file and grab frames from it; `down` closes it.
+    ⛔ A running window keeps the packs it BOOTED with. --live relaunches on its own, and says
+    why, when any pack on disk is newer than the boot, or the subject, exe or --env differ.
+    ⛔ `bench` and `scene` still boot their own engine (their captures are armed by env vars at
+    launch) and `kill` every window first, the live one included."""
+    import json
+    kill()
+    exe = _exe(a)
+    exe_path = os.path.join(NATIVE, exe)
+    if not os.path.exists(exe_path):
+        print("no %s -- run `driver.py build` first" % exe); return 1
+    env = dict(os.environ, REVA_WINDOWED="1", REVA_LABCTL="anim_bench/lab_ctl.txt",
+               REVA_AUTOMODE="11", REVA_ANIMSUBJ=a.subject, REVA_ANIMSTATE="0", REVA_FACEDBG="1")
+    if exe.endswith("_soft.exe"):
+        env["REVA_NOWINDOW"] = "1"   # kept up, and still nothing on the screen
+    for kv in (a.env or []):
+        k, _, v = kv.partition("="); env[k] = v
+    flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+    logf = open(LIVELOG, "w")
+    pr = subprocess.Popen([exe_path, "400", "packs", a.subject], cwd=NATIVE, env=env,
+                          stdout=logf, stderr=subprocess.STDOUT, creationflags=flags)
+    logf.close()
+    rec = dict(pid=pr.pid, exe=exe, subject=a.subject, t0=time.time(), env=a.env or [], sets={})
+    json.dump(rec, open(LIVE, "w"))
+    # BOOTED = IT ANSWERS A SHOT. The ctl is only polled once the lab loop runs, so the probe
+    # frame arriving is the boot finishing -- no frame number guessed against a load time.
+    probe = os.path.join(NATIVE, "anim_bench", "_live_probe.ppm")
+    if os.path.exists(probe): os.remove(probe)
+    t0 = time.time()
+    _ctl("face=0 grid=0 dqs=0 clip=z_upright partner=off shot=%s" % win(probe))
+    if not _wait_file(probe, 240, pr.pid):
+        print("live: the window never answered -- log tail:")
+        print("".join(open(LIVELOG, errors="replace").readlines()[-15:]))
+        return 1
+    os.remove(probe)
+    print("live: %s up with %s in %.0fs (pid %d). Steer it: lab/face --live. Close it: driver.py down"
+          % (exe, a.subject, time.time() - t0, pr.pid))
+    return 0
+
+
+def down(_a):
+    kill()
+    if os.path.exists(LIVE): os.remove(LIVE)
+    print("live: down")
+    return 0
+
+
+def _live_shot(a, ctl_text, crop=None, scale=None):
+    import json
+    rec = _live_rec()
+    exe = _exe(a)
+    why = None
+    if rec is None:
+        why = "no live window"
+    elif rec["subject"] != a.subject or rec["exe"] != exe:
+        why = "the live window is %s on %s" % (rec["subject"], rec["exe"])
+    elif (a.env or []) != rec.get("env", []):
+        why = "this shot's --env differs from the live window's"
+    else:
+        # ⛔ (10-22) AND THE SET PROPS: the engine caches a prop pack by NAME across set loads, so a rebaked ship
+        # (props/mf_*.rpack) kept drawing the old one in a window booted before the bake
+        newer = [f for f in glob.glob(os.path.join(NATIVE, "packs", "*.rpack")) + glob.glob(os.path.join(NATIVE, "props", "*.rpack"))
+                 if os.path.getmtime(f) > rec["t0"]]
+        if newer:
+            why = "%s changed on disk after the live window booted" % os.path.basename(newer[0])
+    if why:
+        print("live: %s -- booting one" % why)
+        if up(a) != 0: return 1
+        rec = _live_rec()
+        if rec is None: return 1
+    ctl_text = (ctl_text or "").strip()
+    # ⛔ A REWRITTEN SET NEEDS set=off FIRST: the engine loads a set only when its NAME changes,
+    # so a live window would keep drawing the old _bench.set forever.
+    m = re.search(r"\bset=(\S+)", ctl_text)
+    if m and m.group(1) != "off":
+        sp = os.path.join(NATIVE, "sets", m.group(1) + ".set")
+        mt = os.path.getmtime(sp) if os.path.exists(sp) else 0.0
+        if rec["sets"].get(m.group(1)) != mt:
+            _ctl(re.sub(r"\bset=\S+", "set=off", ctl_text)); time.sleep(0.6)
+            rec["sets"][m.group(1)] = mt
+            json.dump(rec, open(LIVE, "w"))
+    logpos = os.path.getsize(LIVELOG) if os.path.exists(LIVELOG) else 0
+    _, body = _ctl(ctl_text); print("ctl: " + body.strip())
+    time.sleep(a.settle)                      # sets load, lenses and bodies ease in
+    ppm = os.path.splitext(os.path.abspath(a.out))[0] + ".ppm"
+    os.makedirs(os.path.dirname(ppm) or ".", exist_ok=True)
+    if os.path.exists(ppm): os.remove(ppm)
+    _ctl(ctl_text + " shot=%s" % win(ppm))
+    if not _wait_file(ppm, 60, rec["pid"]):
+        print("live: no frame came back (engine log: %s)" % LIVELOG); return 1
+    if a.grep:
+        with open(LIVELOG, errors="replace") as f:
+            f.seek(logpos)
+            for line in f.read().splitlines():
+                if _rx(a.grep).search(line): print("  | " + line)
+    return 0 if _ppm2png(ppm, a.out, crop, scale) else 1
+
+
+def shot(a):
+    """boot the club proper (mode select -> variant -> character -> play) and shoot it"""
+    # ⛔ argv[3] is the FLOW, not a body. The club boots mode select -> variant ->
+    # character select, and that flow is named "select"; handing it a pack name here
+    # loads that body as the hero and the menus never run, so REVA_SHOT fires on a
+    # frame the capture path never reaches and NO FILE IS WRITTEN.
+    env = {}
+    if a.mode is not None:
+        env.update(REVA_AUTOMODE=str(a.mode), REVA_AUTOVAR=str(a.var), REVA_AUTOPICK=str(a.pick))
+    # ⭐ --ctl lets a GAME DOOR load a set (`set=parsons`) the way the lab does. Without it a
+    # door boots onto the bare club floor, and "walk the player into a house" cannot be
+    # tested in the mode that actually has a player.
+    return _capture(a, a.ctl, env, argv3=a.flow)
+
+
+def lab(a):
+    """the ANIM LAB (mode 11): one body, a ctl line, and a camera you control"""
+    if getattr(a, "live", False):
+        return _live_shot(a, a.ctl)
+    return _capture(a, a.ctl, dict(REVA_AUTOMODE="11", REVA_ANIMSUBJ=a.subject,
+                                   REVA_ANIMSTATE="0"))
+
+
+def face(a):
+    """THE FACE RIG: eight angles round the head plus a mouth and an eye camera, with
+    the face marks drawn in (cyan lips / green mouth corners / yellow eyes / magenta
+    chin / red jaw hinge). --panel crops one lens; --jaw parks the mouth open."""
+    ctl = "face=10 dqs=0 clip=%s partner=%s %s look=%d jaw=%s" % (
+        a.clip, a.partner, ("pclip=%s" % a.pclip) if a.partner != "off" else "",
+        1 if a.look else 0, a.jaw)
+    env = dict(REVA_AUTOMODE="11", REVA_ANIMSUBJ=a.subject, REVA_ANIMSTATE="0",
+               REVA_FACEDBG="1")
+    if getattr(a, "live", False):
+        return _live_shot(a, ctl, crop=PANELS[a.panel], scale=a.zoom)
+    return _capture(a, ctl, env, crop=PANELS[a.panel], scale=a.zoom)
+
+
+def scene(a):
+    """Record a conversation scene WITH ITS AUDIO. REVA_SCENEFPS makes the scene clock
+    fixed-step and starts the capture on the scene's own first frame, so frame N is
+    scene second N/fps exactly and the wav muxes in blind.
+
+    ⛔ REVA_FIXEDSTEP MUST GO WITH IT. REVA_SCENEFPS only steps the SCENE clock -- the
+    bodies' clip phases still advance on `dt`, which during a capture is however long
+    the frame took to write 2.7MB to disk. So the picture stayed in sync with the wav
+    while the ANIMATION ran at capture speed: a walk cycle sprinting under a woman
+    strolling away. It went unnoticed while both bodies stood in z_upright and showed up
+    the moment a scene played a real clip."""
+    if not FFMPEG:
+        print("no ffmpeg found"); return 1
+    frames = int(a.seconds * a.fps)
+    tmp = os.path.abspath(a.tmp or os.path.join(os.path.dirname(os.path.abspath(a.out)), "_capframes"))
+    os.makedirs(tmp, exist_ok=True)
+    for f in glob.glob(os.path.join(tmp, "*.ppm")): os.remove(f)
+    # ⛔ NO clip=/pclip= HERE. A scene's own per-line staging resolves both, and writing
+    # them into the ctl overwrote that resolution on every poll -- which is how kaeli spent
+    # a whole take crawling through her get-up-off-the-floor loop. The engine ignores them
+    # during a scene now too; this just stops sending them.
+    ctl = ("face=0 grid=0 dqs=0 partner=%s pyaw=%s pgap=%s pside=%s "
+           "jaw=-1 look=%d scene=%s" % (a.partner, a.pyaw, a.pgap,
+                                        a.pside, 1 if a.look else 0, a.name))
+    # A SCENE CAN HAPPEN IN THE WORLD. The set renderer and the scene system coexist --
+    # `set=` draws the street, `stage=` stands the pair in it, and the scene camera keeps
+    # working because it frames the two HEAD POSITIONS, which move with them.
+    if a.partner2:
+        ctl += " partner2=%s" % a.partner2
+    if getattr(a, "partner3", ""):
+        ctl += " partner3=%s" % a.partner3
+    if a.set:
+        ctl += " set=%s" % a.set
+        if a.stage: ctl += " stage=%s" % a.stage
+        if a.sun:   ctl += " sun=%s" % a.sun
+        if a.sky:   ctl += " sky=%s" % a.sky
+        # ⛔ A DAY SET SHOT AT NIGHT NEEDS ITS LAMPS TAKEN DOWN. other_side.set's practicals
+        # were authored for ep 4 at tod=10.0; at ep 5's tod=21.5 the same porch light delivers
+        # ~30x the sky ambient and the street comes back in FULL DAYLIGHT with sun=/sky=
+        # correctly set and visibly doing nothing. The engine reports it at set load now;
+        # this is the dimmer. 1.0 (default) leaves the set exactly as authored.
+        if a.lamps is not None: ctl += " lamps=%s" % a.lamps
+        # A WIDE PINS ITS OWN LENS. The conversation camera frames the two heads, which is
+        # right for coverage and wrong for act IV, where the pair are off-camera and the
+        # shot is the street. cam= overrides it for that one kind of shot.
+        if a.cam:   ctl += " cam=%s" % a.cam
+    _, body = _ctl(ctl); print("ctl: " + body.strip())
+    print("capturing %d frames at %d fps (this takes a few minutes)..." % (frames, a.fps))
+    # ⛔ POLL AND KILL; DO NOT BLOCK. The engine exits only when `taken >= burst`, and
+    # frame writing is armed by `REVA_SCENEFPS && g_scnT >= 0` -- so a take that asks for
+    # more seconds than the scene runs stops writing at the end of the dialogue and never
+    # reaches its quota. It then sits there forever, and a blocking wait sits with it.
+    # Watch the frames instead: done when the count reaches the target, or when it has
+    # stopped growing for STALL seconds, which covers every other way a scene can end.
+    # ⛔ (11-09) A HEAVY FRAME IS NOT A STALLED SCENE: four REVAs' hair, each set up on its first frame, took a frame past 8 s, and the
+    # take was wrapped at 2 frames of 720 with nothing wrong in the engine (no crash, no driver reset: the log just stops). --stall
+    STALL = getattr(a, "stall", 8.0)
+    kill()
+    exe = os.path.join(NATIVE, a.exe or ("crowd_new.exe" if a.new else "crowd.exe"))
+    env = dict(os.environ, REVA_WINDOWED="1",
+               REVA_LABCTL="anim_bench/lab_ctl.txt", REVA_AUTOMODE="11",
+               REVA_ANIMSUBJ=a.subject, REVA_ANIMSTATE="0",
+               REVA_SCENEFPS=str(a.fps), REVA_FIXEDSTEP=str(a.fps),
+               REVA_SHOTN=str(frames),
+               REVA_SHOT_PATH=win(os.path.join(tmp, "f.ppm")))
+    # ⭐ --env on a SCENE too (09-11): the arms-up A/B wanted REVA_NOWMS=1 on a take and the
+    # flag only existed on lab/bench/up, so the take never ran and the strip came back black.
+    # ⭐ (10-23) THE FILM LOOK: the engine draws the 3D frame at twice
+    # the size and resolves it in the post pass (the ink antialiased), with bloom, its grade and its vignette. --env wins.
+    if getattr(a, "film", False):
+        env.update(REVA_SSAA="2", REVA_POST="1", REVA_GRADE="1", REVA_VIG="0.6")
+    for kv in (a.env or []):
+        k, _, v = kv.partition("="); env[k] = v
+    # ⭐ KEEP THE ENGINE'S WORD. `[stage] hclip 'x' NOT FOUND`, `[cue]`, `[step]` and
+    # `[scene]` all come out on stdout, and a take recorded with it thrown away cannot say
+    # why a clip was missing. It lands beside the mp4.
+    logp = os.path.splitext(os.path.abspath(a.out))[0] + ".log"
+    logf = open(logp, "w")
+    # ⭐ ep 12: --res WxH is the engine's argv[4] (it always forced the window size; the driver never passed it),
+    # so a scene can be filmed at 1080p. Each frame is a PPM (6.2 MB at 1920x1080) only until the encoder has it: since
+    # 10-24 a take is streamed, so --tmp holds a frame or two, not the take.
+    pr = subprocess.Popen([exe, str(getattr(a, "crowd", 400)), "packs", a.subject] + ([a.res] if getattr(a, "res", "") else []),
+                          cwd=NATIVE, env=env, stdout=logf, stderr=subprocess.STDOUT)
+    # ⭐ (10-24) THE TAKE IS STREAMED, NOT SPOOLED. A re-record's peak left too little room on the disk.
+    # Every frame sat on disk as a raw PPM until the take ended (2.76 MB each at 720p, ~4 GB a minute of scene:
+    # chapter 3's 13.6 min peaked at 54 GB) and was encoded only then. Now each frame goes into the encoder the moment
+    # the engine has written all of it, and is deleted: a take needs a few frames of disk and its own mp4. The --film dip
+    # to black wants the END, which a stream does not know until it gets there, so the last 0.6 s are held back in
+    # memory (~40 MB) and faded on the way out -- what ffmpeg's fade filter did, done here.
+    import collections
+    import numpy as np
+    film = getattr(a, "film", False)
+    wav = os.path.join(NATIVE, "scenes", "%s.wav" % a.name)
+    vf = []
+    if a.crop:   # the conversation camera aims at the SPEAKER's head, so it lands dead
+                 # centre -- a centre crop is a free close-up that always frames whoever
+                 # is talking, with no tracking.
+        vf.append("crop=560:315:360:150,scale=1280:720:flags=lanczos,eq=brightness=0.06:contrast=1.12")
+    elif a.grade and not film:
+        vf.append("eq=brightness=0.02:contrast=1.07:saturation=1.04")
+    cmd = [FFMPEG, "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(a.fps), "-vcodec", "ppm", "-i", "-"]
+    if os.path.exists(wav): cmd += ["-i", wav]
+    if vf: cmd += ["-vf", ",".join(vf)]
+    # (11-12) --lossless: qp 0, 4:4:4, for a frame-for-frame A/B (a lossy stream carries one frame's difference into every frame coded after it)
+    cmd += (["-c:v", "libx264", "-qp", "0", "-preset", "ultrafast", "-pix_fmt", "yuv444p"] if getattr(a, "lossless", False) else ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "19", "-preset", "veryfast"])
+    if os.path.exists(wav): cmd += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
+    cmd += [os.path.abspath(a.out)]
+    elogp = os.path.join(tmp, "_encode.log")
+    elog = open(elogp, "w")
+    enc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=elog)
+    fin, fout = max(1, int(round(0.35 * a.fps))), max(1, int(round(0.6 * a.fps)))
+    PPM = re.compile(rb"P6\s+(\d+)\s+(\d+)\s+(\d+)\s")
+    held, stale, size = collections.deque(), [], [0]
+
+    def whole(i):
+        """frame i's bytes once the engine has written all of it (then it is deleted), else None"""
+        p = os.path.join(tmp, "f_%05d.ppm" % i)
+        try:
+            if size[0] and os.path.getsize(p) < size[0]: return None
+            with open(p, "rb") as fh: b = fh.read()
+        except OSError:
+            return None
+        m = PPM.match(b)
+        if not m or len(b) < m.end() + int(m.group(1)) * int(m.group(2)) * 3: return None
+        size[0] = m.end() + int(m.group(1)) * int(m.group(2)) * 3
+        try: os.remove(p)
+        except OSError: stale.append(p)              # the engine still holds it open: gone at the next look
+        return b
+
+    def faded(b, s):
+        if s >= 0.999: return b
+        m = PPM.match(b)
+        px = np.frombuffer(b, np.uint8, offset=m.end()).astype(np.float32) * max(0.0, s)
+        return b[:m.end()] + np.clip(px + 0.5, 0, 255).astype(np.uint8).tobytes()
+
+    # ⛔ THE DIP TO BLACK AT THE END NEVER SHOWED: the capture runs ~1.5 s past the mix (the scene's clock outlives its
+    # last line) and -shortest cuts the picture at the sound's end, so a fade on the last 0.6 s of FRAMES was always cut
+    # off (every --film take until 10-24 ended at full brightness). The end is the shorter of the two: the sound's
+    # length is known before the first frame.
+    wav_dur = None
+    if film and os.path.exists(wav):
+        import wave
+        try:
+            with wave.open(wav) as w: wav_dur = w.getnframes() / float(w.getframerate())
+        except Exception:
+            wav_dur = None
+
+    def send(i, b, s=1.0):
+        if film:
+            if i < fin: s = min(s, i / float(fin))                       # in from black over 0.35 s
+            if wav_dur: s = min(s, (wav_dur - i / float(a.fps)) / 0.6)   # out to black as the sound ends
+            b = faded(b, s)
+        enc.stdin.write(b)
+
+    # ⛔ (11-09) THE GPU GUARD, for a graphics card that mustn't be run flat out. A frame that grinds (four REVAs' hair read from a
+    # ring that had wrapped over itself) holds the GPU at 99% with the engine idle and no driver reset, for as long as it's left: the take is
+    # stopped after 5 s in a row at 95% or more. Each second's reading is kept, and the take says its mean and its highest at the end.
+    SMI = r"C:\Windows\System32\nvidia-smi.exe"
+    # (11-11) OFF BY DEFAULT: what held the GPU at 99% was the hair simulation's ring fault, since fixed.
+    # Left on, it stopped working takes at 95% (chorus 3a twice, with no word in the take's
+    # output). Only on when asked for: --gpu-guard.
+    guard = os.path.exists(SMI) and getattr(a, "gpu_guard", False) and not getattr(a, "no_gpu_guard", False)
+    gpu_t, gpu_hot, gpu_seen = 0.0, 0, []
+
+    def gpu_now():
+        try:
+            r = subprocess.run([SMI, "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5)
+            return int(r.stdout.strip().splitlines()[0])
+        except Exception:
+            return -1
+
+    nxt, last_change, t0 = 0, time.time(), time.time()
+    try:
+        while True:
+            if guard and time.time() - gpu_t >= 1.0:
+                gpu_t = time.time(); u = gpu_now()
+                if u >= 0 and nxt > 0: gpu_seen.append(u)
+                gpu_hot = gpu_hot + 1 if u >= 95 else 0
+                if gpu_hot >= 5:
+                    print("   THE GPU AT %d%% FOR %d s IN A ROW -- the take is stopped (--gpu-guard)" % (u, gpu_hot)); break
+            b = whole(nxt)
+            if b is not None:
+                held.append((nxt, b)); nxt += 1; last_change = time.time()
+                while len(held) > fout: send(*held.popleft())
+                if nxt >= frames: break
+                continue
+            for p in stale[:]:
+                try: os.remove(p); stale.remove(p)
+                except OSError: pass
+            now = time.time()
+            if pr.poll() is not None:
+                break
+            if nxt > 0 and now - last_change > STALL:
+                print("   frames stopped at %d/%d (the scene ended) -- wrapping the take" % (nxt, frames))
+                break
+            if now - t0 > max(3600.0, frames / 1.5):
+                print("   take ran past its time (an hour, or 1.5 frames a second); stopping"); break
+            time.sleep(0.03)
+        if gpu_seen:
+            print("   the GPU while frames came: mean %.0f%%, highest %d%%, %d of %d seconds over 80%%" % (sum(gpu_seen) / len(gpu_seen), max(gpu_seen), sum(1 for u in gpu_seen if u > 80), len(gpu_seen)))
+        time.sleep(0.7)
+        kill()
+        while True:                                   # the engine's last frames, finished as it was stopped
+            b = whole(nxt)
+            if b is None: break
+            held.append((nxt, b)); nxt += 1
+        n = nxt
+        for i, b in held:                             # and out to black over the last 0.6 s, if the frames end first
+            send(i, b, min(1.0, (n - i) / (0.6 * a.fps)))
+        enc.stdin.close()
+    except OSError as e:                              # a broken pipe: the encoder stopped taking frames
+        print("   the encoder stopped taking frames (%s)" % e)
+    rc = enc.wait()
+    elog.close()
+    logf.close()
+    for p in stale + glob.glob(os.path.join(tmp, "*.ppm")):
+        try: os.remove(p)
+        except OSError: pass
+    print("captured %d frames   (engine log: %s)" % (nxt, logp))
+    if rc != 0:
+        print(open(elogp, encoding="utf-8", errors="replace").read()[-2000:]); return 1
+    if nxt < 10:
+        print("too few frames -- is scenes/%s.scn present?" % a.name); return 1
+    try:
+        os.remove(elogp); os.rmdir(tmp)
+    except OSError: pass
+    print("wrote %s (%.1f MB)   <-- WATCH IT" % (a.out, os.path.getsize(a.out) / 1e6))
+    return 0
+
+
+def packs(a):
+    """the roster, or one pack's census -- clips, morphs and which face marks it has"""
+    import struct
+    sys.path.insert(0, AUTHOR)
+    from rpack import Rpack, HDR
+    pd = os.path.join(NATIVE, "packs")
+    hits = sorted(f for f in os.listdir(pd)
+                  if f.endswith(".rpack") and (not a.name or a.name in f))
+    if not a.name or len(hits) > 1:
+        for f in hits: print("  " + f)
+        print("%d pack(s)%s" % (len(hits), "" if not a.name else " matching %r" % a.name))
+        return 0
+    p = Rpack(os.path.join(pd, hits[0]))
+    nm = p.node_names()
+    print("%s: v%d nodes %d meshes %d clips %d tex %d  %.1f MB"
+          % (hits[0], p.ver, p.nNodes, p.nMeshes, p.nClips, p.nTex, len(p.buf) / 1e6))
+    print("  face marks: %s" % (", ".join(n for n in nm if n.startswith("face_")) or "NONE"))
+    for mi in range(p.nMeshes):
+        r = p.MESH.unpack_from(p.buf, p.offMeshes + mi * 60)
+        print("  mesh%d '%s' verts %d bones %d" % (mi, p.sname(r[0]), r[2], r[4]))
+    offM = HDR.unpack_from(p.buf, 4)[14]
+    if offM:
+        n = struct.unpack_from("<I", p.buf, offM)[0]
+        print("  morphs: " + ", ".join(p.sname(struct.unpack_from("<4I", p.buf, offM + 4 + i * 16)[1])
+                                       for i in range(n)))
+    print("  clips: " + ", ".join(p.clip_names()))
+    return 0
+
+
+def bench(a):
+    """ONE BODY, FOUR ANGLES, ACROSS TIME -- the isolation read.
+
+    A garment can't be judged off a wide two-shot with a second character in it: the body and the
+    garment are isolated, on the multi-angle sheet with its framings.
+
+    It settled six rounds of guessing in one sheet. A body judged beside
+    another body in a wide is judged at maybe 200 pixels tall; alone, from four sides,
+    across eight moments, it cannot hide. That sheet found five bugs in a row -- ending
+    with a bone map that had been wrong since the file was first written.
+
+    anim_bench/ridecheck.py IS the sheet. It wants a SET with the subject placed as an
+    ACTOR at the origin, and hand-authoring that set is the whole reason the read did not
+    get taken sooner -- so this writes it.
+    ⛔ The subject is an ACTOR, not the hero: the lab parks its hero at z -150 while the
+    bench's four cameras all look at the origin, so a subject loaded as the hero is not
+    in any of the frames.
+    ⭐ --env REVA_NOCLOTH=1 is THE CONTROL RUN. Shooting the same body with the solver
+    off is what separates "the sim is wrong" from "the mesh is wrong", and it answered in
+    one run what four rounds of tuning had not.
+    """
+    setp = os.path.join(NATIVE, "sets", "_bench.set")
+    open(setp, "w").write(LF.join([
+        "# _bench.set -- WRITTEN BY driver.py bench, overwritten every run.",
+        "# One body at the origin facing +x, on a strip of road for scale and contact.",
+        "prop road_01     -14  0.00  14   0  1.0",
+        "prop grass_00    -14 -0.02  42   0  1.0  0.30 0.44 0.20",
+        "actor v1_%s  %s   0  0 0  90  %g" % (a.subject, a.clip, a.scale),
+        ""]))
+    print("wrote sets/_bench.set  (actor v1_%s clip %s)" % (a.subject, a.clip))
+    cmd = [PY, os.path.join(NATIVE, "anim_bench", "ridecheck.py"),
+           "--set", "_bench", "--body", a.host, "--secs", str(a.secs),
+           "--cols", str(a.cols), "--orbit", str(a.orbit),
+           "--out", os.path.abspath(a.out)]
+    for kv in (a.env or []):
+        cmd += ["--env", kv]
+    r = subprocess.run(cmd, cwd=ROOT)
+    if r.returncode == 0:
+        print("wrote %s  (%s x %d frames)   <-- LOOK AT IT"
+              % (a.out, ("%d angles" % a.orbit) if a.orbit else "4 angles", a.cols))
+    return r.returncode
+
+
+def marks(a):
+    """Place a body's face marks by pointing at them.
+
+    A person places them more easily than any calculation. Placing a face mark is
+    something a person does by LOOKING, and the automatic tools genuinely cannot do it on
+    kaeli: geometry picks her FRINGE, and face_calibrate.py reads eyes as the darkest texels
+    and reports "no symmetric dark pair" because of her liner.
+
+    ⛔ THE FIRST VERSION OF THIS WAS FOUR ENVIRONMENT VARIABLES AND A WALKING SUBJECT. In the
+    anim lab she walks and the camera director wanders, so he would have been clicking a
+    small moving figure through a moving lens. Testing rather than assuming is what caught
+    it: the log said "STATE 2/7 WALK".
+    ⭐ Now the command stages it. A short headless pass asks the engine where her head is,
+    then the interactive launch PINS her and parks the lens on that head.
+
+        1 2 3 4      eye_l / eye_r / mouth / chin
+        LEFT CLICK   place the selected mark
+        ESC          done -- the file is written on every click, nothing to save
+    """
+    import re as _re
+    subj = a.subject
+    ctlp = os.path.join(NATIVE, "anim_bench", "lab_ctl.txt")
+    base = "face=0 grid=0 dqs=0 partner=off clip=%s" % a.clip
+
+    # ---- pass 1: where is her head? ------------------------------------------------
+    print("finding %s's head..." % subj)
+    open(ctlp, "w").write("seq=%d %s\n" % (int(time.time()) % 100000, base))
+    env = dict(os.environ, REVA_WINDOWED="1", REVA_LABCTL="anim_bench/lab_ctl.txt",
+               REVA_AUTOMODE="11", REVA_ANIMSUBJ=subj, REVA_ANIMSTATE="0",
+               REVA_MARKEDIT="1", REVA_FIXEDSTEP="30")
+    kill()
+    pr = subprocess.Popen([os.path.join(NATIVE, "crowd.exe"), "400", "packs", subj],
+                          cwd=NATIVE, env=env, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    head = None
+    t0 = time.time()
+    while time.time() - t0 < 90:
+        ln = pr.stdout.readline()
+        if not ln:
+            break
+        m = _re.search(r"\[mark\] head at ([-\d.]+) ([-\d.]+) ([-\d.]+)", ln)
+        if m:
+            head = tuple(float(m.group(i)) for i in (1, 2, 3))
+            break
+    pr.terminate()
+    try: pr.wait(timeout=10)
+    except Exception: pr.kill()
+    if not head:
+        print("could not find the head -- does %s have a face rig? (packs %s)" % (subj, subj))
+        return 1
+    print("  head at %.3f %.3f %.3f" % head)
+
+    # ---- pass 2: interactive, pinned, lens on her face -----------------------------
+    cam = "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d" % (
+        head[0] + 0.14, head[1] + 0.06, head[2] + a.dist,
+        head[0], head[1] - 0.02, head[2], a.fov)
+    open(ctlp, "w").write("seq=%d %s cam=%s\n" % (int(time.time()) % 100000, base, cam))
+    print()
+    print("  1 2 3 4     eye_l / eye_r / mouth / chin")
+    print("  LEFT CLICK  place the selected mark")
+    print("  ESC         done. anim_bench/marks_%s.txt is written on EVERY click." % subj)
+    print()
+    env["REVA_NOMOUSEGRAB"] = "1"
+    env.pop("REVA_FIXEDSTEP", None)
+    subprocess.run([os.path.join(NATIVE, "crowd.exe"), "400", "packs", subj],
+                   cwd=NATIVE, env=env)
+    f = os.path.join(NATIVE, "anim_bench", "marks_%s.txt" % subj)
+    if os.path.exists(f):
+        print()
+        print(open(f).read().rstrip())
+        print()
+        print("bake it in:")
+        print("  %s skate_src/author/face_marks.py reva_native/packs/v1_%s.rpack --from %s"
+              % ("python", subj, os.path.relpath(f, ROOT).replace("\\", "/")))
+    else:
+        print("no marks file -- nothing was placed")
+    return 0
+
+
+def looks(a):
+    """⭐ (10-22) A SET FROM EVERY CAMERA IN ONE BOOT. One engine boot per camera was ~25 s each, so a
+    five-camera look spent two minutes booting. `looks` boots -- or reuses -- ONE live window, grabs every camera of the set from it (~2-4 s each: the first
+    waits --settle for the set to load, the rest only for the lens), and tiles them into one sheet, each frame labelled
+    ABOVE itself. Cameras `name=ex,ey,ez,ax,ay,az,fov;...` in club units, or in METRES with --metres (x1.75).
+    One frame a camera: motion is `bench`'s or a scene's job."""
+    from PIL import Image, ImageDraw, ImageFont
+    U = 1.75 if a.metres else 1.0
+    stem = os.path.splitext(os.path.abspath(a.out))[0]
+    shots = []
+    for spec in [c.strip() for c in a.cams.split(";") if c.strip()]:
+        name, _, nums = spec.partition("=")
+        try:
+            v = [float(x) for x in nums.split(",")]
+        except ValueError:
+            v = []
+        if len(v) != 7:
+            print("looks: camera '%s' wants name=ex,ey,ez,ax,ay,az,fov" % spec); return 1
+        cam = "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d" % tuple([x * U for x in v[:6]] + [int(v[6])])
+        a2 = argparse.Namespace(**vars(a))
+        a2.out = "%s_%s.png" % (stem, name.strip())
+        if shots: a2.settle = min(a.settle, 0.8)          # same set, only the lens moves
+        t0 = time.time()
+        if _live_shot(a2, "face=0 grid=0 dqs=0 set=%s cam=%s %s" % (a.set, cam, a.light or "")) != 0: return 1
+        print("looks: %-12s %.1fs" % (name.strip(), time.time() - t0))
+        shots.append((name.strip(), a2.out))
+    ims = [(n, Image.open(p).convert("RGB")) for n, p in shots]
+    w, h = ims[0][1].size; tw, th = w // 2, h // 2
+    small = w < 640   # the engine's own rasterizer's 320 x 240: shown twice its size with its pixels hard, not at half
+    if small: tw, th = w * 2, h * 2
+    cols = max(1, min(a.cols, len(ims))); rows = (len(ims) + cols - 1) // cols
+    try: font = ImageFont.truetype("arialbd.ttf", 22)
+    except Exception: font = ImageFont.load_default()
+    sheet = Image.new("RGB", (cols * (tw + 6) + 6, rows * (th + 38) + 6), (20, 24, 34)); d = ImageDraw.Draw(sheet)
+    for k, (n, im) in enumerate(ims):
+        x = 6 + (k % cols) * (tw + 6); y = 6 + (k // cols) * (th + 38)
+        d.rectangle((x, y, x + tw - 1, y + 31), fill=(30, 60, 110)); d.text((x + 8, y + 4), n, font=font, fill=(255, 255, 255))
+        sheet.paste(im.resize((tw, th), Image.NEAREST if small else Image.LANCZOS), (x, y + 32))
+    sheet.save(stem + "_sheet.png")
+    print("looks: %d cameras of '%s' from one window -> %s_sheet.png   <-- LOOK AT IT" % (len(ims), a.set, stem))
+    return 0
+
+
+def main():
+    # ⛔ argparse writes help to a cp1252 stdout here, so ONE non-ascii glyph in a help
+    # string takes the whole command down with a UnicodeEncodeError. Same trap packcheck
+    # hit on the ninjato pack name.
+    # ⛔ AND LINE-BUFFERED. Redirected to a file, python block-buffers stdout, so an
+    # interactive command that blocks (marks) shows the user NOTHING until it exits --
+    # its instructions arrive after they are needed.
+    try: sys.stdout.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+    except Exception: pass
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def common(sp, out_default=None):
+        sp.add_argument("out", nargs="?" if out_default else None, default=out_default)
+        sp.add_argument("--subject", default="r2moves", help="packs/v1_<subject>.rpack")
+        sp.add_argument("--frame", type=int, default=420,
+                        help="capture frame; boot takes ~250 frames, so keep it >300")
+        sp.add_argument("--new", action="store_true", help="use crowd_new.exe")
+        sp.add_argument("--soft", action="store_true", help="use crowd_soft.exe: the engine's own rasterizer, 320 x 240, and no window is opened")
+        sp.add_argument("--env", action="append", help="extra REVA_* var, K=V")
+        sp.add_argument("--grep", help="echo matching stdout lines")
+        sp.add_argument("--verbose", action="store_true")
+        sp.add_argument("--live", action="store_true",
+                        help="steer the window `driver.py up` left running instead of booting one")
+        sp.add_argument("--settle", type=float, default=2.5,
+                        help="--live: seconds between the ctl line and the grab")
+
+    sub.add_parser("kill").set_defaults(fn=kill)
+    sp = sub.add_parser("up"); sp.add_argument("--subject", default="r2moves")
+    sp.add_argument("--new", action="store_true"); sp.add_argument("--soft", action="store_true"); sp.add_argument("--env", action="append")
+    sp.set_defaults(fn=up)
+    sub.add_parser("down").set_defaults(fn=down)
+    sub.add_parser("build").set_defaults(fn=build)
+    sp = sub.add_parser("buildvk"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildvk)
+    sp = sub.add_parser("buildsoft"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=buildsoft)
+    sp = sub.add_parser("check"); sp.add_argument("--bless", action="store_true"); sp.add_argument("--nodoors", action="store_true"); sp.add_argument("--sample", action="store_true"); sp.add_argument("--game"); sp.set_defaults(fn=check)
+    sub.add_parser("promote").set_defaults(fn=promote)
+
+    sp = sub.add_parser("packs"); sp.add_argument("name", nargs="?"); sp.set_defaults(fn=packs)
+
+    sp = sub.add_parser("shot"); common(sp)
+    sp.add_argument("--mode", type=int, help="auto-drive mode select to this door")
+    sp.add_argument("--var", type=int, default=0); sp.add_argument("--pick", type=int, default=0)
+    sp.add_argument("--flow", default="select", help='argv[3]: "select" for the menus')
+    sp.add_argument("--ctl", default=None, help="a lab ctl line for the door, e.g. 'set=parsons'")
+    sp.set_defaults(fn=shot)
+
+    sp = sub.add_parser("lab"); common(sp)
+    sp.add_argument("--ctl", default="face=0 grid=0 dqs=0 clip=z_upright partner=off")
+    sp.set_defaults(fn=lab)
+
+    sp = sub.add_parser("looks"); common(sp)
+    sp.add_argument("--set", required=True, help="the set to shoot")
+    sp.add_argument("--cams", required=True, help="name=ex,ey,ez,ax,ay,az,fov;...  (club units, or --metres)")
+    sp.add_argument("--metres", action="store_true", help="camera numbers in METRES (x1.75)")
+    sp.add_argument("--light", default="", help="more ctl for every shot, e.g. 'sun=40,150,1.2 sky=0.4,0.5,0.6 shadow=0'")
+    sp.add_argument("--cols", type=int, default=3)
+    sp.set_defaults(fn=looks)
+
+    sp = sub.add_parser("face"); common(sp)
+    sp.add_argument("--panel", choices=list(PANELS), default="mouth")
+    sp.add_argument("--zoom", type=float, default=None)
+    sp.add_argument("--jaw", default="-1", help="0..1 parks the mouth open; -1 = the scene")
+    sp.add_argument("--clip", default="idle")
+    sp.add_argument("--partner", default="off"); sp.add_argument("--pclip", default="idle")
+    sp.add_argument("--look", action="store_true")
+    sp.set_defaults(fn=face)
+
+    sp = sub.add_parser("marks")
+    sp.add_argument("--subject", default="kmoves")
+    sp.add_argument("--clip", default="z_upright",
+                    help="a STATIC pose. \u26d4 not `idle` -- on kaeli that tilts her head at "
+                         "the floor, and marks judged on a tilted head are a projection, "
+                         "not a position. That cost three rounds by hand.")
+    sp.add_argument("--dist", type=float, default=1.72, help="lens distance, club units")
+    sp.add_argument("--fov", type=int, default=30)
+    sp.set_defaults(fn=marks)
+
+    sp = sub.add_parser("bench"); sp.add_argument("out")
+    sp.add_argument("--scale", type=float, default=1.0,
+                    help="⛔ THE BENCH CAMERAS ARE FIXED and were framed for a ~1.75 body. "
+                         "A pack with a different load scale fills the frame and you shoot its "
+                         "knees -- hina came back as two legs. Scale the actor to fit.")
+    sp.add_argument("--orbit", type=int, default=8,
+                    help="⭐ N evenly-spaced yaws in ONE sheet. Eight angles at once: "
+                         "shooting singles by hand is exactly the loop this "
+                         "bench exists to replace. 0 = the four named framings.")
+    sp.add_argument("--subject", default="r2moves", help="the body to isolate: packs/v1_<subject>.rpack")
+    sp.add_argument("--clip", default="tpose",
+                    help="STATIC by default. A test bench stands still: a "
+                         "garment judged on a body mid-crouch is unreadable, and one look at a "
+                         "T-pose showed it was a CATSUIT, which six rounds of animated benches "
+                         "had not. Same mistake as judging eye marks on a tilted head.")
+    sp.add_argument("--secs", type=float, default=6.0)
+    sp.add_argument("--cols", type=int, default=8, help="time columns per angle")
+    sp.add_argument("--host", default="r2moves",
+                    help="the lab hero, parked off-camera at z -150; NOT the subject")
+    sp.add_argument("--env", action="append", help="extra REVA_* var, e.g. REVA_NOCLOTH=1")
+    sp.set_defaults(fn=bench)
+
+    sp = sub.add_parser("scene"); sp.add_argument("out"); sp.add_argument("--exe", help="an exe of its own in reva_native, instead of crowd.exe or --new's crowd_new.exe")
+    sp.add_argument("--name", default="club_night"); sp.add_argument("--seconds", type=float, default=60.0)
+    sp.add_argument("--stall", type=float, default=8.0, help="seconds with no new frame before the scene is taken to have ended")
+    sp.add_argument("--no-gpu-guard", dest="no_gpu_guard", action="store_true", help="don't stop the take when the GPU sits at 95%% or more for 5 s")
+    sp.add_argument("--lossless", action="store_true", help="encode the take losslessly (x264 qp 0, 4:4:4): for comparing two takes frame for frame")
+    sp.add_argument("--gpu-guard", dest="gpu_guard", action="store_true", help="stop the take when the GPU sits at 95%% or more for 5 s (off unless asked for)")
+    sp.add_argument("--fps", type=int, default=30); sp.add_argument("--subject", default="r2moves")
+    sp.add_argument("--partner", default="kmoves"); sp.add_argument("--pclip", default="idle")
+    # ⭐ the scene system takes three bodies now; slot 2 is loaded the same way slot 1 is
+    sp.add_argument("--partner2", default="")
+    sp.add_argument("--partner3", default="")   # ⭐ ep 7: the fourth body (SCN_MAXCAST 5)
+    sp.add_argument("--clip", default="idle")
+    sp.add_argument("--pyaw", default="185"); sp.add_argument("--pgap", default="1.05")
+    sp.add_argument("--pside", default="0.12"); sp.add_argument("--look", action="store_true", default=True)
+    sp.add_argument("--crop", action="store_true", help="2x centre crop = a close-up on the speaker")
+    sp.add_argument("--grade", action="store_true", default=True)
+    sp.add_argument("--raw", dest="grade", action="store_false", help="no colour grade")
+    sp.add_argument("--set", default="", help="play the scene inside this .set")
+    sp.add_argument("--stage", default="", help="x,z,yawDeg -- where the pair stands in it")
+    sp.add_argument("--sun", default="", help="elev,azim,intensity[,r,g,b]")
+    sp.add_argument("--sky", default="", help="r,g,b")
+    sp.add_argument("--lamps", default=None,
+                    help="scale the SET's own `light` practicals (1.0 = as authored). A set lit "
+                         "for daylight blows out at night: its lamps do not scale with the sun.")
+    sp.add_argument("--cam", default="", help="ex,ey,ez,ax,ay,az,fov -- pin the lens (a wide)")
+    sp.add_argument("--tmp"); sp.add_argument("--new", action="store_true")
+    sp.add_argument("--res", default="", help="WxH render size, e.g. 1920x1080 (the engine's argv[4]; ep 12)")
+    sp.add_argument("--crowd", type=int, default=400, help="(11-11) the club's dancers loaded behind the scene (argv[1]); a one-body take wants 1 (0 segfaults)")
+    sp.add_argument("--env", action="append", help="extra REVA_* var, K=V (a control take)")
+    sp.add_argument("--film", action="store_true",
+                    help="(10-23) THE FILM LOOK: SSAA x2, the post pass, the engine's grade and vignette, and a dip to "
+                         "black at each end of the take (ffmpeg's eq grade is skipped: the engine grades)")
+    sp.set_defaults(fn=scene)
+
+    a = ap.parse_args()
+    return a.fn(a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,21 @@
+#version 450
+// (11-06) THE LOCKS' RIBBONS, a lock to an invocation (engine/strands.inc's hsRibbons): each ribbon round its lock's new line, its width carried down from the root
+// by parallel transport so no ribbon twists edge-on, its normal across the lock, the root's side out. They cast the hair's shadow; and each point's across, normal
+// and way go to the hairs along it
+#extension GL_GOOGLE_include_directive : enable
+layout(local_size_x = 64) in;
+#include "strand.glsl"
+void main() {
+    int s = int(gl_GlobalInvocationID.x), ns = int(PRM[64]), np = int(PRM[65]); if (s >= ns) return;
+    vec3 w = vec3(0.0); float sgn = 1.0;
+    for (int j = 0; j < np; j++) { int p = s * np + j; vec3 c = GET(X, p);
+        vec3 t = GET(X, p + (j < np - 1 ? 1 : 0)) - GET(X, p - (j > 0 ? 1 : 0)); float tl = length(t); t = tl < 1e-9 ? vec3(0.0, -1.0, 0.0) : t / tl;
+        vec3 h = GET(HW, p); float hl = length(h);
+        vec3 u = j > 0 ? w : h; u -= t * dot(u, t); float ul = length(u);
+        w = ul > 1e-9 ? u * (hl / ul) : h;
+        vec3 nr = GET(NR, p), n = cross(w, t); float nl = length(n); n = nl > 1e-12 ? n / nl : nr;
+        if (j == 0) sgn = dot(n, nr) < 0.0 ? -1.0 : 1.0;
+        int q = s * 2 * np + 2 * j;
+        PUT(RIBP, q, c - w); PUT(RIBP, q + 1, c + w); PUT(RIBN, q, sgn * n); PUT(RIBN, q + 1, sgn * n);
+        PUT(WNT, p * 3, w); PUT(WNT, p * 3 + 1, sgn * n); PUT(WNT, p * 3 + 2, t); }
+}

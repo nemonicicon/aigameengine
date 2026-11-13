@@ -1,0 +1,4 @@
+# walking-collision fixture (not an episode): kaeli (the hero) walks at a mark behind a wall
+cast 0=kaeli 1=reva
+0 dur=0.3 step=60 tod=12 snap=1 hmark=wa pmark=park hclip=z_upright pclip=z_upright hlook=0 plook=0 cam=8.0,2.4,5.0,0.0,1.6,5.0,55 |
+0 dur=6.0 hmark=wb |

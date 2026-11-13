@@ -1,0 +1,14 @@
+scene 1 lt_grip.wav 3.840 3
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 1.000 
+env 0 
+stage cam=16.0,1.9,10.8,13.4,1.7,10.8,40 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=1 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=1 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=1.0
+vis 0 
+line 0 1.420 1.000 
+env 0 
+stage cam=16.0,1.9,10.8,13.4,1.7,10.8,40 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=1 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=1 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r:0.3@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0
+vis 0 
+line 0 2.840 1.000 
+env 0 
+stage cam=13.4,1.75,13.2,13.45,1.65,11.0,30 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=1 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=1 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r:0.3@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0
+vis 0 

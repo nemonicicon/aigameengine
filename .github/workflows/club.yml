@@ -1,0 +1,40 @@
+# aigameengine -- what a push has to keep true (rewritten 2026-11-05, for the engine as it is since the old renderer left).
+# Every step is a part of .github/ci.sh, so the same lines run on any Linux machine: bash .github/ci.sh
+#
+# What it holds: every way the engine is built off Windows compiles and links; five games' receipts are the blessed
+# ones (the rules' hashes, the frame's, and for the sample three frames of the engine's own rasterizer, whose pixels
+# are the same on every machine); online play's ten cases on this runner's loopback; and the receipt doesn't depend
+# on what was in memory before.
+# What it doesn't: the Vulkan build is compiled and linked and never started (a runner has no driver for it), nothing
+# here looks at a picture, and nothing here is a Raspberry Pi.
+#
+# Every step was run from this repository's own files in a Debian 13 container (gcc 14.2) before this was written.
+# The receipts were blessed with gcc 16.2 on Windows and hold there too. This runner's gcc is another version again:
+# if a hash parts here and nowhere else, that's the first thing to look at, and reva_native/toolchain.lock has the pins.
+name: checks
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: what the engine links against
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libvulkan-dev libstb-dev libdrm-dev
+          gcc --version | head -1
+      - name: every road builds, and every game with no display
+        run: bash .github/ci.sh build
+      - name: the receipts
+        run: bash .github/ci.sh receipts
+      - name: online play, on this machine's loopback
+        run: bash .github/ci.sh online
+      - name: the receipt doesn't depend on what was in memory before
+        run: bash .github/ci.sh memory
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-logs
+          path: out/ci/*.log
+          if-no-files-found: ignore

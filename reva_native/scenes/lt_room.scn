@@ -1,0 +1,22 @@
+scene 1 lt_room.wav 6.680 5
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 1.000 
+env 0 
+stage cam=10.5,3.8,5.6,3.3,1.2,5.4,44 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=0 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=0 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=1.0 tone=0.66
+vis 0 
+line 0 1.420 1.000 
+env 0 
+stage cam=4.9,2.9,2.6,3.3,1.5,5.5,32 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=0 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=0 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0 tone=0.66
+vis 0 
+line 0 2.840 1.000 
+env 0 
+stage cam=9.6,2.9,4.2,4.4,1.4,6.8,48 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=0 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=0 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0 tone=0.66
+vis 0 
+line 0 4.260 1.000 
+env 0 
+stage cam=16.8,2.6,10.8,13.5,2.75,10.8,38 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=0 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=0 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0 tone=0.66
+vis 0 
+line 0 5.680 1.000 
+env 0 
+stage cam=17.5,3.0,11.6,5.0,1.6,6.0,55 dur=1.000 hbrow=auto hclip=auto hgt=0 hlook=0 hmark=bedside pbrow=auto pclip=auto pgap=1.15 plook=0 pmark=k_door pprop=v1_x_cigarette@0.16@0@middle_01_r@F2EFE8@light:0.5:0.5@smoke pside=0.12 pyaw=180 shot=ots step=60 tod=1.0 tone=0.66
+vis 0 

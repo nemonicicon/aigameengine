@@ -1,0 +1,5 @@
+# _bench.set -- WRITTEN BY driver.py bench, overwritten every run.
+# One body at the origin facing +x, on a strip of road for scale and contact.
+prop road_01     -14  0.00  14   0  1.0
+prop grass_00    -14 -0.02  42   0  1.0  0.30 0.44 0.20
+actor v1_kaeli_street  z_rm_sk_ride   0  0 0  90  1

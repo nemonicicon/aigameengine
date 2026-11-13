@@ -1,0 +1,24 @@
+# which clip she plays, when that changes, and when something in a clip happens. See engine/animgraph.inc. It's read again when this file changes.
+state idle  idle   loop 1
+state walk  w_walk loop gait
+state run   w_run  loop gait
+state punch punch  once 1.6
+state jump  jump   once 1
+state fall  fall   loop 1
+when any   jump  jump
+when any   punch punch
+when punch idle  end
+when jump  fall  end
+when fall  idle  grounded>0.5
+when idle  walk  speed>0.35
+when walk  idle  speed<0.25
+when walk  run   speed>5
+when run   walk  speed<4.5
+when idle  fall  grounded<0.5
+when walk  fall  grounded<0.5
+when run   fall  grounded<0.5
+event punch 0.35 hit
+event walk 0.25 step
+event walk 0.75 step
+event run 0.25 step
+event run 0.75 step

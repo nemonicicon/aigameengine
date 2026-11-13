@@ -1,0 +1,23 @@
+#version 450
+// (11-06) HAIR AGAINST HAIR, and the speed's ceiling, a point to an invocation (engine/strands.inc's hsClampV and hsCohere). mode 0: the cells emptied; 1: each point's
+// speed held under the ceiling and added into its 2.5 cm cell, in fixed point; 2: each point but a root pulled toward its cell's mean; 3: the ceiling alone (the settle).
+// The cells are a cube round her head (PRM 91 its side, 92-94 its corner, 96 cells a side): a point outside it isn't pulled
+#extension GL_GOOGLE_include_directive : enable
+layout(local_size_x = 256) in;
+#include "strand.glsl"
+const float VFIX = 100000.0;
+void main() {
+    int i = int(gl_GlobalInvocationID.x), n = int(PRM[64]) * int(PRM[65]), vd = int(PRM[96]);
+    if (pc.mode == 0) { if (i < vd * vd * vd * 4) VG[i] = 0; return; }
+    if (i >= n) return;
+    vec3 v = GET(Vv, i);
+    if (pc.mode == 1 || pc.mode == 3) { float vm = PRM[89], v2 = dot(v, v); if (v2 > vm * vm) { v *= vm / sqrt(v2); PUT(Vv, i, v); } if (pc.mode == 3) return; }
+    ivec3 c = ivec3(floor((GET(X, i) - vec3(PRM[92], PRM[93], PRM[94])) / PRM[91]));
+    if (any(lessThan(c, ivec3(0))) || any(greaterThanEqual(c, ivec3(vd)))) return;
+    int ci = ((c.z * vd + c.y) * vd + c.x) * 4;
+    if (pc.mode == 1) { atomicAdd(VG[ci], int(round(v.x * VFIX))); atomicAdd(VG[ci + 1], int(round(v.y * VFIX))); atomicAdd(VG[ci + 2], int(round(v.z * VFIX))); atomicAdd(VG[ci + 3], 1); return; }
+    if (i % int(PRM[65]) == 0) return;
+    float cnt = float(VG[ci + 3]); if (cnt < 1.5) return;
+    vec3 avg = vec3(float(VG[ci]), float(VG[ci + 1]), float(VG[ci + 2])) / (VFIX * cnt);
+    PUT(Vv, i, v + PRM[90] * (avg - v));
+}

@@ -1,0 +1,24 @@
+# hello.talk -- a short conversation, and most of what one can do. Seat 0 is you and seat 1 is her: the game says so with E->talkSeat.
+# engine/face.inc lists every line a file can have.
+say 0 voice/a1.wav Where were you last night?
+shape 1 brow 1 0.2
+say 1 voice/b1.wav Out.
+shape 1 brow 0 0.3
+say 0 voice/a2.wav Out where?
+shape 1 smile 1 0.4
+say 1 voice/b2.wav Somewhere you have never been, and you would not like it.
+ask again Ask her again
+ask leave Let it go
+:again
+shape 1 smile 0 0.2
+shot close 1
+# no sound on this one: the mouth moves on the words alone, for as long as they take to read
+say 1 - Fine. I went to see the tower.
+event told
+goto done
+:leave
+shot close 0
+say 0 - Have it your way.
+:done
+shot two
+wait 0.8

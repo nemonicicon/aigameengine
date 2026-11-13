@@ -1,0 +1,137 @@
+#version 450
+// (11-06) ONE SUBSTEP OF EVERY LOCK, a lock to an invocation: engine/strands.inc's hsStepXR line for line (Jolt's way: gravity and damping on the speed, the
+// points move, one pass of constraints -- held to the haircut, inextensible, a straight hair's bend, the tether -- the speed rebuilt from where they ended, then
+// collisions with her skull, her body and, near her head, the segments, positions only, with friction). mode 1: a frame of the settle, the haircut held still.
+#extension GL_GOOGLE_include_directive : enable
+layout(local_size_x = 64) in;
+#include "strand.glsl"
+const uint HS_GRID = 131072u;
+uint hsHash(int a, int b, int c) { return ((uint(a) * 73856093u) ^ (uint(b) * 19349663u) ^ (uint(c) * 83492791u)) & (HS_GRID - 1u); }
+float u1g; bool lerpOn; float gCell; vec3 gLo, gHi; ivec3 gVD; float gVS; vec3 gVO;   // read once a substep: PRM is in the GPU's memory, but every lookup still costs
+// a point of her body this substep: between last frame's place and this one's, as the roots are
+vec3 bodyP(int c) { vec4 a = BODY[c * 4], f = BODY[c * 4 + 2]; return (lerpOn && a.w > 0.5) ? mix(a.xyz, f.xyz, u1g) : f.xyz; }
+vec3 bodyN(int c) { vec4 f = BODY[c * 4 + 3]; if (lerpOn && BODY[c * 4].w > 0.5) { vec3 n = mix(BODY[c * 4 + 1].xyz, f.xyz, u1g); float l = length(n); return l > 1e-9 ? n / l : f.xyz; } return f.xyz; }
+// a point out of her body: the nearest of her within a cell, and out along its normal to the margin. pro: what it found (-1 nothing, 1 part of her head standing out)
+float bodyPush(inout vec3 x, float margin, out vec3 nOut, out int pro) {
+    pro = -1; nOut = vec3(0.0);
+    // (11-06) one read of the closest-point grid (strand_vox.comp), where walking the hash grid's chains had the substeps at 293 ms a frame
+    // the 8 cells whose middles surround it, each cell's point measured from the hair itself, the nearest within the reach: one cell's point is the nearest to the
+    // cell's middle, and taken alone it flung hairs off her crown (a surface facing another way read a hair outside her as inside)
+    ivec3 c = ivec3(floor((x - gVO) / gVS - 0.5)); int best = -1; float bd = gCell * gCell;
+    for (int e = 0; e < 8; e++) { ivec3 v = c + ivec3(e & 1, (e >> 1) & 1, e >> 2); if (any(lessThan(v, ivec3(0))) || any(greaterThanEqual(v, gVD))) continue;
+        uint key = VOX[(v.z * gVD.y + v.y) * gVD.x + v.x]; if (key == 0xFFFFFFFFu) continue;
+        int i = int(key & 0xFFFFu); vec3 d = x - bodyP(i); float d2 = dot(d, d); if (d2 < bd || (d2 == bd && i < best)) { bd = d2; best = i; } }
+    if (best < 0) return 0.0;
+    pro = int(BODY[best * 4 + 1].w + 0.5);
+    vec3 q = bodyP(best), n = bodyN(best); float d = dot(x - q, n);
+    if (d >= margin) return 0.0;
+    float push = margin - d; x += n * push; nOut = n; return push;
+}
+// ⭐ (11-11) HER BODY AS A DISTANCE WITH NO STEPS IN IT (PRM 111; REVA_STRANDFIELD=0 is bodyPush and segOut as they were). Stray hairs at the
+// outline wriggled like worms, very fast. Measured on a head standing still, long after settling: 287 of her 7,908 locks had points past 100 mm/s
+// and turned back on themselves frame after frame, every one of them a lock lying on her forehead, brows and temples; with her body's surfaces off, 1. bodyPush
+// takes the nearest point of her and pushes to that point's own flat plane: where the nearest point changes the plane jumps (most where she curves: a brow, an
+// eyelid, an ear), and a point 13 mm to one side of the last point at an edge is pushed by a plane that has nothing to do with it. A substep is 2.8 ms, so a jump
+// of a tenth of a millimetre is 36 mm/s once the lengths pull it back. Here each of the eight cells round a hair's point says how far its own middle is from her
+// (from the cell's nearest point as a small disc, gFoot across: straight off it, or round its rim; under it, less than nothing), and the eight are blended by
+// where the point is among them: one number that changes smoothly as the point moves, and its slope is the way out. The same 287 locks: 1.
+float gFoot;
+float cellSd(ivec3 v) {
+    if (any(lessThan(v, ivec3(0))) || any(greaterThanEqual(v, gVD))) return gCell;
+    uint key = VOX[(v.z * gVD.y + v.y) * gVD.x + v.x]; if (key == 0xFFFFFFFFu) return gCell;
+    int i = int(key & 0xFFFFu); vec3 r = gVO + (vec3(v) + 0.5) * gVS - bodyP(i); float d = dot(r, bodyN(i)), e = max(sqrt(max(dot(r, r) - d * d, 0.0)) - gFoot, 0.0);
+    return d >= 0.0 ? sqrt(d * d + e * e) : e + d;
+}
+float sdfAt(vec3 x, out vec3 g) {
+    vec3 f = (x - gVO) / gVS - 0.5; ivec3 c = ivec3(floor(f)); vec3 t = f - vec3(c);
+    float s0 = cellSd(c), s1 = cellSd(c + ivec3(1, 0, 0)), s2 = cellSd(c + ivec3(0, 1, 0)), s3 = cellSd(c + ivec3(1, 1, 0));
+    float s4 = cellSd(c + ivec3(0, 0, 1)), s5 = cellSd(c + ivec3(1, 0, 1)), s6 = cellSd(c + ivec3(0, 1, 1)), s7 = cellSd(c + ivec3(1, 1, 1));
+    float x00 = mix(s0, s1, t.x), x10 = mix(s2, s3, t.x), x01 = mix(s4, s5, t.x), x11 = mix(s6, s7, t.x), y0 = mix(x00, x10, t.y), y1 = mix(x01, x11, t.y);
+    g = vec3(mix(mix(s1 - s0, s3 - s2, t.y), mix(s5 - s4, s7 - s6, t.y), t.z), mix(x10 - x00, x11 - x01, t.z), y1 - y0) / gVS;
+    return mix(y0, y1, t.z);
+}
+// a point out of her, by the distance: up its slope to the margin, no further in a substep than `most`
+float sdfPush(inout vec3 x, float margin, float most, out vec3 nOut) {
+    vec3 g; nOut = vec3(0.0); float sd = sdfAt(x, g); if (sd >= margin) return 0.0;
+    float gl = length(g); if (gl < 0.05) return 0.0;
+    float push = min((margin - sd) / max(gl, 0.5), most); nOut = g / gl; x += nOut * push; return push;
+}
+// a segment kept out of her, by the distance: nothing to do when its middle is further from her than half its length; else looked along every few mm between its
+// ends, and what's nearer her than half the margin is lifted to that (an ear between two points both clear of it; a segment lying on her dips a little between
+// its ends, and is left alone)
+int sdfSeg(inout vec3 a, inout vec3 b, float margin, float stp, float most, inout vec3 nOut, inout float depth) {
+    float L = length(b - a); vec3 g; if (sdfAt(0.5 * (a + b), g) > 0.5 * L + margin) return 0;
+    int ns = clamp(int(L / stp), 1, 8), hits = 0; float ms = 0.5 * margin;
+    for (int m = 1; m <= ns; m++) { float t = float(m) / float(ns + 1); vec3 q = mix(a, b, t), n9; float dp = sdfPush(q, ms, most, n9); if (dp <= 0.0) continue;
+        float s9 = dp / ((1.0 - t) * (1.0 - t) + t * t); a += n9 * s9 * (1.0 - t); b += n9 * s9 * t; hits++; if (dp > depth) { depth = dp; nOut = n9; } }
+    return hits;
+}
+// a segment kept out of her (engine/strands.inc's hsSegOut): by an ear every few mm from the first touch, elsewhere at its thirds and only well in
+int segOut(inout vec3 a, inout vec3 b, float margin, float deepIn, float stp, int mid, bool proOnly, inout vec3 nOut, inout float depth) {
+    vec3 n9; int pro; vec3 probe = 0.5 * (a + b); bodyPush(probe, margin * 4.0, n9, pro); if (pro < 0) return 0;
+    int dbg = int(PRM[109] + 0.5); if (dbg == 1 && pro == 1) pro = 0; if (dbg == 2 && pro != 1) return 0;   // REVA_STRANDSEGDBG: 1 no dense look, 2 only by what stands out
+    if (proOnly && pro != 1) return 0;
+    float L = length(b - a); int ns = mid; float thr = margin + deepIn;
+    if (pro == 1) { ns = clamp(int(L / stp), 2, 16); thr = 0.0; }
+    int hits = 0;
+    for (int m = 1; m <= ns; m++) { float t = float(m) / float(ns + 1); vec3 q = mix(a, b, t); int pr2;
+        float dp = bodyPush(q, margin, n9, pr2); if (dp <= thr) continue; if (pro != 1) dp -= margin;
+        float s9 = dp / ((1.0 - t) * (1.0 - t) + t * t); a += n9 * s9 * (1.0 - t); b += n9 * s9 * t;
+        hits++; if (dp > depth) { depth = dp; nOut = n9; } }
+    return hits;
+}
+mat4 prmMat(int o) { return mat4(PRM[o], PRM[o + 1], PRM[o + 2], PRM[o + 3], PRM[o + 4], PRM[o + 5], PRM[o + 6], PRM[o + 7], PRM[o + 8], PRM[o + 9], PRM[o + 10], PRM[o + 11], PRM[o + 12], PRM[o + 13], PRM[o + 14], PRM[o + 15]); }
+void main() {
+    int s = int(gl_GlobalInvocationID.x), ns = int(PRM[64]), np = int(PRM[65]); if (s >= ns || np > 64) return;
+    bool settle = pc.mode == 1;
+    gCell = PRM[78]; gLo = vec3(PRM[79], PRM[80], PRM[81]) - 2.0 * gCell; gHi = vec3(PRM[82], PRM[83], PRM[84]) + 2.0 * gCell;
+    gVD = ivec3(int(PRM[101]), int(PRM[102]), int(PRM[103])); gVS = PRM[104]; gVO = vec3(PRM[105], PRM[106], PRM[107]);
+    float dt = settle ? PRM[95] : PRM[67]; u1g = settle ? 1.0 : float(pc.k + 1) / PRM[66]; lerpOn = !settle && PRM[86] > 0.5;
+    float sc = PRM[68], gdt = PRM[69] * dt, damp = max(0.0, 1.0 - PRM[70] * dt), margin = PRM[71], idt = 1.0 / dt, aB = PRM[72] * sc / (dt * dt), sk1 = PRM[73], sk2 = PRM[74], fric = PRM[75];
+    bool head = PRM[76] > 0.5; int mid = int(PRM[77] + 0.5); bool body = PRM[85] > 0.5; float deepIn = PRM[87], stp = PRM[88];
+    float lk = PRM[110] > 0.0 ? PRM[110] : 1.0;   // (11-11) a lock's lengths are the pack's: how long it is in the world, at her size (engine/strands.inc, REVA_STRANDLEN)
+    bool field = PRM[111] > 0.5; gFoot = 0.75 * gVS; float most = 2.0 * margin;   // (11-11) her body as a distance with no steps in it (sdfAt, above)
+    float shA = PRM[112], shB = PRM[113], holdL = PRM[114], holdW = PRM[115], holdD = PRM[116];      // (11-11) the haircut's own shell, and a hair's own stiffness (below)
+    mat4 E = prmMat(32), Ei = prmMat(48);
+    if (!settle) { E = prmMat(0) + (E - prmMat(0)) * u1g; Ei = prmMat(16) + (Ei - prmMat(16)) * u1g; }   // her skull u1 of the way from last frame's to this one's
+    int b = s * np;
+    // the root: kinematic, where her scalp is at the end of this substep
+    { vec3 x0 = GET(X, b); PUT(XP, b, x0); vec3 r = mix(GET(T0, b), GET(T1, b), u1g); PUT(X, b, r); PUT(Vv, b, (r - x0) * idt); }
+    // gravity and damping on the speed, then the points move
+    for (int j = 1; j < np; j++) { int p = b + j; vec3 v = GET(Vv, p); v.y -= gdt; v *= damp; vec3 x = GET(X, p); PUT(XP, p, x); PUT(X, p, x + v * dt); PUT(Vv, p, v); }
+    // one pass of constraints: how the lock leaves her scalp, its length, a straight hair's bend, the tether from the root
+    for (int j = 1; j <= 2 && j < np; j++) { int p = b + j; vec3 t = mix(GET(T0, p), GET(T1, p), u1g); float md = j == 1 ? sk1 : sk2; vec3 d = GET(X, p) - t; float l2 = dot(d, d);
+        if (l2 > md * md) PUT(X, p, t + d * (md / sqrt(l2))); }
+    // (11-11) a hair's own stiffness (PRM 114-115, engine/strands.inc g_hsHoldL): each point drawn toward its place in the haircut, wholly within holdL of its root
+    // and less by the cube of how far along the lock it is past that: a short fringe keeps the way it was combed, a long lock hangs
+    if (holdL > 0.0) for (int j = 1; j < np; j++) { int p = b + j; float kq = holdL / max(LOCKD[p].y * lk, 1e-6); kq = kq >= 1.0 ? 1.0 : kq * kq * kq;
+        vec3 x = GET(X, p); PUT(X, p, x + (mix(GET(T0, p), GET(T1, p), u1g) - x) * (holdW * kq)); }
+    for (int j = 1; j < np; j++) { int p = b + j; float w0 = j == 1 ? 0.0 : 1.0; vec3 xa = GET(X, p - 1), xb = GET(X, p), d = xb - xa; float l = length(d), den = l * (w0 + 1.0);
+        if (den < 1e-12) continue; float f = (l - LOCKD[p].x * lk) / den; PUT(X, p - 1, xa + w0 * d * f); PUT(X, p, xb - d * f); }
+    for (int j = 0; j + 2 < np; j++) { int p = b + j; float w0 = j == 0 ? 0.0 : 1.0, L = (LOCKD[p + 1].x + LOCKD[p + 2].x) * lk; vec3 xa = GET(X, p), xc = GET(X, p + 2), d = xc - xa;
+        float l = length(d), den = l * (w0 + 1.0 + aB); if (den < 1e-12) continue; float f = (l - L) / den; PUT(X, p, xa + w0 * d * f); PUT(X, p + 2, xc - d * f); }
+    { vec3 x0 = GET(X, b); for (int j = 2; j < np; j++) { int p = b + j; vec3 d = GET(X, p) - x0; float l2 = dot(d, d), g = LOCKD[p].y * lk; if (l2 > g * g) PUT(X, p, x0 + d * (g / sqrt(l2))); } }
+    // the speed from where the constraints left it: before the collisions, so a push out of her is never turned into speed
+    for (int j = 1; j < np; j++) { int p = b + j; PUT(Vv, p, (GET(X, p) - GET(XP, p)) * idt); }
+    // (11-11) the hold's own damping (PRM 116, engine/strands.inc g_hsHoldD): what's held loses its speed against the haircut's own speed there, wholly where
+    // the pull is whole and less by its cube down the lock; without it the hold was a spring at about 30 Hz that the clip's head snaps rang
+    if (holdL > 0.0 && holdD > 0.0) { float ift = settle ? 0.0 : 1.0 / (dt * PRM[66]);
+        for (int j = 1; j < np; j++) { int p = b + j; float kq = holdL / max(LOCKD[p].y * lk, 1e-6); kq = kq >= 1.0 ? 1.0 : kq * kq * kq;
+            float dd = min(1.0, holdD * 2.0 * sqrt(holdW) * kq); vec3 v = GET(Vv, p); PUT(Vv, p, v + ((GET(T1, p) - GET(T0, p)) * ift - v) * dd); } }
+    // collisions: off her skull, out of her body, the segment near her head; positions only, then what's moving into her stops and what slides feels friction
+    for (int j = 1; j < np; j++) { int p = b + j; float cd = 0.0; vec3 cn = vec3(0.0); bool near9 = false; vec3 x = GET(X, p); float rr = LOCKD[p].z;
+        if (head && rr > 0.0) { vec3 q = (E * vec4(x, 1.0)).xyz; float L = length(q), lim = min(0.995 * rr, 1.02); near9 = L < 1.6;
+            // (11-11) the haircut's own shell (PRM 112-113, engine/strands.inc g_hsShell): no nearer her skull's middle than it lies in the haircut, wholly to shA of
+            // the ellipsoid and eased to the old 1.02 by shB, so the cut's layers keep their thickness and lie over her ears, and the ends still hang free
+            if (shA > 0.0) { float t = clamp((rr - shA) / (shB - shA), 0.0, 1.0); t = t * t * (3.0 - 2.0 * t); lim = min(mix(min(0.995 * rr, 0.995 * shB), 1.02, t), 0.995 * rr); }
+            if (L < lim && L > 1e-6) { vec3 o = x; x = (Ei * vec4(q * (lim / L), 1.0)).xyz; vec3 d = x - o; float dl = length(d); if (dl > 1e-9) { cd = dl; cn = d / dl; } } }
+        if (body && field) { vec3 n9; float dp = sdfPush(x, margin, most, n9); if (dp > cd) { cd = dp; cn = n9; } }
+        else if (body) { vec3 n9; int pr; float dp = bodyPush(x, margin, n9, pr); if (dp > cd) { cd = dp; cn = n9; } }
+        PUT(X, p, x);
+        if (field) { if (j >= 2 && mid > 0 && body) { vec3 xa = GET(X, p - 1), xb = x, n9 = vec3(0.0); float dep = 0.0;
+            if (sdfSeg(xa, xb, margin, stp, most, n9, dep) > 0) { PUT(X, p - 1, xa); PUT(X, p, xb); if (dep > cd) { cd = dep; cn = n9; } } } }
+        else if (near9 && j >= 2 && mid > 0 && body) { vec3 xa = GET(X, p - 1), xb = x, n9 = vec3(0.0); float dep = 0.0;
+            if (segOut(xa, xb, margin, deepIn, stp, mid, j < 3, n9, dep) > 0) { PUT(X, p - 1, xa); PUT(X, p, xb); if (dep > cd) { cd = dep; cn = n9; } } }
+        if (cd > 0.0) { vec3 v = GET(Vv, p); float vn = dot(v, cn); vec3 vt = v - cn * vn; float vtl = length(vt), fr = vtl > 1e-9 ? min(fric * cd / (vtl * dt), 1.0) : 0.0;
+            PUT(Vv, p, v - vt * fr - (vn < 0.0 ? cn * vn : vec3(0.0))); } }
+}

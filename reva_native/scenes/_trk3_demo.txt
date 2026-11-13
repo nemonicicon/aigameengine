@@ -1,0 +1,8 @@
+# _trk3_demo -- a look, not a scene (queue step 21, 11-04): the set's timeline, third format. Made with scenes/trk3_demo.py.
+# Left card: a new picture of its sheet every second and a half. Right card: washes to red and thins out. Her head follows the place the
+# track gives slot 0. The two actors are on one clip, the right-hand one cued half way through it.
+#   python scenes/trk3_demo.py && cd scenes && python compile_scene.py _trk3_demo.txt
+#   driver.py scene out.mp4 --name _trk3_demo --seconds 6 --fps 30 --subject reva902 --partner off --set _trk3_demo --stage 0,0,0 --new
+cast 0=reva
+
+0 dur=6 snap=1 cam=1.6,2.6,9.5,1.6,1.9,0,40 |

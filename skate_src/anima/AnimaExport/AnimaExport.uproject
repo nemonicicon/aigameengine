@@ -1,0 +1,1 @@
+{ "FileVersion": 3, "EngineAssociation": "5.8", "Category": "", "Description": "throwaway shim to export Anima textures out of ZAMNRemake (which has no PythonScriptPlugin)", "Plugins": [ { "Name": "PythonScriptPlugin", "Enabled": true }, { "Name": "GLTFExporter", "Enabled": true } ] }

@@ -1,0 +1,20 @@
+#version 450
+// (11-06) HER BODY AS A CLOSEST-POINT GRID, once a frame before the hair's substeps: each 4 mm cell round her head and shoulders keeps which point of her body is
+// nearest its middle, within the collision's reach (PRM 108). A lookup is then one read, where walking the hash grid's chains point by point had the GPU's substeps
+// at 293 ms a frame (each lock's lookups one dependent read after another, and a warp waiting on its slowest lock). mode 0: every cell empty; 1: each body point
+// writes itself into the cells within reach, nearest first (atomicMin of the distance, then its number: the same answer whatever order they come in)
+#extension GL_GOOGLE_include_directive : enable
+layout(local_size_x = 64) in;
+#include "strand.glsl"
+void main() {
+    ivec3 D = ivec3(int(PRM[101]), int(PRM[102]), int(PRM[103])); float vs = PRM[104], R = PRM[108]; vec3 O = vec3(PRM[105], PRM[106], PRM[107]);
+    int i = int(gl_GlobalInvocationID.x);
+    if (pc.mode == 0) { int n = D.x * D.y * D.z; for (int k = 0; k < 16; k++) { int c = i * 16 + k; if (c < n) VOX[c] = 0xFFFFFFFFu; } return; }   // 16 cells a thread: a dispatch has 65535 groups at most
+    if (i >= int(PRM[85])) return;
+    vec4 a0 = BODY[i * 4]; vec3 p = BODY[i * 4 + 2].xyz;
+    if (pc.mode == 1 && PRM[86] > 0.5 && a0.w > 0.5) p = mix(a0.xyz, p, float(pc.k + 1) / PRM[66]);   // where it is this substep, as the lookups weigh it (strand_sim.comp's bodyP)
+    ivec3 lo = max(ivec3(floor((p - vec3(R) - O) / vs)), ivec3(0)), hi = min(ivec3(floor((p + vec3(R) - O) / vs)), D - 1);
+    for (int z = lo.z; z <= hi.z; z++) for (int y = lo.y; y <= hi.y; y++) for (int x = lo.x; x <= hi.x; x++) {
+        float d = length(O + (vec3(x, y, z) + 0.5) * vs - p); if (d > R) continue;
+        atomicMin(VOX[(z * D.y + y) * D.x + x], (uint(d / R * 65534.0) << 16) | uint(i)); }
+}

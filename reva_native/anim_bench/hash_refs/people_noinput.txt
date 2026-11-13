@@ -1,0 +1,31 @@
+[simhash] tick 60 exact 34cf30d37fcd9103 coarse 191d77f32a29ff21 (every)
+[packet] tick 60 6e376f78a4ed828f draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 120 exact 67e204aca38be011 coarse 32be7cf587135d07 (every)
+[packet] tick 120 b5547cf2620f2ad9 draws 17 sun 14 hud 41 lines 0 mem 112208
+[simhash] tick 180 exact 870f692d1c84bc07 coarse 058c706bea4c901e (every)
+[packet] tick 180 88d3a79957da9f63 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 240 exact cfb5cd4905eb2867 coarse 5d2638eeb1dc6fc1 (every)
+[packet] tick 240 1b5e04905542b60e draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 300 exact 8551d0a61821bec8 coarse 2cfd74127f5f9d34 (every)
+[packet] tick 300 f7c6489686b54729 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 360 exact ea9e837a9288087e coarse 44bc1cef46b9add0 (every)
+[packet] tick 360 3c4ed67e29ea1018 draws 17 sun 14 hud 41 lines 0 mem 114256
+[simhash] tick 420 exact c949401e7de17b82 coarse 16b30faa9c75b60e (every)
+[packet] tick 420 85b2e95a141c48d6 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 480 exact 03d772b9935fff79 coarse 0a91740dce713564 (every)
+[packet] tick 480 465bf4f16d5e476f draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 540 exact 3a7922d436893c3b coarse ae92b9381ecca4eb (every)
+[packet] tick 540 641497d56a9718e7 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 600 exact b0cbf75965f434e9 coarse 58a83879ca7cab7b (every)
+[packet] tick 600 8a3f1a50c9e5dc13 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 660 exact daa0b47c1fdb4ce7 coarse 1687a045344af7aa (every)
+[packet] tick 660 def8ef25f636eee6 draws 17 sun 14 hud 41 lines 0 mem 115536
+[simhash] tick 720 exact 469e342c6149c6d6 coarse 7329dd5cc85eb77f (every)
+[packet] tick 720 2d2132b83ac980d3 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 780 exact e9c985d80e030e5b coarse 6a659e8e23cc8d28 (every)
+[packet] tick 780 8924b1fd8c44fd85 draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 840 exact 1b39f9eb9e9f4eb0 coarse 3382fbb8def89fed (every)
+[packet] tick 840 5d7eda9ab332d4bf draws 17 sun 14 hud 41 lines 0 mem 85072
+[simhash] tick 900 exact edee6c8d7f2df4ef coarse 422fa7f14a78462a (every)
+[simhash] tick 900 exact edee6c8d7f2df4ef coarse 422fa7f14a78462a (end)
+[packet] tick 900 a20c9ed0386da0eb draws 17 sun 14 hud 41 lines 0 mem 85072

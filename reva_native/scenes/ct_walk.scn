@@ -1,0 +1,10 @@
+scene 1 ct_walk.wav 7.720 2
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 0.300 
+env 0 
+stage cam=5.0,11.0,7.9,5.0,0.0,8.0,55 dur=0.300 hbrow=auto hclip=z_upright hgt=0 hlook=0 hmark=away pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=wA pside=0.12 pyaw=180 shot=ots snap=1 step=60 tod=12
+vis 0 
+line 1 0.720 7.000 
+env 0 
+stage cam=5.0,11.0,7.9,5.0,0.0,8.0,55 dur=7.000 hbrow=auto hclip=z_upright hgt=0 hlook=0 hmark=away pbrow=auto pclip=z_upright pgap=1.15 plook=0 pmark=wB pside=0.12 pyaw=180 shot=ots step=60 tod=12
+vis 0 

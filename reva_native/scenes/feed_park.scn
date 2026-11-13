@@ -1,0 +1,18 @@
+scene 1 feed_park.wav 16.660 4
+cast REVA KAELI SUSAN ARCHIVE -
+line 0 0.000 0.400 
+env 0 
+stage cam=16.0,2.6,-4.3,22.6,0.8,8.0,62 dur=0.400 feed=0 fish=0 hbrow=auto hclip=z_rm_sk_film hgt=0 hlook=0 hmark=s10_b2 hprop=skateboard@1.4@0@board pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 pmark=s10_b8 pprop=skateboard@1.4@0@board pside=0.12 pyaw=180 shot=ots snap=1 step=0 tone=0.66
+vis 0 
+line 0 0.820 6.000 
+env 0 
+stage camhold=0,1,-1,0.95 dur=6.000 feed=1 fish=0.42 hbrow=auto hclip=z_rm_sk_film hgt=0 hlook=0 hloop=1 hpath=@loopB hprop=skateboard@1.4@0@board hspd=3.3 htrick=z_rm_sk_push@0.3 pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 ploop=1 ppath=@loopB pprop=skateboard@1.4@0@board pside=0.12 pspd=3.3 ptrick=z_rm_sk_push@0.1,z_rm_sk_kf@3.6 pyaw=180 shot=ots step=0 tone=0.66
+vis 0 
+line 0 7.240 4.000 
+env 0 
+stage cam=20.3,0.55,11.9,19.8,1.2,13.4,56 camshake=0.06,1.0 dur=4.000 feed=0 fish=0 hbrow=auto hclip=z_rm_sk_film hgt=0 hlook=0 hloop=1 hpath=@loopB hprop=skateboard@1.4@0@board hspd=3.3 pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 ploop=1 ppath=@loopB pprop=skateboard@1.4@0@board pside=0.12 pspd=3.3 pyaw=180 shot=ots step=0 tone=0.66
+vis 0 
+line 0 11.660 5.000 
+env 0 
+stage camhold=0,1,-1,0.95 camshake=0 dur=5.000 feed=1 fish=0.42 hbrow=auto hclip=z_rm_sk_film hgt=0 hlook=0 hloop=1 hpath=@loopB hprop=skateboard@1.4@0@board hspd=3.3 pbrow=auto pclip=z_rm_sk_ride pgap=1.15 plook=0 ploop=1 ppath=@loopB pprop=skateboard@1.4@0@board pside=0.12 pspd=3.3 ptrick=z_rm_sk_pop@1.4,z_rm_sk_kf@3.2 pyaw=180 shot=ots step=0 tone=0.66
+vis 0 

@@ -1,0 +1,7 @@
+# collision fixture (not an episode): kaeli walks where the wall IS (path A, x -2) and where it is NOT (path B, x 5).
+# The old circles sit round the prop's ORIGIN (the wall's end), so they cover x 0..7 while the wall covers -3.5..3.5.
+cast 0=kaeli 1=reva
+0 dur=0.3 step=60 tod=12 snap=1 hmark=a1 pmark=park hclip=z_upright pclip=z_upright hlook=0 plook=0 cam=1.5,14.0,5.1,1.5,0.0,5.0,62 |
+0 dur=5.0 hmark=a2 |
+0 dur=0.5 snap=1 hmark=b1 |
+0 dur=5.0 hmark=b2 |

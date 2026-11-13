@@ -1,0 +1,20 @@
+#version 450
+// (11-06) THE HAIRS, a hair to an invocation (engine/strands.inc's hsHairsR): each down its lock on the Catmull-Rom curve through the lock's points, at its own place
+// across and through it, to its own length; each drawn point twice, a corner a side (mesh_static.vert's STRAND spreads them a pixel apart), with the hair's way as long
+// as its true half-width, narrowing over its last part. Drawn straight from here: nothing goes back to the processor
+#extension GL_GOOGLE_include_directive : enable
+layout(local_size_x = 64) in;
+#include "strand.glsl"
+void main() {
+    int h = int(gl_GlobalInvocationID.x), nh = int(PRM[97]), K = int(PRM[98]), nr = int(PRM[99]), np = int(PRM[65]); if (h >= nh || K < 1 || nr < 2 || np < 2) return;
+    int b = (h / K) * np; vec4 hd = HAIRD[h]; float L = hd.z * float(np - 1), r = hd.w * PRM[68];
+    for (int j = 0; j < nr; j++) { float tt = float(j) / float(nr - 1), q = L * tt; int i = min(int(q), np - 2); float f = q - float(i), g = 1.0 - f, f2 = f * f, f3 = f2 * f;
+        vec3 P0 = GET(X, b + max(i - 1, 0)), P1 = GET(X, b + i), P2 = GET(X, b + i + 1), P3 = GET(X, b + min(i + 2, np - 1));
+        vec3 A = P2 - P0, Bq = 2.0 * P0 - 5.0 * P1 + 4.0 * P2 - P3, Cq = 3.0 * (P1 - P2) + P3 - P0;
+        vec3 c = P1 + 0.5 * (A * f + Bq * f2 + Cq * f3), t = 0.5 * (A + 2.0 * Bq * f + 3.0 * Cq * f2);
+        vec3 a = GET(WNT, (b + i) * 3) * g + GET(WNT, (b + i + 1) * 3) * f, nn = GET(WNT, (b + i) * 3 + 1) * g + GET(WNT, (b + i + 1) * 3 + 1) * f;
+        float al = length(a), tl = length(t); if (tl < 1e-9) { t = vec3(0.0, -1.0, 0.0); tl = 1.0; }
+        float hw = r * (1.0 - 0.6 * smoothstep(0.86, 1.0, tt)) / tl;
+        vec3 pe = c + a * hd.x + nn * (hd.y * al);
+        int o = (h * nr + j) * 2; PUT(HP, o, pe); PUT(HP, o + 1, pe); PUT(HN, o, t * hw); PUT(HN, o + 1, t * hw); }
+}

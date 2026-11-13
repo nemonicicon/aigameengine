@@ -83,6 +83,21 @@ over it.
   ARM builds of 11-05 compile, and ran only under an emulator. Performance is the plan's last phase: no number
   here is a target yet.
 
+## Build (Android)
+- `python reva_native/android/make_apk.py --game <name> --image IMAGE --sdk-volume SDKVOL --sdl-volume SDLVOL
+  [--abi arm64-v8a|x86_64] [--package <id>] [--args "<what the launcher says after the exe>"]` makes a signed test
+  APK in `reva_native/dist/android/`: the engine and the game as `libmain.so` on SDL2 (`-DREVA_SDL`, the NDK's
+  clang, Android 10 and up), SDL2's own Java, and the game's data as the APK's assets. `build_apk.sh` runs in a
+  container the user provides (the Android SDK and NDK, SDL2 2.32.10 built for Android). No script makes that
+  container: `reva_native/android/README.md` says what it must hold.
+- On the phone (`engine/android.inc`, Android only): the first start copies the data out of the APK into the
+  app's own storage; the game starts with the words in its `android_args.txt` (`--args`, or the game's own file of
+  that name, or `package.py`'s table); touch controls are drawn over the picture; a crash or an exit before the
+  game's loop shows a box with what happened and the log's last lines. The renderer needs Vulkan 1.3 on the
+  phone, and says so without it.
+- Where it stands: the sample builds for both ABIs (11-13). ⛔ No APK has been started since the scripts took
+  their present form, and none has ever run on a real phone: an APK that builds is not a game that starts.
+
 ## The tick, the check, the dice, the ladder (`design/platform_tiers.md`)
 - **The sim runs one whole tick at a time.** `REVA_TICK=<hz>` (default 60); a frame owes 1..4 ticks from the
   wall time, snapped against vsync jitter, capped. A frame that owes k passes through the whole loop k times, one

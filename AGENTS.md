@@ -27,6 +27,7 @@ Quick start builds and plays a game in two commands), `CLAUDE.md` (the build, th
 | run it with no graphics driver | `README.md`, "No graphics driver?" | `driver.py buildsoft --game <name>` |
 | show the person a picture, or play the game yourself, with no window | `CLAUDE.md`, "Headless verification instruments" | the `buildsoft` build with `REVA_NOWINDOW=1` and `REVA_SHOT`, and the bridge (`REVA_BRIDGE`, `reva_native/anim_bench/bridge.py`) |
 | hand it to someone | `README.md`, "A game to hand to someone" | `python reva_native/package.py --game <name>` |
+| put it on an Android phone | `reva_native/android/README.md` | `python reva_native/android/make_apk.py --game <name> --image IMAGE --sdk-volume SDKVOL --sdl-volume SDLVOL`, in a container the user provides; the APKs build, and none has been started since the scripts took their present form: say so |
 
 ## If you are helping a Godot 4 project — start here
 
@@ -36,6 +37,7 @@ Quick start builds and plays a game in two commands), `CLAUDE.md` (the build, th
 | use our skate moves and body moves | `godot/ANIMATION_IMPORT.md` | import `godot/animations/*.glb`, retarget with a `BoneMap` on `SkeletonProfileHumanoid`, set loop modes from the table, parent the real board under the `skateboard` node |
 | use the cameras (tripod, dolly/crane, track, pan, orbit, the hand-held phone, shake, fisheye, the phone-screen frame) | `godot/CAMERA_PORT.md` — exact math with line numbers into the C | `godot/club_camera.gd` + `godot/club_camera_post.gdshader`, **verified in Godot 4.7.2**: open `godot/` as a project and press F5 (`demo/main.gd` sets every rig up in code); `demo/score_rigs.py` re-measures them |
 | build or change a CITY map (Seattle, from OpenStreetMap and USGS elevation) | `skate_src/citymap/MAP_GUIDE.md`, its part 2 is for you; then `skate_src/citymap/README.md` | download the data outside the repo, `python -I skate_src/citymap/citymap.py <config> --raw <data> --out <scratch> --godot <folder>`, drop `SM_<name>.glb` and `.park.json` into the game; config first, code second; never Google Street View |
+| bring a Godot scene, or a Godot shader, INTO the engine | the first comment of each file in `skate_src/godot/` | run `engine_export.gd` in Godot (`godot --headless --path <project> -s <path to engine_export.gd> -- <res://scene.tscn> <out folder> [name]`), then `python skate_src/godot/godot2set.py <out folder> <name> <game folder>` writes a set and a pack; it calls `godot_shader.py` for the scene's shader materials, and what can't be carried is said and drawn with its plain material; `reva_native/godot/gd_math.h` is Godot's math types in C, for game code brought across. They were written against one project: expect to extend them |
 | check a result | `godot/CAMERA_PORT.md` §5 | record with Godot's Movie Maker (`--write-movie out.avi --fixed-fps 60`), `ffmpeg -i out.avi out.mp4`, run `skate_src/robot_neko/mp4steps.py`, `heldiff.py`, `scenesheet.py`, `sfxcheck.py` on it — they read any mp4 |
 
 Suggested order: (1) import the animations and get `z_rm_sk_ride` looping on a character with the board

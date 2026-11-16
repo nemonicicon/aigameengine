@@ -10,6 +10,7 @@ usage: hashcheck.py                  every scenario of the game
                                      are compared by comparing their files, which is what .github/ci.sh memory does
 Run from reva_native. Build first: -DREVA_HEADLESS, see CLAUDE.md. packs_rvz/ must exist: the 77 packs of the zombie game, v1_Character* and v1_moves (made on request with --links).
 --game sample checks the sample game instead, which is what the kit has: built with games/sample/sample.c, and run from its own folder so it sees no content but its own body. --game rocks is the 2D game, --game tower the 3D action one, --game herd the crowd one and --game roam the streaming world, the same way. Roam's cells are made by its make_assets.py, not kept in git.
+--game PATH (11-16) is a game in a folder of its own outside this repository: it's run from that folder, and its scenarios are its own check.txt (read_game_check says the format).
 A scenario marked `cadence` also runs at odd tick patterns, which must print the same lines (a packet exists only for a tick that draws, so those compare on the ticks both have).
 A mismatch prints the first tick that parted; REVA_SIMDUMP=<tick>:<file> then names the value. A [packet] line that parts with the [simhash] line
 holding says the rules are the same and what's drawn changed: REVA_PACKETDUMP=<tick>:<file> gives both runs' frames as text to diff."""
@@ -199,6 +200,38 @@ def make_rocks_tape(path):
     print("tape:", path)
 
 
+def read_game_check(folder):
+    """(11-16) A GAME OUTSIDE THIS REPOSITORY keeps its own scenarios, since none of its files may live here: check.txt in its folder, a scenario a line,
+        name ticks cadences KEY=VALUE ... -- the exe's arguments
+    cadences is a list of tick patterns split by ';' (1,1,1,1,2;2,2,3), or '-' for none. A tape is REVA_REPLAY=<path from the game's folder>. '#' starts a note"""
+    path = os.path.join(folder, "check.txt")
+    if not os.path.exists(path):
+        sys.exit("--game %s: a game outside the engine keeps its scenarios in check.txt in its folder, and there's none" % folder)
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for n, line in enumerate(f, 1):
+            line = line.split("#", 1)[0].strip()
+            if not line:
+                continue
+            if " -- " not in " " + line + " ":
+                sys.exit("%s:%d: no ' -- ' before the exe's arguments" % (path, n))
+            head, args = (" " + line + " ").split(" -- ", 1)
+            words = head.split()
+            if len(words) < 3 or not words[1].isdigit():
+                sys.exit("%s:%d: want name ticks cadences KEY=VALUE ... -- arguments" % (path, n))
+            env = {}
+            for kv in words[3:]:
+                if "=" not in kv:
+                    sys.exit("%s:%d: %s isn't KEY=VALUE" % (path, n, kv))
+                k, v = kv.split("=", 1)
+                env[k] = v
+            cad = [] if words[2] == "-" else words[2].split(";")
+            out.append((words[0], env, args.split(), int(words[1]), cad))
+    if not out:
+        sys.exit("%s: no scenarios in it" % path)
+    return out
+
+
 def run(exe, env_extra, args, ticks, cwd=ROOT):
     env = dict(os.environ, REVA_NOSAVE="1", REVA_FIXEDSTEP="60", REVA_SIMHASH="60", REVA_EXITTICK=str(ticks), **env_extra)
     if os.name == "nt":
@@ -248,7 +281,8 @@ ap.add_argument("--game", default="rvz" if os.path.exists(os.path.join(ROOT, "ga
 ap.add_argument("--lines", help="also write every scenario's lines to this file, to compare with another run's")
 a = ap.parse_args()
 a.exe = os.path.abspath(a.exe)
-CWD = ROOT if a.game == "rvz" else os.path.join(ROOT, "games", a.game)
+OUTSIDE = (os.path.isabs(a.game) or "/" in a.game or os.sep in a.game) and os.path.isdir(a.game)   # (11-16) --game PATH: a game in a folder of its own (a bare name is one of games/)
+CWD = os.path.abspath(a.game) if OUTSIDE else ROOT if a.game == "rvz" else os.path.join(ROOT, "games", a.game)
 if a.links:
     links()
 if a.game == "roam" and not os.path.exists(os.path.join(CWD, "sets", "roam.set")):
@@ -270,7 +304,7 @@ if a.make_tape:
         make_setup_tape(os.path.join(REFS, "sample_setup.tape"))
 bad = 0
 ran = {}   # each scenario's lines, by name: what the others are held against
-for name, env, args, ticks, cadences in {"rvz": SCENARIOS, "sample": SCENARIOS_SAMPLE, "rocks": SCENARIOS_ROCKS, "rally": SCENARIOS_RALLY, "tower": SCENARIOS_TOWER, "talk": SCENARIOS_TALK, "people": SCENARIOS_PEOPLE, "roam": SCENARIOS_ROAM, "herd": SCENARIOS_HERD}[a.game]:
+for name, env, args, ticks, cadences in (read_game_check(CWD) if OUTSIDE else {"rvz": SCENARIOS, "sample": SCENARIOS_SAMPLE, "rocks": SCENARIOS_ROCKS, "rally": SCENARIOS_RALLY, "tower": SCENARIOS_TOWER, "talk": SCENARIOS_TALK, "people": SCENARIOS_PEOPLE, "roam": SCENARIOS_ROAM, "herd": SCENARIOS_HERD}[a.game]):
     if a.only and a.only != name:
         continue
     if "REVA_REPLAY" in env and not os.path.exists(os.path.join(CWD, env["REVA_REPLAY"])):

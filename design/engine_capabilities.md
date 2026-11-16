@@ -1116,3 +1116,24 @@ the world's up, then to +z, rather than divide by zero.
 Proof: the same frame of a ship pitched 80 degrees and rolled 30, the chase lens given the ship's up and, as the control,
 not given it: with it the wings read level from behind, without it the ship is rolled on screen. The sample game's check
 comes out the same.
+
+### 50 · A game outside the repository has a check of its own, and what it showed (11-16)
+
+`driver.py check --game PATH` builds the no-display engine with a game in a folder of its own (its exe beside its `.c`, as
+`buildsoft` and `buildvk` already did) and runs `anim_bench/hashcheck.py --game PATH`, which reads that game's scenarios from
+`check.txt` in its folder: a scenario a line, `name ticks cadences KEY=VALUE ... -- the exe's arguments` (`read_game_check`).
+The engine's own games keep theirs in `hashcheck.py`; a game outside can't, since nothing of its may live here.
+
+Its first run, a flight game's, held the rules at every pacing and parted on the picture, twice. Both were the engine's:
+- **The lens's cuts.** A frame counted a cut when its eye moved more than 6 units since the last DRAWN frame ("more in one tick than
+  anything travels"). A chase lens at 90 m/s goes 2.7 units a tick, so a frame owing three ticks counted a cut that a frame owing one
+  didn't, and a first frame that drew nothing yet counted the game's first lens as one at one tick a frame and not at two. Now a game's
+  lens counts its own jumps where it's put, a tick at a time (`gameLensJump`, from `E->lens` and a conversation's lens): more than 6
+  units in one tick, and never its first. The frame's own test stays for the engine's lens.
+- **A game's lights.** `draw` runs on every pass of a frame, and its lines are flushed each pass, but `E->light`'s list was only
+  emptied by a frame that drew, so a frame owing two ticks drew the first pass's lights as well as the second's. Now each pass starts
+  with none.
+`REVA_PACKETDUMP` prints each part's own hash beside what it printed (the lens, the sun, the lights, each draw's whole matrix, each
+line set's and HUD set's vertices): the first diff showed the frames equal but for their hashes, because what parted wasn't printed.
+Proof: the flight game's check, no input for 3,600 ticks at 1,1,1,1,2 and 2,2,3 and a tape of keys and mouse for 1,800 at 1,1,1,1,2,
+all the same; the sample, rocks, rally, tower and herd checks come out the same; no new compiler warning.

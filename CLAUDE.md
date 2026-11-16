@@ -158,7 +158,8 @@ over it.
 - A game with cooked packs lists every file it loads in a `game.txt`, with a budget per kind, and
   `anim_bench/cookcheck.py` holds it to that. None of the games here has one: everything in them is made by code.
 - A game's check is a list of scenarios in `anim_bench/hashcheck.py`, by the game's name: a new game adds its
-  own there.
+  own there. A game in a folder of its own outside this repository keeps its scenarios in `check.txt` there
+  (`driver.py check --game PATH`; `read_game_check` says the format).
 - `design/pack_format.md` is what's on disk; `anim_bench/packdump.py --check` holds a pack to it.
 
 ## Online play (`club_net.c`, `engine/net.inc`)

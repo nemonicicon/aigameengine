@@ -11,7 +11,7 @@ static const char* apiBannerText(void){ return GM.msgT>0.f?GM.msg:NULL; }
 static int vmOf(const char*n);
 static int g_videoWant=-1;   /* what a game asked for: the loop changes it between frames (engine/display.inc) */
 static void apiVideo(const char*mode){ g_videoWant=vmOf(mode); }
-static void apiLens(float ex,float ey,float ez,float ax,float ay,float az){ g_gameLens.on=1; g_gameLens.e[0]=ex; g_gameLens.e[1]=ey; g_gameLens.e[2]=ez; g_gameLens.a[0]=ax; g_gameLens.a[1]=ay; g_gameLens.a[2]=az; }
+static void apiLens(float ex,float ey,float ez,float ax,float ay,float az){ const float e9[3]={ex,ey,ez}; gameLensJump(e9); g_gameLens.on=1; g_gameLens.e[0]=ex; g_gameLens.e[1]=ey; g_gameLens.e[2]=ez; g_gameLens.a[0]=ax; g_gameLens.a[1]=ay; g_gameLens.a[2]=az; }
 static void apiLensFree(void){ g_gameLens.on=0; }
 /* (11-16) the game's lens looks with this up, until it's said again; (0,0,0) is the world's up, as before. Picture, not rules */
 static void apiLensUp(float ux,float uy,float uz){ const float l=sqrtf(ux*ux+uy*uy+uz*uz);

@@ -146,16 +146,18 @@ static unsigned long long pkHash(const GfxView *v) {
 
 static void pkDump(const char *path, const GfxView *v, unsigned long long hash) {
     FILE *f = fopen(path, "w"); if (!f) return;
+    const unsigned long long H0 = 14695981039346656037ull;   /* (11-16) each part's own hash beside what's printed: what the frame's hash holds and the text doesn't print (a whole matrix, the lights, a line's or the HUD's vertices) still shows where two frames part */
     fprintf(f, "tick %ld hash %016llx cuts %u reset %d\neye %.6f %.6f %.6f sun %.6f %.6f %.6f %.6f shadow %d clear %.4f %.4f %.4f\n", v->tick, hash, v->cuts, v->reset, v->eye[0], v->eye[1], v->eye[2], v->sunDir[0], v->sunDir[1], v->sunDir[2], v->sunI, v->shadowOn, v->clear[0], v->clear[1], v->clear[2]);
+    fprintf(f, "lens %016llx sun %016llx %d lights %016llx\n", fnv(fnv(H0, v->vp, 64), v->eye, 12), fnv(H0, v->sunVP, 64), v->nLights, v->nLights > 0 ? fnv(H0, v->lights, (size_t)v->nLights * sizeof(GfxLight)) : 0ull);
     fprintf(f, "%d draws\n", g_pk.nDraw);
     for (int i = 0; i < g_pk.nDraw; i++) { const GfxDraw *d = &g_pk.draws[i]; unsigned long long ph = d->bones ? fnv(14695981039346656037ull, g_pk.mem + d->palOff, (size_t)d->bones * 48) : 0;
-        fprintf(f, "%4d id %08x kind %u owner %u mesh %u idx %u verts %u bones %u flags %d tex %u use %.3f tint %.3f %.3f %.3f at %.4f %.4f %.4f pal %016llx vb %u\n", i, d->id, d->id >> 28, (d->id >> 12) & 0xffff, d->id & 0xfff, d->nIndex, d->nVerts, d->bones, d->flags, d->tex, d->useTex, d->tint[0], d->tint[1], d->tint[2], d->model[12], d->model[13], d->model[14], ph, d->vb[0]); }
+        fprintf(f, "%4d id %08x kind %u owner %u mesh %u idx %u verts %u bones %u flags %d tex %u use %.3f tint %.3f %.3f %.3f at %.4f %.4f %.4f pal %016llx vb %u model %016llx\n", i, d->id, d->id >> 28, (d->id >> 12) & 0xffff, d->id & 0xfff, d->nIndex, d->nVerts, d->bones, d->flags, d->tex, d->useTex, d->tint[0], d->tint[1], d->tint[2], d->model[12], d->model[13], d->model[14], ph, d->vb[0], fnv(H0, d->model, 64)); }
     fprintf(f, "%d line sets\n", g_pk.nLine);
-    for (int i = 0; i < g_pk.nLine; i++) fprintf(f, "%4d %d vertices\n", i, g_pk.lines[i].n);
+    for (int i = 0; i < g_pk.nLine; i++) fprintf(f, "%4d %d vertices %016llx\n", i, g_pk.lines[i].n, fnv(H0, g_pk.mem + g_pk.lines[i].off, (size_t)g_pk.lines[i].n * 24));
     fprintf(f, "%d effects\n", g_pk.nFx);
     for (int i = 0; i < g_pk.nFx; i++) fprintf(f, "%4d how %d under %d %d %s\n", i, g_pk.fx[i].how, g_pk.fx[i].under, g_pk.fx[i].n, g_pk.fx[i].vb ? "points from a buffer" : "inline");
     fprintf(f, "%d hud sets\n", g_pk.nHud);
-    for (int i = 0; i < g_pk.nHud; i++) fprintf(f, "%4d %d vertices canvas %.0f %.0f colour %.3f %.3f %.3f %.3f first %.2f %.2f\n", i, g_pk.hud[i].n, g_pk.hud[i].scr[0], g_pk.hud[i].scr[1], g_pk.hud[i].col[0], g_pk.hud[i].col[1], g_pk.hud[i].col[2], g_pk.hud[i].col[3], ((float *)(g_pk.mem + g_pk.hud[i].off))[0], ((float *)(g_pk.mem + g_pk.hud[i].off))[1]);
+    for (int i = 0; i < g_pk.nHud; i++) fprintf(f, "%4d %d vertices canvas %.0f %.0f colour %.3f %.3f %.3f %.3f first %.2f %.2f %016llx\n", i, g_pk.hud[i].n, g_pk.hud[i].scr[0], g_pk.hud[i].scr[1], g_pk.hud[i].col[0], g_pk.hud[i].col[1], g_pk.hud[i].col[2], g_pk.hud[i].col[3], ((float *)(g_pk.mem + g_pk.hud[i].off))[0], ((float *)(g_pk.mem + g_pk.hud[i].off))[1], fnv(H0, g_pk.mem + g_pk.hud[i].off, (size_t)g_pk.hud[i].n * (g_pk.hud[i].tex ? 32 : 8)));
     fclose(f);
 }
 

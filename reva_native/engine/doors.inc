@@ -19,7 +19,14 @@ static const char*MODE_VAR[MODE_N][6]={{0}};
 static int g_mode=MODE_DEFAULT;
 static int g_modeVariant=0;
 static int g_cabAttract=0;   /* no live input for 30 s: the cab plays itself (set once a frame by the input policy) */
-static struct { int on; float e[3],a[3]; float shake,shakeT,shakeLen; int upOn; float up[3]; } g_gameLens;   /* E->lens, E->shake, E->lensUp (11-16) */
+static struct { int on; float e[3],a[3]; float shake,shakeT,shakeLen; int upOn; float up[3]; unsigned cuts; int seen; } g_gameLens;   /* E->lens, E->shake, E->lensUp (11-16), and its jumps (11-16) */
+/* (11-16) THE GAME'S LENS COUNTS ITS OWN JUMPS, where it's put, a tick at a time: more than 6 units at once is a cut (what blends across frames doesn't blend
+ * across it); the first lens a game puts isn't one. The frame's own test (main.inc, "the lens jumped") measured from one drawn frame to the next, so at two or
+ * three ticks a frame a quick lens (a ship's chase lens at 90 m/s goes 2.7 units a tick) crossed 6 units with no jump at all, and the count then differed with
+ * the frame pacing, which the check holds the packet to */
+static void gameLensJump(const float*e){
+    if(g_gameLens.seen){ const float dx=e[0]-g_gameLens.e[0],dy=e[1]-g_gameLens.e[1],dz=e[2]-g_gameLens.e[2]; if(dx*dx+dy*dy+dz*dz>36.f) g_gameLens.cuts++; }
+    g_gameLens.seen=1; }
 static float g_tapeMusicIn=-1.f;   /* the music clock's reading, off a tape */
 static float musicClockRead(void);   /* engine/gameworld.inc */
 static float g_heroFaceY=0.f; static int g_heroFaceOn=0;   /* E->heroFace: which way the hero's asked to turn, this tick */

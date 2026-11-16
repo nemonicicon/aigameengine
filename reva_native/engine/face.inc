@@ -246,8 +246,8 @@ static void apiTalkView(int view){ g_talk.view=view<0?-1:view>3?3:view; }
 /* the lens the conversation sets, and the one it hands back: the whole screen's, or one player's picture of a split screen (the first picture's lens is also the screen's) */
 static void talkLensPut(const float*e,const float*c,float fov){ g_tune.lensFov=fov;
     if(g_talk.view>=0&&g_gameViews.n>1){ memcpy(g_gameViews.e[g_talk.view],e,12); memcpy(g_gameViews.a[g_talk.view],c,12); if(g_talk.view!=0) return; }
-    g_gameLens.on=1; memcpy(g_gameLens.e,e,12); memcpy(g_gameLens.a,c,12); }
-static void talkLensBack(void){ g_gameLens.on=g_talk.hadLens; memcpy(g_gameLens.e,g_talk.saveE,12); memcpy(g_gameLens.a,g_talk.saveA,12); g_tune.lensFov=g_talk.saveFov;
+    gameLensJump(e); g_gameLens.on=1; memcpy(g_gameLens.e,e,12); memcpy(g_gameLens.a,c,12); }
+static void talkLensBack(void){ gameLensJump(g_talk.saveE); g_gameLens.on=g_talk.hadLens; memcpy(g_gameLens.e,g_talk.saveE,12); memcpy(g_gameLens.a,g_talk.saveA,12); g_tune.lensFov=g_talk.saveFov;
     if(g_talk.view>=0&&g_gameViews.n>1){ memcpy(g_gameViews.e[g_talk.view],g_talk.saveVE,12); memcpy(g_gameViews.a[g_talk.view],g_talk.saveVA,12); } }
 static int apiTalking(void){ return g_talk.on; }
 static void talkLook(int k,int body){ if(k==-1) apiBodyLookOff(body); else if(k>=0&&k<TALK_SEATS&&g_talk.used[k]) apiBodyLookBody(body,g_talk.seat[k]); }

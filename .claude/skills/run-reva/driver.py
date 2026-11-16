@@ -172,11 +172,10 @@ def check(a):
     to the next: the engine isn't finished, and what it prints changes with every improvement. It says nothing about how the picture looks."""
     env = dict(os.environ, PATH=MINGW + os.pathsep + os.environ["PATH"])
     rc_object(env)
-    # --nodoors: the engine with no old game modes. --game NAME: that game.
-    name = other_game(a)
-    exe = f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe"
-    src = [(f"games/{name}/{name}.c" if f == GAME and name else f) for f in SRC]
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
+    # --nodoors: the engine with no old game modes. --game NAME: that game. (11-16) --game PATH: a game in a folder of its own, which keeps its own scenarios (check.txt)
+    name, src, outdir, inc = game_unit(a)
+    exe = os.path.join(outdir, f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe")
+    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + inc + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
     builds = [cmd]
     procs = [subprocess.Popen(c, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") for c in builds]
     failed = 0
@@ -189,7 +188,8 @@ def check(a):
             failed = 1
     if failed:
         return 1
-    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", os.path.join(NATIVE, exe)] + (["--game", name] if name else []), cwd=NATIVE).returncode
+    game = outdir if inc else name   # a game outside: its folder, where hashcheck finds its check.txt
+    return subprocess.run([PY, os.path.join("anim_bench", "hashcheck.py"), "--exe", exe] + (["--game", game] if game else []), cwd=NATIVE).returncode
 
 
 def buildsoft(a):

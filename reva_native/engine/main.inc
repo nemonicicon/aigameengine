@@ -3426,7 +3426,9 @@ int main(int argc,char**argv){
             if(GM.wCd>0.f) GM.wCd-=dtf;
             switch(g_mode){
 
-            case MODE_GAME: uiFrame(); musicClockStep(); g_game->tick(dtf); talkStep(); apiUiEnd(); faceStep(); unseenClear(); g_game->draw(g_game->state); break;
+            case MODE_GAME: uiFrame(); musicClockStep(); g_game->tick(dtf); talkStep(); apiUiEnd(); faceStep(); unseenClear();
+                g_frameNL=0;   /* (11-16) a game's lights are its draw's, each pass's own, as its lines are: a frame owing two ticks drew the first pass's lights as well as the second's, so the packet parted with the frame pacing */
+                g_game->draw(g_game->state); break;
 
             case MODE_ANIM: {   /* -------- THE ANIM LAB: one body, measured -------- */
                 /* state clock: auto-advance unless REVA_ANIMSTATE pinned one; A steps
@@ -4950,8 +4952,12 @@ int main(int argc,char**argv){
             for(int k9=0;k9<g_frameNL&&n9<GFX_MAX_LIGHTS;k9++) L9[n9++]=g_frameLight[k9];
             g_frameNL=0; v9.lights=L9; v9.nLights=n9; memcpy(v9.ground,g_ground,12); v9.haze=g_lensNow.haze>=0.f?g_lensNow.haze:g_haze; }
           /* the lens jumped: more in one tick than anything travels. The first frame carries nothing over. */
-          { static int first9=1; static float le9[3]; static unsigned cuts9=0; float dx9=g_camEye[0]-le9[0],dy9=g_camEye[1]-le9[1],dz9=g_camEye[2]-le9[2];
-            if(!first9&&dx9*dx9+dy9*dy9+dz9*dz9>36.f) cuts9++;
+          { static int first9=1, game9=0; static float le9[3]; static unsigned cuts9=0, gameCuts9=0; float dx9=g_camEye[0]-le9[0],dy9=g_camEye[1]-le9[1],dz9=g_camEye[2]-le9[2];
+            const int gl9=GAME_ON&&g_gameLens.on&&!g_lensNow.camOn;
+            if(gl9){ if(game9) cuts9+=g_gameLens.cuts-gameCuts9; else if(!first9) cuts9++;   /* (11-16) a game's lens: its own jumps, counted a tick at a time (gameLensJump); taking over from the engine's lens is one */
+                     gameCuts9=g_gameLens.cuts; }
+            else if(!first9&&dx9*dx9+dy9*dy9+dz9*dz9>36.f) cuts9++;
+            game9=gl9;
             memcpy(le9,g_camEye,12); v9.cuts=cuts9; v9.reset=first9; first9=0; v9.tick=g_tickTotal; }
           statsDraw(); ANDROID_TOUCHDRAW gfxFrameEnd(&v9); statsFrame(); }   /* make the GPU actually finish so the number means something */
         bridgeFrameDone(W,H);

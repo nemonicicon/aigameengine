@@ -1103,3 +1103,16 @@ to the CAMERA's side of the room (its random turn takes the camera's side, and a
 actor cheats out -- not into the lens -- unless the lens is behind it: a look about turned away from a close lens gave a
 close-up of the back of a body's head at a mirror. And the WALK LOG IS TIMED: a walk's start, its arrival and a STUCK
 placing print the scene time (`[walk] t <s> slot <n> -> mark ...`), which is what the scene tools time footsteps off.
+
+### 49 · A game's lens with its own up (`E->lensUp`) -- BUILT (11-16)
+
+A flight game behind engine.h: a chase lens behind a ship that turns about its own axes. `E->lens` takes an eye and an aim
+and builds the view with the world's up, so a ship rolled 30 degrees kept its roll on screen while the lens stayed level,
+and with the ship pitched past vertical the aim ran parallel to the world's up and the view had no up at all.
+`E->lensUp(ux,uy,uz)` gives the lens `E->lens` sets the game's own up (normalised; a zero vector hands it back to the
+world's). It's a picture, not a rule. It reaches only that lens: not `E->views` (split screen) and not a timeline's lens.
+`m4_lookat_up` (club_math.c) is `m4_lookat` with a given up; when the up is parallel to the line of sight it falls back to
+the world's up, then to +z, rather than divide by zero.
+Proof: the same frame of a ship pitched 80 degrees and rolled 30, the chase lens given the ship's up and, as the control,
+not given it: with it the wings read level from behind, without it the ship is rolled on screen. The sample game's check
+comes out the same.

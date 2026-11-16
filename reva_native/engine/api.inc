@@ -13,6 +13,10 @@ static int g_videoWant=-1;   /* what a game asked for: the loop changes it betwe
 static void apiVideo(const char*mode){ g_videoWant=vmOf(mode); }
 static void apiLens(float ex,float ey,float ez,float ax,float ay,float az){ g_gameLens.on=1; g_gameLens.e[0]=ex; g_gameLens.e[1]=ey; g_gameLens.e[2]=ez; g_gameLens.a[0]=ax; g_gameLens.a[1]=ay; g_gameLens.a[2]=az; }
 static void apiLensFree(void){ g_gameLens.on=0; }
+/* (11-16) the game's lens looks with this up, until it's said again; (0,0,0) is the world's up, as before. Picture, not rules */
+static void apiLensUp(float ux,float uy,float uz){ const float l=sqrtf(ux*ux+uy*uy+uz*uz);
+    if(!(l>1e-6f)){ g_gameLens.upOn=0; return; }
+    g_gameLens.upOn=1; g_gameLens.up[0]=ux/l; g_gameLens.up[1]=uy/l; g_gameLens.up[2]=uz/l; }
 /* (step 26) the language: the file read, the page laid out again for it, and the choice kept for next time unless saves are blind */
 static int langSet(const char*code,int keep){ const int ok=langLoad(code); if(g_tvOk&&g_tvW>0) tvUse(g_tvRead);
     if(keep&&!getenv("REVA_NOSAVE")){ FILE*f=fopen("save/language.txt","w"); if(f){ fprintf(f,"%s\n",ok?g_langCode:""); fclose(f); } }
@@ -226,7 +230,7 @@ static void apiInit(void){
     g_api.lineSolid=gmLineSolid; g_api.keyPad=apiKeyPad; g_api.bodyPlace=apiBodyPlace;
     g_api.saveBytes=apiSaveBytes; g_api.loadBytes=apiLoadBytes;
     g_api.soundPlace=apiSoundPlace; g_api.soundLength=sfxLength; g_api.musicCross=musicCross; g_api.musicLeft=musicLeft;
-    g_api.font=gfFont; g_api.fontText=gfText; g_api.fontWidth=gfWidth; g_api.imageSmooth=sprImageSmooth; g_api.canvasEdges=sprCanvasEdges; g_api.quit=apiQuit; g_api.imageSize=sprImageSize; g_api.fontEdge=gfEdge; g_api.bodyTint=apiBodyTint; g_api.bodyMirror=apiBodyMirror; g_api.triAdd=apiTriAdd; g_api.triAddClear=trAddClear; g_api.triRebuild=apiTriRebuild; g_api.triId=apiTriId; g_api.pointerAt=apiPointerAt; g_api.pointerOver=apiPointerOver; g_api.poly=sprPoly; g_api.stroke=sprLine; g_api.fontEm=gfFontEm; g_api.triRayKinds=trRayK; g_api.triSweepKinds=trSweepK; g_api.triNearKinds=trNearK; g_api.imageMake=sprImageMake; g_api.imagePaint=sprImagePaint; g_api.imageGone=sprImageGone;
+    g_api.font=gfFont; g_api.fontText=gfText; g_api.fontWidth=gfWidth; g_api.imageSmooth=sprImageSmooth; g_api.canvasEdges=sprCanvasEdges; g_api.quit=apiQuit; g_api.imageSize=sprImageSize; g_api.fontEdge=gfEdge; g_api.bodyTint=apiBodyTint; g_api.bodyMirror=apiBodyMirror; g_api.triAdd=apiTriAdd; g_api.triAddClear=trAddClear; g_api.triRebuild=apiTriRebuild; g_api.triId=apiTriId; g_api.pointerAt=apiPointerAt; g_api.pointerOver=apiPointerOver; g_api.poly=sprPoly; g_api.stroke=sprLine; g_api.fontEm=gfFontEm; g_api.triRayKinds=trRayK; g_api.triSweepKinds=trSweepK; g_api.triNearKinds=trNearK; g_api.imageMake=sprImageMake; g_api.imagePaint=sprImagePaint; g_api.imageGone=sprImageGone; g_api.lensUp=apiLensUp;
     g_api.perfStream=apiPerfStream;   /* (11-08) the pose stream */
 #ifdef REVA_GAMELIB
     const GameExport*g9=gameLibOpen();

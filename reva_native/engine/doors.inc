@@ -19,7 +19,7 @@ static const char*MODE_VAR[MODE_N][6]={{0}};
 static int g_mode=MODE_DEFAULT;
 static int g_modeVariant=0;
 static int g_cabAttract=0;   /* no live input for 30 s: the cab plays itself (set once a frame by the input policy) */
-static struct { int on; float e[3],a[3]; float shake,shakeT,shakeLen; } g_gameLens;   /* E->lens, E->shake */
+static struct { int on; float e[3],a[3]; float shake,shakeT,shakeLen; int upOn; float up[3]; } g_gameLens;   /* E->lens, E->shake, E->lensUp (11-16) */
 static float g_tapeMusicIn=-1.f;   /* the music clock's reading, off a tape */
 static float musicClockRead(void);   /* engine/gameworld.inc */
 static float g_heroFaceY=0.f; static int g_heroFaceOn=0;   /* E->heroFace: which way the hero's asked to turn, this tick */

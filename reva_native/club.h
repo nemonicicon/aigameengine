@@ -19,6 +19,7 @@ void m4_mul(M4 r,const M4 a,const M4 b);
 void m4_trs(M4 m,const float*t,const float*q,const float*s);
 void m4_persp(M4 m,float fovyDeg,float aspect,float zn,float zf);
 void m4_lookat(M4 m,float ex,float ey,float ez,float cx,float cy,float cz);
+void m4_lookat_up(M4 m,float ex,float ey,float ez,float cx,float cy,float cz,float ux,float uy,float uz);   /* (11-16) the same, looking with this up: E->lensUp */
 
 void clubOpened(const char*path);   /* crowd_kms.c: REVA_OPENLOG, every file the engine reads */
 /* club_audio.c: THE AUDIO MIXER (09-11). REVA_NOAUDIO, REVA_SFXDBG, REVA_AUDIODUMP as before. */

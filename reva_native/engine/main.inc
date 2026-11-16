@@ -891,7 +891,8 @@ int main(int argc,char**argv){
         else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* a street runs to the horizon */
         else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(140.0f,g_setFar)); }   /* a scene is two bodies on a black stage */
         else          { m4_persp(proj,(GAME_ON&&g_tune.lensFov>0.f)?g_tune.lensFov:42.0f,VIEW_ASPECT(W,H),0.8f,fmaxf(520.0f,g_setFar)); }   /* the far plane is far enough that there is no view distance */
-        m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
+        if(GAME_ON&&g_gameLens.on&&g_gameLens.upOn&&!g_lensNow.camOn) m4_lookat_up(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2], g_gameLens.up[0],g_gameLens.up[1],g_gameLens.up[2]);   /* (11-16) E->lensUp: the game's lens with its own up */
+        else m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
         if(g_lensNow.roll!=0.f){ const float a9=g_lensNow.roll*0.0174532925f, c9=cosf(a9), s9=sinf(a9); M4 r9,t9; memset(r9,0,64); r9[0]=c9; r9[1]=s9; r9[4]=-s9; r9[5]=c9; r9[10]=1.f; r9[15]=1.f; m4_mul(t9,r9,view); memcpy(view,t9,64); }   /* (step 25) the lens rolled about its own line */
         /* the lens's own position, for anything later in the frame that has to face it
          * (a billboarded screen). Stamped here because this is where it is decided. */

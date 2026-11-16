@@ -22,6 +22,20 @@ void m4_lookat(M4 m,float ex,float ey,float ez,float cx,float cy,float cz){
     m[0]=sx[0];m[1]=uy[0];m[2]=fz[0];m[3]=0; m[4]=sx[1];m[5]=uy[1];m[6]=fz[1];m[7]=0;
     m[8]=sx[2];m[9]=uy[2];m[10]=fz[2];m[11]=0;
     m[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); m[13]=-(uy[0]*ex+uy[1]*ey+uy[2]*ez); m[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); m[15]=1; }
+/* (11-16) m4_lookat with the lens's own up, for a lens that isn't level (E->lensUp: a ship's chase lens, a cockpit). The up needn't be square to the line of
+ * sight: only its part across the line counts. An up along the line itself gives no turn at all, so the world's up stands in, and +z where that's along it too */
+void m4_lookat_up(M4 m,float ex,float ey,float ez,float cx,float cy,float cz,float ux,float uy,float uz){
+    float fz[3]={ex-cx,ey-cy,ez-cz}; float l=sqrtf(fz[0]*fz[0]+fz[1]*fz[1]+fz[2]*fz[2]); for(int i=0;i<3;i++)fz[i]/=l;
+    float up[3]={ux,uy,uz};
+    float sx[3]={ up[1]*fz[2]-up[2]*fz[1], up[2]*fz[0]-up[0]*fz[2], up[0]*fz[1]-up[1]*fz[0] };
+    l=sqrtf(sx[0]*sx[0]+sx[1]*sx[1]+sx[2]*sx[2]);
+    if(l<1e-5f){ up[0]=0.f; up[1]=1.f; up[2]=0.f; if(fabsf(fz[1])>0.999f){ up[1]=0.f; up[2]=1.f; }
+        sx[0]=up[1]*fz[2]-up[2]*fz[1]; sx[1]=up[2]*fz[0]-up[0]*fz[2]; sx[2]=up[0]*fz[1]-up[1]*fz[0]; l=sqrtf(sx[0]*sx[0]+sx[1]*sx[1]+sx[2]*sx[2]); }
+    for(int i=0;i<3;i++)sx[i]/=l;
+    float uy2[3]={ fz[1]*sx[2]-fz[2]*sx[1], fz[2]*sx[0]-fz[0]*sx[2], fz[0]*sx[1]-fz[1]*sx[0] };
+    m[0]=sx[0];m[1]=uy2[0];m[2]=fz[0];m[3]=0; m[4]=sx[1];m[5]=uy2[1];m[6]=fz[1];m[7]=0;
+    m[8]=sx[2];m[9]=uy2[2];m[10]=fz[2];m[11]=0;
+    m[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); m[13]=-(uy2[0]*ex+uy2[1]*ey+uy2[2]*ez); m[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); m[15]=1; }
 
 /* ---- THE ENGINE'S OWN MATH (11-02, engine plan Phase 1) ---------------------------------------
  * Each machine's C library rounds sin, cos, atan2, exp, log and pow its own way, within its own

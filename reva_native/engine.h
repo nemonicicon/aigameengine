@@ -573,6 +573,11 @@ typedef struct {
     int (*triRayKinds)(const float *from, const float *to, unsigned kinds, EngineTriHit *hit);
     int (*triSweepKinds)(const float *from, const float *to, float radius, unsigned kinds, EngineTriHit *hit);
     int (*triNearKinds)(const float *at, float radius, unsigned kinds, EngineTriHit *hits, int max);
+    /* (11-16) THE LENS'S OWN UP, for a lens that isn't level: a ship's chase lens that banks with her, a cockpit in a loop. E->lens looks along its line with the world's
+     * up, which turns the picture over as a lens passes straight up or down; with an up, the picture's top is that way, at any heading. Only its part across the line
+     * of sight counts. (0, 0, 0) is the world's up again, as before. It stays until it's said again, for E->lens's lens (not a split screen's views, nor a set's
+     * timeline lens). What's drawn, never the rules */
+    void (*lensUp)(float ux, float uy, float uz);
 } EngineAPI;
 
 /* a game fills in what it needs and leaves the rest out: a missing entry does nothing, and bodies walk on their own feet. Only version is required. */

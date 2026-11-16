@@ -74,16 +74,18 @@ static void sunPass(void){
     float uy[3]={ fz[1]*sx[2]-fz[2]*sx[1], fz[2]*sx[0]-fz[0]*sx[2], fz[0]*sx[1]-fz[1]*sx[0] };
     /* ⭐ TEXEL SNAP: quantise the focus in the light's own basis, so the window slides in whole
      * texels and a still scene under a moving lens does not crawl */
-    float E=g_shadowExt, tx=2.f*E/(float)SUNMAP;
+    /* (11-16) a game's reach: the window that wide either side of the lens, and as deep again toward the sun and past it */
+    float E=g_sunReach>0.f?g_sunReach:g_shadowExt, tx=2.f*E/(float)SUNMAP;
+    const float up9=g_sunReach>0.f?g_sunReach*1.3f:120.f, zf9=g_sunReach>0.f?g_sunReach*2.6f:260.f;
     float C[3]={g_sunFocus[0],g_sunFocus[1],g_sunFocus[2]};
     float cx=C[0]*sx[0]+C[1]*sx[1]+C[2]*sx[2], cy=C[0]*uy[0]+C[1]*uy[1]+C[2]*uy[2];
     float qx=floorf(cx/tx)*tx-cx, qy=floorf(cy/tx)*tx-cy;
     for(int i=0;i<3;i++) C[i]+=sx[i]*qx+uy[i]*qy;
-    float ex=C[0]+fz[0]*120.f, ey=C[1]+fz[1]*120.f, ez=C[2]+fz[2]*120.f;
+    float ex=C[0]+fz[0]*up9, ey=C[1]+fz[1]*up9, ez=C[2]+fz[2]*up9;
     M4 view; view[0]=sx[0];view[1]=uy[0];view[2]=fz[0];view[3]=0; view[4]=sx[1];view[5]=uy[1];view[6]=fz[1];view[7]=0;
     view[8]=sx[2];view[9]=uy[2];view[10]=fz[2];view[11]=0;
     view[12]=-(sx[0]*ex+sx[1]*ey+sx[2]*ez); view[13]=-(uy[0]*ex+uy[1]*ey+uy[2]*ez); view[14]=-(fz[0]*ex+fz[1]*ey+fz[2]*ez); view[15]=1;
-    M4 ortho; memset(ortho,0,64); { float zn=1.f, zf=260.f; ortho[0]=1.f/E; ortho[5]=1.f/E; ortho[10]=-2.f/(zf-zn); ortho[14]=-(zf+zn)/(zf-zn); ortho[15]=1.f; }
+    M4 ortho; memset(ortho,0,64); { float zn=1.f, zf=zf9; ortho[0]=1.f/E; ortho[5]=1.f/E; ortho[10]=-2.f/(zf-zn); ortho[14]=-(zf+zn)/(zf-zn); ortho[15]=1.f; }
     m4_mul(g_sunVP,ortho,view);
     g_shadowPass=1; if(g_setNI||g_nPipe) drawSet(); else objDraw(); g_shadowPass=0;
     for(int ci=0;ci<g_nSunCast;ci++){ SunCast*S=&g_sunCast[ci]; Pack*Pc=S->P; PMesh*M=&Pc->meshes[S->mi];

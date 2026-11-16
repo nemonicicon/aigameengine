@@ -17,12 +17,19 @@ typedef struct { Pack*P; int mi; M4 model; float pal[MAXB*16]; unsigned vb0, vb1
 static SunCast g_sunCast[NSUNCAST]; static int g_nSunCast=0, g_nSunCrowd=0;
 static int g_shadow=-1, g_shadowOn=0, g_shadowPass=0; static float g_shadowExt=28.f;
 static M4 g_sunVP={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; static float g_sunFocus[3]={0,0,0};
+/* (11-16) a game's own reach (tune.shadowReach), this frame: 0 is the engine's own street-sized window round the aim on the ground */
+static float g_sunReach=0.f;
+/* does the sun's window hold something at x y z, about r across? The engine's own: its place on the ground within k windows of the focus. A game's reach:
+ * within 1.6 reaches of the lens in three dimensions, its size added */
+static int sunHolds(float x,float y,float z,float r,float k){
+    if(g_sunReach>0.f){ const float dx=x-g_sunFocus[0],dy=y-g_sunFocus[1],dz=z-g_sunFocus[2],lim=g_sunReach*1.6f+r; return dx*dx+dy*dy+dz*dz<=lim*lim; }
+    const float dx=x-g_sunFocus[0],dz=z-g_sunFocus[2],lim=g_shadowExt*k*g_shadowFar;
+    return !(dx>lim||dx<-lim||dz>lim||dz<-lim); }
 static void sunStash(Pack*P,int mi,const float*pal,int nb,const float*model,int crowd){
     if(!g_shadowOn||nb<=0||nb>MAXB) return;
     if(crowd&&g_nSunCrowd>=32) return;                 /* the crowd may not crowd the hero out */
     if(g_nSunCast>=NSUNCAST){ static int said=0; if(!said){ said=1; printf("[shadow] caster stash FULL at %d -- raise NSUNCAST\n",NSUNCAST); } return; }
-    float dx=model[12]-g_sunFocus[0], dz=model[14]-g_sunFocus[2], lim=g_shadowExt*1.6f*g_shadowFar;
-    if(dx>lim||dx<-lim||dz>lim||dz<-lim) return;       /* outside the window: cannot cast into it */
+    if(!sunHolds(model[12],model[13],model[14],2.f,1.6f)) return;       /* outside the window: cannot cast into it */
     SunCast*S=&g_sunCast[g_nSunCast++]; if(crowd) g_nSunCrowd++;
     S->P=P; S->mi=mi; memcpy(S->model,model,64); memcpy(S->pal,pal,(size_t)nb*64); S->vb0=S->vb1=0; S->world=0;
     S->owner=g_vkOwner; S->ib=g_vkIdxIb; S->ni=g_vkIdxN;   /* (11-07) the sun sees the copy the picture does */
@@ -31,8 +38,7 @@ static void sunStash(Pack*P,int mi,const float*pal,int nb,const float*model,int 
  * palette and bind -- the body's matrix only says whether it stands inside the sun's window */
 static void sunStashW(Pack*P,int mi,unsigned vb0,unsigned vb1,int nb,const float*bodyModel){
     if(!g_shadowOn||nb<=0||nb>MAXB||g_nSunCast>=NSUNCAST) return;
-    float dx=bodyModel[12]-g_sunFocus[0], dz=bodyModel[14]-g_sunFocus[2], lim=g_shadowExt*1.6f*g_shadowFar;
-    if(dx>lim||dx<-lim||dz>lim||dz<-lim) return;
+    if(!sunHolds(bodyModel[12],bodyModel[13],bodyModel[14],2.f,1.6f)) return;
     static const float I9[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     SunCast*S=&g_sunCast[g_nSunCast++];
     S->P=P; S->mi=mi; memcpy(S->model,I9,64); for(int b=0;b<nb;b++) memcpy(S->pal+b*16,I9,64);
@@ -265,8 +271,8 @@ static void drawSet(void){
         if(I->hid) continue;
         if(!g_shadowPass&&g_gloss.on&&g_setPk[I->pk].floor) continue;   /* ⭐ (10-23) a glossy floor goes down LAST (glossFloorPass) */
         if(g_shadowPass){ /* ⭐ only what the sun window holds: a 300-unit street is mostly outside it */
-            float dx=I->m[12]-g_sunFocus[0], dz=I->m[14]-g_sunFocus[2], lim=g_shadowExt*1.7f*g_shadowFar;
-            if(dx>lim||dx<-lim||dz>lim||dz<-lim) continue;
+            { const Pack*Q9=&g_setPk[I->pk]; const float sc9=sqrtf(I->m[0]*I->m[0]+I->m[1]*I->m[1]+I->m[2]*I->m[2]);
+              if(!sunHolds(I->m[12],I->m[13],I->m[14],(Q9->propR+Q9->effH)*(sc9>1e-6f?sc9:1.f),1.7f)) continue; }
             if(g_setPk[I->pk].nocast) continue;   /* ⭐ a ceiling, a room's walls (10-18) */
             if(I->fade>0.5f) continue; }   /* more than half faded out: no shadow any more */
         else if(cullOn){ Pack*Q=&g_setPk[I->pk];

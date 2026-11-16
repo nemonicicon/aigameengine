@@ -136,6 +136,7 @@ static unsigned long long pkHash(const GfxView *v) {
     if (v->filmGrade > 0.f || v->filmVig > 0.f) { h = fnv(h, &v->filmGrade, 4); h = fnv(h, &v->filmVig, 4); }
     if (v->gloss[3] > 0.f) h = fnv(h, v->gloss, 16);
     if (v->bars) h = fnv(h, &v->bars, 4);
+    if (v->shadowReach > 0.f) h = fnv(h, &v->shadowReach, 4);   /* (11-16) a frame without it hashes as it did */
     if (v->dof > 0.f || v->shutter > 0.f || v->sepia > 0.f || v->flash > 0.f || v->burn > 0.f || v->grain > 0.f || v->weave[0] != 0.f || v->weave[1] != 0.f) { h = fnv(h, &v->focus, 12); h = fnv(h, &v->sepia, 16); h = fnv(h, v->weave, 8); }   /* (step 25) the lens and film's look, when a frame has any */
     if (g_pk.star.on) { h = fnv(h, g_pk.star.c, sizeof g_pk.star.c * 3); h = fnv(h, g_pk.star.cut, 12); h = fnv(h, g_pk.star.spot, sizeof g_pk.star.spot); }
     for (int i = 0; i < g_pk.nLine; i++) h = fnv(h, g_pk.mem + g_pk.lines[i].off, (size_t)g_pk.lines[i].n * 24);

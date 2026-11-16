@@ -1184,7 +1184,7 @@ static int inv44(const float *m, float *o) {
     float d = m[0]*t[0] + m[1]*t[4] + m[2]*t[8] + m[3]*t[12]; if (d == 0.f) return 0; d = 1.f / d; for (int i = 0; i < 16; i++) o[i] = t[i] * d; return 1;
 }
 /* one cascade: a sun lens on a sphere round the slice of the view between two depths, moved in whole texels so its edge doesn't crawl as the camera moves */
-static void cascadeOf(const float *vpGL, const float *eye, const float *fwd, const float *sun, float d0, float d1, int tile, float *out) {
+static void cascadeOf(const float *vpGL, const float *eye, const float *fwd, const float *sun, float d0, float d1, int tile, float room, float *out) {
     float inv[16]; if (!inv44(vpGL, inv)) return;
     float c[3] = {0, 0, 0}, pts[8][3]; int n = 0;
     for (int xi = -1; xi <= 1; xi += 2) for (int yi = -1; yi <= 1; yi += 2) {
@@ -1199,8 +1199,9 @@ static void cascadeOf(const float *vpGL, const float *eye, const float *fwd, con
     float tiles = g_cfg.cascades > 1 ? 2.f : 1.f, texel = rad * 2.f / ((float)g_sunSize / tiles);
     float cx = xv[0] * c[0] + xv[1] * c[1] + xv[2] * c[2], cy = yv[0] * c[0] + yv[1] * c[1] + yv[2] * c[2], cz = zv[0] * c[0] + zv[1] * c[1] + zv[2] * c[2];
     cx = floorf(cx / texel) * texel; cy = floorf(cy / texel) * texel;
-    /* GL's clip, like every other matrix here: x and y from -1 to 1 across the sphere, and depth from -1 toward the sun, with room there for what casts from outside it */
-    float F = rad + 220.f, B = rad + 40.f, k = -2.f / (F + B);
+    /* GL's clip, like every other matrix here: x and y from -1 to 1 across the sphere, and depth from -1 toward the sun, with room there for what casts from outside it
+     * (room: 1 for the engine's own reach, more for a game whose shadows reach further) */
+    float F = rad + 220.f * room, B = rad + 40.f * room, k = -2.f / (F + B);
     float V4[16] = {xv[0] / rad, yv[0] / rad, k * zv[0], 0.f, xv[1] / rad, yv[1] / rad, k * zv[1], 0.f, xv[2] / rad, yv[2] / rad, k * zv[2], 0.f, -cx / rad, -cy / rad, -k * cz + k * B + 1.f, 1.f};
     (void)tile; memcpy(out, V4, 64);
 }
@@ -1874,11 +1875,12 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     if (g_prOn) { u->probe[0] = g_prGeo[0]; u->probe[1] = g_prGeo[1]; u->probe[2] = g_prGeo[2]; u->probe[3] = 1.f; for (int i = 0; i < 3; i++) u->probeS[i] = 1.f / (g_prGeo[3 + i] * (float)(g_prDims[i == 1 ? 1 : i == 2 ? 2 : 0] - 1)); }
     if (nTile) u->cl3[3] = (float)(tilesAt / 16);
     /* the sun's cascades, from the first view */
-    uint32_t cascOff[4]; const float CD[5] = {1.f, 9.f, 24.f, 64.f, 170.f};
+    /* (11-16) a game's own reach (GfxView.shadowReach) stretches the splits and the room toward the sun in the same proportions; the nearest stays 1 */
+    uint32_t cascOff[4]; const float rs9 = v->shadowReach > 0.f ? v->shadowReach / 170.f : 1.f, CD[5] = {1.f, 9.f * rs9, 24.f * rs9, 64.f * rs9, 170.f * rs9};
     if (g_cfg.cascades > 1 && v->shadowOn && v->sunI > 0.f) {
         const float *eg = v->eye, *vg = v->vp; if (v->nViews > 0) { vg = v->views[0].vp; eg = v->views[0].eye; }
         float fg[3] = {vg[3], vg[7], vg[11]}; { float l = sqrtf(fg[0] * fg[0] + fg[1] * fg[1] + fg[2] * fg[2]); if (l > 0.f) { fg[0] /= l; fg[1] /= l; fg[2] /= l; } }
-        for (int i = 0; i < 4; i++) { float m[16]; cascadeOf(vg, eg, fg, v->sunDir, CD[i], CD[i + 1], i, m); memcpy(u->casc[i], m, 64); clipFix(u->casc[i]); u->split[i] = CD[i + 1]; } }
+        for (int i = 0; i < 4; i++) { float m[16]; cascadeOf(vg, eg, fg, v->sunDir, CD[i], CD[i + 1], i, rs9, m); memcpy(u->casc[i], m, 64); clipFix(u->casc[i]); u->split[i] = CD[i + 1]; } }
     /* split screen: each view is the same uniforms with its own lens */
     if (v->nViews > 0) for (int i = nv - 1; i >= 0; i--) { ViewUBO *w = u; if (i > 0) { w = ringAlloc(f, sizeof(ViewUBO), g_uboAlign, &viewOffs[i]); memcpy(w, u, sizeof(ViewUBO)); }
         memcpy(w->vp, v->views[i].vp, 64); clipFix(w->vp); w->eye[0] = v->views[i].eye[0]; w->eye[1] = v->views[i].eye[1]; w->eye[2] = v->views[i].eye[2];
@@ -1958,9 +1960,10 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     if (part == 0) {
     if (v->bars) { VkClearAttachment ca = {0}; ca.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; for (int k = 0; k < 3; k++) ca.clearValue.color.float32[k] = g_cfg.linear == 2 ? powf(v->clear[k], 2.2f) : v->clear[k]; ca.clearValue.color.float32[3] = 1.f;   /* (step 25) the scene's own colour inside its view, black outside */
         VkClearRect cr = {{{rx, ry}, {(uint32_t)rw, (uint32_t)rh}}, 0, 1}; vkCmdClearAttachments(cb, 1, &ca, 1, &cr); }
-    if (g_cfg.sky && g_skyShd && g_shd[g_skyShd].live) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_shd[g_skyShd].pipe); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutShd, 3, 1, &g_shd[g_skyShd].ds, 0, NULL); vkCmdDraw(cb, 3, 1, 0, 0); }   /* (11-12) a game's own sky (gfx_shd.inc) */
+    const int gameSky9 = g_cfg.sky && g_skyShd && g_shd[g_skyShd].live;
+    if (gameSky9) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_shd[g_skyShd].pipe); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layoutShd, 3, 1, &g_shd[g_skyShd].ds, 0, NULL); vkCmdDraw(cb, 3, 1, 0, 0); }   /* (11-12) a game's own sky (gfx_shd.inc) */
     else if (g_cfg.sky && v->skyDome) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SKYDOME]); vkCmdDraw(cb, 3, 1, 0, 0); }
-    if (v->space) { uint32_t at; float *o = ringAlloc(f, 288, 16, &at); memcpy(o, v->space, 288); float pc[4] = {(float)(at / 16u), 0.f, 0.f, 0.f}; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SPACE]); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); vkCmdDraw(cb, 3, 1, 0, 0); }
+    if (v->space && !gameSky9) {   /* (11-16) a game's own sky is its whole backdrop, space too: the engine's star field drew over it. Without one, the engine's */ uint32_t at; float *o = ringAlloc(f, 288, 16, &at); memcpy(o, v->space, 288); float pc[4] = {(float)(at / 16u), 0.f, 0.f, 0.f}; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SPACE]); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, pc); vkCmdDraw(cb, 3, 1, 0, 0); }
     fxDraw(f, cb, pk, base, 1, vi);
     if (g_fsOn && g_tex[g_fs.tex].ds) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_FLOORSH]); vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[g_fs.tex].ds, 0, NULL); float pc[20]; memset(pc, 0, 64); memcpy(pc + 16, g_fs.rect, 16); vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 80, pc); vkCmdDraw(cb, 6, 1, 0, 0); }
     if (g_cfg.zpre) drawZpre(f, cb, viewOff);   /* (11-07) the world's depth first */

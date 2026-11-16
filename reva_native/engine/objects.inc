@@ -375,8 +375,10 @@ static void objDraw(void){ if(!g_objLive) return;
         for(int k=0;k<6;k++){ float l=sqrtf(pl[k][0]*pl[k][0]+pl[k][1]*pl[k][1]+pl[k][2]*pl[k][2]); if(l>1e-6f) for(int c=0;c<4;c++) pl[k][c]/=l; } }
     for(int i=0;i<g_objHi;i++){ Obj*O=&g_obj[i]; if(!O->on||(O->pub.flags&OBJ_HIDDEN)) continue; Pack*Q=&g_setPk[O->pk];
         if(g_objUnseen[i]&&!g_shadowPass) continue;   /* (11-11) not on this machine's picture */
-        if(g_shadowPass){ float dx=O->m[12]-g_sunFocus[0],dz=O->m[14]-g_sunFocus[2],lim=g_shadowExt*1.7f*g_shadowFar;
-            if(dx>lim||dx<-lim||dz>lim||dz<-lim||Q->nocast||(O->pub.flags&OBJ_NOCAST)) continue; }
+        if(g_shadowPass){ float r9=0.f;
+            if(g_sunReach>0.f){ float sc=fmaxf(sqrtf(O->m[0]*O->m[0]+O->m[1]*O->m[1]+O->m[2]*O->m[2]),fmaxf(sqrtf(O->m[4]*O->m[4]+O->m[5]*O->m[5]+O->m[6]*O->m[6]),sqrtf(O->m[8]*O->m[8]+O->m[9]*O->m[9]+O->m[10]*O->m[10])));
+                r9=(Q->propR+Q->effH)*sc; }   /* (11-16) its size, for a game's reach in three dimensions */
+            if(!sunHolds(O->m[12],O->m[13],O->m[14],r9,1.7f)||Q->nocast||(O->pub.flags&OBJ_NOCAST)) continue; }
         else if(cullOn){ float sc=fmaxf(sqrtf(O->m[0]*O->m[0]+O->m[1]*O->m[1]+O->m[2]*O->m[2]),fmaxf(sqrtf(O->m[4]*O->m[4]+O->m[5]*O->m[5]+O->m[6]*O->m[6]),sqrtf(O->m[8]*O->m[8]+O->m[9]*O->m[9]+O->m[10]*O->m[10]))); if(sc<1e-6f) sc=1.f;   /* (11-16) its biggest axis: a stretched one is drawn longer one way */
             float hh=Q->effH*0.5f,rr=sqrtf(Q->propR*Q->propR+hh*hh)*sc*1.25f+1.0f,cx=O->m[12]+O->m[0]*Q->propCx+O->m[8]*Q->propCz,cy=O->m[13]+hh*sc,cz=O->m[14]+O->m[2]*Q->propCx+O->m[10]*Q->propCz; int out=0;
             for(int k=0;k<6&&!out;k++) if(pl[k][0]*cx+pl[k][1]*cy+pl[k][2]*cz+pl[k][3]<-rr) out=1;

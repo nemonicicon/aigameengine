@@ -910,6 +910,9 @@ int main(int argc,char**argv){
          * most of a frame lies beyond it), for next frame's pass */
         { float dx=ctr[0]-eye[0], dz=ctr[2]-eye[2], dl=sqrtf(dx*dx+dz*dz); if(dl<1e-3f) dl=1.f;
           g_sunFocus[0]=ctr[0]+dx/dl*g_shadowExt*0.35f; g_sunFocus[1]=0.f; g_sunFocus[2]=ctr[2]+dz/dl*g_shadowExt*0.35f; }
+        /* (11-16) a game's own reach: the window is round the lens itself, in three dimensions (a world of rocks in space has no ground to centre it on) */
+        g_sunReach=(GAME_ON&&g_tune.shadowReach>0.f)?g_tune.shadowReach:0.f;
+        if(g_sunReach>0.f){ g_sunFocus[0]=eye[0]; g_sunFocus[1]=eye[1]; g_sunFocus[2]=eye[2]; }
         /* ⭐ FOG needs the eye and, unless a scene named one, the SKY'S OWN HORIZON as its colour,
          * so the far end of a street dissolves into the sky it stands under instead of a grey. */
         /* ⭐ (10-23) the toon key and the room gradient, read once (REVA_TOONKEY, REVA_ROOMGRAD): toonTell hands them to the renderer */
@@ -4915,7 +4918,7 @@ int main(int argc,char**argv){
         tickAcc9+=g_tickN;
         if(g_noDraw) continue;   /* a pass that only ticks: no finish, no shot, no swap or flip. Window events and the stat line wait for the pass that draws */
         { GfxView v9; memset(&v9,0,sizeof v9); memcpy(v9.vp,vp,64); memcpy(v9.sunVP,g_sunVP,64); memcpy(v9.eye,g_camEye,12); memcpy(v9.sunDir,g_sun,12); v9.sunI=g_sun[3];
-          memcpy(v9.sunCol,g_sunC,12); memcpy(v9.sky,g_sky,12); memcpy(v9.fog,g_fog,12); v9.fogD=g_fog[3]; skyHorizonC(v9.clear); v9.knee=g_tone>0.f?g_tone:g_postKnee; v9.shadowOn=g_shadowOn; v9.tsec=(float)tsec; v9.exposure=g_exposure; if(g_tod>=0.f) v9.dayExposure=1.f/(0.4f+0.6f*(g_sun[3]<1.f?g_sun[3]:1.f));   /* the day's: a night's weak sun is opened up by a fixed curve, never by measuring the picture */
+          memcpy(v9.sunCol,g_sunC,12); memcpy(v9.sky,g_sky,12); memcpy(v9.fog,g_fog,12); v9.fogD=g_fog[3]; skyHorizonC(v9.clear); v9.knee=g_tone>0.f?g_tone:g_postKnee; v9.shadowOn=g_shadowOn; v9.shadowReach=g_sunReach; v9.tsec=(float)tsec; v9.exposure=g_exposure; if(g_tod>=0.f) v9.dayExposure=1.f/(0.4f+0.6f*(g_sun[3]<1.f?g_sun[3]:1.f));   /* the day's: a night's weak sun is opened up by a fixed curve, never by measuring the picture */
           if(SET_NONE&&!g_setSpace){ if(g_mode==MODE_ANIM){ v9.clear[0]=0.055f; v9.clear[1]=0.058f; v9.clear[2]=0.070f; } else { v9.clear[0]=0.006f; v9.clear[1]=0.003f; v9.clear[2]=0.014f; } }   /* a dark room, or the lab's grey: no sky to match */
           if(WORLD_OFF) memcpy(v9.clear,g_flatClear,12);
           clearOverride(v9.clear);   /* REVA_CLEAR=r,g,b: the impossible backdrop, for one test */

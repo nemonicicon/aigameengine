@@ -496,7 +496,7 @@ def emit_tokens(toks, tops, builtins, where):
             continue
         t2 = t
         if re.fullmatch(r"[A-Za-z_]\w*", t) and prev != ".":
-            if t in NEVER:
+            if t in NEVER and t not in builtins:   # (11-16) a stage's own built-in first: a sky's POSITION is the eye, a spatial one's isn't carried
                 raise Unsupported("it reads %s" % t)
             if t in tops:
                 t2 = "gd_" + t

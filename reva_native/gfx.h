@@ -52,6 +52,7 @@ typedef struct {
     float weave[2];                 /* and the gate's weave: the whole picture off its place by this share of its width and its height */
     float tunnel;                   /* (11-11) a headset's comfort tunnel: each eye's picture closed in to a circle, 0 none to 1 the most. The two eyes are side by side */
     int bars;                       /* the views don't cover the picture (a game's fair shape on a wider screen): what's outside them is black, and each is cleared to the scene's colour */
+    float shadowReach;              /* (11-16) a game's sun shadows reach this far from the lens, world units: the cascades split over it as over the engine's own 170. 0 is the engine's own */
 } GfxView;
 
 enum { GFX_SHADOW = 1,              /* for the sun's depth pass, not the picture */

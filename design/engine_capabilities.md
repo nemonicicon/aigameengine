@@ -1160,3 +1160,21 @@ Proof: the flight game against its old engine, both headless at a fixed 60 Hz wi
 head-on, another glanced off at 52 m/s and slid along, a third strafed into, within 0.07 cm, the damage the same to 0.01; its chase
 lens within 0.06 cm but for a second after a teleport. The same frame drawn at 640x480 and 960x540: the wide one, scaled, is the
 middle band of the 4:3 one at scale 1.00. The sample, rocks, rally, tower and herd checks come out the same; no new compiler warning.
+
+### 52 · A game's sun shadows reach as far as it says, and a game's own sky is its whole backdrop -- BUILT (11-16)
+
+The flight game held side by side with its old engine on pixels (the same spot, lens and frame in both), in a field of rocks up to
+240 m across. Two things the engine's sun and sky didn't do there.
+- **`tune->shadowReach`**: over 0, the sun's shadows reach that far from the lens, world units. The engine's own are a street's: the
+  cascades split at 1, 9, 24, 64 and 170 units, the casters are what stands on the ground within a small window round the lens's aim
+  (y = 0), and the cascades look 220 units toward the sun for them. With a reach, the splits and that room scale in the same proportions
+  (gfx_vk.c, `GfxView.shadowReach`, hashed only when set), the window is round the lens itself in three dimensions, and a caster is
+  anything within 1.6 reaches of it, its size added (shadow.inc `sunHolds`, used by every caster test: the set's props, a game's
+  objects, the stashed bodies). The single map for machines without cascades widens the same way. 0, the default: as before, bit for bit.
+- **A game's own sky is its whole backdrop**: a set with both `space` and a `skyshader` drew the engine's star field over the game's
+  sky (it's opaque). Now a live game sky shader draws it all; the engine's space sky is the fallback where the shader can't run.
+- **The shader cook** (skate_src/godot/godot_shader.py) let no sky read `POSITION` (the eye), since a spatial shader's isn't carried:
+  a stage's own built-ins now come before that refusal.
+Proof: the flight game's rocks shadow each other, and its sunlit and shadowed rock patches measure close to the old engine's at the
+same pixels (sunlit 63 against 73 of 255, shadowed sides 22 to 32 against 22 to 31); at 1080p on this PC the frame stays at 16 ms with a reach of 1,200 units, as without. The sample, rocks,
+rally, tower and herd checks come out the same; warncheck finds the same 14 warnings as before, none new.

@@ -1137,3 +1137,26 @@ Its first run, a flight game's, held the rules at every pacing and parted on the
 line set's and HUD set's vertices): the first diff showed the frames equal but for their hashes, because what parted wasn't printed.
 Proof: the flight game's check, no input for 3,600 ticks at 1,1,1,1,2 and 2,2,3 and a tape of keys and mouse for 1,800 at 1,1,1,1,2,
 all the same; the sample, rocks, rally, tower and herd checks come out the same; no new compiler warning.
+
+### 51 · Stretched objects, one model placed many times among the triangles, a lens as wide across on any screen -- BUILT (11-16)
+
+The flight game, made to match the engine it came from frame for frame. Its field is 3,800 rocks: six meshes, each rock turned and
+stretched its own way, and a ship collides with each at the triangles its old engine did (29,402 apiece). Three things were missing.
+- **`E->stretch(obj, sx, sy, sz)`**: an object stretched along its own x, y and z before it's turned (objects.inc, `Obj.st`). The draw
+  matrix's columns carry it, the cull's reach is its longest column, and the object's hash takes it in when it isn't 1. It stays
+  through `place` and `placeTurned`. Rules, as `spawn` is.
+- **`E->triMesh(prop)` and `E->triPlace(mesh, m, kind, id)`**: many places of one model among the triangles `triRay`, `triSweep` and
+  `triNear` ask (tris.inc). A model's triangles are kept once, in its own frame, with a tree of their own; a place is a 4x4 matrix
+  (any turn, stretch and move), its inverse and its box in the world, and `triRebuild` builds a tree of the places' boxes beside the
+  triangles' own. A question is carried into each place it reaches, a ball's radius there grown by the most that place squeezes
+  anything (so nothing is missed), and the triangles it finds are turned into the world and asked there, so a moving ball stays round
+  and the answer is the one a copy of every triangle would give, with the same ties. A hit on a place says `tri = triCount()` plus the
+  place's number; `triId` gives the game's number. The field: 176,412 triangles kept for what would be 112 million copied.
+- **`tune->lensFovAcross`**: over 0, the lens holds that angle across the picture whatever the screen's shape, and the angle up and
+  down follows (main.inc's `gameFovY`, in every place the projection is made: the lens, first person and split views), as an engine
+  that keeps the horizontal angle does. 0, the default: `lensFov` up and down, as before.
+Proof: the flight game against its old engine, both headless at a fixed 60 Hz with the same inputs, 600 frames each: free flight
+(turns, loops, rolls, throttle, brake, boost, hover strafes and climbs) within 0.008 cm and 0.00005 degrees every frame; a rock hit
+head-on, another glanced off at 52 m/s and slid along, a third strafed into, within 0.07 cm, the damage the same to 0.01; its chase
+lens within 0.06 cm but for a second after a teleport. The same frame drawn at 640x480 and 960x540: the wide one, scaled, is the
+middle band of the 4:3 one at scale 1.00. The sample, rocks, rally, tower and herd checks come out the same; no new compiler warning.

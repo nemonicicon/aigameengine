@@ -13,7 +13,7 @@
 #define OBJ_MAXPROP 512   /* (11-12) their library is 173 pieces */
 #define OBJ_GENMAX (1u<<(28-OBJ_BITS))
 static int objHandle(int i, unsigned gen) { return (int)((((unsigned)i >> OBJ_BITS) << 28) | (gen << OBJ_BITS) | ((unsigned)i & ((1u << OBJ_BITS) - 1u))); }
-typedef struct { EngineObject pub; int on,pk; unsigned gen; float m[16],tint[3],r; int tinted; SpGrid*grid;
+typedef struct { EngineObject pub; int on,pk; unsigned gen; float m[16],tint[3],r,st[3]; int tinted; SpGrid*grid;   /* st: E->stretch, along its own x y z (11-16) */
     float p[3],q[4],w[3],half[3],ext[3],slope[2],mass,radius,up,bounce,grip,still,restTop; int lastBody,restOn,touch,turning; } Obj;   /* a loose one: p its middle, q how it's turned, w its spin, half its own half sizes, ext how far it reaches along each of the world's axes as it's turned now, up from its lowest point to its middle */
 static int g_objNLoose=0,g_objNoLoose=0; static unsigned g_objSeen=0;
 static void rdGameClear(void);
@@ -74,7 +74,8 @@ static void objReady(void){ g_objReady=1; for(int i=0;i<g_nObjProp;i++) objPropL
 /* the matrix, the way a set's prop line makes one: y is where its lowest point goes */
 static void objMatrix(Obj*O){ const Pack*Q=&g_setPk[O->pk]; float eff=O->pub.scale*((Q->scale>1e-6f)?Q->scale:1.f),ca=cosf(O->pub.yaw),sa=sinf(O->pub.yaw);
     const float my=(O->pub.flags&OBJ_ORIGIN)?0.f:Q->mny;   /* (11-12) OBJ_ORIGIN: its own origin at y, as the editor it was made in puts it */
-    memset(O->m,0,64); O->m[0]=ca*eff; O->m[2]=-sa*eff; O->m[5]=eff; O->m[8]=sa*eff; O->m[10]=ca*eff; O->m[15]=1.f; O->m[12]=O->pub.x; O->m[13]=O->pub.y-my*eff; O->m[14]=O->pub.z; O->pub.top=O->pub.y+(Q->propY1-my)*eff; }
+    const float ex=eff*O->st[0],ey=eff*O->st[1],ez=eff*O->st[2];   /* (11-16) E->stretch: each of its own axes its own size */
+    memset(O->m,0,64); O->m[0]=ca*ex; O->m[2]=-sa*ex; O->m[5]=ey; O->m[8]=sa*ez; O->m[10]=ca*ez; O->m[15]=1.f; O->m[12]=O->pub.x; O->m[13]=O->pub.y-my*ey; O->m[14]=O->pub.z; O->pub.top=O->pub.y+(Q->propY1-my)*ey; }
 /* ---- LOOSE ONES: OBJ_LOOSE. They fall, bounce, slide, roll and come to rest, on what's really there: the walked world's surfaces, so one lands on a deck and rolls down a ramp, and it stands on any other solid thing. The solver is the 09-11 rigid layer's way of doing it, grown up: one point with an orientation, not a set of corners. A box is held by how far it reaches as it's turned now, so its lowest corner is what touches, and it turns onto the face its weight is over, so something tall goes over easily and something wide doesn't. Two loose things meet as the boxes around them, so they stack and knock each other about. ⛔ It's no contact solver: nothing here works out the forces at each corner, so a box doesn't rock, and a stack doesn't lean before it goes.
  * Asleep, it costs a look at what's under it, and only when something's changed. If it's solid it has columns then, like any solid thing, so it can be stood on and walked into. Awake it has none: a tumbling thing's triangles aren't worth building every tick. */
 #define LOOSE_QUIET 1.5f    /* slower than this, a hit doesn't bounce and nobody hears it */
@@ -146,7 +147,7 @@ static int apiSpawn(int prop,float x,float y,float z,float yaw,float scale,unsig
     int pk=objPropLoad(prop); if(pk<0) return 0;
     int i=g_objNFree?g_objFree[--g_objNFree]:(g_objHi<OBJ_MAX?g_objHi++:-1);
     if(i<0){ objSay("all 8192 objects are in use: spawn gave back 0"); return 0; }
-    Obj*O=&g_obj[i]; const unsigned gen=O->gen?O->gen:1u; memset(O,0,sizeof *O); O->on=1; O->pk=pk; O->gen=gen;
+    Obj*O=&g_obj[i]; const unsigned gen=O->gen?O->gen:1u; memset(O,0,sizeof *O); O->on=1; O->pk=pk; O->gen=gen; O->st[0]=O->st[1]=O->st[2]=1.f;
     O->pub.x=x; O->pub.y=y; O->pub.z=z; O->pub.yaw=yaw; O->pub.scale=scale>0.f?scale:1.f; O->pub.prop=prop; O->pub.flags=flags;
     objMatrix(O);
     if(g_setPk[pk].open) O->pub.flags&=~(unsigned)OBJ_SOLID;
@@ -172,14 +173,25 @@ static void apiPlace(int h,float x,float y,float z,float yaw){ Obj*O=objOf(h); i
 static void apiPlaceTurned(int h,float x,float y,float z,float yaw,float pitch,float roll){ Obj*O=objOf(h); if(!O||(O->pub.flags&OBJ_LOOSE)) return;
     if(!(pitch-pitch==0.f)||!(roll-roll==0.f)){ pitch=0.f; roll=0.f; }
     if(pitch==0.f&&roll==0.f){ O->pub.pitch=O->pub.roll=0.f; apiPlace(h,x,y,z,yaw); return; }
-    const Pack*Q=&g_setPk[O->pk]; const float eff=O->pub.scale*((Q->scale>1e-6f)?Q->scale:1.f); float qy[4],qx[4],qz[4],qt[4],q[4],t[3]={x,0.f,z},s3[3]={eff,eff,eff};
+    const Pack*Q=&g_setPk[O->pk]; const float eff=O->pub.scale*((Q->scale>1e-6f)?Q->scale:1.f); float qy[4],qx[4],qz[4],qt[4],q[4],t[3]={x,0.f,z},s3[3]={eff*O->st[0],eff*O->st[1],eff*O->st[2]};
     O->pub.x=x; O->pub.y=y; O->pub.z=z; O->pub.yaw=yaw; O->pub.pitch=pitch; O->pub.roll=roll;
     qaxis(qy,0,1,0,yaw); qaxis(qx,1,0,0,pitch); qaxis(qz,0,0,1,roll); qmul(qt,qy,qx); qmul(q,qt,qz); m4_trs(O->m,t,q,s3);
     const float my=(O->pub.flags&OBJ_ORIGIN)?0.f:Q->mny;
     O->m[13]=y-(O->m[5]*my); O->m[12]-=O->m[4]*my; O->m[14]-=O->m[6]*my;   /* its lowest point, along its own up, at y (OBJ_ORIGIN: its origin) */
-    O->pub.top=y+(Q->propY1-my)*eff;
+    O->pub.top=y+(Q->propY1-my)*eff*O->st[1];
     if(O->pub.flags&OBJ_SOLID){ objGridDrop(O); objGridMake(O); } }
 static void apiPaint(int h,float r,float g,float b){ Obj*O=objOf(h); if(!O) return; O->tinted=r>=0.f; O->tint[0]=r; O->tint[1]=g; O->tint[2]=b; }
+/* (11-16) a model's triangles kept once for placing many times (E->triPlace: engine/tris.inc says it all) */
+static int apiTriMesh(int prop){ if(!g_objReady){ objSay("triMesh in start or tick: in boot the world isn't loaded yet"); return 0; }
+    if(prop<0||prop>=g_nObjProp){ objSay("triMesh with a prop nobody asked for"); return 0; }
+    const int pk=objPropLoad(prop); if(pk<0) return 0;
+    return trModelOfPack(&g_setPk[pk],g_objProp[prop].stem); }
+/* (11-16) STRETCHED along its own x, y and z, a factor each, before it's turned: one model drawn long, flat or squat, as a field of rocks is made of six
+ * meshes. A solid one's columns go with it. Not a loose one: its box and its fall are its model's own */
+static void apiStretch(int h,float sx,float sy,float sz){ Obj*O=objOf(h); if(!O||(O->pub.flags&OBJ_LOOSE)) return;
+    O->st[0]=(sx>1e-4f&&sx<1e4f)?sx:1.f; O->st[1]=(sy>1e-4f&&sy<1e4f)?sy:1.f; O->st[2]=(sz>1e-4f&&sz<1e4f)?sz:1.f;
+    if(O->pub.pitch!=0.f||O->pub.roll!=0.f){ apiPlaceTurned(h,O->pub.x,O->pub.y,O->pub.z,O->pub.yaw,O->pub.pitch,O->pub.roll); return; }
+    objMatrix(O); if(O->pub.flags&OBJ_SOLID){ objGridDrop(O); objGridMake(O); } }
 /* add this to its speed, and it wakes. A push that lifts it turns it over as it goes, and one along the ground slides it flat */
 static void looseWake(Obj*O){ if(!O->pub.asleep) return; O->pub.asleep=0; O->still=0.f; O->restOn=0; objGridDrop(O); g_spStamp++; }
 static void apiPush(int h,float vx,float vy,float vz){ Obj*O=objOf(h); if(!O||!(O->pub.flags&OBJ_LOOSE)) return; looseWake(O); O->pub.vx+=vx; O->pub.vy+=vy; O->pub.vz+=vz;
@@ -365,7 +377,7 @@ static void objDraw(void){ if(!g_objLive) return;
         if(g_objUnseen[i]&&!g_shadowPass) continue;   /* (11-11) not on this machine's picture */
         if(g_shadowPass){ float dx=O->m[12]-g_sunFocus[0],dz=O->m[14]-g_sunFocus[2],lim=g_shadowExt*1.7f*g_shadowFar;
             if(dx>lim||dx<-lim||dz>lim||dz<-lim||Q->nocast||(O->pub.flags&OBJ_NOCAST)) continue; }
-        else if(cullOn){ float sc=sqrtf(O->m[0]*O->m[0]+O->m[1]*O->m[1]+O->m[2]*O->m[2]); if(sc<1e-6f) sc=1.f;
+        else if(cullOn){ float sc=fmaxf(sqrtf(O->m[0]*O->m[0]+O->m[1]*O->m[1]+O->m[2]*O->m[2]),fmaxf(sqrtf(O->m[4]*O->m[4]+O->m[5]*O->m[5]+O->m[6]*O->m[6]),sqrtf(O->m[8]*O->m[8]+O->m[9]*O->m[9]+O->m[10]*O->m[10]))); if(sc<1e-6f) sc=1.f;   /* (11-16) its biggest axis: a stretched one is drawn longer one way */
             float hh=Q->effH*0.5f,rr=sqrtf(Q->propR*Q->propR+hh*hh)*sc*1.25f+1.0f,cx=O->m[12]+O->m[0]*Q->propCx+O->m[8]*Q->propCz,cy=O->m[13]+hh*sc,cz=O->m[14]+O->m[2]*Q->propCx+O->m[10]*Q->propCz; int out=0;
             for(int k=0;k<6&&!out;k++) if(pl[k][0]*cx+pl[k][1]*cy+pl[k][2]*cz+pl[k][3]<-rr) out=1;
             if(out) continue; }
@@ -380,6 +392,7 @@ static void objDraw(void){ if(!g_objLive) return;
 static void objHash(void){ if(!g_objEver) return; { float n9=(float)g_objLive; g_shDumpTag="objects"; simHashMix(&n9,1); }
     for(int i=0;i<g_objHi;i++){ const Obj*O=&g_obj[i]; if(!O->on) continue; float f9[8]={O->pub.x,O->pub.y,O->pub.z,O->pub.yaw,O->pub.scale,(float)O->pub.prop,(float)O->pub.flags,(float)O->gen}; g_shDumpTag="object"; simHashMix(f9,8);
         if(O->pub.pitch!=0.f||O->pub.roll!=0.f){ float t9[2]={O->pub.pitch,O->pub.roll}; g_shDumpTag="turned"; simHashMix(t9,2); }
+        if(O->st[0]!=1.f||O->st[1]!=1.f||O->st[2]!=1.f){ g_shDumpTag="stretched"; simHashMix(O->st,3); }   /* (11-16) */
         if(O->pub.flags&OBJ_LOOSE){ float l9[8]={O->pub.vx,O->pub.vy,O->pub.vz,(float)O->pub.asleep,O->q[0],O->q[1],O->q[2],O->q[3]}; g_shDumpTag="loose"; simHashMix(l9,8); } } }
 
 /* a body from the pool: one that's hidden and on no team, the lowest first, so a replay wakes the same one. A graph it has starts again */

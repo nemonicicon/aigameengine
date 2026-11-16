@@ -162,6 +162,11 @@ static void shotWritePPM(const char*shotPath,int burst,int idx,int SW9,int SH9,c
     unsigned char*rw=(unsigned char*)malloc((size_t)SW9*3);
     for(int y=SH9-1;y>=0;y--){ for(int x=0;x<SW9;x++){ rw[x*3]=px[((size_t)y*SW9+x)*4]; rw[x*3+1]=px[((size_t)y*SW9+x)*4+1]; rw[x*3+2]=px[((size_t)y*SW9+x)*4+2]; } fwrite(rw,1,(size_t)SW9*3,sf); }
     free(rw); fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,SW9,SH9,fno); simHashPrint("shot"); }
+/* (11-16) a game's lens's angle up and down, for a picture of this shape: E->tune->lensFov, or with lensFovAcross set the angle that holds that one
+ * across (Unreal's way: a wider screen sees more at the sides). dflt when the game says neither */
+static float gameFovY(float aspect,float dflt){
+    if(GAME_ON&&g_tune.lensFovAcross>0.f&&aspect>0.f) return 2.f*atanf(tanf(g_tune.lensFovAcross*0.0087266463f)/aspect)*57.2957795f;
+    return (GAME_ON&&g_tune.lensFov>0.f)?g_tune.lensFov:dflt; }
 int main(int argc,char**argv){
 #ifdef __ANDROID__
     androidBoot(&argc,&argv);   /* (11-06) the log, the data out of the APK, the working folder, play.bat's arguments */
@@ -887,10 +892,10 @@ int main(int argc,char**argv){
         g_aspect=VIEW_ASPECT(W,H);   /* ⭐ the medium's lateral guarantee needs the frame's SHAPE, and W/H are locals in here */
         if(g_lensNow.camOn&&g_lensNow.fov>0.f){ float fv9=fishFov(g_lensNow.fov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* the timeline's lens */
         else if(g_fpvNow){ float fv9=fishFov(68.0f,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.12f,fmaxf(900.0f,g_setFar)); }   /* first person: a wide eye and a near plane inside her own head */
-        else if(GAME_ON&&g_tune.firstPerson){ m4_persp(proj,g_tune.lensFov>0.f?g_tune.lensFov:68.0f,VIEW_ASPECT(W,H),0.12f,fmaxf(520.0f,g_setFar)); }   /* (11-06) a game's first person: its lens at her eyes, the near plane in close */
+        else if(GAME_ON&&g_tune.firstPerson){ m4_persp(proj,gameFovY(VIEW_ASPECT(W,H),68.0f),VIEW_ASPECT(W,H),0.12f,fmaxf(520.0f,g_setFar)); }   /* (11-06) a game's first person: its lens at her eyes, the near plane in close */
         else if(g_camOn&&g_camFov>0.f){ float fv9=fishFov(g_camFov,VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(900.0f,g_setFar)); }   /* a street runs to the horizon */
         else if(g_scnT>=0.f){ float fv9=fishFov(SHOT_FOV[g_scnShot&7],VIEW_ASPECT(W,H)); m4_persp(proj,fv9,VIEW_ASPECT(W,H),0.30f,fmaxf(140.0f,g_setFar)); }   /* a scene is two bodies on a black stage */
-        else          { m4_persp(proj,(GAME_ON&&g_tune.lensFov>0.f)?g_tune.lensFov:42.0f,VIEW_ASPECT(W,H),0.8f,fmaxf(520.0f,g_setFar)); }   /* the far plane is far enough that there is no view distance */
+        else          { m4_persp(proj,gameFovY(VIEW_ASPECT(W,H),42.0f),VIEW_ASPECT(W,H),0.8f,fmaxf(520.0f,g_setFar)); }   /* the far plane is far enough that there is no view distance */
         if(GAME_ON&&g_gameLens.on&&g_gameLens.upOn&&!g_lensNow.camOn) m4_lookat_up(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2], g_gameLens.up[0],g_gameLens.up[1],g_gameLens.up[2]);   /* (11-16) E->lensUp: the game's lens with its own up */
         else m4_lookat(view, eye[0],eye[1],eye[2], ctr[0],ctr[1],ctr[2]);
         if(g_lensNow.roll!=0.f){ const float a9=g_lensNow.roll*0.0174532925f, c9=cosf(a9), s9=sinf(a9); M4 r9,t9; memset(r9,0,64); r9[0]=c9; r9[1]=s9; r9[4]=-s9; r9[5]=c9; r9[10]=1.f; r9[15]=1.f; m4_mul(t9,r9,view); memcpy(view,t9,64); }   /* (step 25) the lens rolled about its own line */
@@ -4918,7 +4923,7 @@ int main(int argc,char**argv){
           if(g_fairNow>0.f){ v9.bars=1; if(g_gameViews.n<=1){ v9.nViews=1; memcpy(v9.views[0].vp,vp,64); memcpy(v9.views[0].eye,g_camEye,12); v9.views[0].x=FX9; v9.views[0].y=0; v9.views[0].w=FW9; v9.views[0].h=H; } }
           if(g_gameViews.n>1){ int n9=g_gameViews.n,cols9=n9>2?2:1,w9=FW9/cols9,h9=H/2; v9.nViews=n9;
               for(int i9=0;i9<n9;i9++){ M4 pj9,vw9,vp9; const float*e9=g_gameViews.e[i9],*a9=g_gameViews.a[i9];
-                  m4_persp(pj9,g_tune.lensFov>0.f?g_tune.lensFov:42.f,VIEW_ASPECT(W,H)*((float)w9/(float)FW9)/((float)h9/(float)H),0.8f,fmaxf(520.f,g_setFar));
+                  { const float as9=VIEW_ASPECT(W,H)*((float)w9/(float)FW9)/((float)h9/(float)H); m4_persp(pj9,gameFovY(as9,42.f),as9,0.8f,fmaxf(520.f,g_setFar)); }
                   m4_lookat(vw9,e9[0],e9[1],e9[2],a9[0],a9[1],a9[2]); m4_mul(vp9,pj9,vw9);
                   memcpy(v9.views[i9].vp,vp9,64); memcpy(v9.views[i9].eye,e9,12); v9.views[i9].x=FX9+(i9%cols9)*w9; v9.views[i9].y=(i9/cols9)*h9; v9.views[i9].w=w9; v9.views[i9].h=h9; } }
           /* the lab's wall: a lens to a panel, and the bodies alone in each */

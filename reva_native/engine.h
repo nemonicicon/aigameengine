@@ -594,6 +594,10 @@ typedef struct {
      * every triangle in the world would give (engine/tris.inc). Rules, in the tick or start, in the same order */
     int (*triMesh)(int prop);
     void (*triPlace)(int mesh, const float *m, int kind, int id);
+    /* (11-16) the picture's size in the display's own pixels (the window's, or the screen's fullscreen), for a game that sizes its 2D the way
+     * another engine's HUD does, by the screen's height in pixels with a floor for small windows. With canvasEdges a canvas unit is
+     * w / (x1 - x0) pixels. Picture, not rules */
+    void (*displaySize)(int *w, int *h);
 } EngineAPI;
 
 /* a game fills in what it needs and leaves the rest out: a missing entry does nothing, and bodies walk on their own feet. Only version is required. */

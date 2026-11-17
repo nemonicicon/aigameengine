@@ -105,6 +105,9 @@ static void sprCanvasEdges(float*x0,float*y0,float*x1,float*y1){
     if(y0) *y0=-(float)g_sprY0/sy;
     if(x1) *x1=(float)(g_sprW-g_sprX0)/sx;
     if(y1) *y1=(float)(g_sprH-g_sprY0)/sy; }
+/* (11-16) the picture's size in the display's own pixels: a game that sizes its 2D by the screen's pixels, as another engine's HUD does (a canvas
+ * unit is w / (x1 - x0) of them, x0 and x1 from canvasEdges) */
+static void sprDisplaySize(int*w,int*h){ if(w) *w=g_sprW; if(h) *h=g_sprH; }
 /* x y w h on the canvas; u0 v0 u1 v1 in the image's own pixels */
 static void sprDraw(int im,float x,float y,float w,float h,float u0,float v0,float u1,float v1,float r,float g,float b,float a){
     if(im<1||im>=g_sprNI) return;

@@ -1178,3 +1178,16 @@ The flight game held side by side with its old engine on pixels (the same spot, 
 Proof: the flight game's rocks shadow each other, and its sunlit and shadowed rock patches measure close to the old engine's at the
 same pixels (sunlit 63 against 73 of 255, shadowed sides 22 to 32 against 22 to 31); at 1080p on this PC the frame stays at 16 ms with a reach of 1,200 units, as without. The sample, rocks,
 rally, tower and herd checks come out the same; warncheck finds the same 14 warnings as before, none new.
+
+### 53 · The picture's size in pixels, for a game that sizes its 2D the way another engine's HUD does -- BUILT (11-16)
+
+The flight game's HUD held side by side with its old engine's on pixels. That HUD is laid out in 1080p pixels times a scale: the
+screen's height over 1080, but never under 0.85 (a 720p window's HUD is a little bigger than its share) nor over its width over 1300.
+A game on the engine's canvas knew the screen only in canvas units (canvasEdges), and a canvas unit is a whole number of pixels that
+changes with the window, so it couldn't work out that scale, nor bake its fonts at that HUD's exact pixel sizes.
+- **`E->displaySize(&w, &h)`**: the picture's size in the display's own pixels (sprite.inc `sprDisplaySize`). With canvasEdges a
+  canvas unit is w / (x1 - x0) pixels, so a game can place anything at a given pixel and size its fonts in pixels (fontEm's size is
+  canvas units: pixels over that). Picture, not rules.
+Proof: the flight game's HUD drawn this way lands on its old engine's at 1280 x 720: the same panels at the same pixels, the same
+colours where they're solid (a bar's fill, the clock's white, the radar's ring: equal to the pixel). The sample, rocks, rally, tower
+and herd checks come out the same; warncheck finds the same 14 warnings as before, none new.

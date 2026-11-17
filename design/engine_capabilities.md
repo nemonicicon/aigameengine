@@ -1228,3 +1228,15 @@ tower and herd checks come out the same; warncheck finds the same 14 warnings as
   what the rules read. A run being recorded (REVA_SHOT) doesn't hear it, as it hears no mouse.
 Proof: built, and the flight game's chase zoom reads it (1.15 a notch between 0.6 and 2.2 of its arm, as its old engine's); not yet
   turned by a hand, which a recorded run can't do.
+
+### 57 · A sound's own reach -- BUILT (11-16)
+
+The flight game's effects are heard over a dogfight's distances: a laser's shot to 102 m, a ship's explosion to 185 m, enemy fire aimed at the
+player to 450 m. The engine's placed sounds had one falloff, a room's (-6 dB at 9 units, -20 at 29), so a shot 50 m off was all but silent.
+- **`E->soundReach(id, whole, fall, dbFar)`**: a playing sound's own falloff, world units: whole volume within `whole`, then down in decibels in
+  step with the distance, to `dbFar` at `whole + fall`, and silent past it (club_audio.c `sfxVoiceReach`, worked out in the mixer for that voice
+  alone). Another engine's sphere attenuation with its natural curve, so a game sets the same numbers its sounds had there. A sound without it
+  keeps the engine's own.
+Proof: a 40 s match of the flight game with six ships plays its eleven kinds of effect (191 shots, 92 bolt hits on hulls, shield zaps and
+breaks, five explosions) with no clipping in the recorded mix (peaks 0.27 to 0.57 of full scale). The sample, rocks, rally, tower and herd checks
+come out the same; warncheck finds the same 14 warnings as before, none new.

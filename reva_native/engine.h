@@ -618,6 +618,10 @@ typedef struct {
     /* (11-16) THE MOUSE WHEEL: this machine's, the notches turned since the game last asked, away from the player (up) positive. Picture, not rules:
      * it isn't on the tape, so a chase lens's zoom or a list's scroll, never what the rules read */
     int (*mouseWheel)(void);
+    /* (11-16) A SOUND'S OWN REACH, by E->sound's handle, for a sound placed in the world: whole within near (world units), then down in decibels in
+     * step with the distance, to dbFar (below 0) at near + fall, and silent past that: another engine's sphere attenuation and its natural curve.
+     * Without it a sound has the engine's own, a room's (-6 dB at 9 units, -20 at 29). What's heard, never the rules */
+    void (*soundReach)(int id, float nearU, float fallU, float dbFar);
 } EngineAPI;
 
 /* a game fills in what it needs and leaves the rest out: a missing entry does nothing, and bodies walk on their own feet. Only version is required. */

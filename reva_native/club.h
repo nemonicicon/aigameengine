@@ -37,6 +37,7 @@ void sfxBankFree(int slot);                          /* its memory goes, and any
 int sfxBankPCM(const char*name,float*pcm,int n);     /* takes pcm (malloc'd, mono float at SFX_RATE); the slot */
 void sfxVoicePitch(int id,float rate);                /* (11-05) a playing voice's speed, 1 as recorded */
 void sfxVoiceGain(int id,float g);                   /* a playing voice's gain (the id sfxPlay* returned) */
+void sfxVoiceReach(int id,float nearU,float fallU,float dbFar);   /* (11-16) a playing voice's own falloff: whole within near, dbFar at near + fall, none past */
 void sfxSetMaster(float m);                          /* the master volume, 0..1 */
 int sfxReady(void);                                  /* is the device open */
 /* (11-03) every voice is on a bus, and a bus's gain can fade: the music comes down under a voice and nothing else moves. Music is streamed off the disk by a thread of its own, so it can't make a frame late. Ogg Vorbis or 16-bit WAV, any rate. None of this is in the sim */

@@ -28,7 +28,7 @@
 #define SFX_RATE 44100
 #endif
 typedef struct { char name[32]; float*pcm; int n; int missing; } SfxClip;
-typedef struct { int clip; int pos; float gain,pan; int loop,on,spatial; float p[3]; int gen,bus; float rate,frac; int wait; } SfxVoice;   /* rate (11-05): how fast it plays, 1 as recorded; frac, where it is between two samples */
+typedef struct { int clip; int pos; float gain,pan; int loop,on,spatial; float p[3]; int gen,bus; float rate,frac; int wait; float whole,fall,dbFar; } SfxVoice;   /* whole, fall, dbFar (11-16): its own falloff (sfxVoiceReach); fall 0 is the engine's own */   /* rate (11-05): how fast it plays, 1 as recorded; frac, where it is between two samples */
 static SfxClip g_sfx[SFX_BANK]; static int g_nSfx=0;
 static SfxVoice g_voice[SFX_VOICES]; static int g_voiceGen=1;
 static SDL_AudioDeviceID g_mixDev=0;
@@ -66,7 +66,9 @@ static void sfxCallback(void*ud,Uint8*stream,int len){
         SfxClip*C=&g_sfx[V->clip]; if(!C->pcm){ V->on=0; continue; }
         float g=V->gain*g_sfxMaster*g_bus[V->bus].now, pan=V->pan;
         if(V->spatial){ float dx=V->p[0]-g_lstE[0],dy=V->p[1]-g_lstE[1],dz=V->p[2]-g_lstE[2]; float d2=dx*dx+dy*dy+dz*dz;
-            g*=1.f/(1.f+d2*0.012f);                         /* about -6 dB at 9 units, -20 dB at 29 */
+            if(V->fall>0.f){ const float d=sqrtf(d2);   /* (11-16) its own reach: whole within V->whole, then down in decibels in step with the distance, dbFar at whole + fall, and none past it */
+                g*=d<=V->whole?1.f:d>=V->whole+V->fall?0.f:powf(10.f,(d-V->whole)/V->fall*V->dbFar/20.f); }
+            else g*=1.f/(1.f+d2*0.012f);                    /* about -6 dB at 9 units, -20 dB at 29 */
             float dl=sqrtf(d2)+1e-3f; pan=(dx*g_lstR[0]+dz*g_lstR[2])/dl*0.8f; }
         if(pan>1.f)pan=1.f;
         if(pan<-1.f)pan=-1.f;
@@ -130,6 +132,7 @@ int sfxPlaySlot(int slot,float gain,const float*pos,int loop){
     SDL_LockAudioDevice(g_mixDev);
     SfxVoice*V=&g_voice[v]; V->clip=slot; V->pos=0; V->gain=gain; V->pan=0.f; V->loop=loop; V->on=1; V->bus=BUS_SFX; V->rate=1.f; V->frac=0.f; V->wait=g_playWait>0.0?(int)((sfxClock()+g_playWait-(g_cbAt+g_cbPeriod))*(double)SFX_RATE):0; if(V->wait<0) V->wait=0;
     V->spatial=(pos!=NULL); if(pos){ V->p[0]=pos[0]; V->p[1]=pos[1]; V->p[2]=pos[2]; }
+    V->whole=V->fall=V->dbFar=0.f;
     V->gen=g_voiceGen++;
     SDL_UnlockAudioDevice(g_mixDev);
     g_sfxPlays++;
@@ -162,6 +165,13 @@ static float* sfxDecodeBytes(const unsigned char*b,size_t len,const char*path,in
 float* sfxDecodeFile(const char*path,int*n){ char p[256]; snprintf(p,sizeof p,"%s",path); FILE*f=fopen(p,"rb"); if(!f){ snprintf(p,sizeof p,"%s.wav",path); f=fopen(p,"rb"); } if(!f){ snprintf(p,sizeof p,"%s.ogg",path); f=fopen(p,"rb"); } if(!f) return NULL;
     clubOpened(p); fseek(f,0,SEEK_END); const long len=ftell(f); fseek(f,0,SEEK_SET); unsigned char*b=len>0?(unsigned char*)malloc((size_t)len):NULL; if(!b||fread(b,1,(size_t)len,f)!=(size_t)len){ free(b); fclose(f); return NULL; } fclose(f);
     float*o=sfxDecodeBytes(b,(size_t)len,p,n); free(b); return o; }
+/* (11-16) a playing voice's own reach: whole within near (world units), then falling in decibels in step with the distance, to dbFar at near + fall, and
+ * silent past that (a sound's attenuation in another engine: a sphere, its natural curve). fall 0 or less puts back the engine's own */
+void sfxVoiceReach(int id,float nearU,float fallU,float dbFar){ if(id<0||!g_mixDev) return; int v=id>>16; if(v<0||v>=SFX_VOICES) return;
+    if(!(nearU>=0.f)) nearU=0.f;
+    if(!(fallU>0.f)) fallU=0.f;
+    if(!(dbFar<=0.f)) dbFar=-60.f;
+    SDL_LockAudioDevice(g_mixDev); if((g_voice[v].gen&0xffff)==(id&0xffff)){ g_voice[v].whole=nearU; g_voice[v].fall=fallU; g_voice[v].dbFar=dbFar; } SDL_UnlockAudioDevice(g_mixDev); }
 void sfxVoiceGain(int id,float g){ if(id<0||!g_mixDev) return; int v=id>>16; if(v<0||v>=SFX_VOICES) return;
     SDL_LockAudioDevice(g_mixDev); if((g_voice[v].gen&0xffff)==(id&0xffff)) g_voice[v].gain=g; SDL_UnlockAudioDevice(g_mixDev); }
 /* (11-05) a playing voice's speed: 1 as recorded, 2 an octave up. REVA_NOPITCH=1 holds every voice at 1, for a control */

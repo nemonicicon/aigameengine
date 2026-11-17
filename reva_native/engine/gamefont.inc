@@ -12,22 +12,26 @@
  * (11-12) 64 faces and sizes at once: 16 was a guess, and the skate game's own UI (their HUD, their gear wheel, their menus and their session) sets
  * type in three faces at over twenty sizes. A size is a sheet of its own, a few hundred kilobytes */
 #define GF_MAX 64
-typedef struct { int img, W, H, pad, edgeImg; float sc, ascent, line, edgePx, edgeC[3], size, edgeW; unsigned char *alpha; stbtt_packedchar ch[95]; char path[200]; int em; } GameFont;
+typedef struct { int img, W, H, pad, edgeImg; float sc, ascent, line, edgePx, edgeC[3], size, edgeW; unsigned char *alpha; stbtt_packedchar ch[95]; char path[200]; int em, px; } GameFont;   /* px (11-16): fontPx's, baked at its pixels, never again */
 static GameFont g_gf[GF_MAX]; static int g_gfN=0;
 static void gfEdgeMake(GameFont*F);
 /* the font's sheet at the canvas's scale now: into F, a new image or (again) its own image's place */
 static int gfBake(GameFont*F,const char*path,float size,int again);
-static int gfOpen(const char*path,float size,int em){
+/* (11-16) the screen's scale, whether or not a display is begun (sprite.inc: the canvas is the display's then, and a screen's font mustn't follow it) */
+static float gfScreenScale(void){ const int s=g_dispCur?g_dispSave[1]:g_sprSy; return (float)(s>0?s:1); }
+static int gfOpen(const char*path,float size,int em,int px){
     if(!path||g_gfN>=GF_MAX||!(size>0.f)||size>240.f){ printf("[font] %s at %.1f: no (64 fonts, a size up to the canvas's height)\n",path?path:"?",size); return 0; }
-    GameFont*F=&g_gf[g_gfN]; memset(F,0,sizeof *F); F->em=em;
+    GameFont*F=&g_gf[g_gfN]; memset(F,0,sizeof *F); F->em=em; F->px=px;
     if(!gfBake(F,path,size,0)) return 0;
     snprintf(F->path,sizeof F->path,"%s",path); F->size=size;
     return ++g_gfN; }
-static int gfFont(const char*path,float size){ return gfOpen(path,size,0); }
+static int gfFont(const char*path,float size){ return gfOpen(path,size,0,0); }
 /* (11-12) A SIZE AS GODOT SAYS IT (E->fontEm; the skate game's comparison: their words came out smaller than theirs): the em, as Godot, a browser and a
  * word processor size type, where E->font's size is the whole line, top of the tallest letter to the foot of the deepest. A face's line is taller than its
  * em by its own measure (Arial Black's by 1.41, Permanent Marker's by 1.5), so a game laying out a Godot UI asks for its sizes this way */
-static int gfFontEm(const char*path,float size){ return gfOpen(path,size,1); }
+static int gfFontEm(const char*path,float size){ return gfOpen(path,size,1,0); }
+/* (11-16) A FONT FOR A DISPLAY (E->fontPx): its em this many pixels, baked once at that, whatever the screen, for a display's own pixels (E->displayBegin) */
+static int gfFontPx(const char*path,float px){ return gfOpen(path,px,1,1); }
 static int gfBake(GameFont*F,const char*path,float size,int again){
     FILE*f=fopen(path,"rb"); if(!f){ printf("[font] can't open %s\n",path); return 0; }
     fseek(f,0,SEEK_END); const long n=ftell(f); fseek(f,0,SEEK_SET);
@@ -36,7 +40,7 @@ static int gfBake(GameFont*F,const char*path,float size,int again){
     fclose(f); clubOpened(path);
     stbtt_fontinfo info; const int off=stbtt_GetFontOffsetForIndex(ttf,0);
     if(off<0||!stbtt_InitFont(&info,ttf,off)){ free(ttf); printf("[font] %s isn't a TrueType font\n",path); return 0; }
-    F->sc=(float)(g_sprSy>0?g_sprSy:1);
+    F->sc=F->px?1.f:gfScreenScale();
     const float px=size*F->sc, s=F->em?stbtt_ScaleForMappingEmToPixels(&info,px):stbtt_ScaleForPixelHeight(&info,px);
     int asc=0,desc=0,gap=0; stbtt_GetFontVMetrics(&info,&asc,&desc,&gap);
     F->ascent=(float)asc*s; F->line=(float)(asc-desc+gap)*s;
@@ -56,7 +60,7 @@ static int gfBake(GameFont*F,const char*path,float size,int again){
     printf("[font] %s at %.1f of the canvas: %.0f px, a %d x %d sheet%s\n",path,size,px,W,H,again?" (baked again for the canvas's new scale)":""); fflush(stdout);
     return 1; }
 /* the canvas's scale moved since a font was baked (the window's size changed): baked again, and its edge with it */
-static void gfFresh(GameFont*F){ const float sc=(float)(g_sprSy>0?g_sprSy:1); if(F->sc==sc||!F->path[0]) return;
+static void gfFresh(GameFont*F){ const float sc=gfScreenScale(); if(F->px||F->sc==sc||!F->path[0]) return;
     if(!gfBake(F,F->path,F->size,1)){ F->sc=sc; return; }
     if(F->edgeImg) gfEdgeMake(F); }
 /* an edge, width canvas units round each letter (up to the room it was packed with), in this colour: the sheet's coverage grown outward by a disc */
@@ -78,7 +82,8 @@ static void gfEdgeMake(GameFont*F){
 static void gfText(int font,float x,float y,const char*s,float r,float g,float b,float a){
     if(font<1||font>g_gfN||!s) return;
     GameFont*F=&g_gf[font-1]; gfFresh(F);
-    const float ox=floorf(x*F->sc+0.5f), oy=floorf(y*F->sc+0.5f);   /* the line's corner on a whole pixel, so a glyph lands texel on pixel */
+    const float sc=g_dispCur?1.f:F->sc;   /* (11-16) in a display a canvas unit is a pixel, and its glyphs are drawn at their own pixels */
+    const float ox=floorf(x*sc+0.5f), oy=floorf(y*sc+0.5f);   /* the line's corner on a whole pixel, so a glyph lands texel on pixel */
     for(int pass=F->edgeImg?0:1;pass<2;pass++){   /* the edge under every letter first, then the letters */
         const float e=pass?0.f:F->edgePx; const int im=pass?F->img:F->edgeImg; const float*c3=pass?(const float[3]){r,g,b}:F->edgeC;
         float px=0.f, py=F->ascent;
@@ -87,7 +92,7 @@ static void gfText(int font,float x,float y,const char*s,float r,float g,float b
             if(*c<32||*c>126) continue;
             stbtt_aligned_quad q; stbtt_GetPackedQuad(F->ch,F->W,F->H,*c-32,&px,&py,&q,1);
             if(q.x1<=q.x0) continue;
-            sprDraw(im,(ox+q.x0-e)/F->sc,(oy+q.y0-e)/F->sc,(q.x1-q.x0+2.f*e)/F->sc,(q.y1-q.y0+2.f*e)/F->sc,q.s0*(float)F->W-e,q.t0*(float)F->H-e,q.s1*(float)F->W+e,q.t1*(float)F->H+e,c3[0],c3[1],c3[2],a); } } }
+            sprDraw(im,(ox+q.x0-e)/sc,(oy+q.y0-e)/sc,(q.x1-q.x0+2.f*e)/sc,(q.y1-q.y0+2.f*e)/sc,q.s0*(float)F->W-e,q.t0*(float)F->H-e,q.s1*(float)F->W+e,q.t1*(float)F->H+e,c3[0],c3[1],c3[2],a); } } }
 static float gfWidth(int font,const char*s){
     if(font<1||font>g_gfN||!s) return 0.f;
     GameFont*F=&g_gf[font-1]; gfFresh(F); float w=0.f, best=0.f;
@@ -95,4 +100,4 @@ static float gfWidth(int font,const char*s){
         if(*c=='\n'){ if(w>best) best=w; w=0.f; continue; }
         if(*c>=32&&*c<=126) w+=F->ch[*c-32].xadvance; }
     if(w>best) best=w;
-    return best/F->sc; }
+    return best/(g_dispCur?1.f:F->sc); }

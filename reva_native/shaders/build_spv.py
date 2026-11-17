@@ -20,7 +20,8 @@ ALSO = [("mesh.frag", "mesh_mouth_frag", "-DMOUTH_HOLE=1"), ("mesh_skin.vert", "
         ("mesh_skin.vert", "mesh_skin_fur_vert", "-DFUR=1"), ("mesh_static.vert", "mesh_static_fur_vert", "-DFUR=1"), ("mesh.frag", "mesh_fur_frag", "-DFUR=1"), ("mesh.frag", "mesh_toon_fur_frag", "-DTOON=1 -DFUR=1"),
         ("mesh.frag", "mesh_refl_frag", "-DREFL=1"), ("mesh.frag", "mesh_toon_refl_frag", "-DTOON=1 -DREFL=1"), ("mesh.frag", "mesh_gloss_frag", "-DGLOSS=1"), ("mesh.frag", "mesh_toon_gloss_frag", "-DTOON=1 -DGLOSS=1"),
         ("mesh_static.vert", "mesh_static_strand_vert", "-DSTRAND=1"), ("mesh.frag", "mesh_strand_frag", "-DSTRAND=1"),   # (11-06) hair drawn hair by hair
-        ("mesh.frag", "mesh_early_frag", "-DEARLY_Z=1")]   # (11-07) the mesh pipelines that never discard: depth tested before they're shaded
+        ("mesh.frag", "mesh_early_frag", "-DEARLY_Z=1"),   # (11-07) the mesh pipelines that never discard: depth tested before they're shaded
+        ("mesh_static.vert", "mesh_static_obj_vert", "-DOBJSPACE=1")]   # (11-16) a game's own surface shader: the object's own space as well (gfx_shd.inc)
 out = ["/* gfx_spv.h -- the renderer's shaders as SPIR-V. Written by shaders/build_spv.py; edit the GLSL beside it, not this. */"]
 n = 0
 with tempfile.TemporaryDirectory() as tmp:

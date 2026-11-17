@@ -13,6 +13,7 @@
 static GfxPacket g_pk;
 static GfxStats g_st, g_stNext;
 static int g_live;
+static unsigned g_hudTarget;   /* (11-16) where the 2D sets go now: 0 the screen, or a display's picture */
 #define PAL_SEEN 8192
 static struct { const float *pal; unsigned gen, off, stamp; } g_palSeen[PAL_SEEN]; static unsigned g_palStamp;   /* this frame's shared poses, and where their bones went */
 
@@ -27,7 +28,7 @@ static int pkRoom(int n, int max, const char *what) { if (n < max) return 1; sta
 
 void gfxFrameBegin(void) {
     if (!g_pk.mem) { g_pk.mem = malloc(PK_MEM); g_pk.draws = malloc(sizeof(GfxDraw) * GFX_MAX_DRAWS); }
-    g_pk.nDraw = g_pk.nLine = g_pk.nHud = g_pk.nFx = g_pk.nBeam = g_pk.nDecal = g_pk.nStrands = 0; g_pk.star.on = 0; g_pk.memUsed = 0; memset(&g_stNext, 0, sizeof g_stNext); g_live = 1; g_palStamp++;
+    g_pk.nDraw = g_pk.nLine = g_pk.nHud = g_pk.nFx = g_pk.nBeam = g_pk.nDecal = g_pk.nStrands = g_pk.nHolo = 0; g_hudTarget = 0; g_pk.star.on = 0; g_pk.memUsed = 0; memset(&g_stNext, 0, sizeof g_stNext); g_live = 1; g_palStamp++;
     gfxBackBegin();
 }
 
@@ -67,13 +68,13 @@ void gfxLines3DSolid(const float *xyzrgb, int n) { const int k = g_pk.nLine; gfx
 void gfxHud(const float *xy, int n, float cw, float ch, float r, float g, float b, float a) {
     if (!g_live || n <= 0 || !pkRoom(g_pk.nHud, GFX_MAX_HUD, "2D sets")) return;
     unsigned off; void *p = pkAlloc((size_t)n * 8, 16, &off); if (!p) return;
-    memcpy(p, xy, (size_t)n * 8); GfxHudRec *h = &g_pk.hud[g_pk.nHud++]; h->off = off; h->n = n; h->scr[0] = cw; h->scr[1] = ch; h->col[0] = r; h->col[1] = g; h->col[2] = b; h->tex = 0; h->col[3] = a;
+    memcpy(p, xy, (size_t)n * 8); GfxHudRec *h = &g_pk.hud[g_pk.nHud++]; h->off = off; h->n = n; h->scr[0] = cw; h->scr[1] = ch; h->col[0] = r; h->col[1] = g; h->col[2] = b; h->tex = 0; h->col[3] = a; h->target = g_hudTarget;
 }
 
 void gfxSprites(unsigned tex, const float *v, int n, float cw, float ch) {
     if (!g_live || n <= 0 || !pkRoom(g_pk.nHud, GFX_MAX_HUD, "2D sets")) return;
     unsigned off; void *p = pkAlloc((size_t)n * 32, 16, &off); if (!p) return;
-    memcpy(p, v, (size_t)n * 32); GfxHudRec *h = &g_pk.hud[g_pk.nHud++]; memset(h, 0, sizeof *h); h->off = off; h->n = n; h->scr[0] = cw; h->scr[1] = ch; h->tex = tex;
+    memcpy(p, v, (size_t)n * 32); GfxHudRec *h = &g_pk.hud[g_pk.nHud++]; memset(h, 0, sizeof *h); h->off = off; h->n = n; h->scr[0] = cw; h->scr[1] = ch; h->tex = tex; h->target = g_hudTarget;
 }
 
 #ifndef REVA_VK
@@ -115,6 +116,9 @@ void gfxBeam(const float *d) { if (g_live && pkRoom(g_pk.nBeam, 64, "beams")) me
 void gfxDecal(const GfxDecal *d) { if (g_live && pkRoom(g_pk.nDecal, GFX_MAX_DECALS, "decals")) g_pk.decal[g_pk.nDecal++] = *d; }
 
 void gfxStar(const GfxStar *s) { if (g_live) g_pk.star = *s; }
+void gfxHudTarget(unsigned target) { g_hudTarget = target; }   /* (11-16) a game's display (engine.h displayBegin) */
+void gfxHolo(unsigned target, const float *corners, const float *look) { if (!g_live || !target || !pkRoom(g_pk.nHolo, GFX_MAX_HOLO, "display panels")) return;
+    GfxHolo *o = &g_pk.holo[g_pk.nHolo++]; o->tex = target; memcpy(o->corner, corners, sizeof o->corner); memcpy(o->look, look, sizeof o->look); }   /* dressing: not hashed */
 void gfxStrands(const GfxStrands *s) { if (g_live && pkRoom(g_pk.nStrands, GFX_MAX_STRANDS, "hair systems")) g_pk.strands[g_pk.nStrands++] = *s; }   /* (11-06) hair on the GPU */
 
 void gfxStats(GfxStats *s) { *s = g_st; }
@@ -140,7 +144,7 @@ static unsigned long long pkHash(const GfxView *v) {
     if (v->dof > 0.f || v->shutter > 0.f || v->sepia > 0.f || v->flash > 0.f || v->burn > 0.f || v->grain > 0.f || v->weave[0] != 0.f || v->weave[1] != 0.f) { h = fnv(h, &v->focus, 12); h = fnv(h, &v->sepia, 16); h = fnv(h, v->weave, 8); }   /* (step 25) the lens and film's look, when a frame has any */
     if (g_pk.star.on) { h = fnv(h, g_pk.star.c, sizeof g_pk.star.c * 3); h = fnv(h, g_pk.star.cut, 12); h = fnv(h, g_pk.star.spot, sizeof g_pk.star.spot); }
     for (int i = 0; i < g_pk.nLine; i++) h = fnv(h, g_pk.mem + g_pk.lines[i].off, (size_t)g_pk.lines[i].n * 24);
-    for (int i = 0; i < g_pk.nHud; i++) { const GfxHudRec *r = &g_pk.hud[i]; h = fnv(h, g_pk.mem + r->off, (size_t)r->n * (r->tex ? 32 : 8)); h = fnv(h, r->scr, 8); h = fnv(h, r->col, 16); }
+    for (int i = 0; i < g_pk.nHud; i++) { const GfxHudRec *r = &g_pk.hud[i]; h = fnv(h, g_pk.mem + r->off, (size_t)r->n * (r->tex ? 32 : 8)); h = fnv(h, r->scr, 8); h = fnv(h, r->col, 16); if (r->target) { static const int disp = 1; h = fnv(h, &disp, 4); } }   /* (11-16) into a display: that it is, not which (a texture's name is load order's) */
     for (int i = 0; i < g_pk.nFx; i++) { const GfxFx *f = &g_pk.fx[i]; h = fnv(h, &f->n, 4); h = fnv(h, &f->how, 4); h = fnv(h, &f->under, 4); if (f->view >= 0) h = fnv(h, &f->view, 4); if (!f->vb) h = fnv(h, g_pk.mem + f->off, (size_t)f->n * (f->how == GFX_FX_SKY ? 20 : 36)); }
     return h;
 }

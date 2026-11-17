@@ -583,6 +583,7 @@ static void skyDraw(const GfxView *v) {
 static void hudDraw(const GfxPacket *pk) {
     const float full[4] = {0.f, 0.f, (float)g_W, (float)g_H};
     for (int i = 0; i < pk->nHud; i++) { const GfxHudRec *h = &pk->hud[i]; if (h->n <= 0 || !(h->scr[0] > 0.f) || !(h->scr[1] > 0.f)) continue;
+        if (h->target) continue;   /* (11-16) into a game's display: this rasterizer has none (gfx.h gfxHudTarget) */
         Paint P; memset(&P, 0, sizeof P); P.x1 = g_W; P.y1 = g_H; P.blend = BL_ALPHA; P.alpha = 256;
         const float kx = full[2] / h->scr[0], ky = full[3] / h->scr[1]; const int stride = h->tex ? 8 : 2;
         if ((size_t)h->off + (size_t)h->n * stride * 4 > pk->memUsed) continue;

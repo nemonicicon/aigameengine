@@ -108,6 +108,33 @@ static void sprCanvasEdges(float*x0,float*y0,float*x1,float*y1){
 /* (11-16) the picture's size in the display's own pixels: a game that sizes its 2D by the screen's pixels, as another engine's HUD does (a canvas
  * unit is w / (x1 - x0) of them, x0 and x1 from canvasEdges) */
 static void sprDisplaySize(int*w,int*h){ if(w) *w=g_sprW; if(h) *h=g_sprH; }
+/* (11-16) A GAME'S DISPLAYS (E->displayMake, displayBegin, displayEnd, displayShow): a picture off-screen (gfxTargetMake's), which the 2D draws into while
+ * one is begun, in its own pixels: the canvas's scale, corner and size are the display's then (1, 0, its size), and the 2D sets are marked for its
+ * picture (gfxHudTarget), which the renderer draws before the world. Its panel in the world is gfxHolo's */
+#define DISP_MAX 8
+static struct { unsigned tex; int w,h; } g_disp[DISP_MAX+1]; static int g_dispN, g_dispCur, g_dispSave[6];
+static int sprDisplayMake(int w,int h){
+    if(g_dispN>=DISP_MAX||w<1||h<1||w>4096||h>4096) return 0;
+    const unsigned t=gfxTextureNew(); gfxTargetMake(t,w,h,0);
+    g_dispN++; g_disp[g_dispN].tex=t; g_disp[g_dispN].w=w; g_disp[g_dispN].h=h; return g_dispN; }
+static void sprDisplayBegin(int d){
+    if(d<1||d>g_dispN||g_dispCur) return;
+    sprFlush();
+    g_dispSave[0]=g_sprSx; g_dispSave[1]=g_sprSy; g_dispSave[2]=g_sprX0; g_dispSave[3]=g_sprY0; g_dispSave[4]=g_sprW; g_dispSave[5]=g_sprH;
+    g_sprSx=g_sprSy=1; g_sprX0=g_sprY0=0; g_sprW=g_disp[d].w; g_sprH=g_disp[d].h;
+    g_dispCur=d; gfxHudTarget(g_disp[d].tex); }
+static void sprDisplayEnd(void){
+    if(!g_dispCur) return;
+    sprFlush(); gfxHudTarget(0);
+    g_sprSx=g_dispSave[0]; g_sprSy=g_dispSave[1]; g_sprX0=g_dispSave[2]; g_sprY0=g_dispSave[3]; g_sprW=g_dispSave[4]; g_sprH=g_dispSave[5];
+    g_dispCur=0; }
+static void sprDisplayShow(int d,const EngineDisplayLook*look,size_t size){
+    if(d<1||d>g_dispN||!look||!size) return;
+    EngineDisplayLook L; memset(&L,0,sizeof L); memcpy(&L,look,size<sizeof L?size:sizeof L);
+    float c[12];
+    for(int k=0;k<3;k++){ c[k]=L.centre[k]-L.right[k]+L.up[k]; c[3+k]=L.centre[k]+L.right[k]+L.up[k]; c[6+k]=L.centre[k]+L.right[k]-L.up[k]; c[9+k]=L.centre[k]-L.right[k]-L.up[k]; }
+    const float lk[12]={L.brightness>0.f?L.brightness:1.f, L.opacityGain>0.f?L.opacityGain:1.f, L.lineFreq, L.lineDepth, L.bandGain, L.bandSharp, L.bandSpeed, L.flicker>0.f?L.flicker:1.f, L.time, 0.f, 0.f, 0.f};
+    if(!g_noDraw) gfxHolo(g_disp[d].tex,c,lk); }
 /* x y w h on the canvas; u0 v0 u1 v1 in the image's own pixels */
 static void sprDraw(int im,float x,float y,float w,float h,float u0,float v0,float u1,float v1,float r,float g,float b,float a){
     if(im<1||im>=g_sprNI) return;

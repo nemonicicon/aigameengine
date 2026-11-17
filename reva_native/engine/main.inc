@@ -4814,7 +4814,7 @@ int main(int argc,char**argv){
                        :"RT PUSH   A OLLIE   X KICKFLIP   Y HEELFLIP   B SHOVE-IT   LB/RB GRAB",
                        0.55f,0.75f,0.85f,0.60f); }
           /* ---- THE ZOMBIE GAME'S HUD, on the TV's grid (11-02): the numbers on two rows at the top, the banner big, one hint at the bottom. Reads at 480i and 240p. */
-          if(GAME_ON){ tvWideSet(g_tune.hudWide); if(!g_pause){ g_ptrHitNext=0; if(!g_xrDraw) g_game->hud(g_game->state);   /* (11-12) what the pointer's over is what this hud says, afresh */   /* (11-11) a HUD laid over both eyes reads as nothing: in a headset a game writes in the world */
+          if(GAME_ON){ tvWideSet(g_tune.hudWide); if(!g_pause){ g_ptrHitNext=0; if(!g_xrDraw){ g_game->hud(g_game->state); sprDisplayEnd(); }   /* (11-16) a display left begun goes back to the screen */   /* (11-12) what the pointer's over is what this hud says, afresh */   /* (11-11) a HUD laid over both eyes reads as nothing: in a headset a game writes in the world */
  g_tvView=-1; uiFlush(); faceHud(); sprFlush(); levelHud(); } }
           /* ---- GAME MODE HUD: the mode's three lines, its banner, and the beat lane ---- */
           else if(MODE_PLAYS){
@@ -5057,6 +5057,7 @@ int main(int argc,char**argv){
           else if(fs9==2&&frames>=ff9){ SDL_SetWindowFullscreen(g_win,0); fs9=3; printf("[window] a window (REVA_FULLTEST)\n"); fflush(stdout); } }
         { SDL_Event ev; while(SDL_PollEvent(&ev)){
             if(ev.type==SDL_QUIT) g_run=0;
+            if(ev.type==SDL_MOUSEWHEEL&&!capLocked()) g_wheelN+=ev.wheel.direction==SDL_MOUSEWHEEL_FLIPPED?-ev.wheel.y:ev.wheel.y;   /* (11-16) E->mouseWheel */
             /* (11-12) FULLSCREEN IS BASIC. Alt+Enter or F11 is fullscreen and back, on any build with a
              * window; the renderer is made again at whatever size the window comes to (gfxResize), and W and H with it, which the HUD's grid, the 2D
              * canvas and a game's fonts follow */

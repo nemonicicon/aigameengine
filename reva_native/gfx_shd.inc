@@ -43,7 +43,7 @@ int gfxShaderNew(const uint32_t *spv, int words, int kind) {
     int id = 0; for (int i = 1; i <= SHD_MAX; i++) if (!g_shd[i].live) { id = i; break; }
     if (!id) { printf("[gfx] more than %d surface shaders at once: the rest are drawn plainly\n", SHD_MAX); fflush(stdout); return 0; }
     GShd *s = &g_shd[id]; memset(s, 0, sizeof *s);
-    PipeSpec ps = {SPV(mesh_static_vert), spv, (size_t)words * 4u, PF_DEPTH | PF_DWRITE, 0, 0, 0, 0, g_layoutShd};
+    PipeSpec ps = {SPV(mesh_static_obj_vert), spv, (size_t)words * 4u, PF_DEPTH | PF_DWRITE, 0, 0, 0, 0, g_layoutShd};   /* (11-16) the static vertex shader that also brings the object's own space */
     if (kind == 1) { PipeSpec sk = {SPV(post_vert), spv, (size_t)words * 4u, 0, g_cfg.sky, 0, 7, 0, g_layoutShd}; ps = sk; }   /* a sky: P_SKYDOME's shape, behind everything */
     g_pipeSoft = 1; s->pipe = pipeMake(&ps); g_pipeSoft = 0;
     if (!s->pipe) { printf("[gfx] a surface shader the driver wouldn't take: drawn plainly\n"); fflush(stdout); return 0; }

@@ -1191,3 +1191,40 @@ changes with the window, so it couldn't work out that scale, nor bake its fonts 
 Proof: the flight game's HUD drawn this way lands on its old engine's at 1280 x 720: the same panels at the same pixels, the same
 colours where they're solid (a bar's fill, the clock's white, the radar's ring: equal to the pixel). The sample, rocks, rally, tower
 and herd checks come out the same; warncheck finds the same 14 warnings as before, none new.
+
+### 54 · A game's shader sees its object's own space, and its paint -- BUILT (11-16)
+
+The flight game's own materials are laid on in a mesh's own space: its rocks' grime and cavities, and a cockpit whose worn metal, scratches and
+hairlines are worked out from where a point is on the canopy, not in the world. A game shader (the Godot cook, skate_src/godot/godot_shader.py)
+saw only the world: VERTEX and NORMAL were the world's, MODEL_MATRIX a stand-in, so a pattern swam as the object moved.
+- **ABI 2** (gfx.h `GFX_SHADER_ABI`): a mesh with a game shader is drawn by a build of mesh_static.vert with its object's own space carried
+  (`OBJSPACE`: the vertex's place and normal before the model matrix, and the matrix's three rows, flat). In the cook's vertex(), VERTEX and
+  NORMAL are the object's own (metres, as Godot's), MODEL_MATRIX and MODEL_NORMAL_MATRIX its real ones, NODE_POSITION_WORLD its origin.
+- **INSTANCE_CUSTOM is the object's paint** (E->paint, unclamped): a game sets a material's value per object while it runs (a cockpit's
+  hairlines turning red when the shields fail) with no new call.
+Proof: the flight game's rocks moved onto their own space draw the same pixels as before; its cockpit's ten parts hold their pattern as the
+craft turns. The sample, rocks, rally, tower and herd checks come out the same.
+
+### 55 · A game's own displays in the world: pictures it draws each frame, shown as holograms -- BUILT (11-16)
+
+The flight game's cockpit has four instruments standing on its dashboard (a radar, the target, the ship's systems, the weapons): pictures the
+game paints every frame with its own 2D, shown on panels in the world that glow, are as see-through as they're dark, and scan.
+- **`E->displayMake(w, h)`**: a display, w x h pixels (eight at once; 0 where the renderer has no pictures off-screen: the software one).
+- **`E->displayBegin(d)` .. `E->displayEnd()`**, in hud: rect, poly, stroke, sprite and fontText draw into display d instead of the screen,
+  in its own pixels, (0, 0) its top-left, on black (sprite.inc; gfx_packet.c records each 2D set's target, gfx_vk.c draws a display's sets
+  into its picture before the world).
+- **`E->displayShow(d, &look, sizeof look)`**, in draw: display d on a panel this frame (`EngineDisplayLook`: its middle and the way to its
+  right and top edges; brightness, how opaque its brightest channel makes it, scan lines, a rolling band, a flicker, the clock). shaders/
+  display.vert and display.frag: the picture decoded from sRGB, given off times its brightness and scan, as see-through as it's dark.
+- **`E->fontPx(path, px)`**: a font baked at its em in pixels, for a display's text (a screen's fonts are baked for the screen's scale).
+Proof: the flight game's four displays drawn this way stand where its old engine's do, at the same size and lean, with the same text and
+bars on them, side by side on pixels at 1280 x 720; with the shields down they dim and flicker as the old ones do. The sample, rocks, rally,
+tower and herd checks come out the same; warncheck finds the same 14 warnings as before, none new.
+
+### 56 · The mouse wheel -- BUILT (11-16)
+
+- **`E->mouseWheel()`**: this machine's wheel, the notches turned since the game last asked, away from the player positive (main.inc adds
+  each wheel event; input.inc keeps the count). Picture, not rules: it isn't on the tape, so a chase lens's zoom or a list's scroll, never
+  what the rules read. A run being recorded (REVA_SHOT) doesn't hear it, as it hears no mouse.
+Proof: built, and the flight game's chase zoom reads it (1.15 a notch between 0.6 and 2.2 of its arm, as its old engine's); not yet
+  turned by a hand, which a recorded run can't do.

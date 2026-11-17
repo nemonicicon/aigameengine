@@ -208,7 +208,7 @@ void gfxTextureHud(unsigned name);                              /* this texture 
 void gfxTextureBC(unsigned name, int w, int h, int levels, int fmt, const void *data, int holes);   /* a cooked texture: fmt 1, 3 or 7, levels largest first */
 /* (11-12) A SURFACE'S OWN SHADER (gfx_shd.inc; the engine's side is engine/setshader.inc): shaders/mesh.frag built with GODOT_HOOK round a game's surface code, as SPIR-V words.
  * A number from 1, or 0 where this renderer has none (the own rasterizer, the no-display build): the meshes are then drawn with their plain material */
-#define GFX_SHADER_ABI 1   /* ⛔ mesh.frag's GODOT_HOOK_ABI: change both with anything a cooked shader shares with mesh.frag (its sets, push constants, inputs) */
+#define GFX_SHADER_ABI 2   /* ⛔ mesh.frag's GODOT_HOOK_ABI: change both with anything a cooked shader shares with mesh.frag (its sets, push constants, inputs). 2 (11-16): the object's own space */
 enum { GFX_ST_SRGB = 1, GFX_ST_NEAREST = 2, GFX_ST_CLAMP = 4, GFX_ST_NOMIP = 8, GFX_ST_ANISO = 16, GFX_ST_ARRAY = 32 };   /* a shader texture: its colour is sRGB; not filtered; not wrapped; no mips; anisotropic; read as an array */
 int gfxShaderNew(const uint32_t *spv, int words, int kind);   /* kind 0 a surface's (mesh.frag's hook), 1 a sky's (skydome.frag's) */
 void gfxSkyShader(int shader);   /* the sky is drawn with this sky shader from now on; 0 the engine's own */
@@ -281,7 +281,16 @@ float gfxXrScale(void);                             /* the share of the runtime'
 #define GFX_MAX_HUD 4096
 typedef struct { unsigned id; unsigned vb[6]; unsigned nIndex, nVerts, tex; float model[16]; unsigned bones, palOff; float tint[3], useTex; int flags; float alpha; unsigned posOn, posOff; float mouth[8]; float mat[4]; unsigned ntex; float kind, eye[4]; unsigned rest; float restScale; float hue; int shader; } GfxDraw;   /* mat, ntex and kind are what it's made of: content, like a texture's pixels, so the hash leaves them out. So does it leave out eye, which is picture */
 typedef struct { unsigned off; int n; int over; } GfxLines;   /* over: 0 added to what's there, depth-tested; 1 added, through what's in front; 2 (11-12) its own colour, depth-tested */
-typedef struct { unsigned off; int n; float scr[2], col[4]; unsigned tex; } GfxHudRec;   /* tex 0: flat colour, 2 floats a vertex. Otherwise sprites, 8 floats a vertex */
+typedef struct { unsigned off; int n; float scr[2], col[4]; unsigned tex; unsigned target; } GfxHudRec;   /* tex 0: flat colour, 2 floats a vertex. Otherwise sprites, 8 floats a vertex. target (11-16): 0 the screen, or a display's picture */
+/* (11-16) A GAME'S DISPLAYS (engine.h's displayMake): 2D drawn into a picture off-screen (gfxTargetMake's), and that picture on a panel in the world.
+ * gfxHudTarget: the 2D sets after this (gfxHud, gfxSprites) go into that target, cleared to black each frame it has any, until gfxHudTarget(0)
+ * sends them to the screen again. gfxHolo: this frame, a panel showing a target: its corners (top-left, top-right, bottom-right, bottom-left, world
+ * units) and its look: brightness, how much its brightness hides behind it, scan lines across its height and how deep, a band rolling down it (its
+ * gain, sharpness and speed), a flicker on the whole, and the clock. Unlit, and seen from both sides. They're dressing: the hash leaves panels out */
+typedef struct { unsigned tex; float corner[12]; float look[12]; } GfxHolo;
+#define GFX_MAX_HOLO 16
+void gfxHudTarget(unsigned target);
+void gfxHolo(unsigned target, const float *corners, const float *look);
 enum { GFX_FX_SKY = 3, GFX_FX_PUFF = 4, GFX_FX_WEB = 5, GFX_FX_WEBX = 6,
        GFX_FX_GLOW = 7,             /* (step 24) added, and fading from the middle by their uv: fire, sparks */
        GFX_FX_SOFTZ = 8,            /* GFX_FX_SOFT that also fades out where it meets a surface, where the machine reads the scene's depth (softfx); elsewhere it's GFX_FX_SOFT */
@@ -301,7 +310,7 @@ enum { GFX_SB_X, GFX_SB_XP, GFX_SB_V, GFX_SB_TG0, GFX_SB_TG1, GFX_SB_HW, GFX_SB_
 #define GFX_STRAND_PRM 128
 typedef struct { unsigned id; unsigned buf[GFX_SB_N]; int ns, np, nh, sub, settle, vdim; float prm[GFX_STRAND_PRM]; } GfxStrands;
 void gfxStrands(const GfxStrands *s);
-typedef struct { GfxDraw *draws; int nDraw; GfxLines lines[64]; int nLine; GfxHudRec hud[GFX_MAX_HUD]; int nHud; GfxFx fx[64]; int nFx; float beam[64][24]; int nBeam; GfxStar star; unsigned char *mem; size_t memUsed; GfxDecal decal[GFX_MAX_DECALS]; int nDecal; GfxStrands strands[GFX_MAX_STRANDS]; int nStrands; } GfxPacket;
+typedef struct { GfxDraw *draws; int nDraw; GfxLines lines[64]; int nLine; GfxHudRec hud[GFX_MAX_HUD]; int nHud; GfxFx fx[64]; int nFx; float beam[64][24]; int nBeam; GfxStar star; unsigned char *mem; size_t memUsed; GfxDecal decal[GFX_MAX_DECALS]; int nDecal; GfxStrands strands[GFX_MAX_STRANDS]; int nStrands; GfxHolo holo[GFX_MAX_HOLO]; int nHolo; } GfxPacket;
 void gfxBackBegin(void);
 void gfxBackEnd(const GfxPacket *p, const GfxView *v);
 

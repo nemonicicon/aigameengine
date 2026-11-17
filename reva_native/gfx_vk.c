@@ -93,7 +93,7 @@ __attribute__((unused)) static void pictureSize(void); __attribute__((unused)) s
 enum { SRC_HDR, SRC_HIST0, SRC_HIST1, SRC_SCR0, SRC_SCR1 };   /* (step 25) where a lens's pass reads the scene from */
 static VkDeviceMemory g_scrMem[2], g_histMem[2], g_snapMem, g_zsMem, g_picMem, g_exMem;   /* (11-12) kept, so a resize can let them go */
 static VkImage g_scrImg[2], g_histImg[2]; static VkImageView g_scrView[2], g_histView[2]; static VkDescriptorSet g_srcDs[5], g_taaDs[2]; static int g_lens, g_taaAt, g_taaOK, g_prevOK; static float g_prevVP[16]; static unsigned g_prevCuts;   /* (step 25) the lens's passes: two pictures to work in, two to keep the last frame in, and the last frame's lens */
-enum { P_STATIC, P_STATIC_CUT, P_SKIN, P_SKIN_CUT, P_STATIC_BLEND, P_SKIN_BLEND, P_STRAND, P_MOUTH, P_MOUTH_CUT, P_TOON, P_TOON_CUT, P_TOON_STATIC, P_TOON_STATIC_CUT, P_TOON_MOUTH, P_TOON_MOUTH_CUT, P_TOON_BLEND, P_INK, P_INK_STATIC, P_FUR, P_FUR_STATIC, P_TOON_FUR, P_TOON_FUR_STATIC, P_M_STATIC, P_M_STATIC_CUT, P_M_TOON_STATIC, P_M_TOON_STATIC_CUT, P_R_STATIC, P_R_STATIC_CUT, P_R_SKIN, P_R_SKIN_CUT, P_TR_STATIC, P_TR_STATIC_CUT, P_TR_SKIN, P_TR_SKIN_CUT, P_M_INK, P_M_INK_STATIC, P_GLOSS, P_TOON_GLOSS, P_TOON_GLOSS_A, P_SH_STATIC, P_SH_SKIN, P_LINE, P_LINE_SOLID, P_HUD, P_FX_ALPHA, P_FX_ADD, P_FX_SOFT, P_SKY, P_HOLO_Z, P_HOLO, P_SPRITE, P_SPACE, P_BEAM, P_SKYDOME, P_SCREEN, P_WATER, P_FX_PUFF, P_FX_WEB, P_FX_WEBX, P_STAR_SURF, P_STAR_FACE, P_STAR_CORONA, P_STAR_LOOP, P_LINE_OVER, P_T_STATIC, P_T_STATIC_CUT, P_T_SKIN, P_T_SKIN_CUT, P_HEAD, P_HEADFLAT, P_B_SKIN, P_FLOORSH, P_POST, P_BLOOM0, P_BLOOM_DOWN, P_BLOOM_UP, P_AO, P_AOBLUR, P_VOL, P_FX_GLOW, P_FX_SOFTZ, P_FX_GLOWZ, P_DECAL, P_DECAL_PAINT, P_LENS_DOF, P_LENS_MB, P_TAA, P_PRESENT, P_TUBE480, P_TUBE240, P_PRESENT_HDR, P_HDREX, P_LINES, P_ZPRE, P_FX_EXACT, P_N };
+enum { P_STATIC, P_STATIC_CUT, P_SKIN, P_SKIN_CUT, P_STATIC_BLEND, P_SKIN_BLEND, P_STRAND, P_MOUTH, P_MOUTH_CUT, P_TOON, P_TOON_CUT, P_TOON_STATIC, P_TOON_STATIC_CUT, P_TOON_MOUTH, P_TOON_MOUTH_CUT, P_TOON_BLEND, P_INK, P_INK_STATIC, P_FUR, P_FUR_STATIC, P_TOON_FUR, P_TOON_FUR_STATIC, P_M_STATIC, P_M_STATIC_CUT, P_M_TOON_STATIC, P_M_TOON_STATIC_CUT, P_R_STATIC, P_R_STATIC_CUT, P_R_SKIN, P_R_SKIN_CUT, P_TR_STATIC, P_TR_STATIC_CUT, P_TR_SKIN, P_TR_SKIN_CUT, P_M_INK, P_M_INK_STATIC, P_GLOSS, P_TOON_GLOSS, P_TOON_GLOSS_A, P_SH_STATIC, P_SH_SKIN, P_LINE, P_LINE_SOLID, P_HUD, P_FX_ALPHA, P_FX_ADD, P_FX_SOFT, P_SKY, P_HOLO_Z, P_HOLO, P_SPRITE, P_SPACE, P_BEAM, P_SKYDOME, P_SCREEN, P_WATER, P_FX_PUFF, P_FX_WEB, P_FX_WEBX, P_STAR_SURF, P_STAR_FACE, P_STAR_CORONA, P_STAR_LOOP, P_LINE_OVER, P_T_STATIC, P_T_STATIC_CUT, P_T_SKIN, P_T_SKIN_CUT, P_HEAD, P_HEADFLAT, P_B_SKIN, P_FLOORSH, P_POST, P_BLOOM0, P_BLOOM_DOWN, P_BLOOM_UP, P_AO, P_AOBLUR, P_VOL, P_FX_GLOW, P_FX_SOFTZ, P_FX_GLOWZ, P_DECAL, P_DECAL_PAINT, P_LENS_DOF, P_LENS_MB, P_TAA, P_PRESENT, P_TUBE480, P_TUBE240, P_PRESENT_HDR, P_HDREX, P_LINES, P_ZPRE, P_FX_EXACT, P_HUD_T, P_SPRITE_T, P_DISP, P_N };   /* (11-16) a game's displays: its 2D into their pictures, and the panels that show them */
 static VkPipeline g_pipe[P_N];
 /* (11-07) REVA_PASSLOG=<frame>: that frame's passes and every graphics pipeline bound, in order (P_ numbers), said once as [passlog] */
 static int g_plogAt = -2, g_plogLive; static char g_plog[16384]; static size_t g_plogN;
@@ -653,6 +653,8 @@ static void pipesMake(void) {
         [P_SKYDOME] = {SPV(post_vert), SPV(skydome_frag), 0, g_cfg.sky, 0, 7, 0},
         [P_SPACE] = {SPV(post_vert), SPV(space_frag), 0, 0, 0, 7, 0}, [P_BEAM] = {SPV(beam_vert), SPV(beam_frag), PF_DEPTH | PF_ADD | PF_CULLF, 0, 0, 7, 0},
         [P_SCREEN] = {SPV(screen_vert), SPV(screen_frag), D, 0, 0, 7, 0},
+        [P_HUD_T] = {SPV(hud_vert), SPV(hud_frag), PF_BLEND, 0, 0, 3, 7}, [P_SPRITE_T] = {SPV(sprite_vert), SPV(sprite_frag), PF_BLEND, 0, 0, 6, 7},   /* (11-16) a display's 2D, into its picture off-screen */
+        [P_DISP] = {SPV(display_vert), SPV(display_frag), PF_DEPTH | PF_BLEND, 0, 0, 7, 0},   /* (11-16) a display's panel in the world: unlit, seen through where it's dark, behind what's in front of it, writing no depth */
         [P_WATER] = {SPV(mesh_static_vert), SPV(water_frag), PF_DEPTH | PF_BLEND, 0, 0, 0}, [P_FX_PUFF] = {SPV(fx_vert), SPV(puff_frag), PF_DEPTH | PF_BLEND, 0, 0, 4}, [P_FX_WEB] = {SPV(fx_vert), SPV(starweb_frag), PF_DEPTH | PF_BLEND, 0, 0, 4}, [P_FX_WEBX] = {SPV(fx_vert), SPV(starweb_frag), PF_BLEND, 0, 0, 4},
         [P_STAR_SURF] = {SPV(star_vert), SPV(starsurf_frag), D, 0, 0, 9}, [P_STAR_FACE] = {SPV(star_vert), SPV(starface_frag), D, 0, 0, 9}, [P_STAR_CORONA] = {SPV(starcorona_vert), SPV(starcorona_frag), PF_DEPTH | PF_ADD, 0, 0, 3}, [P_STAR_LOOP] = {SPV(starloop_vert), SPV(starloop_frag), PF_DEPTH | PF_ADD, 0, 0, 10},
         [P_LINE_OVER] = {SPV(line_vert), SPV(line_frag), PF_ADD | PF_LINE, 0, 0, 2},
@@ -1526,6 +1528,30 @@ static void floorMapDraw(Frame *f, VkCommandBuffer cb, const ViewUBO *u) { GTarg
 /* the screens, in the world */
 static void screensDraw(VkCommandBuffer cb) { if (!g_nScr) return; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_SCREEN]);
     for (int i = 0; i < g_nScr; i++) { unsigned t = g_scr[i].tex; if (t >= g_nTex || !g_tex[t].ds) continue; vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[t].ds, 0, NULL); float pc[20]; memcpy(pc, g_scr[i].model, 64); pc[16] = g_scr[i].amp; pc[17] = pc[18] = pc[19] = 0.f; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 80, pc); vkCmdDraw(cb, 6, 1, 0, 0); } }
+/* (11-16) a game's displays (gfx.h gfxHudTarget): each picture that has 2D this frame, cleared to black, then its sets in order, as the screen's HUD
+ * draws its own. Before the world, which shows them */
+static void dispDraw(Frame *f, VkCommandBuffer cb, const GfxPacket *pk, uint32_t base) {
+    unsigned done[MAX_TARGETS]; int nDone = 0;
+    for (int i = 0; i < pk->nHud; i++) { const unsigned t = pk->hud[i].target; if (!t) continue;
+        int seen = 0;
+        for (int k = 0; k < nDone; k++) if (done[k] == t) seen = 1;
+        if (seen || nDone >= MAX_TARGETS) continue;
+        done[nDone++] = t;
+        GTarget *g = tgOf(t); if (!g) continue;
+        static const float black[3] = {0.f, 0.f, 0.f}; tgBegin(cb, g, black); int curP = -1;
+        for (int j = i; j < pk->nHud; j++) { const GfxHudRec *h = &pk->hud[j]; if (h->target != t) continue;
+            const int sp = h->tex && h->tex < g_nTex && g_tex[h->tex].dsNear; if (h->tex && !sp) continue;
+            const int want = sp ? P_SPRITE_T : P_HUD_T; if (want != curP) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[want]); curP = want; }
+            if (sp) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[h->tex].dsNear, 0, NULL);
+            float pc[8] = {h->scr[0], h->scr[1], 0.f, 0.f, h->col[0], h->col[1], h->col[2], h->col[3]}; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 32, pc);
+            VkDeviceSize o = (VkDeviceSize)base + h->off; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)h->n, 1, 0, 0); }
+        tgEnd(cb, g); } }
+/* (11-16) and the panels that show them, in the world's blended pass (display.vert, display.frag) */
+static void dispPanels(VkCommandBuffer cb, const GfxPacket *pk) { if (!pk->nHolo || !g_pipe[P_DISP]) return; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_DISP]);
+    for (int i = 0; i < pk->nHolo; i++) { const GfxHolo *o = &pk->holo[i]; if (o->tex >= g_nTex || !g_tex[o->tex].ds) continue;
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[o->tex].ds, 0, NULL);
+        float pc[28]; for (int k = 0; k < 4; k++) { pc[k * 4] = o->corner[k * 3]; pc[k * 4 + 1] = o->corner[k * 3 + 1]; pc[k * 4 + 2] = o->corner[k * 3 + 2]; pc[k * 4 + 3] = 1.f; } memcpy(pc + 16, o->look, 48);
+        vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 112, pc); vkCmdDraw(cb, 6, 1, 0, 0); } }
 /* the world's been drawn somewhere other than the glass: bring it across, and leave the glass open for the HUD */
 static void passBegin(VkCommandBuffer cb, VkImageView view, int w, int h, VkAttachmentLoadOp load) {
     VkRenderingAttachmentInfo c = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; c.imageView = view; c.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; c.loadOp = load; c.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1947,6 +1973,7 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     if (g_headOn) { headDraw(f, cb); g_headOn = 0; }
     if (g_feedOn) { feedDraw(f, cb, u); g_feedOn = 0; }
     if (g_fsOn && !g_between) floorMapDraw(f, cb, u);
+    dispDraw(f, cb, pk, base);   /* (11-16) a game's displays */
     /* the lights' own shadows */
     if (nTile) { barrierImg(cb, g_atlasImg, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 1);
         VkRenderingAttachmentInfo d = {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO}; d.imageView = g_atlasView; d.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; d.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; d.storeOp = VK_ATTACHMENT_STORE_OP_STORE; d.clearValue.depthStencil.depth = 1.f;
@@ -1994,6 +2021,7 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
     if (pk->nDecal) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 0, 1, &f->dsView, 1, &viewOff);
     if (g_pipe[P_FX_EXACT]) fxDraw(f, cb, pk, base, 2, vi);   /* (11-13) a set's drawings in their own colours, on the solid world, before what's blended (a coat writes no depth, and they showed over it) */
     drawList(f, cb, viewOff, 0, 1);
+    dispPanels(cb, pk);   /* (11-16) a game's display panels */
     starPass(f, cb, &pk->star);
     if (pk->nBeam) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[P_BEAM]); for (int i = 0; i < pk->nBeam; i++) { vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 96, pk->beam[i]); vkCmdDraw(cb, 36, 1, 0, 0); } }
     if (pk->nLine) { for (int i = 0; i < pk->nLine; i++) { VkPipeline lp9 = g_pipe[pk->lines[i].over == 2 ? P_LINE_SOLID : pk->lines[i].over ? P_LINE_OVER : P_LINE]; if (!lp9) continue; vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, lp9); VkDeviceSize o = (VkDeviceSize)base + pk->lines[i].off; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)pk->lines[i].n, 1, 0, 0); } }
@@ -2042,7 +2070,7 @@ void gfxBackEnd(const GfxPacket *pk, const GfxView *v) {
         float pc9[8] = {W9, H9, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f}; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 32, pc9);
         VkDeviceSize ob9 = (VkDeviceSize)at9; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &ob9); vkCmdDraw(cb, 6, 1, 0, 0); }
     if (nv > 1) { VkViewport vw = {0.f, (float)g_H, (float)g_W, -(float)g_H, 0.f, 1.f}; VkRect2D sc = {{0, 0}, {(uint32_t)g_W, (uint32_t)g_H}}; vkCmdSetViewport(cb, 0, 1, &vw); vkCmdSetScissor(cb, 0, 1, &sc); }
-    if (pk->nHud) { int curP = -1; for (int i = 0; i < pk->nHud; i++) { const GfxHudRec *h = &pk->hud[i]; int sp = h->tex && h->tex < g_nTex && g_tex[h->tex].dsNear; if (h->tex && !sp) continue;
+    if (pk->nHud) { int curP = -1; for (int i = 0; i < pk->nHud; i++) { const GfxHudRec *h = &pk->hud[i]; if (h->target) continue; int sp = h->tex && h->tex < g_nTex && g_tex[h->tex].dsNear; if (h->tex && !sp) continue;
             int want = sp ? P_SPRITE : P_HUD; if (want != curP) { vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe[want]); curP = want; }
             if (sp) vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g_layout, 1, 1, &g_tex[h->tex].dsNear, 0, NULL);
             float pc[8] = {h->scr[0], h->scr[1], 0.f, 0.f, h->col[0], h->col[1], h->col[2], h->col[3]}; vkCmdPushConstants(cb, g_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 32, pc); VkDeviceSize o = (VkDeviceSize)base + h->off; vkCmdBindVertexBuffers(cb, 0, 1, &f->ring.b, &o); vkCmdDraw(cb, (uint32_t)h->n, 1, 0, 0); } }

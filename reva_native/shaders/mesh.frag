@@ -180,7 +180,13 @@ vec3 lightsHere(vec3 N, vec3 Vd, float rough, vec3 F0, float skinC, out vec3 sp)
 // else is this shader's own, so the surface is lit as the world is. Its textures are set 3's (gfx_shd.inc).
 // ⛔ GODOT_HOOK_ABI is what a cooked shader was built against, and gfx.h's GFX_SHADER_ABI is the engine's: change both with anything a cooked shader
 // shares with this file (its sets and bindings, the push constants, what comes in from the vertex shader), or old cooks draw wrong instead of being refused
-#define GODOT_HOOK_ABI 1
+// (11-16) ABI 2: the object's own space comes in from mesh_static.vert's OBJSPACE build (VERTEX and NORMAL in its vertex(), MODEL_MATRIX), and its paint
+#define GODOT_HOOK_ABI 2
+layout(location = 8) in vec3 vObj;
+layout(location = 9) in vec3 vObjN;
+layout(location = 10) flat in vec4 vM0;
+layout(location = 11) flat in vec4 vM1;
+layout(location = 12) flat in vec4 vM2;
 struct GdSurf { vec3 albedo; vec3 normal; float rough, metal, spec, ao; vec3 emit; };
 #include "godot_hook.glsl"
 #endif

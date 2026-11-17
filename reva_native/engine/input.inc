@@ -28,6 +28,10 @@ static float g_ptrLiveX=-1000.f, g_ptrLiveY=-1000.f; static int g_ptrHitNext=0;
 static void sprToCanvas(float px,float py,float*cx,float*cy);   /* engine/sprite.inc */
 static int apiPointerAt(float*x,float*y){ if(x) *x=g_ptrLiveX; if(y) *y=g_ptrLiveY; return g_ptrLiveX>-999.f; }
 static void apiPointerOver(int id){ g_ptrHitNext=id; }
+/* (11-16) THE MOUSE WHEEL (E->mouseWheel): this machine's wheel, the notches turned since the game last asked, away from the player positive. Picture,
+ * not rules: it isn't on the tape, so a chase lens's zoom or a list's scroll, never what the rules read. The window's events add to it (main.inc) */
+static int g_wheelN=0;
+static int apiMouseWheel(void){ const int n=g_wheelN; g_wheelN=0; return n; }
 #ifndef REVA_HEADLESS
 static SDL_GameController* g_padDev[4];
 static void padsOpen(void){

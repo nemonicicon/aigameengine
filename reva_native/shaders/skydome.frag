@@ -17,7 +17,7 @@ float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a
 // (skate_src/godot/godot_shader.py writes godot_hook.glsl and builds this file round it), says the sky's colour each way from the eye, in light's own
 // units; the engine's sun is their first light. Its textures are set 3's (gfx_shd.inc). ⛔ GODOT_HOOK_ABI as mesh.frag's: change both with what a
 // cooked sky shares with this file (the view block, what comes in from post_vert), and gfx.h's GFX_SHADER_ABI with them
-#define GODOT_HOOK_ABI 1
+#define GODOT_HOOK_ABI 2   /* (11-16) 2 with mesh.frag's: a sky's own inputs didn't change, but the engine has one number for both */
 #include "godot_hook.glsl"
 #endif
 void main() {

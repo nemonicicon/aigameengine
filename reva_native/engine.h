@@ -69,6 +69,12 @@ typedef struct {
     const char *picture;      /* for a picture: a model's name, as E->prop takes it, whose first texture it shows. Name one that's loaded: this doesn't read a file politely */
     int image;                /* (11-12) for a picture: a game's image (E->image, E->imageMake) in place of a model's texture; what's painted into it later shows on the wall. 0: the picture above */
 } EngineDecal;
+/* (11-16) a display's panel in the world (E->displayShow): its middle, and the way and distance from there to its right edge and to its top edge (world
+ * units: the panel is twice those across and up). It's a hologram: unlit, its picture given off times brightness, and as see-through as it's dark, its
+ * brightest channel times opacityGain hiding what's behind (black is clear). Scan lines across its height (lineFreq radians a picture's height, lineDepth
+ * how deep), a band rolling down it (bandGain, bandSharp, bandSpeed pictures a second) on the game's clock (time, seconds), and a flicker on the whole
+ * this frame. Zero what you don't set: a brightness, opacityGain or flicker of 0 is 1 */
+typedef struct { float centre[3], right[3], up[3]; float brightness, opacityGain, lineFreq, lineDepth, bandGain, bandSharp, bandSpeed, flicker, time; } EngineDisplayLook;
 
 /* a player's pad, as of this tick. x and y are the stick, -1..1, right and up positive, and exactly 0 in its dead zone. held is which buttons are down, pressed which went down this tick. Pad 0 is also the keyboard, and it's always connected. A tape carries all four.
  * PAD_BACK (11-06) is the pad's Back or View button, and V on the keyboard */
@@ -598,6 +604,20 @@ typedef struct {
      * another engine's HUD does, by the screen's height in pixels with a floor for small windows. With canvasEdges a canvas unit is
      * w / (x1 - x0) pixels. Picture, not rules */
     void (*displaySize)(int *w, int *h);
+    /* (11-16) A GAME'S OWN DISPLAYS IN THE WORLD (a cockpit's instruments): pictures the game draws each frame with the 2D calls, shown on panels in the
+     * world. displayMake(w, h): a display, w x h pixels, black; its handle, or 0 (eight at once; and 0 where the renderer has no pictures off-screen, the
+     * software one and the no-display build, where nothing shows). displayBegin(d), in hud: until displayEnd, rect, poly, stroke, sprite and fontText
+     * draw into display d instead of the screen, in its own pixels, (0, 0) its top-left, on black (it's cleared each frame it's begun). A display's text
+     * wants a font baked at its pixels: fontPx, a font whose size is its em in pixels, whatever the screen (a screen's fonts are baked for the screen's
+     * scale). displayShow(d, look, sizeof look), in draw: this frame, display d on a panel in the world (EngineDisplayLook). Picture, not rules */
+    int (*displayMake)(int w, int h);
+    void (*displayBegin)(int d);
+    void (*displayEnd)(void);
+    void (*displayShow)(int d, const EngineDisplayLook *look, size_t size);
+    int (*fontPx)(const char *path, float px);
+    /* (11-16) THE MOUSE WHEEL: this machine's, the notches turned since the game last asked, away from the player (up) positive. Picture, not rules:
+     * it isn't on the tape, so a chase lens's zoom or a list's scroll, never what the rules read */
+    int (*mouseWheel)(void);
 } EngineAPI;
 
 /* a game fills in what it needs and leaves the rest out: a missing entry does nothing, and bodies walk on their own feet. Only version is required. */

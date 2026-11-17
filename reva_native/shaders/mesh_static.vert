@@ -14,6 +14,15 @@ layout(location = 0) out vec3 vN;
 layout(location = 1) out vec2 vT;
 layout(location = 2) out vec3 vW;
 layout(location = 3) out vec4 vS;
+#ifdef OBJSPACE
+// (11-16) for a game's own surface shader (gfx_shd.inc): this point and its normal in the object's own space, and the object's model matrix, as Godot's
+// vertex() has them (VERTEX, NORMAL, MODEL_MATRIX). Built only for those pipelines, so nothing else pays for them
+layout(location = 8) out vec3 vObj;
+layout(location = 9) out vec3 vObjN;
+layout(location = 10) flat out vec4 vM0;
+layout(location = 11) flat out vec4 vM1;
+layout(location = 12) flat out vec4 vM2;
+#endif
 #ifdef STRAND
 const float HAIRPX = 1.0;   // (11-06) a hair's drawn width, at the least: about a pixel, or it falls between them
 #endif
@@ -37,6 +46,9 @@ void main() {
     vS = V.sunVP * w;
     vTint = iTint;
     vExtra = iExtra;
+#ifdef OBJSPACE
+    vObj = aP; vObjN = aN; vM0 = iR0; vM1 = iR1; vM2 = iR2;
+#endif
 #ifdef STRAND
     // (11-06) A HAIR, ONE OF A HUNDRED THOUSAND (engine/strands.inc). Its point is the hair's middle here, both corners alike; its normal is the hair's own way, as long
     // as its true half-width; its uv says which side of the hair this corner is (the sign), how light the hair is, and how far along it this is. A hair is far thinner

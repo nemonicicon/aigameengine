@@ -5050,6 +5050,11 @@ int main(int argc,char**argv){
         { static int rs9=-1, rw9, rh9, rf9;   /* (11-12) REVA_RESIZETEST=WxH@frame: the window made that size at that frame, for a check of the rebuild with no hands */
           if(rs9<0){ const char*e=getenv("REVA_RESIZETEST"); rs9=e&&sscanf(e,"%dx%d@%d",&rw9,&rh9,&rf9)==3; }
           if(rs9==1&&frames>=rf9){ SDL_SetWindowSize(g_win,rw9,rh9); rs9=2; printf("[window] made %dx%d (REVA_RESIZETEST)\n",rw9,rh9); fflush(stdout); } }
+        { static int fs9=-1, ff9, fb9;   /* (11-16) REVA_FULLTEST=frame[,back]: fullscreen at that frame as Alt+Enter and F11 make it, and a window again `back` frames later, for a check of the switch with no hands */
+          if(fs9<0){ const char*e=getenv("REVA_FULLTEST"); fb9=0; fs9=e&&sscanf(e,"%d,%d",&ff9,&fb9)>=1; }
+          if(fs9==1&&frames>=ff9&&g_win&&!g_noWindow){ SDL_RaiseWindow(g_win); SDL_SetWindowResizable(g_win,SDL_TRUE); SDL_SetWindowFullscreen(g_win,SDL_WINDOW_FULLSCREEN_DESKTOP); fs9=fb9>0?2:3; ff9=frames+fb9;
+              printf("[window] fullscreen (REVA_FULLTEST), %s\n",(SDL_GetWindowFlags(g_win)&SDL_WINDOW_INPUT_FOCUS)?"in front, with the keys":"behind another window"); fflush(stdout); }
+          else if(fs9==2&&frames>=ff9){ SDL_SetWindowFullscreen(g_win,0); fs9=3; printf("[window] a window (REVA_FULLTEST)\n"); fflush(stdout); } }
         { SDL_Event ev; while(SDL_PollEvent(&ev)){
             if(ev.type==SDL_QUIT) g_run=0;
             /* (11-12) FULLSCREEN IS BASIC. Alt+Enter or F11 is fullscreen and back, on any build with a

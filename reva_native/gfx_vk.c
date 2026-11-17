@@ -87,7 +87,7 @@ static VkImage g_img[MAX_IMAGES]; static VkImageView g_view[MAX_IMAGES]; static 
 static VkImage g_depth, g_sunImg; static VkImageView g_depthView, g_sunView; static VkDeviceMemory g_depthMem;
 static VkDescriptorSetLayout g_dslView, g_dslTex, g_dslPost; static VkPipelineLayout g_layout, g_layoutPost; static VkDescriptorPool g_dp; static VkSampler g_smpRepeat, g_smpShadow, g_smpClamp;
 static VkImage g_snapImg, g_zsImg, g_dumImg; static VkImageView g_snapView, g_zsView, g_dumView; static int g_mid;   /* (step 24) the scene's colour and depth as they stood mid-frame, what's bound where a machine doesn't take them, and whether this one does */
-static VkFormat g_glassFmt = GLASS_FMT0; __attribute__((unused)) static VkColorSpaceKHR g_glassCs = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; static int g_hdrOut, g_exFresh; __attribute__((unused)) static int g_csExt; static VkImage g_exImg; static VkImageView g_exView;   /* (step 25) the glass's own format; whether it's an HDR10 display's; and the picture of the light past white */
+static VkFormat g_glassFmt = GLASS_FMT0; __attribute__((unused)) static VkColorSpaceKHR g_glassCs = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; static int g_hdrOut, g_exFresh; __attribute__((unused)) static int g_csExt; __attribute__((unused)) static int g_fsxInst, g_fsx; static VkImage g_exImg; static VkImageView g_exView;   /* (step 25) the glass's own format; whether it's an HDR10 display's; and the picture of the light past white */
 static int g_GW, g_GH, g_present; static float g_picShown, g_tubeP[11] = {448.f, 139.f, 0.47f, 0.25f, 1.f, 0.f, 0.30f, 0.55f, 2.4f, 0.025f, 0.f}; static VkImage g_picImg, g_glassImg[MAX_IMAGES]; static VkImageView g_picView, g_glassView[MAX_IMAGES]; static VkDescriptorSet g_picDs;   /* (step 25) the glass's size, whether the picture's its own, and the picture when it is */
 __attribute__((unused)) static void pictureSize(void); __attribute__((unused)) static void pictureMake(void);   /* below, with the pass that puts the picture on the glass. The SDL road's: the direct road's picture is the glass */
 enum { SRC_HDR, SRC_HIST0, SRC_HIST1, SRC_SCR0, SRC_SCR1 };   /* (step 25) where a lens's pass reads the scene from */
@@ -736,6 +736,9 @@ static void deviceMake(const char **instExt, uint32_t nInst, const char **devExt
     /* (11-07) REVA_GPUCOUNT: the driver's counters, where it has them */
     const char *devExt2[40]; uint32_t nDev2 = 0; for (uint32_t i = 0; i < nDev && nDev2 < 39; i++) devExt2[nDev2++] = devExt[i];
     xrDeviceExt(devExt2, &nDev2, 38);
+#if defined(REVA_SDL) && defined(_WIN32)
+    if (g_fsxInst && nDev2 < 38 && devHas(g_gpu, "VK_EXT_full_screen_exclusive")) { devExt2[nDev2++] = "VK_EXT_full_screen_exclusive"; g_fsx = 1; }   /* (11-16) see fsxChain */
+#endif
     VkPhysicalDevicePerformanceQueryFeaturesKHR fpq = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR}; VkPhysicalDeviceVulkan12Features f12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
     { const char *pc9 = getenv("REVA_GPUCOUNT"); if (pc9 && pc9[0] && strcmp(pc9, "0")) { if (devHas(g_gpu, "VK_KHR_performance_query")) { devExt2[nDev2++] = "VK_KHR_performance_query"; fpq.performanceCounterQueryPools = 1; f12.hostQueryReset = 1; fpq.pNext = &f12; f13.pNext = &fpq; g_pcWant = 1; } else { printf("[gpucount] this driver hasn't VK_KHR_performance_query\n"); fflush(stdout); } } }
     VkDeviceCreateInfo di = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO}; di.pNext = &f13; di.pEnabledFeatures = &want; di.queueCreateInfoCount = 1; di.pQueueCreateInfos = &qi; di.enabledExtensionCount = nDev2; di.ppEnabledExtensionNames = devExt2; CK(vkCreateDevice(g_gpu, &di, NULL, &g_dev)); vkGetDeviceQueue(g_dev, g_qf, 0, &g_q);
@@ -972,13 +975,27 @@ static double g_idleWaited, g_vblankAt; static unsigned g_vblankSeq;   /* (11-07
 #ifdef REVA_SDL
 /* ---- the SDL road: a window and a swapchain ---------------------------------------------- */
 static VkSwapchainKHR g_chain; static VkSurfaceKHR g_surf;
+/* (11-16) FULLSCREEN IS THE WINDOW'S, NOT THE DRIVER'S (Windows). A window that covers the screen may otherwise be taken into exclusive fullscreen by the
+ * driver on its own (NVIDIA's runs Vulkan through DXGI there), behind the engine's back and between its swapchains: a game crashed inside the driver
+ * going fullscreen with Alt+Enter or F11. VK_EXT_full_screen_exclusive, DISALLOWED, keeps it a borderless window the desktop composes, on any
+ * driver that has the extension. Its struct is Win32-only in the headers (vulkan_win32.h, which wants windows.h), so it's spelled out here
+ * (g_fsxInst and g_fsx are with the glass's globals above, as deviceMake asks for the extension) */
+typedef struct { VkStructureType sType; void *pNext; int32_t fullScreenExclusive; } GfxFsxInfo;
+static void fsxChain(VkSwapchainCreateInfoKHR *sw, GfxFsxInfo *x) {
+    if (!g_fsx) return;
+    memset(x, 0, sizeof *x); x->sType = (VkStructureType)1000255000; x->fullScreenExclusive = 2;   /* VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT, VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT */
+    x->pNext = (void *)sw->pNext; sw->pNext = x; }
 void gfxInit(void *sdlWindow, int *W, int *H) {
     xrPrepare();   /* (11-11) a headset, if REVA_XR asks for one: before the instance, which the runtime has its say in */
     SDL_Window *win = (SDL_Window *)sdlWindow; unsigned ne = 0; SDL_Vulkan_GetInstanceExtensions(win, &ne, NULL); const char *ex[16]; SDL_Vulkan_GetInstanceExtensions(win, &ne, ex);
     { uint32_t n = 0; vkEnumerateInstanceExtensionProperties(NULL, &n, NULL); VkExtensionProperties *xp = malloc(sizeof *xp * (n ? n : 1)); vkEnumerateInstanceExtensionProperties(NULL, &n, xp);   /* (step 25) a display's colour spaces other than sRGB are named by an extension */
       for (uint32_t i = 0; i < n; i++) if (!strcmp(xp[i].extensionName, "VK_EXT_swapchain_colorspace") && ne < 15) { ex[ne++] = "VK_EXT_swapchain_colorspace"; g_csExt = 1; break; }
+#ifdef _WIN32
+      for (uint32_t i = 0; i < n; i++) if (!strcmp(xp[i].extensionName, "VK_KHR_get_surface_capabilities2") && ne < 15) { ex[ne++] = "VK_KHR_get_surface_capabilities2"; g_fsxInst = 1; break; }   /* full_screen_exclusive needs it */
+#endif
       free(xp); }
     const char *de[1] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME}; deviceMake(ex, ne, de, 1);
+    if (g_fsx) { printf("[gfx] fullscreen stays a window the desktop composes (VK_EXT_full_screen_exclusive, disallowed)\n"); fflush(stdout); }
     if (!SDL_Vulkan_CreateSurface(win, g_inst, &g_surf)) { printf("[gfx] surface: %s\n", SDL_GetError()); exit(1); }
     VkBool32 ok = 0; vkGetPhysicalDeviceSurfaceSupportKHR(g_gpu, g_qf, g_surf, &ok); if (!ok) { printf("[gfx] this queue can't present\n"); exit(1); }
     VkSurfaceCapabilitiesKHR sc; vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_gpu, g_surf, &sc);
@@ -1013,6 +1030,7 @@ void gfxInit(void *sdlWindow, int *W, int *H) {
       for (int i = 0; i < 4; i++) if (sc.supportedCompositeAlpha & ca[i]) { sw.compositeAlpha = ca[i]; break; } }
     sw.imageUsage &= sc.supportedUsageFlags | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 #endif
+    GfxFsxInfo fsx9; fsxChain(&sw, &fsx9);
     CK(vkCreateSwapchainKHR(g_dev, &sw, NULL, &g_chain)); g_nImg = MAX_IMAGES; vkGetSwapchainImagesKHR(g_dev, g_chain, &g_nImg, g_img);
     g_W = (int)sc.currentExtent.width; g_H = (int)sc.currentExtent.height; pictureSize(); *W = g_W; *H = g_H;
     VkSemaphoreCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -1038,6 +1056,7 @@ int gfxResize(int *W, int *H) {
     VkSwapchainCreateInfoKHR sw = {.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR}; sw.surface = g_surf; sw.minImageCount = sc.minImageCount < 3 ? 3 : sc.minImageCount; if (sc.maxImageCount && sw.minImageCount > sc.maxImageCount) sw.minImageCount = sc.maxImageCount;
     sw.imageFormat = g_glassFmt; sw.imageColorSpace = g_glassCs; sw.imageExtent = sc.currentExtent; sw.imageArrayLayers = 1; sw.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; sw.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     sw.preTransform = sc.currentTransform; sw.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; sw.presentMode = VK_PRESENT_MODE_FIFO_KHR; sw.clipped = 1; sw.oldSwapchain = g_chain;
+    GfxFsxInfo fsx9; fsxChain(&sw, &fsx9);
     VkSwapchainKHR old = g_chain; CK(vkCreateSwapchainKHR(g_dev, &sw, NULL, &g_chain)); vkDestroySwapchainKHR(g_dev, old, NULL);
     g_nImg = MAX_IMAGES; vkGetSwapchainImagesKHR(g_dev, g_chain, &g_nImg, g_img);
     g_W = gw; g_H = gh; pictureSize();

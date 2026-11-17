@@ -114,10 +114,10 @@ static unsigned r16(Rd *r) { unsigned a = r8(r); return a | (r8(r) << 8); }
 static unsigned r32(Rd *r) { unsigned a = r16(r); return a | (r16(r) << 16); }
 static unsigned long long r64(Rd *r) { unsigned long long a = r32(r); return a | ((unsigned long long)r32(r) << 32); }
 static const unsigned char *rbytes(Rd *r, int n) { if (n < 0 || r->at + n > r->n) { r->bad = 1; return NULL; } const unsigned char *p = r->p + r->at; r->at += n; return p; }
-static void wSeat(Wr *w, const NetSeat *s) { w16(w, (unsigned short)s->lx); w16(w, (unsigned short)s->ly); w16(w, (unsigned short)s->rx); w16(w, (unsigned short)s->ry); w16(w, (unsigned short)s->rt); w16(w, (unsigned short)s->mdx); w16(w, (unsigned short)s->mdy); w16(w, s->held); w8(w, s->flags); w16(w, (unsigned short)s->lt); w16(w, (unsigned short)s->px); w16(w, (unsigned short)s->py); w8(w, s->pb); w16(w, (unsigned short)s->hit); }
+static void wSeat(Wr *w, const NetSeat *s) { w16(w, (unsigned short)s->lx); w16(w, (unsigned short)s->ly); w16(w, (unsigned short)s->rx); w16(w, (unsigned short)s->ry); w16(w, (unsigned short)s->rt); w16(w, (unsigned short)s->mdx); w16(w, (unsigned short)s->mdy); w16(w, s->held); w8(w, s->flags); w16(w, (unsigned short)s->lt); w16(w, (unsigned short)s->px); w16(w, (unsigned short)s->py); w8(w, s->pb); w16(w, (unsigned short)s->hit); w32(w, s->gk); }
 static void rSeat(Rd *r, NetSeat *s) { s->lx = (short)r16(r); s->ly = (short)r16(r); s->rx = (short)r16(r); s->ry = (short)r16(r); s->rt = (short)r16(r); s->mdx = (short)r16(r); s->mdy = (short)r16(r);
     s->held = (unsigned short)(r16(r) & 0xff7fu); s->flags = (unsigned char)((r8(r) & (NETF_KB | NETF_FPV | NETF_BACK | NETF_PTR | NETF_KEYS)) | NETF_ON); s->lt = (short)r16(r);   /* ⛔ (11-13) NETF_KEYS wasn't let through: each machine saw its own seat on the keys and every other on a pad, so two machines' tapes of one session differed, and a game deciding by EnginePad.keys would have parted */
-    s->px = (short)r16(r); s->py = (short)r16(r); s->pb = (unsigned char)(r8(r) & 7u); s->hit = (short)r16(r); }   /* only the buttons there are, and a pad that's sent is a pad that's plugged in; (11-12) the pointer: any place, three buttons */
+    s->px = (short)r16(r); s->py = (short)r16(r); s->pb = (unsigned char)(r8(r) & 7u); s->hit = (short)r16(r); s->gk = r32(r); }   /* only the buttons there are, and a pad that's sent is a pad that's plugged in; (11-12) the pointer: any place, three buttons */
 
 /* ---- sending: straight out, or through the slow wire a test asks for ---- */
 static void rawSend(const struct sockaddr_in *to, const unsigned char *d, int n) { if (N.sock >= 0) { N.bytesOut += (double)n; sendto((int)N.sock, (const char *)d, n, 0, (const struct sockaddr *)to, sizeof *to); N.sent++; } }
@@ -167,7 +167,7 @@ static void hostDrop(int c, const char *why) {
 static void peerGone(int i, const char *why) { Peer *P = &N.p[i]; P->leaving = 0; if (N.host) hostDrop(i, why); else { char m[128]; snprintf(m, sizeof m, "the host: %.100s", why); netOver(m); } }
 
 /* ---- pads: kept by tick ---- */
-static const NetSeat NEUTRAL = {0, 0, 0, 0, 0, 0, 0, 0, NETF_ON, 0, 0, 0, 0, 0};   /* (11-12) its pointer off: no NETF_PTR */
+static const NetSeat NEUTRAL = {0, 0, 0, 0, 0, 0, 0, 0, NETF_ON, 0, 0, 0, 0, 0, 0};   /* (11-12) its pointer off: no NETF_PTR */
 static void padsStart(void) { for (int i = 0; i < NET_PEERS; i++) { Peer *P = &N.p[i]; if (!P->used) continue; P->have = N.delay;
         for (long t = 1; t <= N.delay; t++) { P->inTick[t % NET_RING] = t; for (int s = 0; s < NET_SEATS; s++) P->in[t % NET_RING][s] = NEUTRAL; }
         for (int q = 0; q < NET_PEERS; q++) { P->ackOf[q] = N.delay; }

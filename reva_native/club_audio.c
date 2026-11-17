@@ -37,6 +37,7 @@ static FILE*g_mixDump=NULL; static long g_mixDumpFrames=0;
 static float g_sfxMaster=1.f; static int g_sfxDbg=0, g_sfxPlays=0;
 /* ---- BUSES AND STREAMED MUSIC (11-03, engine plan Phase 6). A thread of its own reads the music a little at a time into a ring of two seconds, and the mixer only ever reads the ring, so the disk can't reach the sound or a frame. */
 static struct { float now,want,rate; } g_bus[BUS_N]={{1.f,1.f,0.f},{1.f,1.f,0.f},{1.f,1.f,0.f},{1.f,1.f,0.f}};
+static float g_busVol[BUS_N]={1.f,1.f,1.f,1.f};   /* (11-16) a player's volume for each bus (a game's settings), on top of the bus's own gain, which fades move */
 #define MUS_CAP (SFX_RATE*2*2)
 static SDL_atomic_t g_musOut;
 /* (11-12) TWO DECKS, for a crossfade (the Godot proof of concept's step 8: their soundtrack crosses one song into the next): each deck is a thread
@@ -57,14 +58,14 @@ static void sfxCallback(void*ud,Uint8*stream,int len){
     memset(acc,0,(size_t)frames*2*sizeof(float));
     for(int b=0;b<BUS_N;b++){ float d=g_bus[b].want-g_bus[b].now,st=g_bus[b].rate*(float)frames/(float)SFX_RATE; g_bus[b].now=(fabsf(d)<=st||st<=0.f)?g_bus[b].want:g_bus[b].now+(d>0.f?st:-st); }
     for(int d=0;d<2;d++){ MusDeck*M=&g_mus[d]; if(!M->ring||!SDL_AtomicGet(&M->run)) continue;
-        int rd=SDL_AtomicGet(&M->rd),wr=SDL_AtomicGet(&M->wr),m=(wr-rd)/2; const float g=M->gain*g_bus[BUS_MUSIC].now*g_sfxMaster; if(m>frames) m=frames;
+        int rd=SDL_AtomicGet(&M->rd),wr=SDL_AtomicGet(&M->wr),m=(wr-rd)/2; const float g=M->gain*g_bus[BUS_MUSIC].now*g_busVol[BUS_MUSIC]*g_sfxMaster; if(m>frames) m=frames;
         for(int i=0;i<m;i++){
             if(M->fade<M->fadeTo){ M->fade+=M->fadeStep; if(M->fade>M->fadeTo) M->fade=M->fadeTo; } else if(M->fade>M->fadeTo){ M->fade-=M->fadeStep; if(M->fade<M->fadeTo) M->fade=M->fadeTo; }
             const float gf=g*M->fade; acc[i*2]+=M->ring[(unsigned)(rd+i*2)%MUS_CAP]*gf; acc[i*2+1]+=M->ring[(unsigned)(rd+i*2+1)%MUS_CAP]*gf; }
         SDL_AtomicSet(&M->rd,rd+m*2); SDL_AtomicAdd(&M->out,m); if(d==g_musCur) SDL_AtomicAdd(&g_musOut,m); }
     for(int v=0;v<SFX_VOICES;v++){ SfxVoice*V=&g_voice[v]; if(!V->on) continue;
         SfxClip*C=&g_sfx[V->clip]; if(!C->pcm){ V->on=0; continue; }
-        float g=V->gain*g_sfxMaster*g_bus[V->bus].now, pan=V->pan;
+        float g=V->gain*g_sfxMaster*g_bus[V->bus].now*g_busVol[V->bus], pan=V->pan;
         if(V->spatial){ float dx=V->p[0]-g_lstE[0],dy=V->p[1]-g_lstE[1],dz=V->p[2]-g_lstE[2]; float d2=dx*dx+dy*dy+dz*dz;
             if(V->fall>0.f){ const float d=sqrtf(d2);   /* (11-16) its own reach: whole within V->whole, then down in decibels in step with the distance, dbFar at whole + fall, and none past it */
                 g*=d<=V->whole?1.f:d>=V->whole+V->fall?0.f:powf(10.f,(d-V->whole)/V->fall*V->dbFar/20.f); }
@@ -203,6 +204,7 @@ int sfxPlayIn(int bus,const char*name,float gain,float seconds){ g_playWait=seco
     if(g_sfxSync>0&&id>=0&&g_mixDev){ SDL_LockAudioDevice(g_mixDev); int n=g_stN; int gg[256]; long aa[256]; memcpy(gg,g_stGen,sizeof gg); memcpy(aa,g_stAt,sizeof aa); g_stN=0; SDL_UnlockAudioDevice(g_mixDev);
         printf("[sfxin] %d %.6f\n",g_voice[id>>16].gen,want); for(int i=0;i<n;i++) printf("[sfxst] %d %ld\n",gg[i],aa[i]); fflush(stdout); }
     if(id>=0&&bus>=0&&bus<BUS_N) g_voice[id>>16].bus=bus; return id; }
+void sfxBusVolume(int bus,float v){ if(bus<0||bus>=BUS_N||!(v>=0.f)) return; g_busVol[bus]=v>4.f?4.f:v; }   /* (11-16) */
 void sfxBus(int bus,float gain,float fadeSeconds){ if(bus<0||bus>=BUS_N) return; g_bus[bus].want=gain; g_bus[bus].rate=fadeSeconds>0.f?fabsf(gain-g_bus[bus].now)/fadeSeconds:0.f; }
 /* the music's thread: read a block, turn it into the mixer's rate and two channels, and wait while the ring is full */
 static int musThread(void*ud){ MusDeck*M=(MusDeck*)ud; stb_vorbis*ov=NULL; FILE*wf=NULL; int ch=2,rate=SFX_RATE; long wavAt=0,wavLen=0,wavLeft=0;

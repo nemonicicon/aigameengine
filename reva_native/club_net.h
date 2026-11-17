@@ -7,7 +7,7 @@
 #define NET_ACTS 32
 
 /* one pad, one tick, as it's sent and as every machine plays it. Sticks are sixteen bits, which is all a pad gives, so nothing is lost on the way */
-typedef struct { short lx, ly, rx, ry, rt, mdx, mdy; unsigned short held; unsigned char flags; short lt; short px, py; unsigned char pb; short hit; } NetSeat;   /* px, py, pb, hit (11-12): the seat's pointer (eighths of the 2D canvas's units), its buttons and what its game said it was over; NETF_PTR when it's on */   /* lt (11-12): the left trigger; held has every button but Back, which is a flag */
+typedef struct { short lx, ly, rx, ry, rt, mdx, mdy; unsigned short held; unsigned char flags; short lt; short px, py; unsigned char pb; short hit; unsigned gk; } NetSeat;   /* gk (11-16): a game's own key bits (E->keyGame) */   /* px, py, pb, hit (11-12): the seat's pointer (eighths of the 2D canvas's units), its buttons and what its game said it was over; NETF_PTR when it's on */   /* lt (11-12): the left trigger; held has every button but Back, which is a flag */
 enum { NETF_ON = 1, NETF_KB = 2, NETF_FPV = 4, NETF_BACK = 8, NETF_PTR = 16, NETF_KEYS = 32 };   /* NETF_KEYS (11-12): the seat's player last used the keys and mouse (EnginePad.keys) */
 /* where a session is: gathering its players, loading, loaded and waiting for the word, playing, over */
 enum { NET_OFF = 0, NET_GATHER = 1, NET_LOAD = 2, NET_READY = 3, NET_PLAY = 4, NET_OVER = 5 };

@@ -162,6 +162,15 @@ static void shotWritePPM(const char*shotPath,int burst,int idx,int SW9,int SH9,c
     unsigned char*rw=(unsigned char*)malloc((size_t)SW9*3);
     for(int y=SH9-1;y>=0;y--){ for(int x=0;x<SW9;x++){ rw[x*3]=px[((size_t)y*SW9+x)*4]; rw[x*3+1]=px[((size_t)y*SW9+x)*4+1]; rw[x*3+2]=px[((size_t)y*SW9+x)*4+2]; } fwrite(rw,1,(size_t)SW9*3,sf); }
     free(rw); fclose(sf); printf("shot: %s %dx%d frame %ld\n",pth,SW9,SH9,fno); simHashPrint("shot"); }
+/* (11-16) E->displayMode: a game's video setting. 0 a window w x h, centred, resizable; 1 or 2 the whole screen (the desktop's: the engine's fullscreen
+ * is never exclusive), as Alt+Enter makes it. The renderer follows the window's new size as it does a hand's resize */
+static SDL_Window*g_mainWin=NULL;
+static void apiDisplayMode(int mode,int w,int h){
+    if(!g_mainWin) return;   /* none in a run with no window */
+    if(mode){ SDL_SetWindowResizable(g_mainWin,SDL_TRUE); SDL_SetWindowFullscreen(g_mainWin,SDL_WINDOW_FULLSCREEN_DESKTOP); printf("[window] fullscreen (the game's setting)\n"); }
+    else { SDL_SetWindowFullscreen(g_mainWin,0); if(w>0&&h>0){ SDL_SetWindowSize(g_mainWin,w,h); SDL_SetWindowPosition(g_mainWin,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED); }
+           printf("[window] a window %dx%d (the game's setting)\n",w,h); }
+    fflush(stdout); }
 /* (11-16) a game's lens's angle up and down, for a picture of this shape: E->tune->lensFov, or with lensFovAcross set the angle that holds that one
  * across (Unreal's way: a wider screen sees more at the sides). dflt when the game says neither */
 static float gameFovY(float aspect,float dflt){
@@ -239,6 +248,7 @@ int main(int argc,char**argv){
                                           SDL_WINDOWPOS_CENTERED_DISPLAY(g_disp),
                                           W,H,g_wflags);
     if(!g_win){ fprintf(stderr,"SDL_CreateWindow: %s\n",SDL_GetError()); return 1; }
+    g_mainWin=g_noWindow?NULL:g_win;   /* (11-16) for E->displayMode */
 #ifdef REVA_VK
     gfxConfigBoot(); gfxInit(g_win,&W,&H);
 #endif

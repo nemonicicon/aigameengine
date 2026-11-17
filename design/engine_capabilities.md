@@ -1240,3 +1240,32 @@ player to 450 m. The engine's placed sounds had one falloff, a room's (-6 dB at 
 Proof: a 40 s match of the flight game with six ships plays its eleven kinds of effect (191 shots, 92 bolt hits on hulls, shield zaps and
 breaks, five explosions) with no clipping in the recorded mix (peaks 0.27 to 0.57 of full scale). The sample, rocks, rally, tower and herd checks
 come out the same; warncheck finds the same 14 warnings as before, none new.
+
+### 58 · A game's own keys, on the tape and the wire -- BUILT (11-16)
+
+The flight game's menus take the keys its old engine's do: the arrows, Enter, Space, Escape, Tab and Shift-Tab, Q and E, Page Up and Page Down.
+None of them may be a pad's button, because in flight Space, Q, E and Shift are already flying the ship.
+- **`E->keyGame(keys, bits)`**, in boot: while any of those keys is held, pad 0's **`gk`** holds those bits (the game's own, 32 of them), and
+  **`gkPressed`** has them the tick they go down (EnginePad, at its end). Names as keyPad's, and `pageup` and `pagedown`. A key can be in both
+  keyPad's buttons and keyGame's bits.
+- They are input, so they are on the **tape (v8**: each line's `p8`, the four pads' bits) and on the **wire** (NetSeat's `gk`): a replay and
+  every machine in a session see the same keys. Tapes v1 to v7 still play, as no game keys held.
+Proof: a hand-written v8 tape drives the flight game's menus headless at 1280 x 720: the main page, its four sub-pages and the three sections
+of one of them, the quit box, a match started from the menu, its pause menu and its leave box, then the main menu again. Side by side
+with its old engine's pictures the pages line up, most text to the pixel. The wire is not yet tried in a session of two machines.
+
+### 59 · A player's volumes -- BUILT (11-16)
+
+- **`E->soundVolume(bus, v)`**: a player's volume for a bus (0 effects, 1 music, 2 voices, 3 the menu), 0 to 1 (up to 4), applied on top of the
+  bus's own gain (club_audio.c `g_busVol`). soundBus and the music's fades move the bus's gain, so a fade and a setting never undo each other.
+Proof: built, and the flight game's master, music and effects sliders set it (master times music on the music bus, master times effects
+on the others). Not yet measured in a recorded mix.
+
+### 60 · A game's video setting -- BUILT (11-16)
+
+- **`E->displayMode(mode, w, h)`**: 0 is a window of w x h, centred and resizable; 1 or 2 is the whole screen. That is the desktop's fullscreen,
+  as Alt+Enter makes it, never exclusive (main.inc). The picture follows the window's new size as it does a hand's resize. A run with no
+  window ignores it.
+Proof: built, and the flight game's APPLY DISPLAY CHANGES calls it. Not yet tried with a window: every run here was headless.
+For 58 to 60: the sample, rocks, rally, tower and herd checks come out the same (their tapes, all older than v8, play as before);
+warncheck finds the same 14 warnings as before, none new.

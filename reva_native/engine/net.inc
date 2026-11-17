@@ -159,7 +159,7 @@ static void netPoll(void){
 static void netPreInput(void){ if(g_netOn&&netState()>=NET_PLAY){ g_kbActive=g_netLocalKb; g_fpv=g_netLocalFpv;
     /* ⛔ and this machine's own pads start from nothing. The polls write them fresh on a machine with hands, but a run with none (a shot, a tape that's run out, no display)
      * leaves what the merge put there, and that would go back out as this machine's own: every other player's bat following pad 1's, a few ticks late */
-    g_lx=g_ly=g_rx=g_ry=g_rt=g_lt=0.f; g_mdx=g_mdy=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=0; g_btnMore=0u; memset(g_padRaw,0,sizeof g_padRaw); g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0; } }
+    g_lx=g_ly=g_rx=g_ry=g_rt=g_lt=0.f; g_mdx=g_mdy=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=0; g_btnMore=0u; memset(g_padRaw,0,sizeof g_padRaw); g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0; g_gk=0u; } }
 static short netQ(float x){ if(!(x==x)) x=0.f; if(x>1.f) x=1.f; if(x<-1.f) x=-1.f; return (short)lrintf(x*32767.f); }
 static short netQi(float x){ if(!(x==x)) x=0.f; if(x>32767.f) x=32767.f; if(x<-32767.f) x=-32767.f; return (short)lrintf(x); }
 static short netQp(float x){ return netQi(x*8.f); }   /* (11-12) the pointer, in eighths of the canvas's units */
@@ -171,18 +171,22 @@ static void netInput(void){
     loc[0].lx=netQ(g_lx); loc[0].ly=netQ(g_ly); loc[0].rx=netQ(g_rx); loc[0].ry=netQ(g_ry); loc[0].rt=netQ(g_rt); loc[0].lt=netQ(g_lt); loc[0].mdx=netQi(g_mdx); loc[0].mdy=netQi(g_mdy);
     loc[0].held=(unsigned short)((g_btnA?PAD_A:0)|(g_btnB?PAD_B:0)|(g_btnX?PAD_X:0)|(g_btnY?PAD_Y:0)|(g_btnLB?PAD_LB:0)|(g_btnRB?PAD_RB:0)|(g_btnStart?PAD_START:0)|(g_btnMore&0x3f00u));
     loc[0].flags=(unsigned char)(NETF_ON|(g_kbActive?NETF_KB:0)|(g_fpv?NETF_FPV:0)|(g_btnBack?NETF_BACK:0)|(g_ptrX>-999.f?NETF_PTR:0)|(g_keysNow?NETF_KEYS:0));
+    loc[0].gk=g_gk;   /* (11-16) a game's own key bits */
     if(g_ptrX>-999.f){ loc[0].px=netQp(g_ptrX); loc[0].py=netQp(g_ptrY); loc[0].pb=(unsigned char)(g_ptrB&7u); loc[0].hit=(short)(g_ptrHit>32767?32767:g_ptrHit<-32767?-32767:g_ptrHit); }   /* (11-12) the pointer */
     for(int j=1;j<netLocalSeats()&&j<NET_SEATS;j++){ const PadRaw*r=&g_padRaw[j]; loc[j].lx=netQ(r->lx); loc[j].ly=netQ(r->ly); loc[j].rx=netQ(r->rx); loc[j].ry=netQ(r->ry); loc[j].rt=netQ(r->rt); loc[j].lt=netQ(r->lt); loc[j].held=(unsigned short)(r->held&0x3f7fu); loc[j].flags=NETF_ON; }
+    for(int j=1;j<netLocalSeats()&&j<NET_SEATS;j++) loc[j].gk=g_padRaw[j].gk;   /* (11-16) */
     g_netLocalKb=g_kbActive; g_netLocalFpv=g_fpv;
     netLocal(T,loc);
     NetSeat all[NET_SEATS]; netTake(T,all);
     { const NetSeat*s=&all[0]; g_lx=(float)s->lx/32767.f; g_ly=(float)s->ly/32767.f; g_rx=(float)s->rx/32767.f; g_ry=(float)s->ry/32767.f; g_rt=(float)s->rt/32767.f; g_lt=(float)s->lt/32767.f; g_btnMore=s->held&0x3f00u; g_mdx=(float)s->mdx; g_mdy=(float)s->mdy;
       g_btnA=(s->held&PAD_A)!=0; g_btnB=(s->held&PAD_B)!=0; g_btnX=(s->held&PAD_X)!=0; g_btnY=(s->held&PAD_Y)!=0; g_btnLB=(s->held&PAD_LB)!=0; g_btnRB=(s->held&PAD_RB)!=0; g_btnStart=(s->held&PAD_START)!=0;
       g_kbActive=(s->flags&NETF_KB)!=0; g_keysNow=(s->flags&NETF_KEYS)!=0; g_fpv=(s->flags&NETF_FPV)!=0; g_btnBack=(s->flags&NETF_BACK)!=0; g_pad0On=(s->flags&NETF_ON)!=0;
+      g_gk=s->gk;   /* (11-16) */
       if(s->flags&NETF_PTR){ g_ptrX=(float)s->px/8.f; g_ptrY=(float)s->py/8.f; g_ptrB=s->pb&7u; g_ptrHit=s->hit; } else { g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0; } }
     for(int k=1;k<NET_SEATS;k++){ const NetSeat*s=&all[k]; PadRaw*r=&g_padRaw[k]; r->lx=(float)s->lx/32767.f; r->ly=(float)s->ly/32767.f; r->rx=(float)s->rx/32767.f; r->ry=(float)s->ry/32767.f; r->rt=(float)s->rt/32767.f; r->lt=(float)s->lt/32767.f; r->held=s->held&0x3f7fu; r->connected=(s->flags&NETF_ON)!=0;
         r->mdx=(float)s->mdx; r->mdy=(float)s->mdy;   /* (11-11) its machine's mouse, which the wire always carried and this used to drop */
         r->keys=(s->flags&NETF_KEYS)!=0;   /* (11-12) which device that player last used */
+        r->gk=s->gk;   /* (11-16) and its game's key bits */
         r->ptrOn=(s->flags&NETF_PTR)!=0; r->px=(float)s->px/8.f; r->py=(float)s->py/8.f; r->pb=s->pb&7u; r->hit=s->hit; }   /* (11-12) and its pointer */
     g_startEdge=0;   /* the engine's own pause menu is one machine's: not in a session */
     g_manual=1;      /* a game is the pad's (the loop says so a few lines on): said here so that every machine's tape of the session is the same file */

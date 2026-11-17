@@ -16,11 +16,12 @@ static int capLocked(void){
 static int g_keysLast=0;   /* (11-12) the last input was the keys and mouse (1) or pad 0's controller (0): EnginePad.keys, for a game's prompts */
 static int g_pad0Here=0;   /* (11-12) a controller is plugged in as pad 0: without one, a game's prompts are the keys' */
 static int g_keysNow=0;    /* (11-12) pad 0's keys flag this tick: after the polls (the keys last, or no pad), or from the tape (v7) or the wire */
-typedef struct { float lx,ly,rx,ry,rt; unsigned held; int connected; float mdx,mdy; float lt; int ptrOn; float px,py; unsigned pb; int hit; int keys; } PadRaw;   /* ptrOn, px, py, pb, hit (11-12): a session's other players' pointers, and a tape's */   /* lt (11-12): the left trigger; held has the stick clicks, the D-pad and the triggers as buttons too */   /* in the globals' own terms: lx is negated and ly is down. mdx, mdy (11-11): a session's other players' mice */
+typedef struct { float lx,ly,rx,ry,rt; unsigned held; int connected; float mdx,mdy; float lt; int ptrOn; float px,py; unsigned pb; int hit; int keys; unsigned gk; } PadRaw;   /* ptrOn, px, py, pb, hit (11-12): a session's other players' pointers, and a tape's */   /* lt (11-12): the left trigger; held has the stick clicks, the D-pad and the triggers as buttons too */   /* in the globals' own terms: lx is negated and ly is down. mdx, mdy (11-11): a session's other players' mice */
 static PadRaw g_padRaw[4];
 static EnginePad g_pads[4];
 static float g_lt=0.f; static unsigned g_btnMore=0u;   /* (11-12) pad 0's left trigger, and its buttons past Back (L3, R3, the D-pad): beside the old globals, from the pad, the keys, the tape or the wire */
 static float g_mdx=0.f, g_mdy=0.f;       /* this frame's mouse delta, pixels (RTS cursor; and since 11-10 a game's, as pads[0].mx and my) */
+static unsigned g_gk=0u;                 /* (11-16) pad 0's game key bits this tick (E->keyGame) */
 /* (11-12) THE POINTER: pad 0's, where the mouse is on the 2D canvas (under -999 off), its buttons and what the game's hud said it was over (input,
  * so on the tape and the wire); this machine's own mouse now, for a hud (E->pointerAt); and what the hud said this frame, for the next poll */
 static float g_ptrX=-1000.f, g_ptrY=-1000.f; static unsigned g_ptrB=0u; static int g_ptrHit=0;
@@ -103,7 +104,7 @@ static void jsPoll(double tsec){
 static void padStick(float*x,float*y){ float m=hypotf(*x,*y); if(m<PAD_DEAD){ *x=*y=0.f; return; }
     float s=((m>1.f?1.f:m)-PAD_DEAD)/(1.f-PAD_DEAD)/m; *x*=s; *y*=s; }
 static void padsUpdate(void){
-    for(int k=0;k<4;k++){ EnginePad*d=&g_pads[k]; unsigned was=d->held;
+    for(int k=0;k<4;k++){ EnginePad*d=&g_pads[k]; unsigned was=d->held, wasGk=d->gk;
         d->mx=k==0?g_mdx:g_padRaw[k].mdx; d->my=k==0?g_mdy:g_padRaw[k].mdy;   /* (11-10) the mouse, for a game: pad 0's, as the keyboard is, and in a session each player's own (11-11) */
         { const unsigned wasB=d->pb; const PadRaw*r9=&g_padRaw[k]; const int on9=k==0?g_ptrX>-999.f:r9->ptrOn;   /* (11-12) the pointer */
           d->px=on9?(k==0?g_ptrX:r9->px):-1000.f; d->py=on9?(k==0?g_ptrY:r9->py):-1000.f; d->pb=on9?((k==0?g_ptrB:r9->pb)&7u):0u; d->hit=on9?(k==0?g_ptrHit:r9->hit):0;
@@ -115,7 +116,8 @@ static void padsUpdate(void){
         if(k==0&&g_xrLive) xrPad(d);   /* (11-11) a headset's controllers (engine/xr.inc) */
         padStick(&d->x,&d->y); padStick(&d->rx,&d->ry);
         d->keys=k==0?g_keysNow:g_padRaw[k].keys;   /* (11-12) input: the poll's (the keys last, or no pad plugged in, as their InputDeviceManager), the tape's or the wire's */
-        d->pressed=d->held&~was; } }
+        d->pressed=d->held&~was;
+        d->gk=k==0?g_gk:g_padRaw[k].gk; d->gkPressed=d->gk&~wasGk; } }   /* (11-16) a game's own key bits: the poll's, the tape's or the wire's */
 /* did anyone but pad 0 do anything this tick */
 static int padsOthersTouched(void){ for(int k=1;k<4;k++){ const EnginePad*d=&g_pads[k]; if(d->connected&&(d->held||fabsf(d->x)>0.3f||fabsf(d->y)>0.3f)) return 1; } return 0; }
 /* ---- ACTIONS: a name for what a button does, so a player can move it. A game asks for one at boot with the buttons it's on by default, and asks about it by player. save/controls.txt moves them:
@@ -162,13 +164,15 @@ static int g_kbActive=0;                 /* keyboard/mouse used: the HUD shows k
 /* (11-12) A GAME'S OWN KEYS (E->keyPad): each line is some keys and the pad 0 buttons they hold. The mouse's buttons are keys -1, -2 and -3 */
 #define KEYPAD_MAX 48
 static struct { int key[6]; int n; unsigned bits; } g_keyPad[KEYPAD_MAX]; static int g_nKeyPad=0;
+/* (11-16) A GAME'S OWN KEY BITS (E->keyGame): each line is some keys and the bits of pad 0's gk they hold, apart from its buttons; g_gk is pad 0's this tick */
+static struct { int key[6]; int n; unsigned bits; } g_keyGame[KEYPAD_MAX]; static int g_nKeyGame=0;
 static int keyPadName(const char*w){
 #ifdef REVA_SDL
     if(w[0]&&!w[1]){ if(w[0]>='a'&&w[0]<='z') return SDL_SCANCODE_A+(w[0]-'a'); if(w[0]>='1'&&w[0]<='9') return SDL_SCANCODE_1+(w[0]-'1'); if(w[0]=='0') return SDL_SCANCODE_0; }
     static const struct { const char*n; int k; } K[]={{"space",SDL_SCANCODE_SPACE},{"tab",SDL_SCANCODE_TAB},{"enter",SDL_SCANCODE_RETURN},{"backspace",SDL_SCANCODE_BACKSPACE},
         {"lshift",SDL_SCANCODE_LSHIFT},{"rshift",SDL_SCANCODE_RSHIFT},{"lctrl",SDL_SCANCODE_LCTRL},{"rctrl",SDL_SCANCODE_RCTRL},{"lalt",SDL_SCANCODE_LALT},{"ralt",SDL_SCANCODE_RALT},
         {"up",SDL_SCANCODE_UP},{"down",SDL_SCANCODE_DOWN},{"left",SDL_SCANCODE_LEFT},{"right",SDL_SCANCODE_RIGHT},{"mouse1",-1},{"mouse2",-2},{"mouse3",-3},
-        {"escape",SDL_SCANCODE_ESCAPE}};   /* escape (11-12): a game that owns its pause (EngineTuning.pauseOwn) */
+        {"escape",SDL_SCANCODE_ESCAPE},{"pageup",SDL_SCANCODE_PAGEUP},{"pagedown",SDL_SCANCODE_PAGEDOWN}};   /* pageup, pagedown (11-16) */   /* escape (11-12): a game that owns its pause (EngineTuning.pauseOwn) */
     for(unsigned i=0;i<sizeof K/sizeof K[0];i++) if(!strcmp(w,K[i].n)) return K[i].k;
 #endif
     return 0; }
@@ -182,6 +186,16 @@ static void apiKeyPad(const char*keys,unsigned buttons){ if(!keys||!buttons) ret
         const int k=keyPadName(t); if(k) k6[n++]=k; else { printf("[keys] no key called %s\n",t); fflush(stdout); } }
     if(!n) return;
     memcpy(g_keyPad[g_nKeyPad].key,k6,sizeof k6); g_keyPad[g_nKeyPad].n=n; g_keyPad[g_nKeyPad].bits=buttons; g_nKeyPad++; }
+static void apiKeyGame(const char*keys,unsigned bits){ if(!keys||!bits) return;   /* (11-16) */
+    if(g_nKeyGame>=KEYPAD_MAX){ printf("[keys] more than %d lines of a game's key bits: %s isn't laid out\n",KEYPAD_MAX,keys); fflush(stdout); return; }
+    char buf[160]; snprintf(buf,sizeof buf,"%s",keys); int n=0; int k6[6];
+    for(char*t=strtok(buf," ,");t&&n<6;t=strtok(NULL," ,")){
+        if(!strcmp(t,"shift")){ k6[n++]=keyPadName("lshift"); if(n<6) k6[n++]=keyPadName("rshift"); continue; }
+        if(!strcmp(t,"ctrl")){ k6[n++]=keyPadName("lctrl"); if(n<6) k6[n++]=keyPadName("rctrl"); continue; }
+        if(!strcmp(t,"alt")){ k6[n++]=keyPadName("lalt"); if(n<6) k6[n++]=keyPadName("ralt"); continue; }
+        const int k=keyPadName(t); if(k) k6[n++]=k; else { printf("[keys] no key called %s\n",t); fflush(stdout); } }
+    if(!n) return;
+    memcpy(g_keyGame[g_nKeyGame].key,k6,sizeof k6); g_keyGame[g_nKeyGame].n=n; g_keyGame[g_nKeyGame].bits=bits; g_nKeyGame++; }
 /* (g_mdx and g_mdy, this frame's mouse delta, are declared at the top now, beside the pads that carry them to a game) */
 /* ---- THE TAPE (2026-09-30): input record and replay -----------------------------------------
  * With the sim on whole ticks, the pad and keyboard state per frame is the only thing that makes
@@ -194,19 +208,19 @@ static void apiKeyPad(const char*keys,unsigned buttons){ if(!keys||!buttons) ret
  * their exact bits, because a text number goes through each libc's own parser, and carries the seed, so a session recorded on the real clock replays exactly under
  * REVA_FIXEDSTEP at any cadence, on any machine. v1 tapes still read.
  * ⭐ (11-03) v3 adds pads 1 to 3 to the end of each line, and a `# binds` line per action in the header. Older tapes read as those three pads not being plugged in. */
-static FILE*g_tapeRec=0,*g_tapeRep=0; static int g_tapeV7=0; static int g_tapeDone=0,g_tapeV2=0,g_tapeV3=0,g_tapeV4=0,g_tapeV5=0,g_tapeV6=0;   /* v6 (11-12): the pointers */   /* v5 (11-12): the left triggers and pad 0's buttons past Back */ static unsigned g_tapeSeedUsed=0;   /* v4 (11-11): pads 1 to 3's mouse too */
+static FILE*g_tapeRec=0,*g_tapeRep=0; static int g_tapeV7=0, g_tapeV8=0;   /* v8 (11-16): a game's own key bits */ static int g_tapeDone=0,g_tapeV2=0,g_tapeV3=0,g_tapeV4=0,g_tapeV5=0,g_tapeV6=0;   /* v6 (11-12): the pointers */   /* v5 (11-12): the left triggers and pad 0's buttons past Back */ static unsigned g_tapeSeedUsed=0;   /* v4 (11-11): pads 1 to 3's mouse too */
 /* (step 29) in a session the tape is written after the pads of every machine are in (engine/net.inc), so what it holds is the session: four pads, as any tape */
 static int g_tapeLate=0; static void tapeRecord(void);
 static float tapeF(unsigned u){ float f; memcpy(&f,&u,4); return f; }
 static unsigned tapeU(float f){ unsigned u; memcpy(&u,&f,4); return u; }
 /* a replay's seed, from its header: the dice are rolled before the first poll, so main asks for this before it seeds them */
 static int tapeSeedOf(const char*path,unsigned*seed){ FILE*f=fopen(path,"r"); if(!f) return 0; char ln[320]; int ok=0;
-    if(fgets(ln,sizeof ln,f)){ const char*s=strstr(ln,"seed "); if((strstr(ln,"tape v2")||strstr(ln,"tape v3")||strstr(ln,"tape v4")||strstr(ln,"tape v5")||strstr(ln,"tape v6")||strstr(ln,"tape v7"))&&s&&sscanf(s,"seed %u",seed)==1) ok=1; } fclose(f); return ok; }
+    if(fgets(ln,sizeof ln,f)){ const char*s=strstr(ln,"seed "); if((strstr(ln,"tape v2")||strstr(ln,"tape v3")||strstr(ln,"tape v4")||strstr(ln,"tape v5")||strstr(ln,"tape v6")||strstr(ln,"tape v7")||strstr(ln,"tape v8"))&&s&&sscanf(s,"seed %u",seed)==1) ok=1; } fclose(f); return ok; }
 static void inputTape(double tsec){
     static int init=0;
     if(!init){ init=1; const char*r=getenv("REVA_RECORD"); const char*q=getenv("REVA_REPLAY");
         if(r&&r[0]){ g_tapeRec=fopen(r,"w");
-            if(g_tapeRec){ fprintf(g_tapeRec,"# reva input tape v7  seed %u  tick %.4f ms  fixedstep %.4f ms  (tick lx ly rx ry rt A B X Y LB RB St Bk edge mdx mdy manual kb fpv, then pads 1 to 3: on lx ly rx ry rt held mdx mdy, then p5: pad 0 lt and its buttons past Back, pads 1 to 3 lt, then p6: pad 0's pointer x y buttons over, pads 1 to 3's on x y buttons over; floats as bits)\n",g_tapeSeedUsed,g_tickMs,g_fixedStepMs);
+            if(g_tapeRec){ fprintf(g_tapeRec,"# reva input tape v8  seed %u  tick %.4f ms  fixedstep %.4f ms  (tick lx ly rx ry rt A B X Y LB RB St Bk edge mdx mdy manual kb fpv, then pads 1 to 3: on lx ly rx ry rt held mdx mdy, then p5: pad 0 lt and its buttons past Back, pads 1 to 3 lt, then p6: pad 0's pointer x y buttons over, pads 1 to 3's on x y buttons over, then p7 keys, then p8 the game's key bits of pads 0 to 3; floats as bits)\n",g_tapeSeedUsed,g_tickMs,g_fixedStepMs);
                 for(int a9=0;a9<g_nAct;a9++) fprintf(g_tapeRec,"# binds %s %x %x %x %x\n",g_binds[a9].name,g_binds[a9].mask[0],g_binds[a9].mask[1],g_binds[a9].mask[2],g_binds[a9].mask[3]);
                 printf("[tape] RECORDING %s\n",r); }
             else printf("[tape] cannot write %s\n",r); }
@@ -216,9 +230,9 @@ static void inputTape(double tsec){
                                /* ⛔ (11-13) A LINE LONGER THAN h9 IS READ TO ITS END. v6's header (11-12) grew to 345 characters, past this buffer: what was left of it was taken for the
                                 * first tick, which it isn't, so the replay ended at frame 1 and played neutral. No tape recorded from 11-12 replayed, a session's among them */
                                if(!strchr(h9,'\n')){ int c9; while((c9=fgetc(g_tapeRep))!=EOF&&c9!='\n'){} }
-                               if(strstr(h9,"tape v7")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=g_tapeV7=1; else if(strstr(h9,"tape v6")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=1; else if(strstr(h9,"tape v5")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=1; else if(strstr(h9,"tape v4")) g_tapeV2=g_tapeV3=g_tapeV4=1; else if(strstr(h9,"tape v3")) g_tapeV2=g_tapeV3=1; else if(strstr(h9,"tape v2")) g_tapeV2=1;
+                               if(strstr(h9,"tape v8")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=g_tapeV7=g_tapeV8=1; else if(strstr(h9,"tape v7")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=g_tapeV7=1; else if(strstr(h9,"tape v6")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=g_tapeV6=1; else if(strstr(h9,"tape v5")) g_tapeV2=g_tapeV3=g_tapeV4=g_tapeV5=1; else if(strstr(h9,"tape v4")) g_tapeV2=g_tapeV3=g_tapeV4=1; else if(strstr(h9,"tape v3")) g_tapeV2=g_tapeV3=1; else if(strstr(h9,"tape v2")) g_tapeV2=1;
                                char an[24]; unsigned m9[4]; if(sscanf(h9,"# binds %23s %x %x %x %x",an,&m9[0],&m9[1],&m9[2],&m9[3])==5){ int i9=actFind(an); if(i9>=0) memcpy(g_binds[i9].mask,m9,sizeof m9); else printf("[tape] it was recorded with an action this game doesn't have: %s\n",an); } }
-                           printf("[tape] REPLAY %s (v%d) -- the pad and keyboard are ignored\n",q,g_tapeV7?7:g_tapeV6?6:g_tapeV5?5:g_tapeV4?4:g_tapeV3?3:g_tapeV2?2:1); }
+                           printf("[tape] REPLAY %s (v%d) -- the pad and keyboard are ignored\n",q,g_tapeV8?8:g_tapeV7?7:g_tapeV6?6:g_tapeV5?5:g_tapeV4?4:g_tapeV3?3:g_tapeV2?2:1); }
             else printf("[tape] cannot read %s\n",q); }
         fflush(stdout); }
     if(g_tapeRep&&!g_tapeDone){ char ln[640]; unsigned long fr; int used9=0; float lx,ly,rx,ry,rt,mdx,mdy; int a,b,x,y,lb,rb,st,bk,ed,man,kb,fpv; unsigned u9[7]; int got9=0;
@@ -231,6 +245,7 @@ static void inputTape(double tsec){
             g_lx=lx; g_ly=ly; g_rx=rx; g_ry=ry; g_rt=rt; g_btnA=a; g_btnB=b; g_btnX=x; g_btnY=y; g_btnLB=lb; g_btnRB=rb;
             g_btnStart=st; g_btnBack=bk; g_startEdge=ed; g_mdx=mdx; g_mdy=mdy; g_lt=0.f; g_btnMore=0u;   /* (11-12) a v5 tape's p5 says otherwise */
             g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0;   /* (11-12) and a v6 tape's p6 */
+            g_gk=0u;   /* (11-16) and a v8 tape's p8 */
             if(man&&!g_manual) g_inT=tsec;
             g_manual=man; g_kbActive=kb; g_fpv=fpv; g_keysNow=kb!=0;   /* (11-12) a tape before v7 has no keys flag: the keyboard's, as best it can say */
             memset(g_padRaw,0,sizeof g_padRaw);
@@ -243,10 +258,11 @@ static void inputTape(double tsec){
                 if(g_tapeV6){ unsigned a6,b6,c6,d6; int n6=0; if(sscanf(q9," p6 %x %x %x %x%n",&a6,&b6,&c6,&d6,&n6)==4){ g_ptrX=tapeF(a6); g_ptrY=tapeF(b6); g_ptrB=c6&7u; g_ptrHit=(int)d6; q9+=n6;   /* (11-12) the pointers */
                     for(int k=1;k<4;k++){ int on6=0,m6=0; if(sscanf(q9," %d %x %x %x %x%n",&on6,&a6,&b6,&c6,&d6,&m6)!=5) break; PadRaw*r=&g_padRaw[k]; r->ptrOn=on6; r->px=tapeF(a6); r->py=tapeF(b6); r->pb=c6&7u; r->hit=(int)d6; q9+=m6; } } }
                 if(g_tapeV7){ unsigned k7; int n7=0; if(sscanf(q9," p7 %x%n",&k7,&n7)==1){ g_keysNow=(int)(k7&1u); for(int k=1;k<4;k++) g_padRaw[k].keys=(int)((k7>>k)&1u); q9+=n7; } }   /* (11-12) which device each pad last used */
+                if(g_tapeV8){ unsigned g8[4]; int n8=0; if(sscanf(q9," p8 %x %x %x %x%n",&g8[0],&g8[1],&g8[2],&g8[3],&n8)==4){ g_gk=g8[0]; for(int k=1;k<4;k++) g_padRaw[k].gk=g8[k]; q9+=n8; } }   /* (11-16) a game's own key bits */
                 { unsigned m9; g_tapeMusicIn=sscanf(q9," m %x",&m9)==1?tapeF(m9):-1.f; }
                 g_pad0On=strstr(q9," u")==NULL; } }   /* (step 29) a session's tape: pad 1's machine had left */
         else { g_tapeDone=1; g_pad0On=1; memset(g_padRaw,0,sizeof g_padRaw); printf("[tape] replay ended at frame %lu -- neutral from here\n",g_frameNo); fflush(stdout);
-               g_lx=g_ly=g_rx=g_ry=g_rt=g_lt=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=g_startEdge=0; g_btnMore=0u; g_mdx=g_mdy=0.f; g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0; } }
+               g_lx=g_ly=g_rx=g_ry=g_rt=g_lt=0.f; g_btnA=g_btnB=g_btnX=g_btnY=g_btnLB=g_btnRB=g_btnStart=g_btnBack=g_startEdge=0; g_btnMore=0u; g_mdx=g_mdy=0.f; g_ptrX=g_ptrY=-1000.f; g_ptrB=0u; g_ptrHit=0; g_gk=0u; } }
     if(!g_tapeLate) tapeRecord(); }
 static void tapeRecord(void){
     if(g_tapeRec){ fprintf(g_tapeRec,"%ld %08x %08x %08x %08x %08x %d %d %d %d %d %d %d %d %d %08x %08x %d %d %d",
@@ -256,11 +272,13 @@ static void tapeRecord(void){
         fprintf(g_tapeRec," p6 %08x %08x %x %x",tapeU(g_ptrX),tapeU(g_ptrY),g_ptrB,(unsigned)g_ptrHit);   /* (11-12) v6: the pointers */
         for(int k=1;k<4;k++){ const PadRaw*r=&g_padRaw[k]; fprintf(g_tapeRec," %d %08x %08x %x %x",r->ptrOn,tapeU(r->px),tapeU(r->py),r->pb,(unsigned)r->hit); }
         { unsigned k7=g_keysNow?1u:0u; for(int k=1;k<4;k++) if(g_padRaw[k].keys) k7|=1u<<k; fprintf(g_tapeRec," p7 %x",k7); }   /* (11-12) v7: each pad's keys flag */
+        fprintf(g_tapeRec," p8 %x %x %x %x",g_gk,g_padRaw[1].gk,g_padRaw[2].gk,g_padRaw[3].gk);   /* (11-16) v8: a game's own key bits */
         { const float m9=musicClockRead(); if(m9>=0.f) fprintf(g_tapeRec," m %08x",tapeU(m9)); }
         if(!g_pad0On) fputs(" u",g_tapeRec);   /* (step 29) pad 1 is unplugged: only ever in a session, once its machine has gone */   /* what the music clock will read this tick, for a replay to read the same */
         fputc('\n',g_tapeRec); } }
 __attribute__((unused)) static float g_mLook=0.f, g_mPitch=0.f;  /* integrated look, mapped onto the right stick */
 static void kbPoll(double tsec){
+    g_gk=0u;   /* (11-16) a game's key bits are what's held now, or the tape's */
     /* ⛔ THE CAPTURE LOCK SWALLOWED THE BENCH'S OWN KEYBOARD. capLocked() exists so a stray
      * click cannot move a body mid-take -- right -- but every headless run IS a capture,
      * so REVA_KBSIM, which exists precisely to test the key mapping headlessly, could
@@ -307,6 +325,12 @@ static void kbPoll(double tsec){
             g_btnStart|=(b&PAD_START)!=0; g_btnBack|=(b&PAD_BACK)!=0; g_btnMore|=b&0x3f00u;
             if(b&PAD_RT){ g_rt=1.f; }
             if(b&PAD_LT){ g_lt=1.f; } } }
+    if(g_nKeyGame){   /* (11-16) a game's own key bits (E->keyGame): beside its buttons, never instead of them */
+        const int altDown=ks[SDL_SCANCODE_LALT]||ks[SDL_SCANCODE_RALT];
+        for(int i=0;i<g_nKeyGame;i++){ int on=0; for(int j=0;j<g_keyGame[i].n&&!on;j++){ const int k=g_keyGame[i].key[j];
+                if(altDown&&(k==SDL_SCANCODE_RETURN||k==SDL_SCANCODE_KP_ENTER)) continue;
+                on=k>0?ks[k]!=0:k==-1?(mb&SDL_BUTTON(SDL_BUTTON_LEFT))!=0:k==-2?(mb&SDL_BUTTON(SDL_BUTTON_RIGHT))!=0:(mb&SDL_BUTTON(SDL_BUTTON_MIDDLE))!=0; }
+            if(on){ g_gk|=g_keyGame[i].bits; used=1; } } }
     int kA=!g_nKeyPad&&(ks[SDL_SCANCODE_SPACE]||sSpc||(mb&SDL_BUTTON(SDL_BUTTON_LEFT)));
     int kB=!g_nKeyPad&&(ks[SDL_SCANCODE_E]||sE||(mb&SDL_BUTTON(SDL_BUTTON_RIGHT)));
     int kX=!g_nKeyPad&&(ks[SDL_SCANCODE_Q]||sQ||(mb&SDL_BUTTON(SDL_BUTTON_MIDDLE)));

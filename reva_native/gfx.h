@@ -13,7 +13,7 @@
 #include <stddef.h>
 
 /* a light beyond the sun. falloff: how fast it dims with distance, 1/(1+falloff*d*d). A spot has a direction of length 1 and the cosines of its edges; a point light's dir is all 0 */
-typedef struct { float pos[3], col[3], falloff, dir[3], cosOuter, cosInner; int shadow; float reach; } GfxLight;   /* reach (11-11): where its light has faded to nothing, 0 for no end */
+typedef struct { float pos[3], col[3], falloff, dir[3], cosOuter, cosInner; int shadow; float reach; float decay; } GfxLight;   /* reach (11-11): where its light has faded to nothing, 0 for no end. decay (11-16): over 0, it falls off as Godot's lights do, its colour over the distance in metres to this power (their attenuation), in place of 1/(1+falloff*d*d); 0 the engine's own */
 #define GFX_MAX_LIGHTS 256
 typedef struct {
     float vp[16], sunVP[16];        /* column-major, GL's clip conventions: the renderer converts */
@@ -50,9 +50,14 @@ typedef struct {
     float shutter;                  /* motion blur: how much of the frame's time the shutter's open, 0 none to 1 */
     float sepia, flash, burn, grain;/* film's: how far to sepia, white over the picture, a burn eating in from the edge, grain */
     float weave[2];                 /* and the gate's weave: the whole picture off its place by this share of its width and its height */
+    float split[2];                 /* (11-14) the colours parted: red read this share of the width and height one way, blue the other, green in place */
     float tunnel;                   /* (11-11) a headset's comfort tunnel: each eye's picture closed in to a circle, 0 none to 1 the most. The two eyes are side by side */
     int bars;                       /* the views don't cover the picture (a game's fair shape on a wider screen): what's outside them is black, and each is cleared to the scene's colour */
     float shadowReach;              /* (11-16) a game's sun shadows reach this far from the lens, world units: the cascades split over it as over the engine's own 170. 0 is the engine's own */
+    int tone;                       /* (11-16) the scene's own tone: 0 the machine's curve, 1 linear (the light as it is, clipped: a Godot scene's TONEMAP_LINEAR) */
+    int noBloom;                    /* (11-16) the scene has no glow, whatever the machine's bloom */
+    int noAO;                       /* (11-16) and no occlusion or contact shadows, whatever the machine's (a set's "occlusion off") */
+    int noReflect;                  /* (11-16) and its surfaces reflect nothing of their surroundings (a set's "reflect off"): the view's misc2.w */
 } GfxView;
 
 enum { GFX_SHADOW = 1,              /* for the sun's depth pass, not the picture */
@@ -68,7 +73,8 @@ enum { GFX_SHADOW = 1,              /* for the sun's depth pass, not the picture
        GFX_REFL = 1024,             /* seen in the glossy floor: it fades with its depth under the floor */
        GFX_GLOSS = 2048,            /* the glossy floor: down after everything that reflects in it, over what's under it */
        GFX_WATER = 4096,            /* a pool's surface: it reads the sky and the sun, and blends */
-       GFX_OCCLUSION = 8192 };      /* (11-11) its texture's alpha, from a half up, is how much of the room each point sees (a mouth's inside: the material row's flag 16):
+       GFX_OCCLUSION = 8192,
+       GFX_FLAT = 16384 };          /* (11-13) GFX_FLAT: its tint exactly, unlit, and the post pass leaves it: a body washed to one flat colour (`slotwash ... flat`). Never with GFX_BLEND. And GFX_OCCLUSION: */      /* (11-11) its texture's alpha, from a half up, is how much of the room each point sees (a mouth's inside: the material row's flag 16):
                                      * mesh.frag takes it off the room's light, the hemisphere's and the reflection's, and never off the colour */
 enum { GFX_FX_ALPHA = 0,            /* effect triangles: alpha-blended */
        GFX_FX_ADD = 1,              /* added */
@@ -95,6 +101,7 @@ typedef struct {
     unsigned rest;                  /* (step 23) for a mesh whose drawn positions aren't its own (cloth that hangs: they're the simulation's, in the world), the buffer of where they were at rest. Fur keeps each strand's place by it. 0: its own positions */
     float restScale;                /* and the world's units to one of that buffer's. 0: the renderer works it out from the mesh's matrices */
     float hue;                      /* (11-09) KALEIDOSCOPE: not 0, its colours' hue turned by this (radians, running with time) and by where each pixel is in the world: bands of every colour flowing through it. Picture: no hash has it */
+    float tone;                     /* (11-13) over 0: a wash that keeps its texture's light and dark: its tint times how light the texture is there, mixed in by this much (`actorwash ... tone`). Picture: no hash has it */
     int shader;                     /* (11-12) a surface's own shader (gfxShaderNew): drawn with it in the world's solid pass, plainly anywhere else; 0 none. Content, like a texture: no hash has it */
 } GfxMesh;
 
@@ -279,7 +286,7 @@ float gfxXrScale(void);                             /* the share of the runtime'
 /* the packet, between gfx_packet.c and whatever draws it. Offsets are into mem. Bones are 3 vec4 rows each, multiplied by the mesh's bind. */
 #define GFX_MAX_DRAWS 16384
 #define GFX_MAX_HUD 4096
-typedef struct { unsigned id; unsigned vb[6]; unsigned nIndex, nVerts, tex; float model[16]; unsigned bones, palOff; float tint[3], useTex; int flags; float alpha; unsigned posOn, posOff; float mouth[8]; float mat[4]; unsigned ntex; float kind, eye[4]; unsigned rest; float restScale; float hue; int shader; } GfxDraw;   /* mat, ntex and kind are what it's made of: content, like a texture's pixels, so the hash leaves them out. So does it leave out eye, which is picture */
+typedef struct { unsigned id; unsigned vb[6]; unsigned nIndex, nVerts, tex; float model[16]; unsigned bones, palOff; float tint[3], useTex; int flags; float alpha; unsigned posOn, posOff; float mouth[8]; float mat[4]; unsigned ntex; float kind, eye[4]; unsigned rest; float restScale; float hue; int shader; float tone; } GfxDraw;   /* mat, ntex and kind are what it's made of: content, like a texture's pixels, so the hash leaves them out. So does it leave out eye, which is picture */
 typedef struct { unsigned off; int n; int over; } GfxLines;   /* over: 0 added to what's there, depth-tested; 1 added, through what's in front; 2 (11-12) its own colour, depth-tested */
 typedef struct { unsigned off; int n; float scr[2], col[4]; unsigned tex; unsigned target; } GfxHudRec;   /* tex 0: flat colour, 2 floats a vertex. Otherwise sprites, 8 floats a vertex. target (11-16): 0 the screen, or a display's picture */
 /* (11-16) A GAME'S DISPLAYS (engine.h's displayMake): 2D drawn into a picture off-screen (gfxTargetMake's), and that picture on a panel in the world.
@@ -306,7 +313,7 @@ void gfxStar(const GfxStar *s);
  * width and normal, her body and its grid, each point's lengths, each hair's place, the ribbons, each point's frame, the hairs, the cells for hair against hair. Its
  * numbers in prm (engine/strands.inc's hsGpuFrame names them). settle: frames of settling first, the haircut held. Picture: nothing comes back, and no hash has it */
 enum { GFX_SB_X, GFX_SB_XP, GFX_SB_V, GFX_SB_TG0, GFX_SB_TG1, GFX_SB_HW, GFX_SB_NR, GFX_SB_BODY, GFX_SB_GRID, GFX_SB_LOCK, GFX_SB_HAIR, GFX_SB_RIBP, GFX_SB_RIBN, GFX_SB_WNT, GFX_SB_HAIRP, GFX_SB_HAIRN, GFX_SB_VGRID, GFX_SB_VOX, GFX_SB_N };   /* VOX: (11-06) her body as a closest-point grid, the GPU's own */
-#define GFX_MAX_STRANDS 8
+#define GFX_MAX_STRANDS 32   /* (11-14) 32, with HS_POOL. (11-13) was 8, then 16: a scene with nine heads of hair had the ninth's step dropped, and the GPU lost a frame later */
 #define GFX_STRAND_PRM 128
 typedef struct { unsigned id; unsigned buf[GFX_SB_N]; int ns, np, nh, sub, settle, vdim; float prm[GFX_STRAND_PRM]; } GfxStrands;
 void gfxStrands(const GfxStrands *s);

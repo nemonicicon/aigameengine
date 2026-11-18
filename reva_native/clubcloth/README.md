@@ -53,6 +53,10 @@ Then on a body, with its own contacts: read what's drawn by frequency, against t
 
 On a Ryzen 5 5500, the alien's tee and shorts (908 points), 60 Hz, main thread, 480 substeps a second: 0.81 ms a frame, 99th percentile 1.2, worst 1.4. Sweatshirt and trousers 1.3, 1.7, 2.0. Two garments solve on two threads, so the caller waits for the slower. GDScript was 27 ms for the same loops and Godot's SoftBody3D about 2 ms a tick with a worst of 15 ms, at 60 Hz only.
 
+## In the engine
+
+Since 11-16 the engine runs it too, on a game's body: `engine/clubwear.inc` (`E->bodyCloth`), with a garment's numbers from its pack's `CLTH` chunk instead of a second UV. `cc_vertex_points` is there for it: each of the caller's vertices' point, so a caller can draw its own mesh from `cc_shown` and `cc_normals`.
+
 ## In Godot
 
 `godot/club_cloth.gd` is the rider's side: a `SkeletonModifier3D` that has to go after everything else that moves the skeleton, a ragdoll included. A ragdoll's simulator moves itself last when it starts, so whatever starts one has to put this back after it (`skater_ragdoll.gd` in the game). It moves itself back behind anything added to the skeleton later, like a map's raised torch. When the skeleton's own space jumps with nothing moving in the world, a rider put back after turning round on his deck, `carry(rel)` takes the cloth through it. `godot/club_cloth.gdshader` is the garment's look: keep its `LIGHT_VERTEX` line or smooth cloth breaks up in dots at a glancing sun.

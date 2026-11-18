@@ -130,6 +130,10 @@ static void vkMirrorCopies(GfxMesh*m,const float*model){
 typedef struct { const Pack*P; unsigned mi; int role; unsigned vb[4]; unsigned nIndex, nVerts; float tint[3], rough, c[3]; } HsHook;   /* c: her head's middle, in the world */
 static HsHook g_hsHook;
 static float g_vkTint[3]={1.f,1.f,1.f},g_vkUse=1.f; static unsigned g_vkOwner=0,g_vkPalShared=0; static int g_vkBodyFlags=0,g_vkBodySkip=0,g_vkPassDark=0;   /* (11-12) g_vkPassDark: a pass whose picture nobody sees (the lab's feed): its bodies are posed and stepped, never drawn */
+static float g_bodyHair[4]={0.f,0.f,0.f,0.f};   /* (11-13) `actorhair`: her hair's own wash, a colour and how far, in place of the body's for her hair */
+static int g_instFlat=0;   /* (11-13) the set instance being drawn is a `mover ... flat`: wholly in its colour, it's that colour exactly, unlit (set.inc setInstLook) */
+static int g_bodyWashTone=0;   /* (11-13) `... tone`: the wash keeps each textured mesh's light and dark (GfxMesh.tone) */
+static int g_bodyWashFlat=0;   /* (11-13) `... flat`: washed all the way, she's one flat colour, unlit, as given (GFX_FLAT) */
 static int g_bodyWashHair=0;   /* (11-13) the wash reaches her hair too (`actorwash ... hair`) */
 static float g_bodyWash[4]={0.f,0.f,0.f,0.f};   /* (11-11) a colour every mesh drawn is washed toward, and how far (vkMesh): set round one body's draw, 0 again after */
 static int hsIsHair(Pack*P,unsigned mi);   /* engine/strands.inc */
@@ -145,9 +149,11 @@ static void vkMesh(Pack*P,unsigned mi,const float*model,const float*bind,const f
         GfxMesh m9; memset(&m9,0,sizeof m9); m9.id=g_vkOwner|(mi&0xfffu);
         m9.vb[0]=h9.vb[0]; m9.vb[1]=h9.vb[1]; m9.vb[4]=h9.vb[2]; m9.vb[5]=h9.vb[3]; m9.nIndex=h9.nIndex; m9.nVerts=h9.nVerts; m9.model=I9;
         m9.tint[0]=h9.tint[0]; m9.tint[1]=h9.tint[1]; m9.tint[2]=h9.tint[2]; m9.useTex=0.f; m9.mat[0]=h9.rough; m9.kind=7.f;
-        if(g_bodyWashHair&&g_bodyWash[3]>0.f){ const float a9=g_bodyWash[3]>1.f?1.f:g_bodyWash[3]; for(int k=0;k<3;k++) m9.tint[k]+=(g_bodyWash[k]-m9.tint[k])*a9; }   /* (11-13) washed too */
+        { const float*w9=g_bodyHair[3]>0.f?g_bodyHair:((g_bodyWashHair&&g_bodyWash[3]>0.f)?g_bodyWash:NULL);   /* (11-13) washed too: with her hair's own colour (`actorhair`) where it has one */
+          if(w9){ const float a9=w9[3]>1.f?1.f:w9[3]; for(int k=0;k<3;k++) m9.tint[k]+=(w9[k]-m9.tint[k])*a9; } }
         m9.eye[0]=h9.c[0]; m9.eye[1]=h9.c[1]; m9.eye[2]=h9.c[2]; m9.eye[3]=0.f;   /* her head's middle, where a hair's shader reads it (mesh.frag's STRAND): a hair has no eyes to glow */
         m9.flags=GFX_BLEND|flags|g_vkBodyFlags; m9.alpha=1.f; m9.hue=kaleidoOf(P,mi);
+        if(g_bodyWashFlat&&g_bodyWashHair&&g_bodyWash[3]>=0.999f&&!(flags&GFX_SHADOW)) m9.flags=(m9.flags&~GFX_BLEND)|GFX_FLAT;   /* (11-13) flat: her hair's ribbons solid, in the one colour */
         if(!(g_vkMirror&8)) gfxMesh(&m9);
         if(g_vkMirror) vkMirrorCopies(&m9,I9);
         return; }
@@ -161,6 +167,7 @@ static void vkMesh(Pack*P,unsigned mi,const float*model,const float*bind,const f
     int tx=P->meshTex[mi]; m.tex=(tx>=0&&(M->flags&2))?P->tex[tx]:0;
     if(g_instTex&&m.tex) m.tex=g_instTex;   /* a mover showing one picture of its sheet */
     if(P->meshMat){ memcpy(m.mat,P->meshMat[mi],16); m.kind=P->meshMat[mi][4]; }   /* (step 22) what it's made of, its kind for a body (step 23), and its normal map */
+    if((flags&GFX_SHADOW)&&m.kind>7.5f&&m.kind<8.5f) return;   /* (11-16) glass (kind 8) casts no shadow: the light goes through a lens */
     { const int nt9=P->meshNTex?P->meshNTex[mi]:-1; if(nt9>=0&&(unsigned)nt9<P->nTex&&(M->flags&2)) m.ntex=P->tex[nt9]; }
     m.model=model; m.bind=bind; m.pal=pal; m.bones=bones; m.palShared=g_vkPalShared;
     if(m.tex){ m.tint[0]=tint[0]; m.tint[1]=tint[1]; m.tint[2]=tint[2]; m.useTex=use; }
@@ -168,13 +175,18 @@ static void vkMesh(Pack*P,unsigned mi,const float*model,const float*bind,const f
     /* (11-11) A BODY WASHED WITH A COLOUR (g_bodyWash: r g b and how much, 0 none). Its own colour, texture and tint together, is mixed that far toward the
      * wash: the music video's chorus, where each copy behind the lead sinks into the colour of the card behind her as the original video's faces are drawn in one colour-way
      * (a set's `slotwash` line, engine/set.inc). Her hair is drawn by its own road above and keeps its colour; her eyes' glow below is set after this */
-    if(g_bodyWash[3]>0.f&&!(flags&GFX_SHADOW)&&(g_bodyWashHair||!hsIsHair(P,mi))){ const float a9=g_bodyWash[3]>1.f?1.f:g_bodyWash[3], u9=m.useTex, d9=1.f-u9+u9*a9;   /* (her hair drawn as its locks' ribbons comes this way too, and keeps its colour) */
-        if(d9>1e-6f) for(int k=0;k<3;k++) m.tint[k]=(m.tint[k]*(1.f-u9)*(1.f-a9)+a9*g_bodyWash[k])/d9;
+    const float*w9=g_bodyWash; int wh9=g_bodyWashHair;   /* (11-13) her hair's own wash (`actorhair`), where it has one */
+    if(g_bodyHair[3]>0.f&&hsIsHair(P,mi)){ w9=g_bodyHair; wh9=1; }
+    if(g_bodyWashTone&&w9==g_bodyWash&&w9[3]>0.f&&m.useTex>0.f&&!(flags&GFX_SHADOW)&&!hsIsHair(P,mi)){   /* (11-13) tone: the wash's colour times the texture's own light and dark, in the shader */
+        m.tint[0]=w9[0]; m.tint[1]=w9[1]; m.tint[2]=w9[2]; m.tone=w9[3]>1.f?1.f:w9[3]; }
+    else if(w9[3]>0.f&&!(flags&GFX_SHADOW)&&(wh9||!hsIsHair(P,mi))){ const float a9=w9[3]>1.f?1.f:w9[3], u9=m.useTex, d9=1.f-u9+u9*a9;   /* (her hair drawn as its locks' ribbons comes this way too, and keeps its colour) */
+        if(d9>1e-6f) for(int k=0;k<3;k++) m.tint[k]=(m.tint[k]*(1.f-u9)*(1.f-a9)+a9*w9[k])/d9;
         m.useTex=u9*(1.f-a9); }
     m.flags=flags|g_vkBodyFlags|((P->meshMatFlags[mi]&4)?GFX_CUTOUT:0)|((P->meshMatFlags[mi]&16)?GFX_OCCLUSION:0)|((M->flags&8u)?GFX_BLEND:0); m.hue=kaleidoOf(P,mi);   /* (11-11) flag 16: its alpha is its share of the room (8 is old writers', read by nothing) */
     if(P->meshShd&&!(flags&GFX_SHADOW)) m.shader=P->meshShd[mi];   /* (11-12) its surface's own shader (engine/setshader.inc) */
     if(M->flags&8u) m.alpha=meshAlphaOf(P,mi);   /* a sheer mesh says how sheer in its name: #rrggbbaa */
     if(P->sheer>0.f&&P->sheer<1.f&&!(flags&GFX_SHADOW)){ m.flags|=GFX_BLEND; m.alpha=P->sheer; }   /* and a sheer prop in a marker */
+    if(m.kind>7.5f&&m.kind<8.5f){ m.flags|=GFX_BLEND; if(!(M->flags&8u)) m.alpha=0.f; }   /* (11-16) glass is drawn over what's behind it; its alpha is its haze (clear, unless its name says) */
     if(g_instFade>0.f&&!(flags&GFX_SHADOW)){ const float a9=1.f-g_instFade; m.alpha=(m.flags&GFX_BLEND)?m.alpha*a9:a9; m.flags|=GFX_BLEND; }   /* and one the timeline's fading out */
     /* (step 23) eyes that glow. An eye that's a mesh of its own is unlit at the glow's colour, on every machine; a person who's one mesh has it done pixel by pixel, where the eyes setting is on */
     if(g_vkEye[3]>0.f&&!(flags&GFX_SHADOW)){ const float a9=g_vkEye[3]>1.f?1.f:g_vkEye[3];
@@ -189,6 +201,9 @@ static void vkMesh(Pack*P,unsigned mi,const float*model,const float*bind,const f
     float mo9[8]; if(g_faceCur&&!(flags&GFX_SHADOW)){ m.pos=faceMeshPos(P,mi,mo9); if(mo9[6]>0.f) m.mouth=mo9; }   /* a face that's moved, and a mouth that's open */
     if(!m.pos&&(P->vcol||P->hcol)&&g_vcolOn!=0&&g_vkWorld&&pal&&bones&&!(flags&GFX_SHADOW)&&hairFitIs(P,mi)) m.pos=hairFitPos(P,mi,pal,bind);   /* (step 23) its hair, off its head and out of its neck; (11-06) a HairCollide pack's too */
     else if(g_vkOpen>0.002f&&!(flags&GFX_SHADOW)){ mo9[0]=P->mouthBind[0]; mo9[1]=P->mouthBind[1]; mo9[2]=P->mouthBind[2]; mo9[3]=P->mouthBind[5]; mo9[4]=P->mouthBind[3]; mo9[5]=P->mouthBind[4]; mo9[6]=g_vkOpen; mo9[7]=0.f; m.mouth=mo9; }
+    /* (11-13) one flat colour, as given: after every line above that can ask for a blend (a blend would multiply by GFX_FLAT's alpha of 2) */
+    if(g_bodyWashFlat&&g_bodyWash[3]>=0.999f&&!(flags&GFX_SHADOW)&&(g_bodyWashHair||!hsIsHair(P,mi))) m.flags=(m.flags&~(GFX_BLEND|GFX_HOLO|GFX_GLOSS))|GFX_FLAT;
+    if(g_instFlat&&g_vkUse<=0.001f&&!(flags&GFX_SHADOW)){ memcpy(m.tint,g_vkTint,12); m.useTex=0.f; m.flags=(m.flags&~(GFX_BLEND|GFX_HOLO|GFX_GLOSS))|GFX_FLAT; }   /* (11-13) a flat mover */
     if(!(g_vkMirror&8)) gfxMesh(&m);
     if(g_vkMirror&&!(flags&GFX_SHADOW)) vkMirrorCopies(&m,model); }
 /* ⭐ (11-07) A BODY'S LIGHT COPIES, made from its own mesh (E->tune->bodyLite), for the Pi's performance in a bigger game. Bike

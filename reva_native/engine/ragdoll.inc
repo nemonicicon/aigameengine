@@ -28,12 +28,13 @@ typedef struct { int on,coulomb; float lift[RD_J]; Pack*P; float t; int node[RD_
                  float hinge[4][3];   /* ⭐ each knee's/elbow's bend axis, in the body frame (lat,up,fwd) */
                  float hp0[3]; int hp0ok;   /* ⭐ the hips a frame ago, for the rest test */
                  float downT;               /* ⭐ seconds spent DOWN -- two and a half of them is at rest */
-                 float skin; } Ragdoll;   /* tors: hips-neck, shoulder-shoulder, thigh-thigh, AS MEASURED */
+                 float skin; int even; float w0[3]; } Ragdoll;   /* even, w0 (11-16): E->bodyLimpThrow's: every joint at v0, turning at w0 about its middle */   /* tors: hips-neck, shoulder-shoulder, thigh-thigh, AS MEASURED */
 /* fsign: cross(shoulder-to-shoulder, hips-to-chest) times this points FORWARD out of the chest.
  * bend[]: which way the knee/elbow was bent in the pose she bailed from (kneeL, kneeR, elbowL, elbowR). */   /* reach: parent-to-grandchild limit (a knee does not bend backwards) */
 #define RD_GAME 16   /* a game's bodies going limp: this many at once, after the cast's own, and then one for its hero */
 #define RD_HERO (SCN_MAXCAST+RD_GAME)
 static Ragdoll g_rd[RD_HERO+1];
+static float g_rdLead[RD_HERO+1][3];   /* (11-16) E->bodyLimpLead: k, x, z by ragdoll slot */
 static int g_rdOff=-1;
 static int g_rdSay=0;   /* the first write-back after a cue says what it did to the rig */
 static int rdActive(int slot){ return slot>=0&&slot<=RD_HERO&&g_rd[slot].on; }
@@ -270,6 +271,8 @@ static void rdStep(Ragdoll*R,float dt){
                                               0.85f,0.65f,0.50f,0.45f,
                                               0.85f,0.65f,0.50f,0.45f};
             for(int j=0;j<RD_J;j++) for(int k=0;k<3;k++) R->q[j][k]=R->p[j][k]-R->v0[k]*dt*LEAD[j];
+            if(R->even){ float com[3]; for(int k=0;k<3;k++) com[k]=(R->p[RD_HIPS][k]+R->p[RD_CHEST][k])*0.5f;   /* (11-16) E->bodyLimpThrow: as thrown */
+                for(int j=0;j<RD_J;j++){ float r9[3],s9[3]; ctSub(r9,R->p[j],com); ctCross(s9,R->w0,r9); for(int k=0;k<3;k++) R->q[j][k]=R->p[j][k]-(R->v0[k]+s9[k])*dt; } }
             if(R->coulomb) rdFold(R,dt); } }
     if(R->coulomb) for(int j=0;j<RD_J;j++) if(R->lift[j]>0.f){ R->lift[j]-=dt*0.5f; if(R->lift[j]<0.f) R->lift[j]=0.f; }
     for(int j=0;j<RD_J;j++){
@@ -541,9 +544,12 @@ static void ragdollTick(Pack*P,M4*W,const float*model,int slot){
             printf("[rd] t=%.2f scnT=%.2f dt=%.4f hips=(%.2f,%.2f,%.2f) lowest=%.2f floor=%.2f speed=%.2f\n",R->t,g_scnT,(float)g_animDtS,
                    R->p[RD_HIPS][0],R->p[RD_HIPS][1],R->p[RD_HIPS][2],lo,rdFloorAt(R->p[RD_HIPS]),
                    sqrtf(vx*vx+vz*vz)*60.f); fflush(stdout); } } }
+    if(g_rdLead[slot][0]>0.f&&R->seeded){   /* (11-16) E->bodyLimpLead: the hips led to the game's point, the whole body with them (p and q alike, so its speed is its own) */
+        const float k=g_rdLead[slot][0],dx=(g_rdLead[slot][1]-R->p[RD_HIPS][0])*k,dz=(g_rdLead[slot][2]-R->p[RD_HIPS][2])*k;
+        for(int j=0;j<RD_J;j++){ R->p[j][0]+=dx; R->p[j][2]+=dz; R->q[j][0]+=dx; R->q[j][2]+=dz; } }
     rdWrite(P,W,model,R); }
 /* ---- a game's body going limp: E->bodyLimp, and -1 is its hero. It falls as the film's do, from the pose it's in, the next time it's posed. It's what's drawn, and not the rules: its place on the floor stays what the game says, and a game decides what a limp body means. Each pass through the crowd is one tick, so it comes out the same at any frame rate. ⛔ What's off screen isn't posed, so it doesn't fall until it's seen, and bodyLimpState can't tell a game anything about the rules */
-static short g_bodyRd[1024]; static char g_bodyRdGo[1024]; static float g_bodyRdV[1024][3]; static short g_rdOwner[RD_GAME]; static int g_rdGameOn=0,g_heroRd=0,g_heroRdGo=0; static float g_heroRdV[3];
+static short g_bodyRd[1024]; static char g_bodyRdGo[1024]; static float g_bodyRdV[1024][3]; static float g_bodyRdW[1024][4];   /* W (11-16): E->bodyLimpThrow's spin, and [3] 1 for it */ static short g_rdOwner[RD_GAME]; static int g_rdGameOn=0,g_heroRd=0,g_heroRdGo=0; static float g_heroRdV[3];
 static int apiBodyLimp(int i,float vx,float vy,float vz){
     if(i==-1){ if(!g_heroRd){ g_heroRd=1; g_heroRdGo=1; g_heroRdV[0]=vx; g_heroRdV[1]=vy; g_heroRdV[2]=vz; g_rdGameOn=1; } return 1; }
     if(i<0||i>=1024||i>=g_NS||g_slotHide[i]) return 0;
@@ -551,19 +557,27 @@ static int apiBodyLimp(int i,float vx,float vy,float vz){
     for(int s=0;s<RD_GAME;s++) if(!g_rdOwner[s]){ g_rdOwner[s]=(short)(i+1); g_bodyRd[i]=(short)(s+1); g_bodyRdGo[i]=1; g_bodyRdV[i][0]=vx; g_bodyRdV[i][1]=vy; g_bodyRdV[i][2]=vz; g_rdGameOn=1; return 1; }
     { static int said=0; if(!said){ said=1; printf("[ragdoll] all %d of a game's are in use: bodyLimp gave back 0\n",RD_GAME); fflush(stdout); } }
     return 0; }
-static void apiBodyRise(int i){ if(i==-1){ if(g_heroRd){ g_rd[RD_HERO].on=0; g_heroRd=0; g_heroRdGo=0; } return; }
+static void apiBodyRise(int i){ if(i==-1){ if(g_heroRd){ g_rd[RD_HERO].on=0; g_heroRd=0; g_heroRdGo=0; } g_rdLead[RD_HERO][0]=0.f; return; }
     if(i<0||i>=1024||!g_bodyRd[i]) return;
-    int s=g_bodyRd[i]-1; g_rd[SCN_MAXCAST+s].on=0; g_rdOwner[s]=0; g_bodyRd[i]=0; g_bodyRdGo[i]=0; }
+    int s=g_bodyRd[i]-1; g_rd[SCN_MAXCAST+s].on=0; g_rdLead[SCN_MAXCAST+s][0]=0.f; g_rdOwner[s]=0; g_bodyRd[i]=0; g_bodyRdGo[i]=0; }
 static int apiBodyLimpState(int i){ if(i==-1){ if(!g_heroRd) return 0; const Ragdoll*R=&g_rd[RD_HERO]; return (R->on&&R->asleep)?2:1; }
     if(i<0||i>=1024||!g_bodyRd[i]) return 0;
     const Ragdoll*R=&g_rd[SCN_MAXCAST+g_bodyRd[i]-1]; return (R->on&&R->asleep)?2:1; }
+/* (11-16) E->bodyLimpThrow: bodyLimp, every joint at the one speed and a spin about its middle (rdStep's seeding, R->even) */
+static int apiBodyLimpThrow(int i,float vx,float vy,float vz,float wx,float wy,float wz){ if(!(wx==wx&&wy==wy&&wz==wz)) return 0;
+    if(i<0||i>=1024) return 0; const int was=g_bodyRd[i]!=0, r=apiBodyLimp(i,vx,vy,vz); if(r&&!was){ g_bodyRdW[i][0]=wx; g_bodyRdW[i][1]=wy; g_bodyRdW[i][2]=wz; g_bodyRdW[i][3]=1.f; } return r; }
+/* (11-16) E->bodyLimpLead: a limp body's hips led to a point (k of the way each time it's posed); the body must be limp already */
+static void apiBodyLimpLead(int i,float x,float z,float k){ if(!(x==x&&z==z&&k==k)) return; int slot=-1;
+    if(i==-1){ if(g_heroRd) slot=RD_HERO; } else if(i>=0&&i<1024&&g_bodyRd[i]) slot=SCN_MAXCAST+g_bodyRd[i]-1;
+    if(slot<0) return; g_rdLead[slot][0]=k<0.f?0.f:k>1.f?1.f:k; g_rdLead[slot][1]=x; g_rdLead[slot][2]=z; }
 /* a game's world starting over: nobody's limp */
 static void rdGameClear(void){ for(int s=0;s<RD_GAME;s++) if(g_rdOwner[s]) apiBodyRise(g_rdOwner[s]-1); apiBodyRise(-1); }
 static void rdBody(int si,Pack*P,M4*W,const float*model){
     if(si<0){ if(!g_heroRd) return; if(g_heroRdGo){ g_heroRdGo=0; ragdollGo(RD_HERO,P,W,model,g_heroRdV); if(!rdActive(RD_HERO)){ apiBodyRise(-1); return; } g_rd[RD_HERO].coulomb=1; } ragdollTick(P,W,model,RD_HERO); return; }
     if(si>=1024||!g_bodyRd[si]) return;
     const int slot=SCN_MAXCAST+g_bodyRd[si]-1;
-    if(g_bodyRdGo[si]){ g_bodyRdGo[si]=0; ragdollGo(slot,P,W,model,g_bodyRdV[si]); if(!rdActive(slot)){ apiBodyRise(si); return; } g_rd[slot].coulomb=1; }
+    if(g_bodyRdGo[si]){ g_bodyRdGo[si]=0; ragdollGo(slot,P,W,model,g_bodyRdV[si]); if(!rdActive(slot)){ apiBodyRise(si); g_bodyRdW[si][3]=0.f; return; } g_rd[slot].coulomb=1;
+        if(g_bodyRdW[si][3]>0.f){ g_rd[slot].even=1; memcpy(g_rd[slot].w0,g_bodyRdW[si],12); g_bodyRdW[si][3]=0.f; } }   /* (11-16) E->bodyLimpThrow */
     ragdollTick(P,W,model,slot); }
 static void ctSolve(Pack*P,M4*W,const float*model,int slot){
     if(g_ctOn<0){ const char*e=getenv("REVA_NOCONTACT"); g_ctOn=(e&&e[0]&&e[0]!='0')?0:1;

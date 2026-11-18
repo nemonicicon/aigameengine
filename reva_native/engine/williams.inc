@@ -245,6 +245,17 @@ static void bodyMeshes(Pack*P,M4*W,const float*model,float*pal,const BodyGL*g){
         if(!g->hero){   } }
     g_vkOpen=0.f; g_vkWorld=NULL;
 }
+/* (11-14) REVA_FINGERDBG=1: each body's index fingers' bend as drawn, once a second (a clip's fist that draws flat: where is it lost?) */
+static void fingerDbg(Pack*P,M4*W,const char*how){
+    static int on9=-1; if(on9<0){ const char*e9=getenv("REVA_FINGERDBG"); on9=(e9&&e9[0]=='1'); }
+    if(!on9||(g_frameStamp%30u)!=0u) return;
+    float a9[2]={-1.f,-1.f};
+    for(int s9=0;s9<2;s9++){ const int j0=P->pb[16+s9*15+1*3+0], j1=P->pb[16+s9*15+1*3+1], j2=P->pb[16+s9*15+1*3+2]; if(j0<0||j1<0||j2<0) continue;
+        float u9[3],v9[3]; for(int k9=0;k9<3;k9++){ u9[k9]=W[j1][12+k9]-W[j0][12+k9]; v9[k9]=W[j2][12+k9]-W[j1][12+k9]; }
+        const float ul=sqrtf(u9[0]*u9[0]+u9[1]*u9[1]+u9[2]*u9[2]), vl=sqrtf(v9[0]*v9[0]+v9[1]*v9[1]+v9[2]*v9[2]); if(ul<1e-9f||vl<1e-9f) continue;
+        float d9=(u9[0]*v9[0]+u9[1]*v9[1]+u9[2]*v9[2])/(ul*vl); if(d9>1.f) d9=1.f; if(d9<-1.f) d9=-1.f; a9[s9]=57.29578f*acosf(d9); }
+    printf("[fingerdbg] frame %u %s (%s): index finger bent %.0f deg left, %.0f deg right (canon nodes %d %d %d)\n",g_frameStamp,P->label,how,a9[0],a9[1],
+           P->pb[16+15+3],P->pb[16+15+4],P->pb[16+15+5]); fflush(stdout); }
 static void actorHeldPublish(Pack*P,M4*W,const float*mdl);   /* (11-11) scene.inc: a set actor's grip and attach points, for what her line says she holds */
 static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*model,float*pal,
                       const SkPose*sk,float*footOut,float plantMix,
@@ -386,6 +397,7 @@ static void actorDraw(Pack*P,int clip,Pack*dnP,int dnC,double phase,const float*
      * makes a splash -- all three out of one multiply, because the body already knows how
      * fast it is going. waterDisturb ignores anything outside a pool's footprint. */
     if(g_nWat) waterDisturb(mdl[12],mdl[13],mdl[14],0.85f,0.010f*(float)g_chDt*60.f);
+    fingerDbg(P,W,"a set's actor");
     if(g_actorHeldSlot>=0) actorHeldPublish(P,W,mdl);   /* (11-11) her hands, for the prop her line says she holds (drawHeld, next frame, as every held prop) */
     { Pack*Q9=actorLod(P,mdl);
       if(Q9) bodyMeshesLod(P,Q9,W,mdl,pal);
@@ -422,8 +434,8 @@ static void actorsTick(float dt){
             for(int k=0;k<A->nPl;k++) if(A->pl[k].t<=tp9) want=k;
             if(want!=A->curPl){
                 A->curPl=want;
-                if(want>=0){ const SetPlace*Q=&A->pl[want]; A->x=Q->x; A->y=Q->y; A->z=Q->z; if(Q->hasYaw) A->yaw=Q->yaw; }
-                else { A->x=A->x0; A->y=A->y0; A->z=A->z0; A->yaw=A->yaw0; }
+                if(want>=0){ const SetPlace*Q=&A->pl[want]; A->x=Q->x; A->y=Q->y; A->z=Q->z; if(Q->hasYaw) A->yaw=Q->yaw; A->pitch=Q->pitch; A->roll=Q->roll; }
+                else { A->x=A->x0; A->y=A->y0; A->z=A->z0; A->yaw=A->yaw0; A->pitch=0.f; A->roll=0.f; }
                 A->home[0]=A->x; A->home[1]=A->z; A->travel=0.f;
                 static int say9=-1; if(say9<0){ const char*e9=getenv("REVA_PLACESAY"); say9=(e9&&e9[0]=='1'); }
                 if(say9||want<=0){ printf("[place] t=%.3f actor %d at %.3f,%.3f,%.3f yaw %.1f (place %d of %d)\n",tp9,i,A->x,A->y,A->z,A->yaw,want+1,A->nPl); fflush(stdout); } } }

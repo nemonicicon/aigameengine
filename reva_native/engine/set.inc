@@ -36,7 +36,7 @@ static SetMark* markFind(const char*nm){
             printf("[mark] '%s' NOT FOUND among the set's %d marks -- the body keeps its old placement\n",nm,g_setNMk); fflush(stdout); } }
     return NULL; }
 
-typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; float wash,fade; int pic; float sway,swayPh; } SetInst;   /* room: draws self-lit. From the timeline (step 21): wash, how much of tint goes over its own texture or colour, 0..1; fade, how far gone it is, 0 solid to 1 not there; pic, which picture of its sheet, counted from 1, and 0 is its own texture */
+typedef struct { int pk; float m[16]; float tint[3]; int tinted; int room; int mover; int hid; float wash,fade; int pic; float sway,swayPh; int flat; } SetInst;   /* flat (11-13): `mover ... flat`, drawn in its colour exactly, unlit */   /* room: draws self-lit. From the timeline (step 21): wash, how much of tint goes over its own texture or colour, 0..1; fade, how far gone it is, 0 solid to 1 not there; pic, which picture of its sheet, counted from 1, and 0 is its own texture */
 static float g_roomLit=1.0f;   /* ⭐ a room's photographed light, as a gain (ctl roomlit=, REVA_ROOMLIT) */
 static Pack g_setPk[SET_MAXP]; static char g_setNm[SET_MAXP][64]; static int g_setNP=0; static int g_setFree[SET_MAXP],g_setNFree=0;   /* places in the table that something's given back */
 static SetInst g_setI[SET_MAXI]; static int g_setNI=0;
@@ -63,7 +63,7 @@ static void artLoad(const char*path,float off); static void artDrop(void); stati
 #define STK_SHEETS 16
 static float g_stkScrub=-1.f; static double g_stkPlay0=0.0;   /* (step 25) ctl `trackt=<seconds>`: the timeline held at that moment by hand, with no scene playing; `trackt=play` runs it round and round on the lab's own clock; `trackt=off` gives it back to the scene's */
 static int g_stkNS=0; static float g_stkSpot[32][3];   /* (11-11) TRK5: this frame's colour on each of the set's spots, by the order of their lines */
-static int g_stkNC=0,g_stkNP=0; static float g_stkCam[9],g_stkPost[12];   /* (step 25) the timeline's lens and post rows, as they stand this frame */
+static int g_stkNC=0,g_stkNP=0; static float g_stkCam[9],g_stkPost[14];   /* (step 25) the timeline's lens and post rows, as they stand this frame */
 static int g_stkNK=0; static float g_stkLook[STK_LOOKS][4];             /* x y z and whether it's on, by scene slot */
 /* (11-11) A SCENE'S BODY WASHED WITH A MOVER'S COLOUR: a set line `slotwash <slot> <mover> <amount>` (slot 0 the hero, 1.. the cast; the mover by its
  * number in the timeline). Each frame that body is drawn mixed <amount> of the way toward the colour the timeline gives that mover, so a body before a
@@ -71,10 +71,12 @@ static int g_stkNK=0; static float g_stkLook[STK_LOOKS][4];             /* x y z
 #define SLOTWASH_N 8
 #define SLOTWASH_MOV 64
 static int g_slotWashOn=0, g_slotWashM[SLOTWASH_N]; static float g_slotWashA[SLOTWASH_N], g_stkMovCol[SLOTWASH_MOV][3];
+static int g_slotWashTone[SLOTWASH_N];   /* (11-13) `slotwash ... tone` */
+static int g_slotWashHair[SLOTWASH_N], g_slotWashFlat[SLOTWASH_N];   /* (11-13) `slotwash ... hair flat`: her hair too; one flat colour, unlit */
 static void slotWashFor(int slot){
     if(g_slotWashOn&&slot>=0&&slot<SLOTWASH_N&&g_slotWashA[slot]>0.f&&g_slotWashM[slot]>=0&&g_slotWashM[slot]<SLOTWASH_MOV){
-        memcpy(g_bodyWash,g_stkMovCol[g_slotWashM[slot]],12); g_bodyWash[3]=g_slotWashA[slot]; }
-    else g_bodyWash[3]=0.f; }
+        memcpy(g_bodyWash,g_stkMovCol[g_slotWashM[slot]],12); g_bodyWash[3]=g_slotWashA[slot]; g_bodyWashHair=g_slotWashHair[slot]; g_bodyWashFlat=g_slotWashFlat[slot]; g_bodyWashTone=g_slotWashTone[slot]; }
+    else { g_bodyWash[3]=0.f; g_bodyWashHair=0; g_bodyWashFlat=0; g_bodyWashTone=0; } }
 static struct { int pk,n; unsigned*tex; } g_stkSheet[STK_SHEETS]; static int g_stkNSheet=0;   /* a mover's sheet of pictures: its texture cut into cells, each a texture of its own */
 static float g_clipStartS=0.f;                                          /* the set's `clipstart <seconds>`: a take that starts part of the way into its performances */
 static int stkSheet(int pk,int cols,int rows); static void stkSheetsDrop(void);
@@ -83,9 +85,9 @@ static void setInstLook(const SetInst*I){
     if(I->tinted){ g_vkUse=0.f; memcpy(g_vkTint,I->tint,12); }
     else if(I->wash>0.f){ g_vkUse=1.f-I->wash; memcpy(g_vkTint,I->tint,12); }
     else { g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }
-    g_instFade=I->fade; g_instTex=0;
+    g_instFade=I->fade; g_instTex=0; g_instFlat=I->flat;   /* (11-13) `mover ... flat` */
     if(I->pic>0) for(int s=0;s<g_stkNSheet;s++) if(g_stkSheet[s].pk==I->pk){ g_instTex=g_stkSheet[s].tex[(I->pic-1)%g_stkSheet[s].n]; break; } }
-static void setInstLookOff(void){ g_instFade=0.f; g_instTex=0; g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }   /* (11-11) its colour too: a held prop drawn after the set was drawn in the last washed mover's colour (the music video's chorus jar went the columns' colours on the beat) */
+static void setInstLookOff(void){ g_instFlat=0; g_instFade=0.f; g_instTex=0; g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; }   /* (11-11) its colour too: a held prop drawn after the set was drawn in the last washed mover's colour (the music video's chorus jar went the columns' colours on the beat) */
 
 /* ================= RUNTIME COLLISION ==========================================
  * ⭐ The set already knows the shape of the world: every instance has a matrix and every
@@ -160,7 +162,7 @@ typedef struct { float t, x, y, z; } SetWp;
  * time has passed is where she stands, her line's own place before the first. A path walks her there (it turns her the way she goes and paces
  * her clip to the speed); a place doesn't: the music video's copies hop one column on every beat, a cut on the beat, as the original video's strip of
  * faces slides. On the scene's clock when her clip is (`sceneclock`), else the set's. */
-typedef struct { float t, x, y, z, yaw; int hasYaw; } SetPlace;
+typedef struct { float t, x, y, z, yaw; int hasYaw; float pitch, roll; } SetPlace;   /* pitch, roll (11-14): she's tipped and rolled there, degrees, about her own origin */
 #define SET_MAXPLACE 96
 /* where the leashed actor's collar is this frame, published by actorsDraw and consumed
  * by the draw that knows where the partner is -- the two live in different systems. */
@@ -222,13 +224,22 @@ typedef struct { int pk, clip, board;
                  unsigned long long worn;      /* ⭐ (10-23) the pieces she wears (`outfit=`), put on as she is drawn */
                  float cueS,cueF; int cued;    /* (step 21) where her clip starts: `clip>12.5s` or `clip>0.33` on her line, -1 for neither; cued once it's been done */
                  float eye[4];                 /* (step 23) `eyes=r,g,b[,amount]` on her line: her eyes glow that colour */
-                 int washM; float washA; int washHair;   /* washHair (11-13): `actorwash ... hair`, her hair washed too */
+                 int washM; float washA; int washHair; int washFlat; int washTone; int hairM; float hairA;   /* hairM, hairA (11-13): `actorhair`, her hair's own wash */
+                    /* washHair (11-13): `actorwash ... hair`, her hair washed too */
                         /* (11-11) `actorwash <actor> <mover> <amount>`: she's drawn washed toward that mover's colour this frame, as `slotwash` washes a scene's body */
                  int sceneClk; float sceneOff; /* (11-11) `sceneclock [seconds]` after her line: her clip's frame is the SCENE's clock (plus that offset), held on its first frame until the scene starts */
+                 char prop3[PROP_SPEC];   /* (11-14) `prop3=`: a third */
                  char prop[PROP_SPEC], prop2[PROP_SPEC];   /* (11-11) `prop=`/`prop2=` on her line: what she holds, a scene prop's spec (scene.inc, actorHeldSync) */
+                 float pitch, roll;   /* (11-14) how she's tipped and rolled where she's placed (a `place` line's sixth and seventh numbers) */
                  SetPlace pl[SET_MAXPLACE]; int nPl, curPl; float x0, y0, z0, yaw0;   /* (11-12) her `place` lines, the one she's at, and her line's own place */
                  } SetActor;
 static SetActor g_setA[SET_MAXA]; static int g_setNA=0;
+/* (11-14) the held props' slot of set actor i: the first that holds something keeps the voice slot (SCN_VOICE, as before), each one after has a
+ * slot of its own past the scene's (HELD_SLOTS); -1: she holds nothing, or there are more holders than slots (actorHeldSync says so) */
+static int actorHeldSlotOf(int i){
+    if(i<0||i>=g_setNA||!(g_setA[i].prop[0]||g_setA[i].prop2[0]||g_setA[i].prop3[0])) return -1;
+    int k=0; for(int j=0;j<i;j++) if(g_setA[j].prop[0]||g_setA[j].prop2[0]||g_setA[j].prop3[0]) k++;
+    return k==0?SCN_VOICE:(k-1<HELD_ACTORS?SCN_MAXCAST+k-1:-1); }
 
 /* ================= THE NAV GRID AND THE ACTOR'S MIND (09-11) =========================
  * engine_capabilities.md F: "Set actors have no behaviour" -- an actor played one clip on
@@ -452,6 +463,7 @@ static float g_setLpX[SETL_MORE*3], g_setLcX[SETL_MORE*3], g_setLkX[SETL_MORE], 
  * `light x y z r g b [power] [reach]`: REACH is where that lamp is at HALF brightness, in engine units.
  * Stored as EXTRA falloff over the engine's 0.055, so a lamp nobody gave a reach to is unchanged. */
 static float g_setLk[NLIGHT];
+static float g_setLd[NLIGHT], g_setLdX[SETL_MORE];   /* (11-16) a light's decay, the 10th number of a `light` line: over 0 it falls off as a Godot light does (GfxLight.decay) */
 static float g_setLr[NLIGHT];   /* (11-12) a light's END: where it has faded to nothing (GfxLight.reach), the 9th number of a `light` line; 0 goes on as it always did.
                                  * The 8th, the lamp's reach, is where it's at HALF: a Godot light's range is where it ends, and written as the 8th its
                                  * lanterns still gave a fifth of their light at twice that (that level's start was lit evenly by lanterns 30 units off) */

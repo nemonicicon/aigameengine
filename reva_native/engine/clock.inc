@@ -130,6 +130,10 @@ static const TodKey TOD[]={
  {24.0f,  42.f, 320.f, 0.10f, 0.55f,0.62f,0.88f,  0.030f,0.036f,0.062f }};
 static float g_tod=-1.f;        /* <0: the clock is off and sun=/sky= own the light */
 static float g_exposure=0.f;    /* a set's own, on the HDR road: `exposure 1.2`. 0 is the default */
+/* (11-16) a set's own picture, as a Godot scene's environment has it (a park of the skate game: a flat blue background, a linear tonemap, no glow;
+ * ours drew its sky dome, its filmic curve and its bloom over it, and the park came out a white haze): `tone linear` (the light as it is, clipped,
+ * where the machine's curve would bend it), `bloom off`, `background r g b` (no sky dome: the picture behind everything that colour, as it looks) */
+static int g_setTone=0, g_setNoBloom=0, g_setNoAO=0, g_setNoReflect=0, g_setBgOn=0; static float g_setBg[3];
 static float g_todRate=0.f;     /* hours per real second, for a timelapse */
 static void todApply(float h){
     int n=(int)(sizeof TOD/sizeof TOD[0]);

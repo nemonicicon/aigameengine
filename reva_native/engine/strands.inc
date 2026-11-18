@@ -27,7 +27,7 @@
  * still cast the shadow, and the opaque core under them isn't drawn. Their colour is her hair picture's, where it's opaque (load.inc, Pack.hairRGB; REVA_HAIRRGB).
  * Not done: the hair writes no depth (depth of field and the occlusion see through it), a hair doesn't shadow the one beside it, and the engine's own rasterizer draws the
  * locks. */
-#define HS_POOL 8
+#define HS_POOL 32   /* (11-14) 32: a picture had fifteen heads in it and more passing. (11-13) was 8, then 16: a ninth head took the place of one already simulated that frame, and the GPU was lost (below, where a place is picked). As many as a frame steps: GFX_MAX_STRANDS */
 #define HS_SETTLE_FRAME 8   /* (11-09) frames of hair settling a frame, among every hair on the stage */
 #define HS_BODYMAX 48000
 #define HS_GRID 131072
@@ -313,7 +313,11 @@ static void hsGpuFrame(HStrands*S,float sc,const float*E,const float*Ei,int have
     if(S->settleLeft>0){ static unsigned st9=0xffffffffu; static int used9=0; if(st9!=g_frameStamp){ st9=g_frameStamp; used9=0; }
         int per9=HS_SETTLE_FRAME-used9; if(per9>S->settleLeft) per9=S->settleLeft;
         if(per9>0){ st.settle=per9; S->settleLeft-=per9; used9+=per9; }
-        else { st.settle=-1; static int said9=0; if(!said9){ said9=1; printf("[strands] more heads were hung at once than settle in a frame: %d frames of settling a frame among them all, in turn, and a head waiting is held as it was hung (HS_SETTLE_FRAME)\n",HS_SETTLE_FRAME); fflush(stdout); }
+        else { st.settle=-1;
+               /* ⛔ (11-14) ON HER HEAD AS IT IS THIS FRAME, not where it was hung: a body put into a picture and moved on in her next frame (the
+                * music video: a body slid 0.4 u a frame behind thirty heads in a queue) left her bob standing where she'd been put */
+               if(!hang){ memcpy(S->tg0,S->tg1,(size_t)n*12); gfxBufferGpu(S->gs[GFX_SB_X],n12,S->tg1); gfxBufferGpu(S->gs[GFX_SB_XP],n12,S->tg1); }
+               static int said9=0; if(!said9){ said9=1; printf("[strands] more heads were hung at once than settle in a frame: %d frames of settling a frame among them all, in turn, and a head waiting is held as it was hung (HS_SETTLE_FRAME)\n",HS_SETTLE_FRAME); fflush(stdout); }
                if(g_hsCutSay){ printf("[strands] %s: held as hung this frame (%u), %d frames of its settle to come\n",S->pk?S->pk->label:"?",g_frameStamp,S->settleLeft); fflush(stdout); } } }
     gfxBufferGpu(S->gs[GFX_SB_TG0],n12,S->tg0); gfxBufferGpu(S->gs[GFX_SB_TG1],n12,S->tg1); gfxBufferGpu(S->gs[GFX_SB_HW],n12,S->hw); gfxBufferGpu(S->gs[GFX_SB_NR],n12,S->nr);
     /* her body as the grid has it, a point to four vec4s: last frame's place and whether it was there, its normal and whether it stands out of her skull, this frame's, its normal */
@@ -828,6 +832,10 @@ static int strandPrep(int slot,Pack*P,unsigned mi,float*pal,const float*model,M4
     for(int i=0;i<HS_POOL;i++) if(g_hs[i].pk==P&&g_hs[i].slot==slot&&g_hs[i].verts==M->verts&&!memcmp(g_hs[i].key,raw,12)){ S=&g_hs[i]; break; }
     if(!S){ int pick=0; unsigned old=0xffffffffu;
         for(int i=0;i<HS_POOL;i++){ if(!g_hs[i].pk){ pick=i; break; } if(g_hs[i].used<old){ old=g_hs[i].used; pick=i; } }
+        /* ⛔ (11-13) NEVER A PLACE USED THIS FRAME: its head is already in this frame's draws and its step, and setting it up again for another
+         * head had two heads stepping one set of GPU buffers (the music video's chorus, nine heads in a pool of eight: the GPU lost on the
+         * second frame). A head with no place rides her head, unsimulated, and it's said */
+        if(g_hs[pick].pk&&g_hs[pick].used==g_frameStamp){ static int said9=0; if(!said9){ said9=1; printf("[strands] \xe2\x9b\x94 more heads of hair in a frame than the %d that are simulated (HS_POOL): %s's rides her head, unsimulated\n",HS_POOL,P->label); fflush(stdout); } return 0; }
         /* (11-11) a lock that isn't simulated whole is cut (g_hsTrim): said to hsInit, which cuts its rest places and its lengths */
         const int whole9=g_hsLen==1||(g_hsLen<0&&P->hairWhole);
         S=&g_hs[pick]; S->slot=slot; if(!hsInit(S,P,mi,(g_hsLen==0||whole9||!g_hsTrim)?1.f:g_hsCut)) return 0; }

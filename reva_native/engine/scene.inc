@@ -87,6 +87,7 @@ typedef struct { int spk; float t0,dur; char text[1536]; int capA,capN; unsigned
                  /* ⭐ THE SECOND HAND. Same spec, same parser, same 64 bytes -- the
                   * truncation note above applies word for word. */
                  char hprop2[PROP_SPEC], pprop2[PROP_SPEC], p2prop2[PROP_SPEC];
+                 char hprop3[PROP_SPEC], pprop3[PROP_SPEC], p2prop3[PROP_SPEC];   /* (11-14) a third thing: `hprop3=` `pprop3=` `p2prop3=` */
                  /* ⭐ ON A PROP. A named mark in the set, which overrides the pair
                   * relation for that body -- furniture-relative instead of
                   * person-relative, and the two cannot both be true. */
@@ -343,54 +344,55 @@ static const HeldProp*heldPropOf(int pk){ for(int h=0;h<g_nHeld;h++) if(g_held[h
 /* ⭐ WHERE EACH HELD PROP WAS DRAWN -- the matrix drawHeldOne built, per body per hand, and the
  * frame it was built on. The wisp leaves from here and the ember's light sits here: one matrix, so the
  * smoke cannot come off a different place than the cigarette is drawn. */
-static float    g_heldM[SCN_MAXCAST][2][16];
-static unsigned g_heldMSt[SCN_MAXCAST][2];
-static int      g_heldMPk[SCN_MAXCAST][2];
+static float    g_heldM[HELD_SLOTS][3][16];   /* (11-14) HELD_SLOTS: the scene's slots, then a set's actors that hold props (actorHeldSync) */
+static unsigned g_heldMSt[HELD_SLOTS][3];
+static int      g_heldMPk[HELD_SLOTS][3];
 /* ⭐ THE DRAG. 0..1 per body per hand, eased on the exposure clock while the thing in that hand is
  * at the mouth (smokeTick); the ember's light and glow run at 1 + 2 x its ease -- about 3x on a pull. */
-static float    g_heldDrag[SCN_MAXCAST][2];
+static float    g_heldDrag[HELD_SLOTS][3];
 static float heldDragK(int i,int which){
-    if(i<0||i>=SCN_MAXCAST||which<0||which>1) return 1.f;
+    if(i<0||i>=HELD_SLOTS||which<0||which>2) return 1.f;
     float u=g_heldDrag[i][which]; if(u<0.f) u=0.f; if(u>1.f) u=1.f;
     return 1.f+2.f*u*u*(3.f-2.f*u); }
 /* ⛔ 64, WITH THE ScnLine FIELD. `v1_town_lantern@0.42@0@lhand@FFD9A0@light:6` is 42
  * characters -- the spec grew a colour and then a light. */
-static char  g_castProp[SCN_MAXCAST][PROP_SPEC];        /* what each body is holding, by slot */
+static char  g_castProp[HELD_SLOTS][PROP_SPEC];        /* what each body is holding, by slot */
 /* ⭐ AND THE OTHER HAND. A body could hold exactly ONE thing, so a
  * torch and a mug were mutually exclusive and a character who needed both had to put one
  * down between shots. A SECOND slot per body, parsed by the same heldParse, drawn by the
  * same drawHeldOne and lit by the same heldLightOne -- `hprop2=`/`pprop2=`/`p2prop2=`.
  * ⛔ NOT a second parser and NOT a second draw path: the note above says why. */
-static char  g_castProp2[SCN_MAXCAST][PROP_SPEC];       /* ...and what is in the other hand */
+static char  g_castProp3[HELD_SLOTS][PROP_SPEC];       /* (11-14) ...and a third thing, for a body holding three at once (a syringe, a vial and a pair of glasses) */
+static char  g_castProp2[HELD_SLOTS][PROP_SPEC];       /* ...and what is in the other hand */
 static char  g_castMark[SCN_MAXCAST][32];        /* ...and which set mark she is ON, if any */
 static SetMark*g_heroMk=NULL;                    /* slot 0's resolved mark this frame (09-11), or NULL */
 /* ⭐ WHERE EACH BODY WAS LAST DRAWN (world x, z, facing in radians) -- a walk to a new
  * mark starts from here -- and the floor height its placement used, for a board under it. */
 static float g_castAt[SCN_MAXCAST][3]; static int g_castAtOK[SCN_MAXCAST];
-static float g_castFloorY[SCN_MAXCAST];
-static float g_castGripW[SCN_MAXCAST][3];        /* their grips, measured, in world space */
+static float g_castFloorY[HELD_SLOTS];
+static float g_castGripW[HELD_SLOTS][3];        /* their grips, measured, in world space */
 /* ⭐ AND THE WHOLE FRAME, not just the point. The rotation fell out of the same FK and was
  * being thrown away one line later -- so a torch could not point and a hammer could not
  * swing. With the basis, a held prop inherits the hand: it turns with the wrist and
  * follows any clip with nothing authored. */
-static float g_castGripM[SCN_MAXCAST][16];
+static float g_castGripM[HELD_SLOTS][16];
 /* ⭐ AND THREE MORE PLACES A PROP CAN HANG FROM. Published from the same FK as the grip.
  * FOUR, not arbitrary: copying every bone's world matrix per body per frame to make one
  * addressable is a lot of work for a feature whose whole use is "on a person somewhere
  * obvious", and these are the four things actually hang off. A fifth is one line. */
-enum { ATT_HAND=0, ATT_HEAD, ATT_CHEST, ATT_HIP, ATT_LHAND, ATT_DECK, ATT_MARK, ATT_BOARD, ATT_BONE, ATT_BONE2, ATT_N };   /* ⭐ DECK under a rider, MARK on the set; BOARD off the clip's board channel */
-static float g_castAttM[SCN_MAXCAST][ATT_N][16];
-static int   g_castAttOK[SCN_MAXCAST][ATT_N];
+enum { ATT_HAND=0, ATT_HEAD, ATT_CHEST, ATT_HIP, ATT_LHAND, ATT_DECK, ATT_MARK, ATT_BOARD, ATT_BONE, ATT_BONE2, ATT_BONE3, ATT_N };   /* ⭐ DECK under a rider, MARK on the set; BOARD off the clip's board channel */
+static float g_castAttM[HELD_SLOTS][ATT_N][16];
+static int   g_castAttOK[HELD_SLOTS][ATT_N];
 /* ⭐ A PROP ON ANY BONE. `@hand` is the wrist on a UE rig (the bought character's gripNode is hand_r), and a
  * cigarette is held between two FINGERS -- 0.21 u from where the wrist is, which is the whole distance
  * between a drag and a hand across her face. So `where` may name a bone of the body holding the thing
  * (`@middle_01_r`): heldAttach asks for it here, attPublish finds it on whatever pack that slot is
  * drawing and publishes its world frame as ATT_BONE (prop) / ATT_BONE2 (prop2). One frame late, like
  * every other attach point. */
-static char  g_castBoneReq[SCN_MAXCAST][2][32];
-static int   g_castBoneNd[SCN_MAXCAST][2];
-static const Pack*g_castBonePk[SCN_MAXCAST][2];
-static char  g_castBoneHas[SCN_MAXCAST][2][32];   /* the name the cached node was resolved for */
+static char  g_castBoneReq[HELD_SLOTS][3][32];
+static int   g_castBoneNd[HELD_SLOTS][3];
+static const Pack*g_castBonePk[HELD_SLOTS][3];
+static char  g_castBoneHas[HELD_SLOTS][3][32];   /* the name the cached node was resolved for */
 static int attOf(const char*nm){
     if(!nm||!nm[0]) return ATT_HAND;
     if(!strcmp(nm,"head"))  return ATT_HEAD;
@@ -415,7 +417,7 @@ static void attPublish(Pack*P9,M4*W9,const float*model,int slot){
         if(nodes[k]<0) continue;
         m4_mul(g_castAttM[slot][k],(float*)model,W9[nodes[k]]);
         g_castAttOK[slot][k]=1; }
-    for(int w9=0;w9<2;w9++){   /* ⭐ a bone a held prop asked for by name */
+    for(int w9=0;w9<3;w9++){   /* ⭐ a bone a held prop asked for by name */
         g_castAttOK[slot][ATT_BONE+w9]=0;
         const char*rq9=g_castBoneReq[slot][w9]; if(!rq9[0]) continue;
         if(g_castBonePk[slot][w9]!=P9||strcmp(g_castBoneHas[slot][w9],rq9)){
@@ -445,21 +447,26 @@ static void attPublish(Pack*P9,M4*W9,const float*model,int slot){
       D[12]=model[12]; D[13]=g_castFloorY[slot]; D[14]=model[14]; D[15]=1.f;
       g_castAttOK[slot][ATT_DECK]=1; }
     g_castAttOK[slot][ATT_MARK]=0; }
-static int   g_castGripOK[SCN_MAXCAST];
+static int   g_castGripOK[HELD_SLOTS];
 /* ⭐ (11-11) A SET ACTOR HOLDS A PROP. Her line's `prop=`/`prop2=` are a scene prop's spec. As she is drawn she publishes her grip and her attach
  * points into the voice slot (SCN_VOICE: the cast slot that has no body, so its held-prop places were always empty), and drawHeld copies her
- * spec there: the same parser, resolver and draw as a scene body's prop, a frame old like every held prop. One actor at a time, the first that
- * asks. The music video's chorus: a tiny whole copy of her holding a prop, the copy a set actor. */
+ * spec there: the same parser, resolver and draw as a scene body's prop, a frame old like every held prop. The music video's chorus: a tiny
+ * whole copy of her holding a prop, the copy a set actor.
+ * ⭐ (11-14) EVERY ACTOR ITS OWN. It was one actor at a time, the first that asked: with several set actors each holding a prop, only the
+ * first had anything in her hand. The first holder keeps the voice slot; each one after has a slot of its own past the scene's (HELD_SLOTS,
+ * set.inc actorHeldSlotOf), HELD_ACTORS of them. */
 static void actorHeldPublish(Pack*P,M4*W,const float*mdl){
-    const int s=SCN_VOICE; int gb=(P->gripNode>=0)?P->gripNode:P->pb[11];
+    const int s=g_actorHeldSlot; if(s<0||s>=HELD_SLOTS) return;
+    int gb=(P->gripNode>=0)?P->gripNode:P->pb[11];
     if(gb>=0){ ptWorld(W[gb],mdl,g_castGripW[s]); g_castGripOK[s]=1; m4_mul(g_castGripM[s],(float*)mdl,W[gb]); }
     attPublish(P,W,mdl,s); }
 static void actorHeldSync(void){
-    const int s=SCN_VOICE; int who=-1, more=0;
-    for(int i=0;i<g_setNA;i++) if(g_setA[i].prop[0]||g_setA[i].prop2[0]){ if(who<0) who=i; else more=1; }
-    if(who<0){ g_castProp[s][0]=g_castProp2[s][0]=0; g_castGripOK[s]=0; return; }
-    memcpy(g_castProp[s],g_setA[who].prop,PROP_SPEC); memcpy(g_castProp2[s],g_setA[who].prop2,PROP_SPEC);
-    static int said9=0; if(more&&!said9){ said9=1; printf("[held] more than one set actor holds a prop: only actor %d's are drawn (one at a time, through the voice slot)\n",who); fflush(stdout); } }
+    static unsigned char used[HELD_SLOTS]; memset(used,0,sizeof used); int n=0, over=0;
+    for(int i=0;i<g_setNA;i++){ if(!(g_setA[i].prop[0]||g_setA[i].prop2[0]||g_setA[i].prop3[0])) continue; n++;
+        const int s=actorHeldSlotOf(i); if(s<0){ over++; continue; }
+        used[s]=1; memcpy(g_castProp[s],g_setA[i].prop,PROP_SPEC); memcpy(g_castProp2[s],g_setA[i].prop2,PROP_SPEC); memcpy(g_castProp3[s],g_setA[i].prop3,PROP_SPEC); }
+    for(int s=SCN_VOICE;s<HELD_SLOTS;s++) if(!used[s]){ g_castProp[s][0]=g_castProp2[s][0]=g_castProp3[s][0]=0; g_castGripOK[s]=0; }   /* nobody's: nothing drawn there */
+    static int said9=0; if(over&&!said9){ said9=1; printf("[held] %d set actors hold props and %d can at once (HELD_ACTORS): the last %d hold nothing\n",n,HELD_ACTORS+1,over); fflush(stdout); } }
 
 /* ⭐ A HELD PROP THAT IS A LIGHT --------------------------------------
  *     stem@size@pitch@where@RRGGBB@light        (or @light:6 for the power)
@@ -484,9 +491,11 @@ static void actorHeldSync(void){
 static void specTooLong(const char*v){
     printf("[scene] ⛔ a prop spec is longer than PROP_SPEC (%d) and was CUT to '%s' -- the fields past the cut are lost\n",PROP_SPEC,v);
     fflush(stdout); }
-typedef struct { char stem[32]; float size, pitch; char where[32]; float tint[3]; float lpow; float smoke; float lreach; float along; } HeldSpec;
+typedef struct { char stem[32]; float at[3];   /* (11-14) `at:x,y,z`: moved that far, in its own metres, along its attach point's axes */
+                 float size, pitch, yaw, roll;   /* (11-14) yaw, roll: `@pitch/yaw/roll`, the prop turned any way at its attach point */
+                 char where[32]; float tint[3]; float lpow; float smoke; float lreach; float along; } HeldSpec;
 static int heldParse(const char*s,HeldSpec*H){
-    H->stem[0]=0; H->size=0.30f; H->pitch=0.f; H->where[0]=0; H->lpow=0.f; H->smoke=0.f; H->lreach=0.f; H->along=-1.f;
+    H->stem[0]=0; H->size=0.30f; H->pitch=0.f; H->yaw=0.f; H->roll=0.f; H->at[0]=H->at[1]=H->at[2]=0.f; H->where[0]=0; H->lpow=0.f; H->smoke=0.f; H->lreach=0.f; H->along=-1.f;
     H->tint[0]=0.82f; H->tint[1]=0.80f; H->tint[2]=0.76f;   /* the old grey, when no colour is named */
     if(!s||!s[0]||!strncmp(s,"off",3)) return 0;
     const char*p=s; int fi=0;
@@ -497,7 +506,9 @@ static int heldParse(const char*s,HeldSpec*H){
         switch(fi){
             case 0: snprintf(H->stem,32,"%.31s",f); break;
             case 1: H->size=(float)atof(f); break;
-            case 2: H->pitch=(float)atof(f)*0.0174533f; break;
+            case 2: H->pitch=(float)atof(f)*0.0174533f;   /* (11-14) `pitch/yaw/roll`: one number is the pitch, as before */
+                    { const char*s1=strchr(f,'/'); if(s1){ H->yaw=(float)atof(s1+1)*0.0174533f; const char*s2=strchr(s1+1,'/'); if(s2) H->roll=(float)atof(s2+1)*0.0174533f; } }
+                    break;
             /* ⭐ `where:0.3` -- the hand holds the prop 30% of the way from its grip end to its far tip,
              * instead of by the end. A cigarette is held a third of the way along with the filter out on the palm
              * side; held by its end, the filter sat IN the knuckle and the drag put her knuckles on her face. */
@@ -513,9 +524,12 @@ static int heldParse(const char*s,HeldSpec*H){
                         { const char*r9=(f[5]==':')?strchr(f+6,':'):NULL; H->lreach=r9?(float)atof(r9+1):0.f; } }   /* ⭐ light:<power>:<reach> */
                     else if(!strncmp(f,"smoke",5)){ H->smoke=(f[5]==':')?(float)atof(f+6):1.f;
                         if(H->smoke<0.f) H->smoke=0.f; }
+                    else if(!strncmp(f,"turn:",5)){ float t9[3]={0.f,0.f,0.f}; sscanf(f+5,"%f,%f,%f",&t9[0],&t9[1],&t9[2]);   /* (11-14) the third field's pitch/yaw/roll, named */
+                        H->pitch=t9[0]*0.0174533f; H->yaw=t9[1]*0.0174533f; H->roll=t9[2]*0.0174533f; }
+                    else if(!strncmp(f,"at:",3)){ sscanf(f+3,"%f,%f,%f",&H->at[0],&H->at[1],&H->at[2]); }   /* (11-14) shifted in the hand */
                     else if(f[0]){ static char said9[PROP_SPEC]={0};
                         if(strcmp(said9,s)){ snprintf(said9,PROP_SPEC,"%s",s);
-                            printf("[held] '%s': field %d '%s' is not understood -- after the colour it is `light[:<power>[:<reach>]]` or `smoke[:<rate>]`%c",s,fi+1,f,10); fflush(stdout); } }
+                            printf("[held] '%s': field %d '%s' is not understood -- after the colour it is `light[:<power>[:<reach>]]`, `smoke[:<rate>]`, `turn:p,y,r` or `at:x,y,z`%c",s,fi+1,f,10); fflush(stdout); } }
                     break; }
         if(!e) break;
         p=e+1; fi++;
@@ -523,9 +537,10 @@ static int heldParse(const char*s,HeldSpec*H){
     if(H->size<0.01f) H->size=0.30f;
     return H->stem[0]?1:0; }
 static int heldAny(void){
-    for(int i=0;i<SCN_MAXCAST;i++){
+    for(int i=0;i<HELD_SLOTS;i++){
         if(g_castProp [i][0]&&strncmp(g_castProp [i],"off",3)) return 1;
-        if(g_castProp2[i][0]&&strncmp(g_castProp2[i],"off",3)) return 1; }
+        if(g_castProp2[i][0]&&strncmp(g_castProp2[i],"off",3)) return 1;
+        if(g_castProp3[i][0]&&strncmp(g_castProp3[i],"off",3)) return 1; }
     return 0; }
 /* ⭐ WHERE THE FIRST SLOT'S PROP ACTUALLY LANDED -- resolved exactly the way it is drawn,
  * and deliberately NOT recursive: it is what slot 2 measures itself against. -1 = nothing
@@ -564,7 +579,7 @@ static int heldAttach(int i,const HeldSpec*H,int which,int*collide){
             D[0]=c9; D[2]=-s9; D[5]=1.f; D[8]=s9; D[10]=c9;
             D[12]=MK9->x; D[13]=MK9->y; D[14]=MK9->z; D[15]=1.f;
             g_castAttOK[i][ATT_MARK]=1; att=ATT_MARK; }
-        else if(i>=0&&i<SCN_MAXCAST&&which>=0&&which<2){
+        else if(i>=0&&i<HELD_SLOTS&&which>=0&&which<3){
             /* ⭐ not a mark -- ask the body for a BONE of that name (attPublish answers, and says so once) */
             if(strcmp(g_castBoneReq[i][which],H->where)) snprintf(g_castBoneReq[i][which],32,"%s",H->where);
             if(g_castAttOK[i][ATT_BONE+which]) return ATT_BONE+which;
@@ -588,7 +603,7 @@ static int heldAttach(int i,const HeldSpec*H,int which,int*collide){
  * thing; the second slot doubles what the loop can collect, and a cap that does not move
  * with the thing feeding it is precisely how one scene shipped a set that uploaded 3 of its
  * lamps. It is a guard as well as a size -- the collector refuses past it, loudly. */
-#define HELD_LIGHT_MAX (SCN_MAXCAST*2)
+#define HELD_LIGHT_MAX (HELD_SLOTS*3)
 static float g_hlP[HELD_LIGHT_MAX][3], g_hlC[HELD_LIGHT_MAX][3];
 static float g_hlK[HELD_LIGHT_MAX];      /* ⭐ each held light's reach, as extra falloff (lightReachK) */
 static int   g_hlEmber[HELD_LIGHT_MAX];   /* ⭐ this held light is a smoking prop's coal -- the smoke takes it up close */
@@ -644,13 +659,14 @@ static void heldLightOne(int i,const char*spec,int which,char*said){
     g_nHL++; }
 static void heldLightsTick(void){
     static unsigned stamp9=0xffffffffu;
-    static char saidL9[SCN_MAXCAST][2][PROP_SPEC];
+    static char saidL9[HELD_SLOTS][3][PROP_SPEC];
     if(stamp9==g_frameStamp) return;
     stamp9=g_frameStamp;
     g_nHL=0;
-    for(int i=0;i<SCN_MAXCAST;i++){
+    for(int i=0;i<HELD_SLOTS;i++){
         heldLightOne(i,g_castProp [i],0,saidL9[i][0]);
-        heldLightOne(i,g_castProp2[i],1,saidL9[i][1]); } }
+        heldLightOne(i,g_castProp2[i],1,saidL9[i][1]);
+        heldLightOne(i,g_castProp3[i],2,saidL9[i][2]); } }
 /* Merge the held lights into an NLIGHT-long practical array on its way to the shader.
  * `used` is how many slots the caller filled from 0 up; the held ones fill from the top
  * down and stop at `used`, loudly. Every site that uploads lp/lc calls this, which is what
@@ -1845,13 +1861,16 @@ static void drawHeldOne(int i,const char*spec,int which){
          * published a board frame yet. Before the said9 latch, so the pass that skips does not eat the log. */
         { HeldSpec Hb9; int isB9=heldParse(spec,&Hb9)&&!strcmp(Hb9.where,"board");
           if((isB9||g_heldLate)!=g_heldBoardPass) return;   /* (11-12) in the lab, everything after the cast */
-          if(isB9&&!g_castAttOK[i][ATT_BOARD]) return; }
-        static char said9[SCN_MAXCAST][2][PROP_SPEC];
+          if(isB9&&(i>=SCN_MAXCAST||!g_castAttOK[i][ATT_BOARD])) return; }   /* (11-14) a board is a scene body's: a set actor's slot has no board frame */
+        static char said9[HELD_SLOTS][3][PROP_SPEC];
         int tell9=strcmp(said9[i][which],spec)!=0;
         if(tell9) snprintf(said9[i][which],PROP_SPEC,"%s",spec);
         if(!spec[0]||!strncmp(spec,"off",3)) return;
+        { static int hd9=-1; if(hd9<0){ const char*e9=getenv("REVA_HELDDBG"); hd9=(e9&&e9[0]=='1'); }   /* (11-16) REVA_HELDDBG=1: once a second, each held prop's state as it's drawn */
+          if(hd9&&(g_frameStamp%10u)==0u){ printf("[helddbg] frame %u slot %d prop%d '%s': grip %d, hand %d head %d, last drawn at frame %u (%.2f %.2f %.2f)\n",g_frameStamp,i,which+1,spec,g_castGripOK[i],
+              g_castAttOK[i][ATT_HAND],g_castAttOK[i][ATT_HEAD],g_heldMSt[i][which],g_heldM[i][which][12],g_heldM[i][which][13],g_heldM[i][which][14]); fflush(stdout); } }
         if(!g_castGripOK[i]){
-            if(tell9){ printf("[held] slot %d%s '%s' REFUSED: that body never published a grip%c",i,w9,spec,10); fflush(stdout); }
+            if(tell9){ printf("[held] slot %d%s '%s' REFUSED: that body never published a grip (said once: the first frame can be before her)%c",i,w9,spec,10); fflush(stdout); }
             return; }
         /* ⛔ A TOWN PROP IS SIZED FOR A STREET, NOT A HAND. v1_town_lantern went into
          * a body's fist at lamppost scale and read as furniture. `stem@scale` sizes it;
@@ -1904,10 +1923,18 @@ static void drawHeldOne(int i,const char*spec,int which){
         M4 rot; { float cp=cosf(hp), sp=sinf(hp);
           memset(rot,0,64);
           rot[0]=k9; rot[5]=cp*k9; rot[6]=sp*k9; rot[9]=-sp*k9; rot[10]=cp*k9; rot[15]=1.f; }
+        if(HS9.yaw!=0.f||HS9.roll!=0.f){   /* (11-14) then about the prop's own Y, then its own Z: a right hand's prop laid in the left, a pen through her fingers */
+            const float cy=cosf(HS9.yaw), sy=sinf(HS9.yaw), cr=cosf(HS9.roll), sr=sinf(HS9.roll);
+            M4 ry, rz, t9, u9; memset(ry,0,64); memset(rz,0,64);
+            ry[0]=cy; ry[2]=-sy; ry[5]=1.f; ry[8]=sy; ry[10]=cy; ry[15]=1.f;
+            rz[0]=cr; rz[1]=sr; rz[4]=-sr; rz[5]=cr; rz[10]=1.f; rz[15]=1.f;
+            m4_mul(t9,rot,ry); m4_mul(u9,t9,rz); memcpy(rot,u9,64); }
         M4 m; m4_mul(m,g,rot);
         m[12]=g_castAttM[i][att9][12];
         m[13]=g_castAttM[i][att9][13];
         m[14]=g_castAttM[i][att9][14];
+        if(HS9.at[0]!=0.f||HS9.at[1]!=0.f||HS9.at[2]!=0.f)   /* (11-14) `at:`: along the attach point's own axes, in the prop's metres at the size it's drawn */
+            for(int k8=0;k8<3;k8++) m[12+k8]+=(g[k8]*HS9.at[0]+g[4+k8]*HS9.at[1]+g[8+k8]*HS9.at[2])*k9;
         /* ⭐ ON THE FLOOR, the prop's lowest point rests on it, wherever its origin is */
         if(att9==ATT_DECK||att9==ATT_MARK){ for(int h9=0;h9<g_nHeld;h9++) if(g_held[h9].pk==pk){ m[13]-=g_held[h9].loY*k9; break; } }
         /* ⭐ ON ITS CHANNEL, THE FIT. The board frame's origin is the deck top's centre and its +X the
@@ -1974,7 +2001,7 @@ static void drawHeldOne(int i,const char*spec,int which){
         /* ⛔ REPORT THE POINT IT RESOLVED TO, NOT THE STRING. A second prop with no `@where`
          * is deliberately NOT where the string says (it is the other hand), and a log that
          * printed the empty default would describe a prop that is not there. */
-        if(tell9){ static const char*ATTN9[ATT_N]={"hand","head","chest","hip","lhand","deck","mark","board","bone","bone2"};
+        if(tell9){ static const char*ATTN9[ATT_N]={"hand","head","chest","hip","lhand","deck","mark","board","bone","bone2","bone3"};
                    printf("[held] slot %d%s '%s' -> pack %d on the %s at (%.2f,%.2f,%.2f), size %.2f%c",
                           i,w9,stem9,pk,ATTN9[att9],m[12],m[13],m[14],hs,10);
                    printf("[held]   mesh longest side %.3f -> scaled x%.2f%c",ext9,k9,10); fflush(stdout); }
@@ -1984,10 +2011,11 @@ static void drawHeldOne(int i,const char*spec,int which){
         memcpy(g_heldM[i][which],m,64); g_heldMSt[i][which]=g_frameStamp; g_heldMPk[i][which]=pk; }
 
 static void drawHeld(void){
-    actorHeldSync();   /* (11-11) a set actor's prop, in the voice slot */
-    for(int i=0;i<SCN_MAXCAST;i++){
+    actorHeldSync();   /* (11-11) a set actor's prop, in the voice slot; (11-14) and every other holder's in a slot of her own */
+    for(int i=0;i<HELD_SLOTS;i++){
         drawHeldOne(i,g_castProp [i],0);
-        drawHeldOne(i,g_castProp2[i],1); } }
+        drawHeldOne(i,g_castProp2[i],1);
+        drawHeldOne(i,g_castProp3[i],2); } }
 
 /* ⭐ THE BOARDS, drawn after the cast in the frame the riders were posed in.
  * drawHeld runs in the set pass BEFORE any body is drawn, so everything it hangs is one frame old --
@@ -1997,9 +2025,10 @@ static void drawHeld(void){
 static void drawBoards(void){
     actorHeldSync();
     g_heldBoardPass=1;
-    for(int i=0;i<SCN_MAXCAST;i++){
+    for(int i=0;i<HELD_SLOTS;i++){
         drawHeldOne(i,g_castProp [i],0);
-        drawHeldOne(i,g_castProp2[i],1); }
+        drawHeldOne(i,g_castProp2[i],1);
+        drawHeldOne(i,g_castProp3[i],2); }
     g_heldBoardPass=0;
     { static int dbg9=-1; if(dbg9<0){ const char*e9=getenv("REVA_BOARDDBG"); dbg9=(e9&&e9[0]!='0'); }
       static unsigned n9=0;

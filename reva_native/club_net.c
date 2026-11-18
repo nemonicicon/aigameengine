@@ -41,7 +41,7 @@
 #include "club_net.h"
 
 #define NET_MAGIC 0x314E5652u   /* "RVN1" */
-#define NET_PROTO 4   /* 4 (11-12): a seat says which device its player last used (NETF_KEYS), which a game may decide by. */   /* 2 (11-12): a seat carries the left trigger and the whole pad's buttons. 3 (11-12): and the pointer */
+#define NET_PROTO 5   /* 5 (11-18): a seat carries a game's own key bits (gk, four bytes at its end), so it's 30 bytes: a 4 read them as the next seat's start */   /* 4 (11-12): a seat says which device its player last used (NETF_KEYS), which a game may decide by. */   /* 2 (11-12): a seat carries the left trigger and the whole pad's buttons. 3 (11-12): and the pointer */
 #define NET_RING 512            /* ticks of pads kept a peer: eight and a half seconds, far past the longest wait */
 #define NET_MTU 1200
 #define NET_REL_MAX 1000
@@ -50,7 +50,7 @@
 
 enum { T_HELLO = 1, T_WELCOME, T_REFUSE, T_LOBBY, T_REL, T_ACK, T_INPUT, T_PING, T_PONG, T_LAST };
 enum { K_BEGIN = 1, K_SAVE, K_READY, K_GO, K_DROP, K_BYE };
-#define SEAT_BYTES 26
+#define SEAT_BYTES 30   /* what wSeat writes, which a block's room is counted in: (11-18) 26 until a game's keys joined the seat, and a block of more than 38 ticks then ran past NET_MTU and wasn't sent at all (post drops a packet that's overflowed) */
 
 typedef struct RelMsg { struct RelMsg *next; unsigned short seq; int len; unsigned char d[NET_REL_MAX + 8]; } RelMsg;
 typedef struct {

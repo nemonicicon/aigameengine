@@ -8,7 +8,7 @@ layout(std140, set = 0, binding = 0) uniform View {
     vec4 sky;
     vec4 fog;     // rgb, density
     vec4 misc;    // x tone knee, y shadow map on, z half a sun-map texel, w the tick clock
-    vec4 misc2;   // x how big a point is, for a 720-line picture being 1
+    vec4 misc2;   // x how big a point is, for a 720-line picture being 1; w (11-16) 1 when the set reflects nothing of its surroundings
     vec4 ground;  // the bottom of the sky's hemisphere
     vec4 fwd;     // the lens's forward, xyz
     vec4 split;   // how far along the lens each sun cascade ends

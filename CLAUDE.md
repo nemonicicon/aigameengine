@@ -155,6 +155,14 @@ over it.
   (`E->emitter*`, `E->decalAt`), sound and music (`E->sound`, `E->music`, `E->musicClock`), a save
   (`E->saveBegin`..`saveEnd`, `E->load`: `save/<game>_<slot>.txt`, every value bounds-checked on the way in),
   a language (`E->word`, below) and a session (`E->netHost`, `E->netJoin`, below).
+- Carried in on 11-18 (`ENGINE_API_VERSION` 2, `design/engine_capabilities.md` sections 62 to 75): what a game's body
+  carries (`E->attachUpright`, `attachGround`, `attachPoint`, `tune->propTrue`, bones laid over the clip with
+  `E->boneAim`/`boneCurl`/`boneLayOff`, `E->bodyFade`), whole cloth on it (`E->bodyCloth`, `engine/clubwear.inc`), a limp
+  body kept on the rules or thrown as Godot throws one (`E->bodyLimpLead`, `bodyLimpThrow`), and a light's Godot falloff
+  (`E->lightDecay`). In a set: glass (a sheer mesh with `glass` in its name), `solid <kind> ...` boxes in the tree, `tone
+  linear`, `bloom off`, `occlusion off`, `reflect off`, `background r g b`, a light line's 10th number; a graph state's
+  `blend=` and `start=`. ⛔ The first reader of a set line's word takes every line of it: a new word's reader goes before
+  the first that takes it. Built where it came from; here: built here on 11-18, both renderers (`driver.py buildsoft`, `buildvk`); `driver.py check --game rally` all same; `anim_bench/netcheck.py` all the same. Not run here: the new pictures (glass, the hanging coat, held props, the colour split) and anything with a body's cloth
 - A game with cooked packs lists every file it loads in a `game.txt`, with a budget per kind, and
   `anim_bench/cookcheck.py` holds it to that. None of the games here has one: everything in them is made by code.
 - A game's check is a list of scenarios in `anim_bench/hashcheck.py`, by the game's name: a new game adds its
@@ -176,6 +184,9 @@ over it.
   asked (`REVA_NETLAG`, `NETJITTER`, `NETLOSS`, `NETDUP`), every machine's `[simhash]` held against the others'.
   About a minute; `driver.py check --game rally` builds the engine it uses. ⛔ It's one machine's loopback: it
   says nothing about a real network. No two real machines have played yet.
+- ⛔ A seat on the wire is `SEAT_BYTES` (30 since a game's keys joined it, `NET_PROTO` 5, 11-18): a block's room is
+  counted in it, and at 26 a block of more than 38 ticks ran past `NET_MTU` and wasn't sent at all. Anything added
+  to a seat changes both.
 
 ## A file is checked before it's believed
 - `engine/packcheck.inc`: `packCheck` reads the whole of a pack once before the loader touches it and holds every
@@ -216,6 +227,13 @@ itself once its last frame is written; a harness still polls, for the run that n
 off), `REVA_NOFINGERS=1`, `REVA_NORAGDOLL=1`, `REVA_RDDBG=1`, `REVA_MEMSAY=<ticks>` (`[mem]`),
 `REVA_LODDBG=1`, `REVA_SOFTSAY=1` (what the own rasterizer drew, every 120 frames), `REVA_NETSAY=1`. A renderer
 feature's A/B is its setting: `REVA_GFX="normals=0"`.
+Carried on 11-18 (`design/engine_capabilities.md` 63 to 70): `REVA_PACKETHASH=1` (each frame's draws and packet
+bytes), `REVA_DYNSAY=<frames>` and `REVA_BIGBLOCK=<MB>` (the frame's big blocks), `REVA_HELDDBG=1` (each held prop's
+grip and where it was drawn), `REVA_FINGERDBG=1` (how bent each index finger is as drawn), `REVA_STRANDTRACE=<name>`
+(a head's hair hung and carried), `REVA_CWSAY=1` and the control `REVA_NOCWEAR=1` (a game body's whole cloth),
+`REVA_SKIRTDBG=1 REVA_SKEVERY=<n>` and the control `REVA_SKIRTSIM=0` (hanging cloth). ⛔ `[packet] ⛔ past its N MB`
+and `[gfx] THE FRAME'S RING IS FULL` are said once and mean the rest of that frame is missing: read a recorded run's
+log for both. ⛔ With no window (`REVA_NOWINDOW`), or while a run is captured, the engine never takes the pointer.
 A screenshot prints what its frame cost the renderer. PPM output: convert and LOOK before claiming anything
 renders. Boot costs ~250 frames; capture below ~300 and you shoot a loading screen.
 
@@ -255,7 +273,7 @@ minutes and gives up.
 
 ## Where the knowledge is
 `design/engine_plan.md` (the queue of 29 steps: what each built, what each didn't, what was decided),
-`design/engine_capabilities.md` (every capability and the failure that exposed it),
+`design/engine_capabilities.md` (every capability and the failure that exposed it; 62 to 75 came in on 11-18),
 `design/pack_format.md`, `design/the_set.md`, `design/platform_tiers.md`, `design/character_standard.md`,
 `design/tpose_import.md` (.brres / .dae in, any body into a T-pose, a statue rigged by measured marks),
 `design/animation_principles.md`, `animation_authoring.md`, `skating.md`, `cloth.md`, `faces.md`,

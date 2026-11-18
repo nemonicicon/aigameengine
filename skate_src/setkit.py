@@ -493,6 +493,37 @@ def write_glb(path, name, P, N, T, I, png, generator="setkit.py", material="atla
     open(path, "wb").write(out)
 
 
+def write_glb_parts(path, parts, png, generator="setkit.py", material="atlas"):
+    """(11-16) several meshes in one .glb, each its own node and named as given (parts: [(name, P, N, T, I)]), all on the one atlas material:
+    glb2rpack.py keeps them apart in the pack, so each is made of what its name says (a pair of round glasses: plastic rims, lenses of glass)"""
+    blobs, acc, meshes, nodes = [], [], [], []
+    for k, (nm, P, N, T, I) in enumerate(parts):
+        P, N, T = np.asarray(P, "<f4"), np.asarray(N, "<f4"), np.asarray(T, "<f4"); Iu = np.asarray(I).astype("<u4").reshape(-1)
+        a0 = len(acc)
+        acc += [{"bufferView": len(blobs), "componentType": 5126, "count": len(P), "type": "VEC3", "min": P.min(0).tolist(), "max": P.max(0).tolist()},
+                {"bufferView": len(blobs) + 1, "componentType": 5126, "count": len(P), "type": "VEC3"},
+                {"bufferView": len(blobs) + 2, "componentType": 5126, "count": len(P), "type": "VEC2"},
+                {"bufferView": len(blobs) + 3, "componentType": 5125, "count": len(Iu), "type": "SCALAR"}]
+        blobs += [(P.tobytes(), 34962), (N.tobytes(), 34962), (T.tobytes(), 34962), (Iu.tobytes(), 34963)]
+        meshes.append({"name": nm, "primitives": [{"attributes": {"POSITION": a0, "NORMAL": a0 + 1, "TEXCOORD_0": a0 + 2}, "indices": a0 + 3, "material": 0}]})
+        nodes.append({"mesh": k, "name": nm})
+    img = len(blobs); blobs.append((png, None))
+    views, binb = [], b""
+    for b, tg in blobs:
+        binb += b"\0" * ((-len(binb)) % 4)
+        v = {"buffer": 0, "byteOffset": len(binb), "byteLength": len(b)}
+        if tg: v["target"] = tg
+        views.append(v); binb += b
+    binb += b"\0" * ((-len(binb)) % 4)
+    js = {"asset": {"version": "2.0", "generator": generator}, "scene": 0, "scenes": [{"nodes": list(range(len(nodes)))}], "nodes": nodes, "meshes": meshes,
+          "materials": [{"name": material, "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}, "metallicFactor": 0.0, "roughnessFactor": 1.0}}],
+          "textures": [{"source": 0, "sampler": 0}], "samplers": [{"magFilter": 9729, "minFilter": 9987}],
+          "images": [{"bufferView": img, "mimeType": "image/png"}], "accessors": acc, "bufferViews": views, "buffers": [{"byteLength": len(binb)}]}
+    jb = json.dumps(js).encode("utf-8"); jb += b" " * ((-len(jb)) % 4)
+    open(path, "wb").write(struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(jb) + 8 + len(binb)) + struct.pack("<I4s", len(jb), b"JSON") + jb
+                           + struct.pack("<I4s", len(binb), b"BIN\0") + binb)
+
+
 # ---------------------------------------------------------------------------------------------- the self-test
 def _spread(P, N):
     """the widest angle (degrees) between the normals of vertices at one position"""

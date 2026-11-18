@@ -13,7 +13,7 @@
 #define AG_MAXP 64   /* (11-12) a graph's values: 16 until the skate game's rider wanted a flag for each of its 28 clips. Not in [simhash]: agHash mixes a body's state and its place in it */
 #define AG_MAXG 16
 #define AG_MAXPACKS 1024
-typedef struct { char name[24],clip[32]; int c,once,gait; float rate; int low; } AgState;   /* c: this state's clip on the hero's pack. low (11-06): its clip is meant to be low */
+typedef struct { char name[24],clip[32]; int c,once,gait; float rate; int low; float blend,start; } AgState;   /* (11-16) blend: seconds a body's draw fades into it (0: the engine's own); start: seconds into its clip it begins */   /* c: this state's clip on the hero's pack. low (11-06): its clip is meant to be low */
 typedef struct { int from,to,kind,param; float v; } AgWhen;   /* kind 0 a flag, 1 >, 2 <, 3 the end of a once clip */
 typedef struct { int st; float u; char name[24]; } AgEvent;
 typedef struct { Pack*src; int c,own; } AgRef;   /* a state's clip on one pack: found once. src NULL and c 0 hasn't been looked for, and c -1 there isn't one */
@@ -40,6 +40,10 @@ static void agLoad(int g){ AgGraph*G=&g_agG[g]; FILE*f=fopen(G->path,"r"); G->di
         if(!txtNumsOk(ln,1e6)){ printf("[anim] %s: a line with a number in it that isn't one, left out: %.60s\n",G->path,ln); fflush(stdout); continue; }   /* (step 28) a rate of 1e308 hung the loop that wraps a clip */
         char a[32],c[32],d[32];
         if(!strncmp(ln,"state ",6)&&G->nS<AG_MAXS){ AgState*S=&G->s[G->nS]; memset(S,0,sizeof *S);
+            /* (11-16) blend=<s> and start=<s>, anywhere after the clip: read, then blanked, so the words before them read as they always have */
+            for(int w9=0;w9<2;w9++){ char*b9=strstr(ln,w9?" start=":" blend="); if(!b9) continue; const float v9=(float)atof(b9+7);
+                if(v9>=0.f&&v9<=10.f){ if(w9) S->start=v9; else S->blend=v9; }
+                for(char*q9=b9+1;*q9&&*q9!=' '&&*q9!='\n'&&*q9!='\r';q9++) *q9=' '; b9[1]=' '; }
             char e9[32]; e9[0]=0;
             int n=sscanf(ln,"state %23s %31s %31s %31s %31s",S->name,S->clip,c,d,e9); if(n<3) continue;
             S->once=!strcmp(c,"once"); S->rate=1.f;
@@ -90,6 +94,7 @@ static int agTransit(AgGraph*G,AgRun*R,float*prev){
 /* on through the clip by a tick, and tell the game what it passed. who: a body's index, or -1 for the hero */
 static void agAdvance(AgGraph*G,AgRun*R,const PClip*c,float r,float dt,int fresh,float prev,int who){ const AgState*S=&G->s[R->cur]; float len=c->frames>1?(float)c->frames/c->fps:1.f, wrapped=0.f;
     if(!fresh) R->u+=dt*r/len;
+    else if(S->start>0.f&&len>0.f){ R->u=S->start/len; if(R->u>1.f) R->u=1.f; }   /* (11-16) a state that begins partway through its clip */
     if(S->once){ if(R->u>=1.f){ R->u=1.f; R->done=1; } }
     else if(R->u>=1.f){ R->u-=floorf(R->u); wrapped=1.f; if(!(R->u>=0.f&&R->u<1.f)) R->u=0.f; }   /* (step 28) once round or a hundred times, in one go: the same answer as taking 1 off until it's under 1, and it can't run for ever */
     for(int i=0;i<G->nE;i++){ const AgEvent*E9=&G->e[i]; if(E9->st!=R->cur) continue;
@@ -138,6 +143,9 @@ static void agBodyTick(int si,int pack,float spd,float dt){ AgRun*R=&g_agBody[si
     const AgRef*r=agRefOf(G,R->cur,pack); if(r->c<0) return;
     const AgState*S=&G->s[R->cur]; const PClip*c=&r->src->clips[r->c];
     agAdvance(G,R,c,S->gait?gaitRate(r->src,r->c,spd):S->rate,dt,fresh,prev,si); }
+/* (11-16) how long the crowd's draw fades into a body's state: its own `blend=`, or 0 for the engine's */
+static float agBodyBlend(int si){ if(si<0||si>=1024) return 0.f; const AgRun*R=&g_agBody[si]; if(!R->on) return 0.f; const AgGraph*G=&g_agG[R->g];
+    return (G->on&&R->cur<G->nS)?G->s[R->cur].blend:0.f; }
 /* what the crowd's draw asks: its clip, how far through, and a key that's different per state, so a change of state crossfades. 0 if it has no graph, or that state has no clip on this body */
 static int agBodyPose(int si,int pack,Pack**src,int*ci,int*own,double*fp,int*key,int*low){ const AgRun*R=&g_agBody[si]; if(!R->on) return 0; AgGraph*G=&g_agG[R->g]; if(!G->on||R->cur>=G->nS) return 0;
     const AgRef*r=agRefOf(G,R->cur,pack); if(r->c<0) return 0;

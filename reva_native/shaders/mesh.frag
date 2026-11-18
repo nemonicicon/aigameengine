@@ -147,11 +147,14 @@ vec3 lightsHere(vec3 N, vec3 Vd, float rough, vec3 F0, float skinC, out vec3 sp)
         float win = 1.0;   // (11-11) a light with a reach (g.z) fades smoothly to nothing there
         if (g.z > 0.0) { float q = dd / (g.z * g.z); win = clamp(1.0 - q * q, 0.0, 1.0); win *= win; if (win <= 0.0) continue; }
         vec3 L = D * inversesqrt(dd + 0.001);
-        float f = max(0.0, dot(N, L)) / (1.0 + dd * a.w) * win;
+        // (11-16) a light with a decay (g.w) falls off as Godot's do: over the distance in metres (1.75 units a metre) to that power, inside the same window.
+        // A Godot scene's lamps and the skate game's torch: next to a flame theirs is two to four times what 1/(1+k d^2) gave, and the same two metres out
+        float att = g.w > 0.0 ? pow(max(sqrt(dd) * (1.0 / 1.75), 0.0001), -g.w) : 1.0 / (1.0 + dd * a.w);
+        float f = max(0.0, dot(N, L)) * att * win;
         if (c.w > -1.5) f *= smoothstep(c.w, b.w, dot(-L, c.xyz));
 #ifndef TOON
         if (SKIN == 1 && skinC >= 0.0) {   // skin takes a light a little past its edge: how much light is here, then what the skin does with it
-            float at = win / (1.0 + dd * a.w);
+            float at = win * att;
             if (c.w > -1.5) at *= smoothstep(c.w, b.w, dot(-L, c.xyz));
             if (g.x >= 0.0 && at > 0.0) {
                 int tile = int(g.x);
@@ -237,7 +240,7 @@ void main() {
     // much of the room each point of it sees (rays cast against her head at the mouths her clips hold), and its colour is the
     // paint as bought. That share comes off the light from the room, the hemisphere's and what the surface reflects of it, and never off the paint: paint
     // darkened under a reflection left at full strength is what metal looks like (her side teeth read as braces and her tongue as a pale tray, chorus 3b)
-    const bool aoA = vExtra.y > 1.5;
+    const bool aoA = vExtra.y > 1.5 && vExtra.y < 2.5;   // (11-13) 3 is GFX_FLAT's
     const float ao = aoA ? clamp((t.a * 255.0 - 128.0) / 127.0, 0.0, 1.0) : 1.0;
 #ifndef TOON
     if (NORMALS == 1 && mapped) { vec3 nm = texture(uN, vec3(uv, M.m2.x)).xyz * 2.0 - 1.0; N = normalize(TBN * nm); }
@@ -251,6 +254,12 @@ void main() {
     if (LINEAR != 0) tn = pow(tn, vec3(2.2));
 #endif
     vec3 base = mix(tn, tx, vTint.w);
+#ifndef FUR
+    // (11-13) A WASH THAT KEEPS A FACE (`actorwash ... tone`, M.m2.w its amount): the tint times how light the texture is here, so skin and cloth
+    // take the wash's colour whole and lips, lashes, brows and the inside of a mouth stay dark. A plain wash mixed every pixel toward one colour,
+    // and a body washed 0.85 had no face
+    if (M.m2.w > 0.0 && vTint.w > 0.0) { vec3 tl = (LINEAR == 0) ? pow(max(tx, vec3(0.0)), vec3(2.2)) : tx; float tk = clamp(dot(tl, vec3(0.2126, 0.7152, 0.0722)) / 0.30, 0.0, 1.0); base = mix(base, tn * tk, clamp(M.m2.w, 0.0, 1.0)); }
+#endif
 #ifdef GODOT_HOOK
     GdSurf gd = gdSurface(uv, N);   // (11-12) the surface's own code: its colour is in light's own units, and the Pi's road lights what's stored
     base = LINEAR != 0 ? max(gd.albedo, vec3(0.0)) : pow(max(gd.albedo, vec3(0.0)), vec3(1.0 / 2.2));
@@ -407,11 +416,39 @@ void main() {
             spec += vec3(1.15) * smoothstep(0.9860, 0.9935, dot(N, Hc));
         }
         if (SHEEN == 1 && kind == 4) lit += (amb + sunL * max(nl, 0.2)) * mix(vec3(1.0), base, 0.5) * pow(1.0 - NdV, 4.0) * 0.35;   // cloth: its fibres catch the light at the edge
-        if (REFLECT != 0 && kind != 2) { float open = (PROBES == 1 && V.probe.w > 0.5) ? texture(uProbe, (vW + N * 0.5 - V.probe.xyz) * V.probeS.xyz).r : 1.0;
+        if (REFLECT != 0 && kind != 2 && V.misc2.w < 0.5) {   // (11-16) misc2.w: the set reflects nothing of its surroundings (`reflect off`)
+            float open = (PROBES == 1 && V.probe.w > 0.5) ? texture(uProbe, (vW + N * 0.5 - V.probe.xyz) * V.probeS.xyz).r : 1.0;
             if (aoA) open *= clamp(pow(NdV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0);   // (11-11) a hollow reflects its own dark walls, not the room (Lagarde & de Rousiers 2014, "Moving Frostbite to PBR", 4.10.2)
             spec += envAt(reflect(-Vd, N), rough, base) * envBRDF(F0, rough, NdV) * open; }
         lit += spec;
     }
+#ifdef GLASS
+    // ⭐ (11-16) GLASS, a mesh of kind 8 (a sheer mesh with `glass` in its name, engine/load.inc), first wanted for REVA's round glasses: reflections and
+    // transparency, which the engine hadn't had. What it throws back of what's round it and of the lights, and the light its own body scatters (its sheerness,
+    // #rrggbbAA, as a haze), go over what's behind it, and what's behind is kept by how much comes through: the blend (gfx_vk.c PF_GLASS) is this colour plus the
+    // target times this alpha. A lens is two faces a few millimetres apart, so what's thrown back is the pair's, 2F/(1+F) (Fresnel, n 1.5): 8% looked straight
+    // through, all of it at a grazing angle. Done whatever the settings, because glass that throws nothing back isn't there
+    float gT;
+    {
+        vec3 Vg = normalize(V.eye.xyz - vW), Ng = dot(N, Vg) < 0.0 ? -N : N;
+        float ndv = clamp(dot(Ng, Vg), 1e-3, 1.0), rg = clamp(M.m.x, 0.03, 1.0), haze = clamp(vExtra.x, 0.0, 1.0);
+        float Fs = 0.04 + 0.96 * pow(1.0 - ndv, 5.0), Fg = 2.0 * Fs / (1.0 + Fs);
+        vec3 Rg = reflect(-Vg, Ng);
+        vec3 gl = envAt(Rg, rg, base) * Fg;   // the sky and the ground, and where the set's surroundings are baked, those
+        if (V.sunDir.w > 0.0) gl += min(V.sunCol.rgb * V.sunDir.w * shS * ggx(Ng, Vg, V.sunDir.xyz, rg, vec3(0.04)) * 2.0, vec3(6.0));   // the sun, off both faces: held to a point that reads
+        // and a window of light above the lens and to its side (the eyes' catch light is the same light), as every lens in a picture shows: a softbox two metres
+        // off, about eight degrees across, thrown back by the same share. A curved lens shows it as a patch, the rest of it where it doesn't look
+        vec3 Rk = cross(vec3(0.0, 1.0, 0.0), Vg); float rk = length(Rk); Rk = rk > 1e-4 ? Rk / rk : vec3(1.0, 0.0, 0.0);
+        vec3 Lw = normalize(Vg + vec3(0.0, 0.55, 0.0) + Rk * 0.38);
+        // a softbox, wider than it's tall, its edges soft: a round patch read as a pupil
+        vec3 Uw = cross(Lw, Rk); float uw = length(Uw); Uw = uw > 1e-4 ? Uw / uw : vec3(0.0, 1.0, 0.0); vec3 Sw = cross(Uw, Lw);
+        float wu = dot(Rg, Sw), wv = dot(Rg, Uw);
+        float win = dot(Rg, Lw) > 0.0 ? (1.0 - smoothstep(0.08, 0.17, abs(wu))) * (1.0 - smoothstep(0.04, 0.11, abs(wv))) : 0.0;
+        gl += vec3(3.5) * Fg * win;
+        lit = gl + base * (amb + extra) * haze;   // and its body's own scatter, lit as the room is
+        gT = (1.0 - Fg) * (1.0 - haze);
+    }
+#endif
     // eyes that glow (a game's E->bodyEyes, film's eyes=), on every machine and whatever the settings. An eye that's a mesh of its own comes here unlit in the glow's colour already.
     // One painted on a person who's a single mesh is found here, by its texture's alpha. Up to 1 the eye goes over to the colour, and past 1 it's brighter than the colour
     if (M.m3.a > 0.0 && int(M.m2.y + 0.5) == 5 && alphaKind(uv) == 3) { vec3 gc = LINEAR != 0 ? pow(M.m3.rgb, vec3(2.2)) : M.m3.rgb; lit = mix(lit, gc, min(M.m3.a, 1.0)) + gc * max(M.m3.a - 1.0, 0.0); }
@@ -438,6 +475,12 @@ void main() {
 #elif defined(TOON) && !defined(TOON_BLEND)
     o = vec4(lit, 2.0);   // over 1: a pixel the post pass leaves as it is
 #else
+    // (11-13) GFX_FLAT: its tint as given, unlit, and over 1 so the post pass leaves it (the glass is UNORM: post writes display values). A body
+    // washed to one flat colour. Its draws are never blended (engine/body.inc), so the 2 goes to the target as it is
+    if (vExtra.y > 2.5) { o = vec4(clamp(vTint.rgb, 0.0, 1.0), 2.0); return; }
+#ifdef GLASS
+    o = vec4(lit, gT); return;   // (11-16) what the glass throws back, and how much of the target comes through (PF_GLASS)
+#endif
     o = vec4(lit, (aoA ? 1.0 : mix(1.0, t.a, vTint.w)) * vExtra.x);   // the blend pipelines read this, so sheer cloth is sheer; the others ignore it. A GFX_OCCLUSION mesh's alpha is its share of the room
 #ifdef STRAND
     o.a *= hairCov;   // a hair covers this much of the pixel

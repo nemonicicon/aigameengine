@@ -224,7 +224,7 @@ static int scnLoad(const char*name){
                 L->p3has=0; L->p3clip[0]=0;
                 L->scrHas=0; L->camHas=0;
                 L->hprop[0]=L->pprop[0]=L->p2prop[0]=0;
-                L->hprop2[0]=L->pprop2[0]=L->p2prop2[0]=0;
+                L->hprop2[0]=L->pprop2[0]=L->p2prop2[0]=0; L->hprop3[0]=L->pprop3[0]=L->p2prop3[0]=0;
                 L->pmark[0]=L->p2mark[0]=L->p3mark[0]=L->hmark[0]=0;
                 /* ⭐ no path, no speed, no tracking lens -- and a line with no text is an ACTION line */
                 for(int k10=0;k10<4;k10++){ L->path[k10][0]=0; L->spd[k10]=-1.f; L->loop[k10]=L->pseg[k10]=L->pnext[k10]=-1;
@@ -336,6 +336,17 @@ static int scnLoad(const char*name){
             if((q=strstr(ln,"p2prop2="))){ int k=0; q+=8;
                 while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) L->p2prop2[k++]=*q++;
                 L->p2prop2[k]=0; if(*q&&*q!=' '&&*q!='\n'&&*q!='\r') specTooLong(L->p2prop2); }
+            /* (11-14) a third thing in each body's hands: `hprop3=` `pprop3=` `p2prop3=`, read as the second is */
+            if((q=strstr(ln,"hprop3="))){ int k=0; q+=7;
+                while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) L->hprop3[k++]=*q++;
+                L->hprop3[k]=0; if(*q&&*q!=' '&&*q!='\n'&&*q!='\r') specTooLong(L->hprop3); }
+            { q=strstr(ln,"pprop3="); while(q&&q>ln&&q[-1]>='0'&&q[-1]<='9') q=strstr(q+1,"pprop3=");
+              if(q){ int k=0; q+=7;
+                while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) L->pprop3[k++]=*q++;
+                L->pprop3[k]=0; if(*q&&*q!=' '&&*q!='\n'&&*q!='\r') specTooLong(L->pprop3); } }
+            if((q=strstr(ln,"p2prop3="))){ int k=0; q+=8;
+                while(*q&&*q!=' '&&*q!='\n'&&*q!='\r'&&k<PROP_SPEC-1) L->p2prop3[k++]=*q++;
+                L->p2prop3[k]=0; if(*q&&*q!=' '&&*q!='\n'&&*q!='\r') specTooLong(L->p2prop3); }
             /* ⛔ `pmark=` matches inside `p2mark=` -- the pgap/pclip/pprop trap again. */
             { q=strstr(ln,"pmark="); while(q&&q>ln&&q[-1]>='0'&&q[-1]<='9') q=strstr(q+1,"pmark=");
               if(q){ int k=0; q+=6;

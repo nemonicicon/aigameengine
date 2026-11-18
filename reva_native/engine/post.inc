@@ -37,8 +37,9 @@ static float g_grade=0.f, g_vig=0.f; static int g_ssaa=1;
  * All of it is picture. None of it is in the rules, and none of it does anything where the machine has no post pass (the pi and low rungs). */
 static float g_camRoll=0.f, g_lensFocus=0.f, g_lensDof=1.f, g_lensShutter=0.f;
 static float g_filmSepia=0.f, g_filmFlash=0.f, g_filmBurn=0.f, g_filmGrain=0.f, g_filmWeave[2]={0.f,0.f};
-static struct { float roll,focus,dof,shutter,sepia,flash,burn,grain,weave[2],exposure,haze,grade,fov; int camOn; float eye[3],aim[3]; } g_lensNow;   /* this frame's, worked out by lensNow */
-static void lensClear(void){ g_camRoll=0.f; g_lensFocus=0.f; g_lensDof=1.f; g_lensShutter=0.f; g_filmSepia=g_filmFlash=g_filmBurn=g_filmGrain=0.f; g_filmWeave[0]=g_filmWeave[1]=0.f; }
+static float g_filmSplit[2]={0.f,0.f};   /* (11-14) split: the colours parted, red one way and blue the other, as a share of the width and the height */
+static struct { float split[2]; float roll,focus,dof,shutter,sepia,flash,burn,grain,weave[2],exposure,haze,grade,fov; int camOn; float eye[3],aim[3]; } g_lensNow;   /* this frame's, worked out by lensNow */
+static void lensClear(void){ g_camRoll=0.f; g_lensFocus=0.f; g_lensDof=1.f; g_lensShutter=0.f; g_filmSepia=g_filmFlash=g_filmBurn=g_filmGrain=0.f; g_filmWeave[0]=g_filmWeave[1]=0.f; g_filmSplit[0]=g_filmSplit[1]=0.f; }
 /* `focus=` as a ctl line, a scene line and a set's line all say it: a distance, `aim`, or `off`, then how soft */
 static void lensFocusSay(const char*v){ float d=0.f,s=-1.f;
     if(!strncmp(v,"off",3)){ g_lensFocus=0.f; return; }

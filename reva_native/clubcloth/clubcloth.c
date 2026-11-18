@@ -1666,6 +1666,7 @@ void cc_drawn_read(const CCGarment *g, float *pos, float *nrm, int *parents) {
 
 int cc_vertex_count(const CCGarment *g) { return g->nv; }
 int cc_point_count(const CCGarment *g) { return g->np; }
+const int *cc_vertex_points(const CCGarment *g) { return g->vert_point; }
 int cc_edge_count(const CCGarment *g) { return g->ne; }
 const float *cc_points(const CCGarment *g) { return (const float *)g->cur; }
 const float *cc_shown(const CCGarment *g) { return (const float *)g->shown; }

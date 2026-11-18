@@ -129,6 +129,7 @@ void cc_write(const CCGarment *g, unsigned char *pos_out, int pos_stride, unsign
 
 int cc_vertex_count(const CCGarment *g);
 int cc_point_count(const CCGarment *g);
+const int *cc_vertex_points(const CCGarment *g);   /* vertices: each of the caller's vertices' point, so a caller can draw its own mesh from cc_shown and cc_normals */
 const float *cc_points(const CCGarment *g);     /* points * 3, this frame, as solved */
 const float *cc_shown(const CCGarment *g);      /* points * 3, this frame, as drawn: following what's solved at fabric's pace */
 const float *cc_targets(const CCGarment *g);    /* points * 3, what it's held to this frame: the skinned pose, out of whatever it's worn over */

@@ -1284,3 +1284,232 @@ folders, its eleven pictures the same to the pixel as before; the old build, run
 another path (`REVA_MINGW`) came out static too. Not changed: the engine's own games' play.bat files still put `C:\msys64` on the PATH,
 which their exes no longer need, and the checks in anim_bench still look for gcc there.
 The sample, rocks, rally, tower and herd checks come out the same on the static builds; warncheck finds the same 14 warnings, none new.
+
+## Carried in on 11-18: built in another copy of this engine from 11-13 to 11-18
+
+Sections 62 to 75 were built in another copy of the engine, for a music video shot in it and a port of a Godot skate game, and
+carried here on 11-18 with their code. Each section's measurements are the ones taken where it was built. In this repository:
+built here on 11-18, both renderers (`driver.py buildsoft`, `buildvk`); `driver.py check --game rally` all same; `anim_bench/netcheck.py` all the same. Not run here: the new pictures (glass, the hanging coat, held props, the colour split) and anything with a body's cloth
+
+### 62 · A body in one flat colour, a wash that keeps a face, a set actor's hair washed apart -- BUILT (11-13)
+
+- **`slotwash ... [hair] [flat]` and `actorwash ... [hair] [flat]`**: `flat` draws the body as its tint exactly, unlit, and the post pass
+  leaves it (`GFX_FLAT`, a draw's kind 3; mesh.frag writes it over 1 so post passes it as it is). Never blended. A set's
+  `mover <stem> ... flat` is the same for a mover (a band's instruments as cut-outs on a card).
+- **`actorhair <actor> <mover> <amount>`**: a set actor's hair washed with a colour of its own, apart from her body's wash.
+- **`actorwash ... tone`** (mesh.frag, the material's `m2.w`): the tint times how light the texture is there, so skin and cloth take the
+  wash's colour whole and lips, lashes, brows and the inside of a mouth stay dark. A plain wash mixes every pixel toward one colour,
+  and a body washed 0.85 had no face. Picture: no hash has it.
+
+### 63 · Many heads of hair, many bodies each holding its own things, and a frame's packet of 64 MB -- BUILT (11-13, 11-14)
+
+A scene of 32 set actors, three reaching a pen at the lens and twelve with a pill bottle in a fist.
+- **32 heads of hair a frame** (`HS_POOL`, `GFX_MAX_STRANDS`). At 8, a ninth head took the place of a head already simulated and drawn
+  that frame, so two heads stepped one set of GPU buffers every frame and the GPU was lost two frames in. A head with no place now
+  rides its head unsimulated, and says so.
+- **Every set actor holds its own props.** An actor's `prop=`/`prop2=` went through the one voice slot, one actor at a time, the first
+  that asked. The held props' places are `HELD_SLOTS` long: the scene's five slots, then `HELD_ACTORS` (31) more; the first holder keeps
+  the voice slot and each one after has a slot of its own (set.inc `actorHeldSlotOf`, scene.inc `actorHeldSync`).
+- **The frame's packet is 64 MB on a PC and its ring 96** (gfx_packet.c `PK_MEM`, gfx_vk.c `RING_SIZE`; an ARM machine keeps 16 and 16).
+  A posed body is about 0.7 MB of it (its meshes' bone palettes). ⛔ `[packet] ⛔ past its N MB in one frame` and `[gfx] THE FRAME'S RING
+  IS FULL` are each said ONCE in a log and mean everything drawn after that point is missing or overwritten: the 23rd body on and the
+  captions after them weren't drawn, and it was read as a cap on set actors. Read a recorded run's log for both. `REVA_PACKETHASH=1`
+  prints each frame's draws and packet bytes; `REVA_DYNSAY=<frames>` the big blocks' pieces; `REVA_BIGBLOCK=<MB>` their size.
+- ⛔ **`REVA_STRANDS=0` is not a cheap check with many heads**: a head whose hair isn't simulated is posed on the processor and its
+  ribbons' places uploaded in the packet every frame, about 2 MB a head (32 heads: 63 MB against 5 MB with the simulation on).
+- ⛔ OPEN: a scene body with simulated hair that a line snaps to a far mark has its hair stretched from where it was to where it is,
+  through anything between. A scene whose bodies are all set actors is shot with one plain cast body.
+
+### 64 · A third held prop, a prop turned and shifted in the hand, a set actor placed tilted -- BUILT (11-14)
+
+- **A held prop turned any way**: a prop spec's third field is `pitch/yaw/roll` in degrees (about the attach point's X, then the prop's
+  own Y, then its own Z); one number is the pitch, as before. A prop authored for the right hand's frame and hung `@lhand` stands off the
+  wrist until it's turned.
+- **A third held prop**: a scene line's `hprop3=`, `pprop3=`, `p2prop3=` and a set actor's `prop3=` beside the first two (`off` clears
+  it). A spec's named fields after the colour take `turn:p,y,r` (the third field, named) and `at:x,y,z`: the prop moved that far, in its
+  own metres at the size it's drawn, along its attach point's axes (a squirt at a needle's point, a cap in a palm). Not built: a third
+  prop that smokes (smoke.inc still walks two), and the ctl line's `hprop3=`.
+- **A set actor placed tilted**: `place <t> <x> <y> <z> [yaw] [pitch] [roll]`: yaw, then pitch about her own side, then roll about her
+  own front (shadow.inc).
+- ⛔ **A held prop's size is in the world's units**: a set actor drawn bigger than her size needs her props sized by her scale, or a pair
+  of glasses is drawn every frame inside her head. `REVA_HELDDBG=1` says each held prop's grip, attach points and where it was last
+  drawn, every tenth frame. ⛔ A held prop's REFUSED line is said once per spec, and on the first frame it can come before her body has
+  published: the rest of the run says nothing.
+- `REVA_FINGERDBG=1` (williams.inc `fingerDbg`): once a second, how far each body's index fingers are bent as drawn, from the draw's own
+  matrices. It settled a report that the engine left a hand open: the bones were bent 64 degrees as drawn, and the picture was a fist
+  seen from the back of the hand, where a curl toward the palm projects as straight fingers. ⛔ A gripping hand is posed for the lens
+  (the curl in profile); a flat-looking hand is checked with this readout before the engine is blamed.
+
+### 65 · Hair waiting to settle stays on its head -- BUILT (11-14)
+
+A head put somewhere new has its hair hung again, then settled over 40 frames, 8 frames of settling a frame shared among every head on
+the stage (strands.inc `hsGpuFrame`). A head waiting its turn was held where it was hung IN THE WORLD: a body put into a picture and moved
+on in her next frame (0.4 units a frame), behind thirty heads in the queue, left her bob standing behind her bare scalp for as long as she
+waited. `REVA_STRANDTRACE=<part of her name>` showed it: a hang, then a jump with neither a carry nor a hang. A waiting head is now hung
+again each frame it waits, on her head as it is that frame.
+
+### 66 · A tie and a coat's tails kept off the body -- BUILT (11-14)
+
+Only `Cloth*` chains were held off anything (the legs), and not at all on a `VertexCollide` pack, so a tie and a coat's lower half on
+simulated chains had to be switched off. A chain named `Ribbon_tie*` is now pushed out of capsules up the trunk, along the front (from the
+spine's line toward the chain's root at the collar); a chain named `Tail_coat*` is pushed the shortest way out of the seat, both shins and
+the other thigh (the thigh it hangs under is skipped) (pack.inc). Not seen on a body yet.
+
+### 67 · Film's colour split -- BUILT (11-14)
+
+A picture that shakes with a growing red-and-cyan split. `GfxView.split[2]`: the post pass reads the picture's red that share of the width
+and height one way and its blue the other, green in place (post.frag `pc.g.xy`; the post pass now pushes 48 bytes from offset 64 of its
+128). A set's `film ... split=x,y` and the ctl line's `split=x,y`. **The set's timeline is TRK6**: its post row is 14 numbers, the last two
+the split's, added to the set's own each frame as the weave is (TRK5 and older read 12). ⛔ Art drawn OVER the finished picture
+(`artOver`: captions) is laid after the post pass and isn't split.
+
+### 68 · Glass, and a prop of several materials -- BUILT (11-16)
+
+First wanted for REVA's round glasses: reflections and transparency, which the engine didn't have.
+- **Glass, a mesh of kind 8**: a SHEER mesh (`#rrggbbAA`, AA under ff) with `glass` in its name, a prop's or a body's (load.inc
+  `packMaterials`, after the body kinds, so `eyeglass` isn't an eye). It's drawn in the blended pass by `mesh_glass_frag` (mesh.frag
+  built with `GLASS`, build_spv.py's `ALSO`) through `P_STATIC_GLASS` and `P_SKIN_GLASS`, whose blend `PF_GLASS` is the colour plus the
+  target times the alpha (the target's alpha kept). What it throws back: Fresnel for a lens's two faces, 2F/(1+F), so 8% looked straight
+  through and all of it at a grazing angle; the sky and the ground (`envAt`); the sun's GGX point, held to 6; and a softbox above the lens
+  and to its side, the eyes' catch light, as a soft rectangle (a round patch read as a pupil). Plus the haze its own body scatters (its
+  alpha, in its colour, lit by the room), over what comes through, (1-F)(1-haze). Done whatever the settings, because glass that throws
+  nothing back isn't there: a glass draw pushes its material when no material setting is on. It casts no shadow (body.inc). Glass that
+  isn't sheer stays opaque: a city's dark facade glass has nothing behind it.
+- **A prop of several materials** (round glasses: plastic rims, lenses of glass): `setkit.write_glb_parts(path, parts, png)` writes a
+  glTF mesh per part, named as given, and `skate_src/glb2rpack.py` keeps each a mesh of the pack, named as its part: `#rrggbb` in a part's
+  name draws it in that colour, untextured; `#rrggbbAA` under ff makes it sheer (flag 8, drawn blended, last). A glTF mesh of several
+  materials is a part per material, each with its own picture (a skateboard's deck as one part took the grip tape's picture all over, so
+  its underside was black). A .glb of one mesh is baked exactly as before.
+- Not built: the set itself in a reflection (a probe), the lens bending what's behind it, a point light's own highlight on glass, glass in
+  a picture drawn off-screen (a mirror draws it opaque).
+
+### 69 · A garment that hangs as cloth, by `Hang_` nodes -- BUILT (11-16)
+
+Section 37's hanging cloth, now on any pack, first for REVA's lab coat. A mesh whose bones include a node named `Hang_<x>` is hanging cloth
+(load.inc `meshHang`: its points that ride a `Hang_` node are cloth, the rest its waistband riding the body; a mesh named `<base>.hang` is
+the cloth, and another of the same base riding `Hang_` nodes, a pocket, is SEWN on it). No `VertexCollide` node is needed (that one hangs
+every `~skirt~` a pack owns and changes its hair). The first cloth was far too energetic for a coat, and there's no wind; in cloth.inc,
+for these garments:
+- **No wind** (`REVA_SKAIR`).
+- **The hands are solid to it** and never push it into a leg. ⛔ A hand's rule that pressed cloth toward the body was harmless only while
+  it found no skin (her skin isn't named `skin*`); once her real skin was found, an open coat was flung about every substep. The
+  per-layer readout named it.
+- **The garment's own shape**: every point pulled toward where the cut puts it, carried rigidly by the HIPS, its damping toward that
+  target's own motion, capped at 10 cm (`REVA_SKSHAPE=<per s>`, 20 by default: a little sway on a turn, then it settles; `REVA_SKSHAPEZ`,
+  `REVA_SKSHAPEMAX`). The swing relative to the hips dies at `REVA_SKCALM` (6 a second); a scene carrying the body is felt a quarter
+  (`REVA_SKCARRY`).
+- **Thigh capsules from the OUTER surface** (the 90th percentile of skin and plates, never a machine leg's core; `REVA_SKTAPER=0` is one
+  radius); **solid set props and a sit-down** for a seated body (`REVA_SKSET=0` is without); a jump test that allows for the frame's length.
+- Readouts: `REVA_SKIRTDBG=1 REVA_SKEVERY=<n>` (`[skirtlay]` per collision layer, `[skirtshape]` the garment against its cut).
+  `REVA_SKIRTSIM=0` is the old rigid garment, the control. ⛔ OPEN: a stretch spike (3.4) at the end of an armchair's sit-down, not seen
+  in frames.
+
+### 70 · Whole cloth on a game's body, on the engine's own solver -- BUILT (11-16)
+
+The skate game's alien, whose tee and shorts were wrong as skinned meshes. `engine/clubwear.inc` compiles `reva_native/clubcloth/clubcloth.c`
+into the engine (included, so no build line changed) and runs it as its Godot binding does.
+- **`E->bodyCloth(i, path)`**: a text file in the game's folder (`fabric`, `over`, `part` and `capsule` lines; `cwSpecRead` says them)
+  makes every garment the body has on whose pack carries the tailor's numbers (the `CLTH` chunk, `design/pack_format.md`) whole cloth, over
+  every other skinned mesh of the pack as the body (the skin hidden under the clothes is the backstop). NULL or "" takes it off.
+- Once a picture a body: the plain pose (before a mirror) as the palette in metres in its own space, the air and the push from how its
+  origin moved, its turning, then every garment posed, layered (the one under first) and solved. Each garment is drawn from the solver's
+  points (`cc_vertex_points`, added to the library) and casts from them. A mirrored body's cloth is solved plain and drawn reflected.
+  Picture, not rules. `REVA_CWSAY=1` says what was built and how long a solve takes (1.5 ms for a tee and shorts on a PC);
+  `REVA_NOCWEAR=1` is the control.
+- ⛔ A pack's bone map is 16 bits a joint (`bodyPalette`): read as 32, every capsule's bones were "a bone no skin names". ⛔ The tick
+  clock doesn't move inside a picture: time work with `wall_ms`. Not done: the board as a box the cloth keeps out of (`cc_set_boxes`),
+  the solver's finer drawn mesh, threads.
+
+### 71 · What a game's body carries -- BUILT (11-16)
+
+For the skate game's rider: his board, the torch he holds up in a hedge maze at night, his bail, and a chase camera squeezed against him.
+- **`E->attachUpright(body, prop, bone, ...)`**: attach's sibling, the model at the bone's place turned with the body and not the bone (a
+  board carried in a hand, nose up whatever the hand's swing does).
+- **`E->attachGround(h, on, a, b)`**: two points of an attachment (its own units) kept on or above the set's triangles as it's drawn: each
+  looked for 0.2 m along the model's up on a triangle facing up, and one below goes back onto it, the model tilting about its middle (a
+  board's trucks on a bank). The set says `triangles`. Picture, not rules.
+- **`EngineTuning.propTrue`** (appended): what's on a game body's bones drawn at its own size, its offset in true units. ⛔ `E->attach`
+  sizes a prop by its body's eye height against 2.75 units (so a crown fits a child): the alien (his head bone 2.39 units up) drew his
+  board and his torch at about four fifths of their size, and his board grew when he put it down (a loose board is an object, at its own size).
+- **`E->boneAim(body, bone, frame, right, up, front)`, `E->boneCurl(body, bone, angle)`, `E->boneLayOff(body)`**: bones laid over the clip,
+  as a Godot SkeletonModifier3D does (gameworld.inc `boneLayPose`). After its clip, a bone's length (its own +y, as a glTF rig's bones lie)
+  is turned the shortest way onto right*R + up*U + front*F, F the frame bone's +z laid flat (the body's front with no frame); boneCurl
+  turns a bone's rest about its own x (a finger round a grip). A body's lines go in the order first said, each on the pose the last left,
+  and the cloth and what's on its bones follow. A name finds a bone exactly, then after a `:` (`mixamorig:RightArm`), then as attach would.
+- **`E->attachPoint(h, x, y, z, out)`**: where a point of an attachment was last drawn, in the world; in draw it's this picture's (a torch's
+  light at its flame). ⛔ A `NoCast` pack on a bone cast its shadow anyway (`attDraw` drew the shadow pass whatever the pack said): the
+  torch, under its own light, threw an octagon a metre wide round his feet. It doesn't now.
+- **`E->bodyFade(i, f)`**, in draw, as `bodyUnseen`: a game's body and what's on its bones drawn that see-through this picture (0 as it is,
+  1 gone), forgotten at the next draw; its shadow stays.
+- **`E->bodyLimpLead(i, x, z, k)`**: each time it's posed, a limp body's hips go k of the way to (x, z), the whole ragdoll with them (its
+  points and their last places alike, so its speed and its tumble are its own; its height its own); `bodyRise` lets go. A game whose rules
+  keep their own limp body keeps the drawn one on it: on its own physics the drawn ragdoll slid out of the bottom of the picture.
+- **`E->bodyLimpThrow(i, vx, vy, vz, wx, wy, wz)`**: `bodyLimp` with every joint at one speed and a spin about its middle, as Godot sets
+  every PhysicalBone3D's (ragdoll.inc `Ragdoll.even`). `bodyLimp`'s own throw leads with the chest and lets the legs trail (film's falls
+  pitch over their way of going): the alien lay on his back at once where theirs pops up, comes down on his seat and rolls.
+
+### 72 · A graph state's own fade and start -- BUILT (11-16)
+
+`state melon GAME_GRAB_MELON loop 1 blend=0.06 start=0.125` (animgraph.inc): `blend=` is how long a body's draw fades into that state
+(`agBodyBlend`; without it the engine's own 0.18 s), and `start=` where in its clip the state begins, in seconds (rules: it's in
+`[simhash]` with the graph). The skate game snaps a pop, a flip, a grab and a landing in over 0.06 s, and the alien's grab never showed
+in a 0.17 s hop at 0.18. Words anywhere after the clip; the ones before read as ever.
+
+### 73 · A set's own look, lights that fall off as Godot's do, and solid boxes -- BUILT (11-16)
+
+A Godot scene held beside its own game on the same frames: shaded skin carried a grey cast (21, 42, 33 against their 9, 43, 29) and a
+board's aluminium trucks were silver where theirs are black.
+- **`reflect off`** (the bake point's `reflect x y z` reader takes it): the set's surfaces reflect nothing of their surroundings (the
+  view's `misc2.w`, which was always 0; mesh.frag skips the environment term). A scene with a plain colour behind it gives Godot's
+  materials nothing to reflect. **`background r g b`**: a plain colour behind everything, with no sky dome. **`ground`** = the ambient, for
+  an ambient colour that's the same from every side. **`tone linear`** (the light as it is, clipped: Godot's TONEMAP_LINEAR; post.frag),
+  **`bloom off`**, **`occlusion off`** (the scene's occlusion and contact shadows, whatever the machine's: the pass still runs and writes
+  none, so its image's layout never changes). `GfxView.tone`, `noBloom`, `noAO`, `noReflect`. Measured after: lit skin (25, 69, 45)
+  against their (28, 68, 47), shaded (5, 42, 25) against (9, 43, 29), ground and sky within a level or two.
+- ⛔ **The first reader of a set line's word takes every line of it**: `reflect off` sat unread behind the bake point's reader for a
+  build, as `solid <kind>` sat behind the old `solid` reader; a probe, and the machine's own `REVA_GFX=reflect=0`, showed it. A new
+  set line's reader goes before the first that takes the same word.
+- **A light that falls off as Godot's do** (Godot is MIT; this is its formula written here, not its code): `GfxLight.decay` over 0 is the
+  light's colour over the distance in metres (1.75 units) to that power, inside the window it already had to its reach, in place of
+  1/(1+falloff*d*d) (mesh.frag's light loop). `E->lightDecay(decay)` after `E->light` or `E->spot`, and a set `light` line's 10th number
+  (the 8th, the old fit, stays for what reads it). Next to a flame Godot's is two to four times the old fit and the same two metres out:
+  a torch now lights its holder's shoulder as theirs does. ⛔ A cooked Godot shader carries mesh.frag's light loop: a scene converted
+  before this keeps the old falloff on its own surfaces until it's cooked again. The engine's own rasterizer keeps its own falloff.
+- **A set's solid boxes**: `solid <kind> cx cy cz hx hy hz` (the old cloth-and-ragdoll `solid` line, with a surface kind first) is also
+  twelve triangles of that kind in the set's tree (tris.inc `g_trSolid`, up to 64), solid and not drawn; `[triangles]` says how many. A
+  wall's an obstacle, anything else ground. A Godot scene's invisible walls and the net under it: left out, a rider's vert air carried
+  him out over a hedge maze's low walls.
+
+### 74 · The Godot export's additions -- BUILT (11-16)
+
+- ⛔ **Run it WITH A RENDERER, not `--headless`**: `godot --position -20000,0 --path <project> -s engine_export.gd -- <res://scene.tscn>
+  <out folder> [name] [frames]`. Godot's dummy renderer keeps no copy of a MultiMesh a script places as it runs
+  (`set_instance_transform` is dropped and reads back as nothing), and every copy came out at the world's origin: a lobby's dressing, a
+  hedge maze's leaves and weeds, a pumpkin patch's 7,438 tufts. The window is off the screen and never focused, and the export says so
+  when it finds a MultiMesh whose copies all read back at the origin.
+- **A MultiMesh's copies' own data** (`INSTANCE_CUSTOM`): their average is recorded with the shader, and `godot_shader.py` gives it that
+  value (`GD_INSTANCE_CUSTOM`); a pumpkin patch's foliage is coloured by it, and read as nothing the corn, the leaves and the tree crowns
+  were black. A MultiMesh's copies take their shader material's stand-in too: given the shader material itself, the glTF writer wrote a
+  white material by its name, and a lobby's teal sign plates came out pale.
+- **Each Label3D** is its text set as Godot sets it (its font or the theme's fallback, its size, each line centred), each glyph from
+  Godot's own font cache, white with the glyph's coverage as alpha, times its modulate: `<out>/labels/`, and `godot2set.py` makes each a
+  quad in its plane, unlit and see-through, in a pack of its own. Not carried, and said: its outline, autowrap, billboard, colour glyphs.
+- **`godot2set.py`** writes the statics that are solid and never drawn as `solid` lines, each light's attenuation as its 10th number, the
+  ambient colour, a background colour with `reflect off`, `tone linear` for Godot's TONEMAP_LINEAR, and `occlusion off` for a scene
+  with no SSAO.
+- **`skate_src/godot/which_mesh.py <export dir> <name> X Y Z [--r 0.4] [--lift 0]`**: which of an export's meshes have triangles near a
+  point, and which way they face, for finding what a collision in a port met.
+
+### 75 · Smaller things -- (11-16, 11-18)
+
+- **A window made fullscreen no longer crashes**: the presenter pipeline (`P_PRESENT`) is made at start-up whatever the picture is. A
+  window made fullscreen can come to need it (the picture's height is held even, so a screen 1369 lines tall has a picture of its own),
+  and binding the one that had never been made crashed.
+- **The engine never takes the pointer with no window, or while a run is being captured** (`REVA_NOWINDOW`, `capLocked`; main.inc):
+  SDL's relative mode hides the cursor and clips it whatever the window, so a machine doing other work while recorded runs played lost
+  its mouse to them.
+- **The wire's seat is 30 bytes** (club_net.c `SEAT_BYTES`, `NET_PROTO` 5): section 58 put a game's own keys at a seat's end, four bytes,
+  and the block's room was still counted at 26 bytes a seat, so a block of more than 38 ticks ran past `NET_MTU` and wasn't sent at all.
+  Protocol 5: an engine of protocol 4 would read those four bytes as the next seat's start, so the two refuse each other at the hello.
+- **`ENGINE_API_VERSION` 2** (engine.h): the entries this copy added after 11-13 (`lensUp` to `displayMode`), then the ones carried in
+  (`attachUpright` to `lightDecay`), in the one order both copies have. A game built against version 1 is refused.

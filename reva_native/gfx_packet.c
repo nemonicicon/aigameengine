@@ -9,7 +9,13 @@
 #include <string.h>
 #include "gfx.h"
 
+/* (11-14) 64 MB on a PC: a posed body is about 0.7 MB of it (its meshes' bone palettes), and a scene of a pile of bodies had 32 in a frame; at 16 the
+ * 23rd body on and the captions after them weren't drawn. An ARM machine (the Pi, a phone) keeps 16 */
+#if defined(__aarch64__) || defined(__arm__) || defined(__ANDROID__)
 #define PK_MEM (16u << 20)
+#else
+#define PK_MEM (64u << 20)
+#endif
 static GfxPacket g_pk;
 static GfxStats g_st, g_stNext;
 static int g_live;
@@ -51,7 +57,7 @@ void gfxMesh(const GfxMesh *m) {
     else if (m->bind) { const float *A = m->model, *B = m->bind; for (int c = 0; c < 4; c++) for (int r = 0; r < 4; r++) d->model[c * 4 + r] = A[0 * 4 + r] * B[c * 4 + 0] + A[1 * 4 + r] * B[c * 4 + 1] + A[2 * 4 + r] * B[c * 4 + 2] + A[3 * 4 + r] * B[c * 4 + 3]; }
     else memcpy(d->model, m->model, 64);
     d->posOn = 0; d->mouth[6] = 0.f; if (m->mouth) memcpy(d->mouth, m->mouth, 32);
-    memcpy(d->mat, m->mat, 16); d->ntex = m->ntex; d->kind = m->kind; memcpy(d->eye, m->eye, 16); d->rest = m->rest; d->restScale = m->restScale; d->hue = m->hue; d->shader = m->shader;
+    memcpy(d->mat, m->mat, 16); d->ntex = m->ntex; d->kind = m->kind; memcpy(d->eye, m->eye, 16); d->rest = m->rest; d->restScale = m->restScale; d->hue = m->hue; d->shader = m->shader; d->tone = m->tone;
     if (m->pos) { unsigned off2; void *o2 = pkAlloc((size_t)m->nVerts * 12, 16, &off2); if (o2) { memcpy(o2, m->pos, (size_t)m->nVerts * 12); d->posOn = 1; d->posOff = off2; } }
     { long n = m->nIndex ? m->nIndex : m->nVerts; if (m->flags & GFX_SHADOW) { g_stNext.sunDraws++; g_stNext.sunIndices += n; } else { g_stNext.draws++; g_stNext.indices += n; } }
     g_pk.nDraw++;
@@ -141,7 +147,8 @@ static unsigned long long pkHash(const GfxView *v) {
     if (v->gloss[3] > 0.f) h = fnv(h, v->gloss, 16);
     if (v->bars) h = fnv(h, &v->bars, 4);
     if (v->shadowReach > 0.f) h = fnv(h, &v->shadowReach, 4);   /* (11-16) a frame without it hashes as it did */
-    if (v->dof > 0.f || v->shutter > 0.f || v->sepia > 0.f || v->flash > 0.f || v->burn > 0.f || v->grain > 0.f || v->weave[0] != 0.f || v->weave[1] != 0.f) { h = fnv(h, &v->focus, 12); h = fnv(h, &v->sepia, 16); h = fnv(h, v->weave, 8); }   /* (step 25) the lens and film's look, when a frame has any */
+    if (v->dof > 0.f || v->shutter > 0.f || v->sepia > 0.f || v->flash > 0.f || v->burn > 0.f || v->grain > 0.f || v->weave[0] != 0.f || v->weave[1] != 0.f) { h = fnv(h, &v->focus, 12); h = fnv(h, &v->sepia, 16); h = fnv(h, v->weave, 8); }
+    if (v->split[0] != 0.f || v->split[1] != 0.f) h = fnv(h, v->split, 8);   /* (11-14) */   /* (step 25) the lens and film's look, when a frame has any */
     if (g_pk.star.on) { h = fnv(h, g_pk.star.c, sizeof g_pk.star.c * 3); h = fnv(h, g_pk.star.cut, 12); h = fnv(h, g_pk.star.spot, sizeof g_pk.star.spot); }
     for (int i = 0; i < g_pk.nLine; i++) h = fnv(h, g_pk.mem + g_pk.lines[i].off, (size_t)g_pk.lines[i].n * 24);
     for (int i = 0; i < g_pk.nHud; i++) { const GfxHudRec *r = &g_pk.hud[i]; h = fnv(h, g_pk.mem + r->off, (size_t)r->n * (r->tex ? 32 : 8)); h = fnv(h, r->scr, 8); h = fnv(h, r->col, 16); if (r->target) { static const int disp = 1; h = fnv(h, &disp, 4); } }   /* (11-16) into a display: that it is, not which (a texture's name is load order's) */
@@ -190,7 +197,7 @@ static void mixBuild(float t) {
     const PkKept *A = &g_kept[1 - g_keptB], *B = &g_kept[g_keptB];
     if (g_mixCap < B->pk.memUsed || !g_mix.mem) { g_mixCap = B->pk.memUsed + (1u << 20); g_mix.mem = realloc(g_mix.mem, g_mixCap); }
     if (!g_mix.draws) g_mix.draws = malloc(sizeof(GfxDraw) * GFX_MAX_DRAWS);
-    if (!g_mixSeen) g_mixSeen = malloc(65536);
+    if (!g_mixSeen) g_mixSeen = malloc(PK_MEM >> 8);   /* (11-14) a place for every 256 bytes of the packet, whatever its size */
     unsigned char *mem = g_mix.mem; GfxDraw *dr = g_mix.draws;
     g_mix = B->pk; g_mix.mem = mem; g_mix.draws = dr; memcpy(mem, B->pk.mem, B->pk.memUsed); memcpy(dr, B->pk.draws, sizeof(GfxDraw) * (size_t)B->pk.nDraw); g_mixV = B->v; g_mix.nStrands = 0;   /* (11-06) hair steps once a tick: a picture between two draws it as it was */
     g_mixPaired = 0; g_mixDraws = g_mix.nDraw;
@@ -204,14 +211,14 @@ static void mixBuild(float t) {
     memset(g_mixSlot, 0xff, sizeof g_mixSlot);
     for (int i = A->pk.nDraw - 1; i >= 0; i--) { const GfxDraw *d = &A->pk.draws[i]; unsigned k = ((d->id * 2654435761u) ^ ((unsigned)d->flags * 40503u)) & (MIX_SLOTS - 1);
         for (int q = 0; q < MIX_SLOTS; q++, k = (k + 1) & (MIX_SLOTS - 1)) if (g_mixSlot[k] < 0) { g_mixSlot[k] = i; break; } }
-    memset(g_mixSeen, 0, 65536);
+    memset(g_mixSeen, 0, PK_MEM >> 8);
     for (int i = 0; i < g_mix.nDraw; i++) { GfxDraw *d = &g_mix.draws[i]; const GfxDraw *a = NULL; unsigned k = ((d->id * 2654435761u) ^ ((unsigned)d->flags * 40503u)) & (MIX_SLOTS - 1);
         for (int q = 0; q < 64 && g_mixSlot[k] != -1; q++, k = (k + 1) & (MIX_SLOTS - 1)) { if (g_mixSlot[k] < 0) continue; const GfxDraw *c = &A->pk.draws[g_mixSlot[k]];
             if (c->id == d->id && c->flags == d->flags && c->nIndex == d->nIndex && c->nVerts == d->nVerts && c->bones == d->bones) { a = c; g_mixSlot[k] = -2; break; } }
         if (!a) continue;
         g_mixPaired++;
         MIXF(d->model, a->model, d->model, 16); MIXF(d->tint, a->tint, d->tint, 3); d->alpha = a->alpha * s + d->alpha * t; d->useTex = a->useTex * s + d->useTex * t;
-        if (d->bones && d->palOff + (size_t)d->bones * 48 <= B->pk.memUsed && a->palOff + (size_t)a->bones * 48 <= A->pk.memUsed && !g_mixSeen[(d->palOff >> 8) & 65535u]) { g_mixSeen[(d->palOff >> 8) & 65535u] = 1;   /* a pose many bodies share is mixed once */
+        if (d->bones && d->palOff + (size_t)d->bones * 48 <= B->pk.memUsed && a->palOff + (size_t)a->bones * 48 <= A->pk.memUsed && !g_mixSeen[d->palOff >> 8]) { g_mixSeen[d->palOff >> 8] = 1;   /* a pose many bodies share is mixed once */
             float *pb = (float *)(mem + d->palOff); const float *pa = (const float *)(A->pk.mem + a->palOff); const int n = (int)d->bones * 12; for (int q = 0; q < n; q++) pb[q] = pa[q] * s + pb[q] * t; }
         if (d->posOn && a->posOn && d->posOff + (size_t)d->nVerts * 12 <= B->pk.memUsed && a->posOff + (size_t)a->nVerts * 12 <= A->pk.memUsed) {
             float *pb = (float *)(mem + d->posOff); const float *pa = (const float *)(A->pk.mem + a->posOff); const int n = (int)d->nVerts * 3; for (int q = 0; q < n; q++) pb[q] = pa[q] * s + pb[q] * t; } }

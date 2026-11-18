@@ -25,6 +25,7 @@
  * TRK2 had no colour, alpha, picture or looks, and TRK1 one scale and the prop stood on its lowest point: both still read. Beams and lights replace what the set's
  * own lines said, once the track has a frame. A set with no `track` line never comes here. */
 static int g_stkMW=7;
+static int g_stkPW=12;   /* (11-14) the post row's width: 12, or TRK6's 14 (the colour split) */
 static void trackLoad(const char*path,float off){
     if(g_stk){ free(g_stk); g_stk=NULL; }
     g_stkFrames=0; g_stkLast=-1; g_stkNK=0; memset(g_stkLook,0,sizeof g_stkLook);
@@ -39,7 +40,8 @@ static void trackLoad(const char*path,float off){
     if(ver<4||got<9||nc<0||nc>1||np<0||np>1){ nc=0; np=0; }
     if(ver<5||got<10||ns<0||ns>32) ns=0;
     g_stkMW=ver>=3?15:ver>=2?9:7;
-    int stride=3+nl*6+nb*13+nm*g_stkMW+nk*4+nc*9+np*12+ns*3; size_t n=(size_t)fr*(size_t)stride;
+    g_stkPW=ver>=6?14:12;   /* (11-14) TRK6: the post row's last two numbers are the colour split's x and y */
+    int stride=3+nl*6+nb*13+nm*g_stkMW+nk*4+nc*9+np*g_stkPW+ns*3; size_t n=(size_t)fr*(size_t)stride;
     float*d=(float*)malloc(n*sizeof(float));
     if(!d||fread(d,sizeof(float),n,f)!=n){ printf("[track] %s is short: wanted %d frames of %d floats\n",path,fr,stride); free(d); fclose(f); return; }
     fclose(f);
@@ -81,7 +83,8 @@ static void trackApply(void){
         if(g_stkNC){ const float dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2]; const int cut=((a[8]>0.5f)!=(b[8]>0.5f))||dx*dx+dy*dy+dz*dz>6.25f;
             for(int k=0;k<8;k++) g_stkCam[k]=cut?a[k]:a[k]+(b[k]-a[k])*u;
             g_stkCam[8]=a[8]; a+=9; b+=9; }
-        if(g_stkNP) for(int k=0;k<12;k++) g_stkPost[k]=(a[k]<0.f||b[k]<0.f)?a[k]:a[k]+(b[k]-a[k])*u; }
+        if(g_stkNP){ for(int k=0;k<12;k++) g_stkPost[k]=(a[k]<0.f||b[k]<0.f)?a[k]:a[k]+(b[k]-a[k])*u;
+            for(int k=12;k<14;k++) g_stkPost[k]=g_stkPW>k?a[k]+(b[k]-a[k])*u:0.f; } }
     if(fr==g_stkLast) return;
     g_stkLast=fr;
     const float*d=g_stk+(size_t)fr*(size_t)g_stkStride;
@@ -114,18 +117,18 @@ static void trackApply(void){
     /* where each scene body's to look, if the track says */
     { const float*lk=d+(size_t)g_stkNM*(size_t)g_stkMW; for(int k=0;k<g_stkNK&&k<STK_LOOKS;k++) memcpy(g_stkLook[k],lk+k*4,16); }
     /* (11-11) TRK5: each spot's colour this frame, after the lens and the post rows */
-    if(g_stkNS){ const float*sp=d+(size_t)g_stkNM*(size_t)g_stkMW+(size_t)g_stkNK*4u+(size_t)g_stkNC*9u+(size_t)g_stkNP*12u;
+    if(g_stkNS){ const float*sp=d+(size_t)g_stkNM*(size_t)g_stkMW+(size_t)g_stkNK*4u+(size_t)g_stkNC*9u+(size_t)g_stkNP*(size_t)g_stkPW;
         for(int k=0;k<g_stkNS&&k<32;k++) for(int c=0;c<3;c++){ const float v=sp[k*3+c]; g_stkSpot[k][c]=v<0.f?0.f:v; } } }
 /* (step 25) this frame's lens and look: what stands (a ctl line, the set's, a scene line's, a game's), and over it what the timeline says for the frame.
  * eye and aim are the frame's lens as everything before this decided it; if the timeline has the lens they're written over */
 static void lensNow(float*eye,float*aim){
     g_lensNow.roll=g_camRoll; g_lensNow.focus=g_lensFocus; g_lensNow.dof=g_lensDof; g_lensNow.shutter=g_lensShutter;
-    g_lensNow.sepia=g_filmSepia; g_lensNow.flash=g_filmFlash; g_lensNow.burn=g_filmBurn; g_lensNow.grain=g_filmGrain; g_lensNow.weave[0]=g_filmWeave[0]; g_lensNow.weave[1]=g_filmWeave[1];
+    g_lensNow.sepia=g_filmSepia; g_lensNow.flash=g_filmFlash; g_lensNow.burn=g_filmBurn; g_lensNow.grain=g_filmGrain; g_lensNow.weave[0]=g_filmWeave[0]; g_lensNow.weave[1]=g_filmWeave[1]; g_lensNow.split[0]=g_filmSplit[0]; g_lensNow.split[1]=g_filmSplit[1];
     g_lensNow.exposure=g_lensNow.haze=g_lensNow.grade=-1.f; g_lensNow.fov=-1.f; g_lensNow.camOn=0;
     if(g_stk&&g_stkNC&&g_stkCam[8]>0.5f){ g_lensNow.camOn=1; memcpy(eye,g_stkCam,12); memcpy(aim,g_stkCam+3,12); g_lensNow.fov=g_stkCam[6]; g_lensNow.roll=g_stkCam[7]; }
     if(g_stk&&g_stkNP){ const float*q=g_stkPost;
         if(q[0]>0.f) g_lensNow.exposure=q[0];
-        g_lensNow.sepia=fmaxf(g_lensNow.sepia,q[1]); g_lensNow.flash+=q[2]; g_lensNow.burn=fmaxf(g_lensNow.burn,q[3]); g_lensNow.weave[0]+=q[4]; g_lensNow.weave[1]+=q[5]; g_lensNow.grain=fmaxf(g_lensNow.grain,q[6]);
+        g_lensNow.sepia=fmaxf(g_lensNow.sepia,q[1]); g_lensNow.flash+=q[2]; g_lensNow.burn=fmaxf(g_lensNow.burn,q[3]); g_lensNow.weave[0]+=q[4]; g_lensNow.weave[1]+=q[5]; g_lensNow.split[0]+=q[12]; g_lensNow.split[1]+=q[13]; g_lensNow.grain=fmaxf(g_lensNow.grain,q[6]);
         if(q[7]!=0.f){ g_lensNow.focus=q[7]; g_lensNow.dof=q[8]; }
         if(q[9]>0.f) g_lensNow.shutter=q[9];
         if(q[10]>=0.f) g_lensNow.haze=q[10];

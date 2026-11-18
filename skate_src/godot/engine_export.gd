@@ -11,9 +11,15 @@ extends SceneTree
 ##                           safety net), the WorldEnvironment, the park loader's sidecar (rails, gaps, walls), which meshes
 ##                           are ridden (the skate game's own rule, by name), and what can't come over as it is: shader
 ##                           materials, particles, decals, scripts that ran
+##   <out>/labels/            (11-16) each Label3D's text as a picture, set in its own font (Godot's fallback if it names none) by Godot's own text
+##                           server, white where it's ink, in its colour; the manifest's "labels" has where it stands, its size in metres and how it's drawn
 ##   <out>/shaders/           (11-12, step 12) each shader material's textures as pictures, for godot_shader.py: the manifest's "shaders" has
 ##                           each one's code and what its uniforms are set to, and the surfaces it's on are named for it in the glb
-## usage: godot --headless --path <project> -s <this file> -- <res://scene.tscn> <out folder> [name] [frames]
+## usage: godot --position -20000,0 --path <project> -s <this file> -- <res://scene.tscn> <out folder> [name] [frames]
+##    ⛔ (11-16) WITH A RENDERER, NOT --headless: Godot's dummy renderer keeps no copy of a MultiMesh that a script places as it runs
+##    (set_instance_transform is dropped and reads back as nothing), and every one came out at the world's origin: a lobby's
+##    dressing (its signs' plates, their fasteners, the caddies and cans), a hedge maze's leaves and weeds, a pumpkin patch's
+##    7,438 tufts. The window is put off the screen and can't be given focus, and --position keeps it off from the start
 ##    or: ... -- --pieces <out folder> [name]   (11-12, step 14) the skate game's Create a Map library: every piece its ParkLibrary has, built
 ##        by its own ParkObjectFactory, at the origin under one node each (the glb), and each one's settings, collision and rails (the manifest)
 ## skate_src/godot/godot2set.py turns the two files into a set and a pack for the engine.
@@ -33,6 +39,11 @@ func _init() -> void:
 
 
 func _run() -> void:
+	if DisplayServer.get_name() != "headless":   # (11-16) off the screen and never focused (the usage's ⛔)
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true, DisplayServer.MAIN_WINDOW_ID)
+		DisplayServer.window_set_position(Vector2i(-20000, 0), DisplayServer.MAIN_WINDOW_ID)
+	else:
+		print("ENGINE_EXPORT headless: a MultiMesh a script fills as it runs reads back at the origin here; run it with a renderer")
 	var args := OS.get_cmdline_user_args()
 	if args.size() < 2:
 		printerr("usage: -- <res://scene.tscn> <out folder> [name] [frames]")
@@ -45,6 +56,7 @@ func _run() -> void:
 	var frames: int = int(args[3]) if args.size() > 3 else 30
 	DirAccess.make_dir_recursive_absolute(out)
 	DirAccess.make_dir_recursive_absolute(out.path_join("shaders"))
+	DirAccess.make_dir_recursive_absolute(out.path_join("labels"))
 	_out = out
 	var lvl: Node
 	if scene_path == "--pieces":
@@ -138,10 +150,31 @@ func _walk(n: Node, player: Node, out_root: Node3D, m: Dictionary) -> void:
 		var mmi := n as MultiMeshInstance3D
 		if mmi.is_visible_in_tree() and mmi.multimesh != null and mmi.multimesh.mesh != null:
 			var mm := mmi.multimesh
+			var custom = null   # (11-16) the copies' own data (INSTANCE_CUSTOM), their average: a shader that reads it is recorded with it (_stand_in)
+			if mm.use_custom_data and mm.instance_count > 0:
+				var acc := Vector4.ZERO
+				for i in mm.instance_count:
+					var cd := mm.get_instance_custom_data(i)
+					acc += Vector4(cd.r, cd.g, cd.b, cd.a)
+				acc /= float(mm.instance_count)
+				custom = Color(acc.x, acc.y, acc.z, acc.w)
+			var placed := 0   # (11-16) copies that read back somewhere: none of several says the renderer kept no places (headless)
+			for i in mm.visible_instance_count if mm.visible_instance_count >= 0 else mm.instance_count:
+				if mm.get_instance_transform(i) != Transform3D.IDENTITY:
+					placed += 1
+			if placed == 0 and mm.instance_count > 1:
+				m["unsupported"]["multimesh_unplaced"] = int(m["unsupported"].get("multimesh_unplaced", 0)) + mm.instance_count
 			for i in mm.visible_instance_count if mm.visible_instance_count >= 0 else mm.instance_count:
 				var c := MeshInstance3D.new()
 				c.mesh = mm.mesh
 				c.material_override = mmi.material_override
+				for si in mm.mesh.get_surface_count():   # (11-16) a shader material as an ordinary mesh's goes (_stand_in)
+					var smat: Material = mmi.material_override if mmi.material_override != null else mm.mesh.surface_get_material(si)
+					if smat is ShaderMaterial:
+						c.set_surface_override_material(si, _stand_in(smat as ShaderMaterial, m, custom))
+					elif mmi.material_override != null:
+						c.set_surface_override_material(si, mmi.material_override)
+				c.material_override = null
 				c.name = "%s_%d" % [_path_name(mmi), i]
 				c.transform = mmi.global_transform * mm.get_instance_transform(i)
 				out_root.add_child(c)
@@ -187,7 +220,7 @@ func _walk(n: Node, player: Node, out_root: Node3D, m: Dictionary) -> void:
 	elif n is Decal:
 		m["unsupported"]["decals"].append({"name": _path_name(n), "xf": _xf((n as Node3D).global_transform), "size": [(n as Decal).size.x, (n as Decal).size.y, (n as Decal).size.z]})
 	elif n is Label3D:
-		m["unsupported"]["labels"].append({"name": _path_name(n), "text": (n as Label3D).text, "xf": _xf((n as Node3D).global_transform)})
+		m["unsupported"]["labels"].append(_label(n as Label3D, m["unsupported"]["labels"].size()))
 	if "town_path" in n and "sidecar_path" in n:
 		var sp: String = n.get("sidecar_path")
 		m["park"] = {"model": n.get("town_path"), "sidecar": sp}
@@ -195,6 +228,42 @@ func _walk(n: Node, player: Node, out_root: Node3D, m: Dictionary) -> void:
 			m["sidecar"] = JSON.parse_string(FileAccess.get_file_as_string(sp))
 	for c in n.get_children():
 		_walk(c, player, out_root, m)
+
+
+## (11-12, step 12) the shader goes over to be run in the engine (godot_shader.py translates it): its code, what its uniforms are set
+## to, its textures as pictures. The surface's stand-in material is NAMED for it, so the glb says which surfaces it's on. What the
+## material still holds of the model's own look (a texture it wraps, a colour) is the stand-in's too, for wherever it's drawn plainly
+## ⛔ ONE stand-in for each shader material, shared by its surfaces: the glTF writer makes a material of each instance and renames a name
+## it has seen (gshd_1, gshd_12, gshd_13 ...), and the cook knew one surface in each shader's. (11-16) A MultiMesh's copies take theirs
+## here too: given the shader material itself, the glTF writer wrote a white material by its name, and a lobby's teal sign plates,
+## collars and instrument housings (one shader's dark family) came out pale
+func _stand_in(sm: ShaderMaterial, m: Dictionary, custom = null) -> StandardMaterial3D:
+	var sp := (sm.shader.resource_path) if sm.shader != null else "(no shader)"
+	m["unsupported"]["shader_materials"][sp] = int(m["unsupported"]["shader_materials"].get(sp, 0)) + 1
+	if custom != null and (sm.shader == null or not sm.shader.code.contains("INSTANCE_CUSTOM")):
+		custom = null   # only a shader that reads it is made again for it
+	var sid = _custom_key(sm, custom)
+	if _stand_of.has(sid):
+		var had := _stand_of[sid] as StandardMaterial3D
+		if had.albedo_texture != null:
+			m["unsupported"]["shader_materials_kept"] = int(m["unsupported"].get("shader_materials_kept", 0)) + 1
+		return had
+	var stand := StandardMaterial3D.new()
+	_stand_of[sid] = stand
+	var got := false
+	if sm.shader != null:
+		stand.resource_name = _shader_rec(sm, m, custom)
+		for u in sm.shader.get_shader_uniform_list():
+			var v = sm.get_shader_parameter(u["name"])
+			if not got and v is Texture2D and String(u["name"]) in ["original", "albedo", "albedo_texture", "texture_albedo", "base_texture", "main_texture", "tex"]:
+				stand.albedo_texture = v
+				got = true
+			elif v is Color and String(u["name"]) in ["albedo", "albedo_color", "color", "base_color", "tint"]:
+				stand.albedo_color = v
+				got = true
+	if got:
+		m["unsupported"]["shader_materials_kept"] = int(m["unsupported"].get("shader_materials_kept", 0)) + 1
+	return stand
 
 
 func _mesh(mi: MeshInstance3D, out_root: Node3D, m: Dictionary) -> void:
@@ -215,35 +284,7 @@ func _mesh(mi: MeshInstance3D, out_root: Node3D, m: Dictionary) -> void:
 	for i in mi.mesh.get_surface_count():
 		var mat: Material = mi.get_active_material(i)
 		if mat is ShaderMaterial:
-			var sm := mat as ShaderMaterial
-			var sp := (sm.shader.resource_path) if sm.shader != null else "(no shader)"
-			m["unsupported"]["shader_materials"][sp] = int(m["unsupported"]["shader_materials"].get(sp, 0)) + 1
-			# (11-12, step 12) the shader goes over to be run in the engine (godot_shader.py translates it): its code, what its uniforms are set
-			# to, its textures as pictures. The surface's stand-in material is NAMED for it, so the glb says which surfaces it's on. What the
-			# material still holds of the model's own look (a texture it wraps, a colour) is the stand-in's too, for wherever it's drawn plainly
-			# ⛔ ONE stand-in for each shader material, shared by its surfaces: the glTF writer makes a material of each instance and renames a name
-			# it has seen (gshd_1, gshd_12, gshd_13 ...), and the cook knew one surface in each shader's
-			if _stand_of.has(sm.get_instance_id()):
-				c.set_surface_override_material(i, _stand_of[sm.get_instance_id()])
-				if (_stand_of[sm.get_instance_id()] as StandardMaterial3D).albedo_texture != null:
-					m["unsupported"]["shader_materials_kept"] = int(m["unsupported"].get("shader_materials_kept", 0)) + 1
-				continue
-			var stand := StandardMaterial3D.new()
-			_stand_of[sm.get_instance_id()] = stand
-			var got := false
-			if sm.shader != null:
-				stand.resource_name = _shader_rec(sm, m)
-				for u in sm.shader.get_shader_uniform_list():
-					var v = sm.get_shader_parameter(u["name"])
-					if not got and v is Texture2D and String(u["name"]) in ["original", "albedo", "albedo_texture", "texture_albedo", "base_texture", "main_texture", "tex"]:
-						stand.albedo_texture = v
-						got = true
-					elif v is Color and String(u["name"]) in ["albedo", "albedo_color", "color", "base_color", "tint"]:
-						stand.albedo_color = v
-						got = true
-			c.set_surface_override_material(i, stand)
-			if got:
-				m["unsupported"]["shader_materials_kept"] = int(m["unsupported"].get("shader_materials_kept", 0)) + 1
+			c.set_surface_override_material(i, _stand_in(mat as ShaderMaterial, m))
 
 
 ## (11-12, step 14) a script class of the project's, by name, without naming it in this file (which runs in any project)
@@ -324,13 +365,24 @@ func _piece_rec(def, asset) -> Dictionary:
 
 
 ## (11-12, step 12) a shader material, once: its code, its uniforms' values, its textures saved as pictures in <out>/shaders
-func _shader_rec(sm: ShaderMaterial, m: Dictionary) -> String:
-	var id := sm.get_instance_id()
+## (11-16) a shader material's key here: its instance, and the copies' average custom data when a MultiMesh's copies carry it (to a 64th)
+func _custom_key(sm: ShaderMaterial, custom) -> Variant:
+	if custom == null:
+		return sm.get_instance_id()
+	var c := custom as Color
+	return "%d|%d,%d,%d,%d" % [sm.get_instance_id(), roundi(c.r * 64.0), roundi(c.g * 64.0), roundi(c.b * 64.0), roundi(c.a * 64.0)]
+
+
+func _shader_rec(sm: ShaderMaterial, m: Dictionary, custom = null) -> String:
+	var id = _custom_key(sm, custom)
 	if _shd_of.has(id):
 		return _shd_of[id]
 	var key := "gshd_%d" % m["shaders"].size()
 	_shd_of[id] = key
 	var rec := {"key": key, "shader": sm.shader.resource_path, "code": sm.shader.code, "params": {}, "notes": [], "globals": {}}
+	if custom != null:   # (11-16) INSTANCE_CUSTOM as these copies have it (their average): godot_shader.py gives it this value
+		var cc := custom as Color
+		rec["instance_custom"] = [roundi(cc.r * 64.0) / 64.0, roundi(cc.g * 64.0) / 64.0, roundi(cc.b * 64.0) / 64.0, roundi(cc.a * 64.0) / 64.0]
 	# a `global uniform` is the project's: its value as the scene stands (a script may move it as it runs; the cook holds this one)
 	var rx := RegEx.new()
 	rx.compile("global\\s+uniform\\s+\\w+\\s+(\\w+)")
@@ -513,6 +565,81 @@ func _env(e: Environment, m: Dictionary) -> Dictionary:
 		elif sm is PanoramaSkyMaterial and (sm as PanoramaSkyMaterial).panorama != null:
 			d["sky_panorama"] = (sm as PanoramaSkyMaterial).panorama.resource_path
 	return d
+
+
+## (11-16) A Label3D as the engine can take it: its text set as Godot sets it (its font, or the theme's fallback; its size; each line centred, the
+## lines one font height apart and the block centred on its origin, as Label3D lays them out by default), each glyph from Godot's own font cache
+## (shaped by the text server, rendered into the cache, read back as pictures: no renderer needed, so it runs headless), white with the glyph's
+## coverage as alpha, times its modulate. The picture's pixel is pixel_size metres in the label's plane (x along its basis.x, up its basis.y,
+## seen from +z). Its outline, autowrap, billboard and a font of colour glyphs aren't carried, and are said.
+func _label(lb: Label3D, k: int) -> Dictionary:
+	var rec := {"name": _path_name(lb), "text": lb.text, "xf": _xf(lb.global_transform), "pixel_size": lb.pixel_size, "font_size": lb.font_size,
+		"modulate": [lb.modulate.r, lb.modulate.g, lb.modulate.b, lb.modulate.a], "double_sided": lb.double_sided, "shaded": lb.shaded,
+		"billboard": lb.billboard, "outline_size": lb.outline_size, "visibility_range_end": lb.visibility_range_end, "offset": [lb.offset.x, lb.offset.y]}
+	var b := lb.global_transform.basis
+	rec["basis"] = [[b.x.x, b.x.y, b.x.z], [b.y.x, b.y.y, b.y.z], [b.z.x, b.z.y, b.z.z]]
+	var font: Font = lb.font if lb.font != null else ThemeDB.fallback_font
+	var ts := TextServerManager.get_primary_interface()
+	var sz := lb.font_size
+	var csz := Vector2i(sz, 0)
+	var lines := lb.text.split("\n")
+	var shaped := []
+	var widths := []
+	var maxw := 0.0
+	for line in lines:
+		var s := ts.create_shaped_text()
+		ts.shaped_text_add_string(s, line, font.get_rids(), sz)
+		shaped.append(s)
+		var w := ts.shaped_text_get_width(s)
+		widths.append(w)
+		maxw = maxf(maxw, w)
+	var asc := font.get_ascent(sz)
+	var lh := font.get_height(sz) + lb.line_spacing
+	var pad := 2
+	var W := int(ceil(maxw)) + pad * 2
+	var H := int(ceil(lh * lines.size() - lb.line_spacing)) + pad * 2
+	var img := Image.create(maxi(W, 1), maxi(H, 1), false, Image.FORMAT_RGBA8)
+	var ink := lb.modulate
+	img.fill(Color(ink.r, ink.g, ink.b, 0.0))
+	var odd := 0
+	for li in lines.size():
+		var pen := Vector2(pad + (maxw - float(widths[li])) * 0.5, pad + asc + lh * li)
+		for g in ts.shaped_text_get_glyphs(shaped[li]):
+			var frid: RID = g["font_rid"]
+			var gi: int = g["index"]
+			if frid.is_valid() and gi != 0:
+				ts.font_render_glyph(frid, csz, gi)
+				var ti := ts.font_get_glyph_texture_idx(frid, csz, gi)
+				if ti >= 0:
+					var atlas := ts.font_get_texture_image(frid, csz, ti)
+					var uv := ts.font_get_glyph_uv_rect(frid, csz, gi)
+					var off := ts.font_get_glyph_offset(frid, csz, gi)
+					if atlas == null:
+						odd += 1
+					else:
+						if atlas.is_compressed():
+							atlas.decompress()
+						var at := pen + (g["offset"] as Vector2) + off
+						for yy in int(uv.size.y):
+							for xx in int(uv.size.x):
+								var px := int(round(at.x)) + xx
+								var py := int(round(at.y)) + yy
+								if px < 0 or py < 0 or px >= W or py >= H:
+									continue
+								var c := atlas.get_pixel(int(uv.position.x) + xx, int(uv.position.y) + yy)
+								var a := c.a * ink.a
+								var was := img.get_pixel(px, py)
+								if a > was.a:
+									img.set_pixel(px, py, Color(ink.r, ink.g, ink.b, a))
+			pen.x += float(g["advance"])
+		ts.free_rid(shaped[li])
+	var pic := "labels/%s_label_%03d.png" % [_name, k]
+	img.save_png(_out.path_join(pic))
+	rec["picture"] = pic
+	rec["px"] = [W, H]
+	if odd > 0:
+		rec["glyphs_missing"] = odd
+	return rec
 
 
 func _xf(t: Transform3D) -> Dictionary:

@@ -439,7 +439,7 @@ static int labDrawPartner(Pack*P,int clip,double phase,const float*heroModel,flo
       attPublish(P,W,model,g_castI);
       /* ⭐ and her board off her clip's channel, at the phase she was sampled at (after any hold) */
       boardPublish(g_castI,borrowed9?g_labPDnP:P,borrowed9?g_labPDnC:clip,phase,borrowed9,model);
-      clipAuditBody(P,W,model,g_castI); }   /* ⭐ this slot, exactly as drawn */
+      clipAuditBody(P,W,model,g_castI); fingerDbg(P,W,"a scene's body"); }   /* ⭐ this slot, exactly as drawn */
     if(P->pb[5]>=0){ float hx=W[P->pb[5]][12],hy=W[P->pb[5]][13],hz=W[P->pb[5]][14];
         g_partHeadW[0]=model[0]*hx+model[4]*hy+model[8]*hz+model[12];
         g_partHeadW[1]=model[1]*hx+model[5]*hy+model[9]*hz+model[13];

@@ -60,6 +60,38 @@ static void packEyesFind(Pack*P){
             for(int a=0;a<nc;a++) if(twin[a]){ float*o=P->meshMat[cd[a].mi]; o[4]=3.f; o[0]=0.20f; o[1]=0.f; got++; }
             if(got&&!g_loadQuiet) printf("[material] %s: %d meshes taken as eyes, by their shape and where they sit\n",P->label,got); } }
     free(T); free(Q); free(S); free(W); free(pal); free(bb); }
+/* ---- (11-16) WHAT THE TAILOR PAINTED ON A GARMENT: a CLTH chunk (design/pack_format.md), by mesh name, two floats a vertex in metres: how far each point
+ * may go from its skinned pose and how near the skin it may come, as a glTF garment's second UV tells the engine's cloth solver (clubcloth/README.md).
+ * A record whose mesh isn't there, or has another number of vertices, is left out and said; a chunk that doesn't add up is ignored, loudly. One
+ * block, the pointers and the numbers, so it's one free. engine/clubwear.inc is what reads them */
+static void packTailor(Pack*P){
+    P->meshTail=NULL;
+    if(P->len<16||memcmp(P->pk+P->len-4,"RPK2",4)) return;
+    unsigned f9[3]; memcpy(f9,P->pk+P->len-16,12);
+    if(f9[2]!=P->len||(size_t)f9[0]+(size_t)f9[1]*16>P->len-16) return;
+    for(unsigned d9=0;d9<f9[1];d9++){ const unsigned char*e9=P->pk+f9[0]+d9*16; unsigned o9,s9; memcpy(&o9,e9+4,4); memcpy(&s9,e9+8,4);
+        if(memcmp(e9,"CLTH",4)||s9<4||(size_t)o9+s9>P->len) continue;
+        const unsigned char*c=P->pk+o9; unsigned n; memcpy(&n,c,4);
+        if(n>4096u||4u+(size_t)n*12u>s9){ printf("[cloth] %s: a CLTH chunk that doesn't add up, ignored\n",P->label); fflush(stdout); return; }
+        size_t total=0; int*hit=(int*)calloc(n?n:1,sizeof(int));
+        if(!hit) return;
+        for(unsigned r=0;r<n;r++){ unsigned nm,vt,of,ln; memcpy(&nm,c+4+r*12,4); memcpy(&vt,c+8+r*12,4); memcpy(&of,c+12+r*12,4); hit[r]=-1;
+            if(nm>s9||s9-nm<4) continue;
+            memcpy(&ln,c+nm,4); if(ln>s9-nm-4||ln>200) continue;
+            if(of>s9||(size_t)vt*8>s9-of) continue;
+            char name[208]; memcpy(name,c+nm+4,ln); name[ln]=0;
+            for(unsigned mi=0;mi<P->nMeshes;mi++){ const char*mn=packStr(P,P->meshes[mi].name); if(mn&&!strcmp(mn,name)&&P->meshes[mi].verts==vt){ hit[r]=(int)mi; total+=(size_t)vt*2; break; } }
+            if(hit[r]<0){ printf("[cloth] %s: the tailor's numbers for %s fit no mesh of %u vertices, left out\n",P->label,name,vt); fflush(stdout); } }
+        if(total){ unsigned char*blk=(unsigned char*)calloc(1,P->nMeshes*sizeof(float*)+total*sizeof(float));
+            if(blk){ P->meshTail=(float**)blk; float*at=(float*)(blk+P->nMeshes*sizeof(float*));
+                for(unsigned r=0;r<n;r++) if(hit[r]>=0){ unsigned vt,of; memcpy(&vt,c+8+r*12,4); memcpy(&of,c+12+r*12,4); memcpy(at,c+of,(size_t)vt*8);
+                    for(unsigned k=0;k<vt*2u;k++) if(!(at[k]==at[k])||at[k]<0.f||at[k]>1.f) at[k]=0.f;   /* metres, finite, and no more than one */
+                    P->meshTail[hit[r]]=at; at+=vt*2u; } } }
+        free(hit); return; } }
+
+/* (11-16) a MATL record's name is 40 bytes, and material.py cuts a longer one to 39: a record that fills all 39 names the meshes whose names begin with it.
+ * Matched whole, the skate game's alien's long garment names (wear~legs~shorts~street.MAT_Shorts#424247, 41) could never be given a material */
+#define MATL_NAMES(nm,rec) (!strcmp((nm),(rec))||(strlen(rec)==39u&&!strncmp((nm),(rec),39)))
 static void packMaterials(Pack*P){
     if(g_matFileN<0){ g_matFileN=0; FILE*f=fopen("data/materials.txt","r");
         if(f){ char ln[160]; while(fgets(ln,sizeof ln,f)&&g_matFileN<MAT_FILE_MAX){ float r=0.85f,m=0.f,d=0.f; char k[24]; if(ln[0]=='#'||sscanf(ln,"%23s %f %f %f",k,&r,&m,&d)<3) continue;
@@ -76,7 +108,13 @@ static void packMaterials(Pack*P){
                 if(kd==4) for(size_t q=0;q<sizeof MAT_NOTCLOTH/sizeof MAT_NOTCLOTH[0];q++) if(matWordIn(own,MAT_NOTCLOTH[q])){ kd=0; break; }
                 o[4]=(float)kd; if(!hit&&kd) o[0]=MAT_KIND[k].r;
                 if(kd==6){ o[3]=0.035f; o[2]=0.55f; }   /* fur nobody measured: three and a half centimetres, middling fine */
-                break; } } }
+                break; } }
+        /* ⭐ (11-16) GLASS, kind 8, on any mesh, a prop's as well as a body's: a SHEER mesh (#rrggbbAA in its name) with `glass` in its name is drawn as
+         * glass (mesh.frag's GLASS: what it throws back of the room and the lights, growing to all of it at a grazing angle, over what comes through,
+         * its own sheerness as the haze its body scatters), and casts no shadow (body.inc). Built for REVA's round glasses: reflections and
+         * transparency. Glass that isn't sheer is a painted window and stays what it was: a city's dark
+         * facade glass has nothing behind it. After the words for a body's kinds, or a lens called `eyeglass` would be an eye */
+        if((P->meshes[mi].flags&8u)&&matWordIn(nm,"glass")){ o[4]=8.f; o[0]=0.05f; o[1]=0.f; } }
     packEyesFind(P);
     /* the pack's own word beats the tables' */
     if(P->len>=16&&!memcmp(P->pk+P->len-4,"RPK2",4)){ unsigned f9[3]; memcpy(f9,P->pk+P->len-16,12);
@@ -98,8 +136,8 @@ static void packMaterials(Pack*P){
                 if(!(v[4]>=0.f)||v[4]>6.f) v[4]=0.f;
                 v[4]=(float)(int)(v[4]+0.5f); const int ord9=(v[5]>=1.f&&v[5]<4096.f)?(int)(v[5]+0.5f):0; int seen9=0, was9=-1, now9=-1; v[5]=0.f;
                 for(unsigned fi=0;fi<P->nMeshes;fi++){ const unsigned mi=byFile9?byFile9[fi]:fi; const char*nm=packStr(P,P->meshes[mi].name);
-                    if(nm&&!strcmp(nm,nm9)){ seen9++; if(!ord9||seen9==ord9){ memcpy(P->meshMat[mi],v,24); got++; now9=(int)mi; } } }
-                if(ord9&&byFile9){ seen9=0; for(unsigned mi=0;mi<P->nMeshes&&was9<0;mi++){ const char*nm=packStr(P,P->meshes[mi].name); if(nm&&!strcmp(nm,nm9)&&++seen9==ord9) was9=(int)mi; }
+                    if(nm&&MATL_NAMES(nm,nm9)){ seen9++; if(!ord9||seen9==ord9){ memcpy(P->meshMat[mi],v,24); got++; now9=(int)mi; } } }
+                if(ord9&&byFile9){ seen9=0; for(unsigned mi=0;mi<P->nMeshes&&was9<0;mi++){ const char*nm=packStr(P,P->meshes[mi].name); if(nm&&MATL_NAMES(nm,nm9)&&++seen9==ord9) was9=(int)mi; }
                     if(was9!=now9) moved++; } }
             free(byFile9);
             printf("[material] %s: %u in its chunk, on %d meshes",P->label,n,got);
@@ -867,6 +905,28 @@ static Pack loadPack(const char*path){
         printf("\n"); fflush(stdout);
         const char*e=getenv("REVA_OUTFIT");
         if(!(e&&e[0]&&wardWear(&P,e))&&P.nOutfit) wardWear(&P,P.outfitName[0]); } }
+    /* ⭐ (11-16) A GARMENT HANGS WHERE IT RIDES A Hang_ NODE (REVA's lab coat). Her coat's skirt was skinned to her thighs: wherever a thigh turned, its panel went with it, rigid. A mesh whose bones include a node
+     * named Hang_<x> is hanging cloth on any pack (engine/cloth.inc, THE HANGING CLOTH): its points that ride a Hang_ node are the cloth, the rest its
+     * waistband, riding her. No VertexCollide node: that one hangs every ~skirt~ a pack owns (her pleated skirt, another outfit's) and changes her hair's
+     * chains. The Hang_ nodes are where the tailor puts them (on her thighs), so with the cloth off (REVA_SKIRTSIM=0) the mesh is skinned as the coat
+     * always was. A mesh named <base>.hang is that cloth; another mesh of the same <base> riding Hang_ nodes (a pocket) is SEWN ON it, drawn on the
+     * cloth where it lay at rest. Read after the reorder above, like the wardrobe: a per-mesh array made before it points at the wrong meshes */
+    P.meshHang=NULL; P.meshHangSib=NULL;
+    for(unsigned m=0;m<P.nMeshes;m++){ PMesh*M=&P.meshes[m]; if(!(M->flags&4)||!M->boneCount||M->boneCount>MAXB) continue;
+        const unsigned short*bm=(const unsigned short*)(P.pk+M->offBoneMap);
+        for(unsigned b=0;b<M->boneCount;b++){ const unsigned nd=bm[b]; if(nd>=P.nNodes) continue;
+            if(strncmp(packStr(&P,P.nodes[nd].name),"Hang_",5)) continue;
+            if(!P.meshHang){ P.meshHang=(unsigned char*)calloc(P.nMeshes,1); P.meshHangSib=(short*)malloc(sizeof(short)*P.nMeshes);
+                if(!P.meshHang||!P.meshHangSib){ free(P.meshHang); free(P.meshHangSib); P.meshHang=NULL; P.meshHangSib=NULL; break; }
+                for(unsigned q=0;q<P.nMeshes;q++) P.meshHangSib[q]=-1; }
+            P.meshHang[m]=1; break; } }
+    if(P.meshHang) for(unsigned m=0;m<P.nMeshes;m++){ if(!P.meshHang[m]) continue;
+        char nm[128]; snprintf(nm,sizeof nm,"%s",packStr(&P,P.meshes[m].name));
+        char*dot=strrchr(nm,'.'); const int isHang=dot&&!strcmp(dot,".hang");
+        if(!isHang){ char want[136]; if(dot) *dot=0; snprintf(want,sizeof want,"%s.hang",nm); if(dot) *dot='.';
+            for(unsigned q=0;q<P.nMeshes;q++) if(q!=m&&P.meshHang[q]&&!strcmp(packStr(&P,P.meshes[q].name),want)){ P.meshHang[m]=2; P.meshHangSib[m]=(short)q; break; } }
+        printf("[skirt] %s: '%s' %s\n",P.label[0]?P.label:path,nm,P.meshHang[m]==2?"is sewn on the hanging cloth beside it":"hangs: the points that ride a Hang_ node are cloth, the rest its waistband");
+        fflush(stdout); }
     /* ⛔ AND IT MUST HAPPEN BEFORE THE VBOs ARE BUILT. P.vbo is indexed by mesh
      * POSITION, so reordering P.meshes afterwards leaves every mesh drawing with
      * another mesh's vertex buffers. Her face came apart into floating slabs with
@@ -910,6 +970,7 @@ static Pack loadPack(const char*path){
     for(unsigned m=0;m<P.nMeshes;m++) if((P.meshes[m].flags&4)&&P.meshes[m].boneCount<=MAXB) P.drawable=1;
     if(!P.drawable) printf("INVISIBLE PACK (all meshes skipped): %s\n",P.label);
     packMaterials(&P);   /* (step 22) what each mesh is made of, once the meshes are in their final order */
+    packTailor(&P);      /* (11-16) and what the tailor painted on its garments, by the same names */
     return P;
 }
 #undef printf

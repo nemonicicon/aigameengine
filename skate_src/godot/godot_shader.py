@@ -393,6 +393,10 @@ def translate(rec, export_dir):
          "const float GD_UPM = %s, GD_LIFT = %s;   // the engine's units a metre, and how far godot2set.py lifted the scene" % (fnum(UPM), fnum(lift)),
          "const float GD_PI = 3.14159265358979, GD_TAU = 6.28318530717959, GD_E = 2.71828182845905;",
          "vec3 gdEye() { return V.eye.xyz / GD_UPM - vec3(0.0, GD_LIFT, 0.0); }",
+         # (11-16) a MultiMesh's copies' own data, their average (engine_export.gd records it with the shader): a pumpkin patch's foliage is
+         # coloured by it, and read as nothing the corn, the leaves and the tree crowns were black
+         "const vec4 GD_INSTANCE_CUSTOM = vec4(%s);" % ", ".join(fnum(x) for x in (rec.get("instance_custom") or [0.0, 0.0, 0.0, 0.0])),
+         "const bool GD_INSTANCE_RECORDED = %s;   // a MultiMesh's copies' data was recorded: INSTANCE_CUSTOM is that, else the object's paint" % ("true" if rec.get("instance_custom") else "false"),
          "mat4 gdModel = mat4(1.0); mat3 gdModelN = mat3(1.0); vec3 gdNode = vec3(0.0);   // the object's: set from mesh_static.vert's OBJSPACE inputs"]
     g += lines
     g.append("struct GdV { %s };" % " ".join("%s %s;" % m for m in V_MEMBERS))
@@ -406,7 +410,7 @@ def translate(rec, export_dir):
       gdNode = vec3(vM0.w, vM1.w, vM2.w) / GD_UPM - vec3(0.0, GD_LIFT, 0.0);   // its place, in the scene's metres
       gdModel = mat4(vec4(r[0], 0.0), vec4(r[1], 0.0), vec4(r[2], 0.0), vec4(gdNode, 1.0)); gdModelN = transpose(inverse(r)); }
     GdV v; v.VERTEX = vObj / GD_UPM; v.NORMAL = normalize(vObjN); v.TANGENT = vec3(1.0, 0.0, 0.0); v.BINORMAL = vec3(0.0, 0.0, 1.0); v.UV = uvIn; v.UV2 = uvIn; v.COLOR = vec4(1.0);
-    v.POINT_SIZE = 1.0; v.ROUGHNESS = 1.0; v.CUSTOM0 = v.CUSTOM1 = v.CUSTOM2 = v.CUSTOM3 = vec4(0.0); v.INSTANCE_CUSTOM = vTint;   // its paint
+    v.POINT_SIZE = 1.0; v.ROUGHNESS = 1.0; v.CUSTOM0 = v.CUSTOM1 = v.CUSTOM2 = v.CUSTOM3 = vec4(0.0); v.INSTANCE_CUSTOM = GD_INSTANCE_RECORDED ? GD_INSTANCE_CUSTOM : vTint;   // the copies' recorded data, or its paint
     gd_vertex(v);
     vec3 fw = normalize(V.fwd.xyz), rt = cross(fw, vec3(0.0, 1.0, 0.0)); float rl = length(rt); rt = rl > 1e-4 ? rt / rl : vec3(1.0, 0.0, 0.0);
     mat3 toWorld = mat3(rt, cross(rt, fw), -fw), toView = transpose(toWorld);   // the lens's own axes, taken level

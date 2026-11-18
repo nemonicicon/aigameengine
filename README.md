@@ -179,7 +179,7 @@ all come from the project this engine grew out of. They are only names, kept so 
 - **Worlds:** levels as text files, walking on a level's real triangles, loose objects with physics, crowds
   of hundreds, and a world that loads as you cross it.
 - **The picture:** a Vulkan renderer with sun shadows, up to 256 lights, materials, skin, hair, eyes and
-  fur, particles, decals, water, foliage, depth of field and a tube TV's look on a flat panel. Beside it,
+  fur, glass, particles, decals, water, foliage, depth of field and a tube TV's look on a flat panel. Beside it,
   the engine's own renderer, which needs no graphics driver.
 - **What a game needs:** four pads, split screen, menus and text that read on a tube TV, sound and music,
   saves, online play for two to four machines, and text in other languages, which is built and switched off.
@@ -293,9 +293,12 @@ The engine does not run inside Godot. What a Godot 4 project can take from `godo
   cook and change it, first for people and then for an AI.
 
 The other way, from a Godot project into the engine, is `skate_src/godot/`. `engine_export.gd`, run in
-Godot, writes a scene out. `godot2set.py` makes that a level and a pack. `godot_shader.py` turns a Godot
-spatial or sky shader into one the engine draws with. `gd_tuning2c.py` turns exported numbers into a C
-struct, and `reva_native/godot/gd_math.h` is Godot's math types in C, for game code brought across.
+Godot with its renderer (not `--headless`: its first comment says why), writes a scene out. `godot2set.py`
+makes that a level and a pack, with the scene's lights, invisible walls, ambient, background, tone and 3D
+labels. `godot_shader.py` turns a Godot spatial or sky shader into one the engine draws with. `which_mesh.py`
+says which of an export's meshes is near a point, for finding what a collision met. `gd_tuning2c.py` turns
+exported numbers into a C struct, and `reva_native/godot/gd_math.h` is Godot's math types in C, for game code
+brought across.
 
 ## What isn't here
 
@@ -316,6 +319,12 @@ Plainly, as of 2026-11-13.
 | **Raspberry Pi 4** | the engine as it was on 2026-11-04, on a real Pi and a tube TV at 240p and 480i | what has changed since, which has run under an ARM emulator at most. `setup_pi.sh` on a fresh card, and the card image builder |
 | **Android** | the sample game built into a signed APK for `arm64-v8a` and `x86_64`, on 2026-11-13 | either APK started. One game's APK ran on an emulator on 2026-11-06, before the scripts and the phone's start-up took their present form. Nothing has run on a real phone |
 | **Godot 4 hand-off** | the demo in Godot 4.7.2 on 2026-11-13: R.E.V.A. 902 riding, filmed by the tracking camera, 150 frames with no script error | the demo's other cameras that day. The tools in `skate_src/godot/` on any project but the one they were written for |
+
+What came in on 2026-11-18, built in another copy of the engine and carried here with its code
+(`design/engine_capabilities.md`, sections 62 to 75: glass, props of several materials, a garment that hangs as
+cloth, whole cloth on a game's body, held props for every set actor and a third held prop, film's colour split,
+a set's own tone, bloom, occlusion, reflections and background, lights that fall off as Godot's do, the Godot
+export's additions, and the wire's seat at 30 bytes): built here on 11-18, both renderers (`driver.py buildsoft`, `buildvk`); `driver.py check --game rally` all same; `anim_bench/netcheck.py` all the same. Not run here: the new pictures (glass, the hanging coat, held props, the colour split) and anything with a body's cloth
 
 Two more things to know. The Spanish and Japanese words in the games' `lang/` folders were written by an AI
 and no reader of those languages has checked them, which is why languages are built and switched off. And

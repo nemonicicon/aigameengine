@@ -74,6 +74,13 @@ static void actorsDraw(float*pal){
         float ca=cosf(a), sa=sinf(a);
         M4 m; memset(m,0,64);
         m[0]=ca*eff; m[2]=-sa*eff; m[5]=eff; m[8]=sa*eff; m[10]=ca*eff; m[15]=1.f;
+        if(A->pitch!=0.f||A->roll!=0.f){   /* (11-14) a place that tips and rolls her: yaw, then pitch about her own side, then roll about her own front */
+            const float cp=cosf(A->pitch*0.0174532925f), sp9=sinf(A->pitch*0.0174532925f), cr=cosf(A->roll*0.0174532925f), sr=sinf(A->roll*0.0174532925f);
+            const float Y9[9]={ca,0.f,-sa, 0.f,1.f,0.f, sa,0.f,ca}, X9[9]={1.f,0.f,0.f, 0.f,cp,sp9, 0.f,-sp9,cp}, Z9[9]={cr,sr,0.f, -sr,cr,0.f, 0.f,0.f,1.f};   /* columns */
+            float T9[9], R9[9];
+            for(int c9=0;c9<3;c9++) for(int r9=0;r9<3;r9++){ T9[c9*3+r9]=0.f; for(int k9=0;k9<3;k9++) T9[c9*3+r9]+=Y9[k9*3+r9]*X9[c9*3+k9]; }
+            for(int c9=0;c9<3;c9++) for(int r9=0;r9<3;r9++){ R9[c9*3+r9]=0.f; for(int k9=0;k9<3;k9++) R9[c9*3+r9]+=T9[k9*3+r9]*Z9[c9*3+k9]; }
+            for(int c9=0;c9<3;c9++) for(int r9=0;r9<3;r9++) m[c9*4+r9]=R9[c9*3+r9]*eff; }
         /* Z4: a borrowed clip that goes to the ground takes the body down with it. */
         float hipDrop=(A->dnP&&A->dnC>=0)?donorHipDrop(A->dnP,A->dnC,A->phase,P):0.f;
         m[12]=px; m[13]=A->y-P->mny*eff+A->air+hipDrop*eff; m[14]=pz;
@@ -98,12 +105,13 @@ static void actorsDraw(float*pal){
               fflush(stdout); } } }
         { static float mw9[SET_MAXA][MORPH_MAX]; static int mwas9[SET_MAXA];
           g_actorMorphW=(i<SET_MAXA)?mw9[i]:NULL; g_actorMorphWas=(i<SET_MAXA)?&mwas9[i]:NULL; }
-        g_actorHeldSlot=(A->prop[0]||A->prop2[0])?SCN_VOICE:-1;   /* (11-11) she holds something: her hands published into the voice slot (actorHeldSync) */
+        g_actorHeldSlot=actorHeldSlotOf(i);   /* (11-11) she holds something: her hands published into the voice slot (actorHeldSync) */
         g_vkOwner=((unsigned)GFX_KIND_ACTOR<<28)|(((unsigned)i&0xffffu)<<12);
         if(A->eye[3]>0.f) memcpy(g_vkEye,A->eye,16);   /* (step 23) her eyes glow, if her line said so */
         /* (11-11) `actorwash`: her skin and clothes mixed toward a mover's colour this frame, as a scene's body is by `slotwash` (body.inc; her hair keeps its own) */
-        if(A->washA>0.f&&A->washM>=0&&A->washM<SLOTWASH_MOV){ memcpy(g_bodyWash,g_stkMovCol[A->washM],12); g_bodyWash[3]=A->washA; g_bodyWashHair=A->washHair; }
-        else { g_bodyWash[3]=0.f; g_bodyWashHair=0; }
+        if(A->washA>0.f&&A->washM>=0&&A->washM<SLOTWASH_MOV){ memcpy(g_bodyWash,g_stkMovCol[A->washM],12); g_bodyWash[3]=A->washA; g_bodyWashHair=A->washHair; g_bodyWashFlat=A->washFlat; g_bodyWashTone=A->washTone; }
+        else { g_bodyWash[3]=0.f; g_bodyWashHair=0; g_bodyWashFlat=0; g_bodyWashTone=0; }
+        if(A->hairA>0.f&&A->hairM>=0&&A->hairM<SLOTWASH_MOV){ memcpy(g_bodyHair,g_stkMovCol[A->hairM],12); g_bodyHair[3]=A->hairA; } else g_bodyHair[3]=0.f;   /* (11-13) `actorhair` */
         actorDraw(P,isk?-1:A->clip,isk?NULL:A->dnP,isk?-1:A->dnC,
                   A->phase,m,pal,isk?&sp:NULL,ft,pmix,
                   rmOwn9?NULL:&A->wms,g_actorDt,
@@ -113,7 +121,7 @@ static void actorsDraw(float*pal){
                   /* `look camera` resolves to wherever the lens is THIS frame */
                   A->hasLook==2 ? g_camPos : (A->hasLook==1 ? A->look : NULL),
                   CLOTH_ACTOR0+(i%(CLOTH_SLOTS-CLOTH_ACTOR0)));
-        g_vkEye[3]=0.f; g_bodyWash[3]=0.f; g_bodyWashHair=0;   /* (11-11) and her wash ends with her */
+        g_vkEye[3]=0.f; g_bodyWash[3]=0.f; g_bodyWashHair=0; g_bodyWashFlat=0; g_bodyWashTone=0; g_bodyHair[3]=0.f;   /* (11-11) and her wash ends with her */
         g_actorChainSlot=-1; g_actorMorphW=NULL; g_actorMorphWas=NULL; g_actorHeldSlot=-1;
         /* both ends into world space, through the body's own matrix */
         { float*nq=ft+8, *hq=ft+11;

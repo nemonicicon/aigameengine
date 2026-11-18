@@ -28,15 +28,18 @@ static void objSay(const char*what){ static const char*said[8]; static int n=0; 
 static Obj* objOf(int h){ if(h<=0) return NULL; const unsigned u=(unsigned)h; const int i=(int)((u&((1u<<OBJ_BITS)-1u))|(((u>>28)&((1u<<OBJ_HIBITS)-1u))<<OBJ_BITS)); Obj*O=&g_obj[i];
     return (i<g_objHi&&O->on&&O->gen==((u>>OBJ_BITS)&(OBJ_GENMAX-1u)))?O:NULL; }
 /* (11-11) what this machine doesn't show this frame (E->bodyUnseen, E->objectUnseen): asked in draw, cleared before the next */
-static unsigned char g_objUnseen[OBJ_MAX], g_bodyUnseen[1024];
+static unsigned char g_objUnseen[OBJ_MAX], g_bodyUnseen[1024]; static float g_bodyFade[1024];   /* (11-16) how see-through a game's body is drawn this frame (E->bodyFade) */
 /* (11-12) E->bodyPlace: where this frame draws a game's body, and turned how: its place (units) and its yaw, pitch and roll as E->placeTurned has them.
  * Picture, not rules, like bodyUnseen: forgotten at the next draw. The body's pose, its shadow and what's on its bones go with it */
 static float g_bodyPlace[1024][6]; static unsigned char g_bodyPlaceOn[1024];
-static void unseenClear(void){ memset(g_objUnseen,0,sizeof g_objUnseen); memset(g_bodyUnseen,0,sizeof g_bodyUnseen); memset(g_bodyPlaceOn,0,sizeof g_bodyPlaceOn); }
+static void unseenClear(void){ memset(g_objUnseen,0,sizeof g_objUnseen); memset(g_bodyUnseen,0,sizeof g_bodyUnseen); memset(g_bodyFade,0,sizeof g_bodyFade); memset(g_bodyPlaceOn,0,sizeof g_bodyPlaceOn); }
 static void apiBodyUnseen(int i){ if(i>=0&&i<1024) g_bodyUnseen[i]=1; }
 static void apiBodyPlace(int i,float x,float y,float z,float yaw,float pitch,float roll){ if(i<0||i>=1024) return;
     const float v[6]={x,y,z,yaw,pitch,roll}; for(int k=0;k<6;k++) if(!(v[k]-v[k]==0.f)) return;   /* nothing that isn't a number */
     memcpy(g_bodyPlace[i],v,sizeof v); g_bodyPlaceOn[i]=1; }
+/* (11-16) E->bodyFade: body i and what's on its bones drawn this see-through this frame (0 as it is, 1 gone), in draw; forgotten at the next draw.
+ * Its shadow stays. What's drawn, not the rules */
+static void apiBodyFade(int i,float f){ if(i<0||i>=1024||!(f==f)) return; g_bodyFade[i]=f<0.f?0.f:f>1.f?1.f:f; }
 static void bodyPlaceModel(int si,float*model){ const float*p=g_bodyPlace[si];
     const float sc=sqrtf(model[0]*model[0]+model[1]*model[1]+model[2]*model[2]); float qy[4],qx[4],qz[4],qt[4],q[4],t[3]={p[0],p[1],p[2]},s3[3]={sc,sc,sc};
     qaxis(qy,0,1,0,p[3]); qaxis(qx,1,0,0,p[4]); qaxis(qz,0,0,1,p[5]); qmul(qt,qy,qx); qmul(q,qt,qz); m4_trs(model,t,q,s3); }

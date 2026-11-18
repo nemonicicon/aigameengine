@@ -6,7 +6,7 @@ layout(set = 0, binding = 1) uniform sampler2D uBloom;
 layout(set = 0, binding = 2) uniform sampler3D uLut;
 layout(set = 0, binding = 3) uniform sampler2D uAO;   // r occlusion, g contact shadow
 layout(set = 0, binding = 4) uniform sampler2D uVol;  // what the air adds
-layout(push_constant) uniform PC { vec4 a; vec4 b; vec4 c; vec4 d; vec4 e; vec4 f; } pc;   // e, f (step 25), film's look for the frame: e sepia, a flash, a burn, grain. f: the gate's weave x and y, the clock  // a: exposure, bloom, the LUT's size (0 none), tonemap on. b: x the knee, y occlusion or contact on, z haze on, w the colours are already as they'll be shown. c: film's grade, its vignette, the picture's width over its height. d: the fisheye, the half-angle its corners cover, a phone's frame (1 upright, 2 wide), its clock
+layout(push_constant) uniform PC { vec4 a; vec4 b; vec4 c; vec4 d; vec4 e; vec4 f; vec4 g; } pc;   // g.xy (11-14): film's colour split, red off one way and blue the other   // e, f (step 25), film's look for the frame: e sepia, a flash, a burn, grain. f: the gate's weave x and y, the clock  // a: exposure, bloom, the LUT's size (0 none), tonemap on. b: x the knee, y occlusion or contact on, z haze on, w the colours are already as they'll be shown. c: film's grade, its vignette, the picture's width over its height. d: the fisheye, the half-angle its corners cover, a phone's frame (1 upright, 2 wide), its clock
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 o;
@@ -57,11 +57,13 @@ void main() {
     }
     su += pc.f.xy;   // the gate's weave: the whole frame off its place
     vec4 sc = texture(uScene, su); vec3 c = sc.rgb;
+    if (pc.g.x != 0.0 || pc.g.y != 0.0) { c.r = texture(uScene, su + pc.g.xy).r; c.b = texture(uScene, su - pc.g.xy).b; }   // (11-14) the colours parted
     if (pc.b.y > 0.5) { vec2 k = texture(uAO, su).rg; c *= k.r * k.g; }
     if (pc.b.z > 0.5) c += texture(uVol, su).rgb;
     c += texture(uBloom, su).rgb * pc.a.y;
     c *= pc.a.x;
-    if (pc.a.w > 0.5) c = srgb(aces(c * 2.6));   // 2.6 keeps the picture's average brightness where the Pi's is, measured on two scenes: the curve on its own pulls it down
+    if (pc.a.w > 1.5) c = srgb(c);   // (11-16) a scene's own linear tone (a Godot scene's TONEMAP_LINEAR): the light as it is, clipped
+    else if (pc.a.w > 0.5) c = srgb(aces(c * 2.6));   // 2.6 keeps the picture's average brightness where the Pi's is, measured on two scenes: the curve on its own pulls it down
     else if (pc.b.w < 0.5) {   // the old knee, for the A/B
         c = pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
         float kn = pc.b.x; vec3 ov = max(c - vec3(kn), vec3(0.0));

@@ -14,6 +14,7 @@ typedef struct {
     PNode *nodes; PMesh *meshes; PClip *clips; unsigned char *mats;
     float scale; unsigned *vbo; unsigned *tex; int *meshTex; unsigned *meshMatFlags;
     int *meshNTex;     /* ⭐ per mesh: the normal map's texture slot, or -1 (09-11) */
+    float **meshTail;      /* (11-16) per mesh, NULL or its CLTH numbers: two floats a vertex, metres, how far it may go from its skinned pose and how near the skin it may come (engine/load.inc packTailor; a garment with them is whole cloth on a body a game asks it of, engine/clubwear.inc) */
     float (*meshMat)[6];   /* (step 22) per mesh, what it's made of: how rough, how much a metal, how much fine detail, how deep for parallax; and (step 23) its kind for a body: 1 skin, 2 hair, 3 an eye, 4 cloth, 5 its texture's alpha says. One spare. From its MATL chunk, or the tables by name (engine/load.inc, packMaterials) */
     unsigned *meshFile;    /* (11-11) each mesh's place in the FILE, once the blended ones have been moved last (load.inc); NULL when nothing moved. What a chunk's `<name>@N` counts by */
     float cx,cz,mny;   /* rest bone-cloud center + floor (model units): every rig grounds/centers the SAME way */
@@ -104,6 +105,9 @@ typedef struct {
      * nothing is missing when it comes off). NULL on every body without tags. One outfit per PACK: two slots
      * drawing the same pack wear the same clothes. */
     unsigned char*meshOff, *meshKind, *meshPiece; unsigned long long*meshHiders;
+    /* (11-16) THE HANGING CLOTH BY ITS OWN WEIGHTS (engine/load.inc, engine/cloth.inc): per mesh, 1 if it rides a Hang_ node and hangs (simulated),
+     * 2 if it rides one and is sewn on its piece's hanging part (meshHangSib, a pocket); NULL on a pack with no Hang_ node */
+    unsigned char*meshHang; short*meshHangSib;
     int nPiece; char pieceName[64][32]; unsigned pieceOutfits[64];
     int nOutfit; char outfitName[16][24]; int outfit; unsigned long long worn;
     /* ⭐ THE TOON PASS (10-18, the space series): a pack carrying a node named ToonStyle (a zero-weight
@@ -439,21 +443,34 @@ static void chainSim(void*Pv,M4*world,int who){
          * each shoulder (clavicle -> upper arm) and each upper arm (upper arm -> forearm), capsules measured the same way, and pushed
          * out the shortest way: hair comes down onto them from above, and the tent is a skirt's. REVA bowing over her keys swung her
          * jaw-length hair, riding her head whole, into her shoulders and back */
-        if(!g_stepHeld&&adv&&g_chCol&&!(P->vcol&&g_vcolOn!=0)){
+        if(!g_stepHeld&&adv&&g_chCol){
             const char*rn=packStr(P,P->nodes[P->chB[c][0]].name);
             const int hair9=P->hcol&&rn&&(strstr(rn,"Hair")||strstr(rn,"hair"));
-            if(rn&&(hair9||strstr(rn,"Cloth")||strstr(rn,"cloth"))){
+            /* (11-14) a tie off her trunk, a coat's tails off her legs and seat: on any pack, a VertexCollide one too */
+            const int rib9=rn&&strstr(rn,"Ribbon_tie")!=NULL, tail9=rn&&!rib9&&strstr(rn,"Tail_coat")!=NULL;
+            if(rn&&(rib9||tail9||(!(P->vcol&&g_vcolOn!=0)&&(hair9||strstr(rn,"Cloth")||strstr(rn,"cloth"))))){
                 if(!P->boneRok) measureBoneR(P);
                 int sa[6],sb[6]; float sr[6]; int ns=0;
                 static const int legs9[4][2]={{12,13},{13,-2},{14,15},{15,-3}}, hairs9[5][2]={{4,5},{6,7},{9,10},{7,8},{10,11}};
-                const int (*segs)[2]=hair9?hairs9:legs9; const int nseg=hair9?5:4;
+                static const int trunk9[4][2]={{0,1},{1,2},{2,3},{3,4}}, tails9[5][2]={{12,13},{13,-2},{14,15},{15,-3},{0,1}};   /* (11-14) */
+                const int (*segs)[2]=hair9?hairs9:rib9?trunk9:tail9?tails9:legs9; const int nseg=hair9?5:rib9?4:tail9?5:4;
+                int own9=-1;   /* a coat's tail: the thigh it hangs under, which it's never pushed out of */
+                if(tail9){ int j9=P->chB[c][0]; for(int up9=0;up9<16&&j9>=0&&(unsigned)j9<P->nNodes;up9++){ if(j9==P->pb[12]){ own9=12; break; } if(j9==P->pb[14]){ own9=14; break; } j9=P->nodes[j9].parent; } }
+                float fr9[3]={0.f,0.f,0.f}; int haveF9=0;   /* a tie: her front, the way from her spine's line to the chain's root at her collar */
+                if(rib9){ const int a9=P->pb[0], b9=P->pb[4];
+                    if(a9>=0&&b9>=0&&(unsigned)a9<P->nNodes&&(unsigned)b9<P->nNodes){ const float*A9=&world[a9][12],*B9=&world[b9][12],*x9=sp[who][c][0];
+                        float e9[3]={B9[0]-A9[0],B9[1]-A9[1],B9[2]-A9[2]}, el9=e9[0]*e9[0]+e9[1]*e9[1]+e9[2]*e9[2], t9=0.f;
+                        if(el9>1e-12f){ t9=((x9[0]-A9[0])*e9[0]+(x9[1]-A9[1])*e9[1]+(x9[2]-A9[2])*e9[2])/el9; if(t9<0.f) t9=0.f; if(t9>1.f) t9=1.f; }
+                        for(int k=0;k<3;k++) fr9[k]=x9[k]-(A9[k]+e9[k]*t9);
+                        const float l9=sqrtf(fr9[0]*fr9[0]+fr9[1]*fr9[1]+fr9[2]*fr9[2]); if(l9>1e-5f){ fr9[0]/=l9; fr9[1]/=l9; fr9[2]/=l9; haveF9=1; } } }
                 for(int q=0;q<nseg;q++){ int A=P->pb[segs[q][0]];
+                    if(tail9&&segs[q][0]==own9&&segs[q][1]>=0&&segs[q][0]!=0) continue;   /* its own thigh */
                     int B=segs[q][1]>=0?P->pb[segs[q][1]]:(segs[q][1]==-2?P->footL:P->footR);
-                    float rr=hair9?P->boneRF[segs[q][0]]:P->boneR[segs[q][0]];   /* hair: the arm with its twist bones' flesh */
+                    float rr=(hair9||rib9)?P->boneRF[segs[q][0]]:P->boneR[segs[q][0]];   /* hair: the arm with its twist bones' flesh; a tie: her trunk with its flesh (her bust) */
                     if(A>=0&&B>=0&&(unsigned)A<P->nNodes&&(unsigned)B<P->nNodes&&rr>0.f){
                         sa[ns]=A; sb[ns]=B; sr[ns]=rr*g_chColR; ns++; } }
                 /* hair: out, the lengths put back, and again: the lengths pulled a joint hung over a shoulder back into it (3 rounds) */
-                for(int it9=0;it9<(hair9?3:1);it9++){ int pushed9=0;
+                for(int it9=0;it9<(hair9?3:(rib9||tail9)?2:1);it9++){ int pushed9=0;
                 for(int i=1;i<n;i++){ float*x=sp[who][c][i];
                     for(int q=0;q<ns;q++){ const float*A=&world[sa[q]][12], *B=&world[sb[q]][12];
                         float e[3]={B[0]-A[0],B[1]-A[1],B[2]-A[2]};
@@ -466,19 +483,20 @@ static void chainSim(void*Pv,M4*world,int who){
                         float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
                         if(dl<sr[q]){
                             /* THE TENT (10-18): out along the joint's own way out of the body, not radially */
-                            int hp=hair9?-1:P->pb[0]; float nv[3]={0.f,0.f,0.f}, nl=0.f;
+                            int hp=(hair9||tail9||rib9)?-1:P->pb[0]; float nv[3]={0.f,0.f,0.f}, nl=0.f;   /* (11-14) a coat's tail: the shortest way out, as hair's */
                             if(hp>=0&&(unsigned)hp<P->nNodes){ nv[0]=x[0]-world[hp][12]; nv[2]=x[2]-world[hp][14];
                                 nl=sqrtf(nv[0]*nv[0]+nv[2]*nv[2]); }
+                            if(rib9&&haveF9){ nv[0]=fr9[0]; nv[1]=fr9[1]; nv[2]=fr9[2]; nl=1.f; }   /* (11-14) a tie: out along her front */
                             if(nl<1e-6f){ if(dl>1e-7f){ float kk=sr[q]/dl; for(int k=0;k<3;k++) x[k]=cpt[k]+d[k]*kk; } }
-                            else { nv[0]/=nl; nv[2]/=nl;
+                            else { nv[0]/=nl; nv[1]/=nl; nv[2]/=nl;
                                 float eel=sqrtf(el>1e-12f?el:1e-12f), eu[3]={e[0]/eel,e[1]/eel,e[2]/eel};
-                                float dq=d[0]*eu[0]+d[1]*eu[1]+d[2]*eu[2], dn=nv[0]*eu[0]+nv[2]*eu[2];
+                                float dq=d[0]*eu[0]+d[1]*eu[1]+d[2]*eu[2], dn=nv[0]*eu[0]+nv[1]*eu[1]+nv[2]*eu[2];
                                 float qp[3]={d[0]-eu[0]*dq,d[1]-eu[1]*dq,d[2]-eu[2]*dq};
-                                float np[3]={nv[0]-eu[0]*dn,-eu[1]*dn,nv[2]-eu[2]*dn};
+                                float np[3]={nv[0]-eu[0]*dn,nv[1]-eu[1]*dn,nv[2]-eu[2]*dn};
                                 float a9=np[0]*np[0]+np[1]*np[1]+np[2]*np[2], b9=qp[0]*np[0]+qp[1]*np[1]+qp[2]*np[2];
                                 float c9=qp[0]*qp[0]+qp[1]*qp[1]+qp[2]*qp[2]-sr[q]*sr[q];
                                 float s9=(a9>1e-4f)?(-b9+sqrtf(fmaxf(b9*b9-a9*c9,0.f)))/a9:(sr[q]-dl);
-                                if(s9>0.f){ x[0]+=nv[0]*s9; x[2]+=nv[2]*s9; } }
+                                if(s9>0.f){ x[0]+=nv[0]*s9; x[1]+=nv[1]*s9; x[2]+=nv[2]*s9; } }
                             pushed9++; } } }
                 if(!pushed9) break;
                 { g_chColN+=pushed9;

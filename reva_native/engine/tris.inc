@@ -22,6 +22,16 @@ static void trClear(void) { free(g_tr.v); free(g_tr.kind); free(g_tr.id); free(g
 static float *g_trAddV; static unsigned char *g_trAddK; static int *g_trAddI; static int g_trAddN, g_trAddCap;   /* a game's own (E->triAdd): where, what kind, whose */
 static void trPlacesClear(void);
 static void trAddClear(void) { g_trAddN = 0; trPlacesClear(); }   /* (11-16) and its places */
+/* (11-16) a set's solid boxes that aren't drawn (`solid <kind> cx cy cz hx hy hz`, engine/setcloth.inc): square to the axes, in the set's units, each
+ * twelve triangles of its kind in the tree, after the set's props and before a game's own. A Godot scene's invisible walls and the net under it */
+#define TR_SOLIDS 64
+typedef struct { float c[3], h[3]; char kind[24]; } TrSolid;
+static TrSolid g_trSolid[TR_SOLIDS]; static int g_trSolidN;
+static void trSolidTris(const TrSolid *S, float *out) {   /* 12 triangles, 108 floats, wound outward */
+    static const int F[6][4] = {{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};   /* -x +x -y +y -z +z, corners by bits x y z */
+    float P[8][3]; for (int k = 0; k < 8; k++) for (int a = 0; a < 3; a++) P[k][a] = S->c[a] + ((k >> (2 - a)) & 1 ? S->h[a] : -S->h[a]);
+    for (int f = 0; f < 6; f++) { const int *q = F[f]; const int tri[2][3] = {{q[0], q[1], q[2]}, {q[0], q[2], q[3]}};
+        for (int t = 0; t < 2; t++) for (int v = 0; v < 3; v++) memcpy(out + ((f * 2 + t) * 3 + v) * 3, P[tri[t][v]], 12); } }
 static void trDrop(void) { const int w = g_tr.want; trClear(); g_tr.want = w; }   /* what's built goes, and that the set wants a tree stays (a set with nothing solid of its own, for a game's) */
 
 static inline void trSub(float *o, const float *a, const float *b) { o[0] = a[0] - b[0]; o[1] = a[1] - b[1]; o[2] = a[2] - b[2]; }
@@ -98,8 +108,10 @@ static void trBuild(const char *name) {
                 const unsigned nt = trMesh(pass, Mw, (const float *)(Q->pk + Mh->offPos), Mh->verts, Mh->idxCount ? (const unsigned *)(Q->pk + Mh->offIdx) : NULL, Mh->idxCount,
                                            pass ? spKindOf(packStr(Q, Mh->name), 128u) : 0, &at);
                 if (pass == 0) cap += nt; } }
-        if (pass == 0) cap += (unsigned)g_trAddN;   /* and a game's own, after the set's */
-        else { if (g_tr.id) for (int i = 0; i < at; i++) g_tr.id[i] = -1;   /* the set's own */
+        if (pass == 0) cap += (unsigned)g_trAddN + 12u * (unsigned)g_trSolidN;   /* and the set's solid boxes, and a game's own, after the set's */
+        else { for (int s = 0; s < g_trSolidN; s++) { float tv[108]; trSolidTris(&g_trSolid[s], tv); const int kd = spKindOf(g_trSolid[s].kind, 24u);
+                   for (int t = 0; t < 12; t++) { memcpy(g_tr.v + (size_t)at * 9, tv + t * 9, 36); g_tr.kind[at] = (unsigned char)kd; at++; } }
+               if (g_tr.id) for (int i = 0; i < at; i++) g_tr.id[i] = -1;   /* the set's own */
             for (int t = 0; t < g_trAddN; t++) { const float *s = g_trAddV + (size_t)t * 9; float e1[3], e2[3], cr[3]; trSub(e1, s + 3, s); trSub(e2, s + 6, s); trCross(cr, e1, e2);
                 if (trDot(cr, cr) < 1e-14f) continue;
                 memcpy(g_tr.v + (size_t)at * 9, s, 36); g_tr.kind[at] = g_trAddK[t]; g_tr.id[at] = g_trAddI[t]; at++; } }
@@ -121,8 +133,10 @@ static void trBuild(const char *name) {
     free(ix); free(g_trCen); g_trCen = NULL;
     { TrNode *nd2 = (TrNode *)realloc(g_tr.nd, (size_t)g_tr.nn * sizeof(TrNode)); if (nd2) g_tr.nd = nd2; }   /* room was made for the most a tree could need */
     g_tr.buildMs = wall_ms() - t0;
-    printf("[triangles] %s: %d props, %d triangles, %d boxes, %.1f MB, %.0f ms\n", name, nProp, at, g_tr.nn,
-           ((double)at * 37 + (double)g_tr.nn * sizeof(TrNode)) / 1048576.0, g_tr.buildMs); fflush(stdout);
+    printf("[triangles] %s: %d props, %d triangles, %d boxes, %.1f MB, %.0f ms", name, nProp, at, g_tr.nn,
+           ((double)at * 37 + (double)g_tr.nn * sizeof(TrNode)) / 1048576.0, g_tr.buildMs);
+    if (g_trSolidN) { printf("; %d solid boxes that aren't drawn:", g_trSolidN); for (int s = 0; s < g_trSolidN; s++) printf(" %s", g_trSolid[s].kind); }   /* (11-16) */
+    printf("\n"); fflush(stdout);
 }
 
 /* ---- asking */

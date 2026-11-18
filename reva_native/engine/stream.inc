@@ -62,7 +62,8 @@ static void packFree(Pack*P){
     if(P->vbo){ gfxBuffersDrop((int)(P->nMeshes*6),P->vbo); free(P->vbo); }
     if(P->liteIb){ gfxBuffersDrop((int)(P->nMeshes*2),P->liteIb); free(P->liteIb); } free(P->liteN);   /* (11-07) its light copies */
     if(P->tex){ gfxTexturesDrop((int)P->nTex,P->tex); free(P->tex); }
-    free(P->nodes); free(P->pk); free(P->meshTex); free(P->meshMatFlags); free(P->meshNTex); free(P->meshMat); free(P->meshFile); free(P->nodeCanon); free(P->gaitUPS); free(P->meshOff); free(P->meshKind); free(P->meshPiece); free(P->meshHiders); free(P->meshShd);
+    free(P->nodes); free(P->pk); free(P->meshTex); free(P->meshMatFlags); free(P->meshNTex); free(P->meshMat); free(P->meshTail); free(P->meshFile); free(P->nodeCanon); free(P->gaitUPS); free(P->meshOff); free(P->meshKind); free(P->meshPiece); free(P->meshHiders); free(P->meshShd);
+    free(P->meshHang); free(P->meshHangSib);
     memset(P,0,sizeof *P); }
 /* the cell's bytes are read: make it a pack and put it in the world */
 static void stInstall(StCell*C){ char p[96]; double t0=wall_ms(); stPath(C,p,sizeof p);

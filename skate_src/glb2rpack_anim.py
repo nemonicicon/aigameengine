@@ -391,6 +391,7 @@ def main():
         pos = accessor(js, bin_, att['POSITION'])
         nrm = accessor(js, bin_, att['NORMAL']) if 'NORMAL' in att else None
         uv = accessor(js, bin_, att['TEXCOORD_0']) if 'TEXCOORD_0' in att else None
+        uv2 = accessor(js, bin_, att['TEXCOORD_1']) if 'TEXCOORD_1' in att else None   # (11-16) a garment's tailor's numbers: the CLTH chunk
         ji = q['ji'] if 'ji' in q else accessor(js, bin_, att['JOINTS_0'])
         jw = q['jw'] if 'jw' in q else accessor(js, bin_, att['WEIGHTS_0'])
         idx = accessor(js, bin_, prim['indices']) if 'indices' in prim else list(range(len(pos) // 3))
@@ -541,7 +542,7 @@ def main():
                 sep = '.' if name.startswith('wear~') or name.startswith('skin~h=') else '_'
                 name = '%s%s%s#%s' % (name, sep, ''.join(ch if ch.isalnum() else '_' for ch in mat.get('name', 'mat%d' % matIdx)), hx)
         built.append({'name': name, 'node': q['node'], 'nv': nv, 'idx': idx,
-                      'pos': pos, 'nrm': nrm, 'uv': uv, 'jb': jb, 'wb': wb,
+                      'pos': pos, 'nrm': nrm, 'uv': uv, 'uv2': uv2, 'jb': jb, 'wb': wb,
                       'boneMap': boneMap, 'ibm': ibmOut, 'tex': texSlot, 'ntex': nSlot, 'blend': blend,
                       'joints': len(joints), 'kept': len(kept), 'shapes': shapes})
 
@@ -995,6 +996,12 @@ def main():
         out += b
 
     rpackchunks.bake_write(a.dst, out, a.fresh)
+    # (11-16) a garment that carries the tailor's numbers in its second UV (a wardrobe piece, wear~...) is whole cloth to the engine
+    # (engine/clubwear.inc): the numbers go in a CLTH chunk by the mesh's name, in its vertices' order, which a bake keeps
+    tail = [(b['name'], b['nv'], b['uv2']) for b in built if b.get('uv2') and len(b['uv2']) >= b['nv'] * 2 and b['name'].startswith('wear~')]
+    rpackchunks.put_tailor(a.dst, tail)
+    if tail:
+        print('  the tailor\'s numbers for %d garment(s): %s' % (len(tail), ', '.join(t[0] for t in tail)))
     print(a.dst)
     print('  nodes %d   meshes %d   clips %d   textures %d' % (nN, nM, len(clips), nTex))
     for b in built:

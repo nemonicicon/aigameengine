@@ -20,7 +20,7 @@
 #define SCL_W      17
 #define SCL_H      17
 #define SCL_N      (SCL_W*SCL_H)
-#define SCL_MAXBOX 8
+#define SCL_MAXBOX 16   /* (11-16) a Godot park's invisible walls and net are up to seven */
 typedef struct {
     int used, kind;                    /* 0 = curtain (hangs), 1 = sheet (falls) */
     float cur[SCL_N][3], prv[SCL_N][3], nrm[SCL_N][3];
@@ -393,14 +393,14 @@ static int setLoad(const char*name){
     g_nRb=0;
     objClear(); rideClear(); liqClear();   /* what a game made goes with the set, and first: its columns are about to go with spClear */
     shdSetClear();   /* (11-12) the surfaces' own shaders go with the set: engine/setshader.inc */
-    g_setNI=0; g_setNA=0; g_setNMk=0; g_nCol=0; g_setCur[0]=0; stClear(); spClear(); trClear(); trAddClear(); setLookClear();   /* (11-12) a game's own triangles go with the set */
+    g_setNI=0; g_setNA=0; g_setNMk=0; g_nCol=0; g_setCur[0]=0; stClear(); spClear(); trClear(); trAddClear(); g_trSolidN=0; setLookClear();   /* (11-12) a game's own triangles go with the set */
     { static int once=-1; if(once<0){ once=1; g_colOff=getenv("REVA_NOCOLLIDE")?1:0; } }
     g_setT=0.f;              /* Z7a: every load restarts the shot */
     g_setNRt=0;              /* ⭐ a set's routes go with it */
     pipeClear();             /* ⭐ and its half-pipes */
     g_setNL=0; g_setNLX=0;
     ptSetClear(); dcSetClear(); lensClear(); g_stkNC=g_stkNP=0; g_stkNS=0; memset(g_stkCam,0,sizeof g_stkCam); g_beamLight=6.f; g_setSpace=0; g_skyYaw=g_skyPitch=0.f; g_setFar=0.f; g_nStar=0; g_milky[3]=0.f; g_nBeam=0; g_nMir=0; g_gloss.on=0; if(g_stk){ free(g_stk); g_stk=NULL; } g_stkFrames=0; g_stkLast=-1; g_nMover=0;
-    g_slotWashOn=0; memset(g_slotWashA,0,sizeof g_slotWashA); g_bodyWash[3]=0.f;   /* (11-11) and no body is washed with a mover's colour */
+    g_slotWashOn=0; memset(g_slotWashA,0,sizeof g_slotWashA); memset(g_slotWashHair,0,sizeof g_slotWashHair); memset(g_slotWashFlat,0,sizeof g_slotWashFlat); memset(g_slotWashTone,0,sizeof g_slotWashTone); g_bodyWash[3]=0.f;   /* (11-11) and no body is washed with a mover's colour */
     g_stkNK=0; memset(g_stkLook,0,sizeof g_stkLook); g_clipStartS=0.f; stkSheetsDrop();   /* (step 21) and what the timeline gave: the looks, the pictures, where clips start */
     artDrop();   /* (11-11) and its drawings */
     g_setEnvOn=0;   /* (step 22) and where its surroundings are baked from */
@@ -542,7 +542,14 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"solid ",6)&&g_nSclBox<SCL_MAXBOX){
             float*B=g_sclBox[g_nSclBox]; int mv9=-1;
             { char*g9=strstr(ln," mover="); if(g9){ mv9=atoi(g9+7); for(char*w9=g9;*w9&&*w9!='\n'&&*w9!='\r';w9++) *w9=' '; } }
-            if(sscanf(ln,"solid %f %f %f %f %f %f",&B[0],&B[1],&B[2],&B[3],&B[4],&B[5])==6){
+            /* (11-16) a surface kind may come first (`solid wall cx cy cz hx hy hz`): then the box is solid in the set's tree of triangles too, as that
+             * kind (engine/tris.inc), not drawn. A Godot scene's invisible walls and the net under it: their skate game keeps vert air in its parks with them */
+            char kd9[24]={0}; const char*nu9=ln+6; while(*nu9==' ') nu9++;
+            if(*nu9&&!(*nu9=='-'||*nu9=='+'||*nu9=='.'||(*nu9>='0'&&*nu9<='9'))){ int k9=0; while(nu9[k9]&&nu9[k9]!=' '&&k9<23){ kd9[k9]=nu9[k9]; k9++; } nu9+=k9; }
+            if(sscanf(nu9,"%f %f %f %f %f %f",&B[0],&B[1],&B[2],&B[3],&B[4],&B[5])==6){
+                if(kd9[0]&&mv9<0&&g_trSolidN<TR_SOLIDS){ TrSolid S; memset(&S,0,sizeof S); memcpy(S.kind,kd9,sizeof S.kind); memcpy(S.c,B,12); memcpy(S.h,B+3,12); int ok=1;
+                    for(int a=0;a<3;a++) if(!(S.c[a]-S.c[a]==0.f)||!(S.h[a]>0.f)||fabsf(S.c[a])>1e6f||S.h[a]>1e6f) ok=0;
+                    if(ok) g_trSolid[g_trSolidN++]=S; }
                 g_sclBoxMover[g_nSclBox]=mv9; memcpy(g_sclBoxLoc[g_nSclBox],B,12);
                 printf("[cloth] solid box at %.2f,%.2f,%.2f half %.2f,%.2f,%.2f%c",
                        B[0],B[1],B[2],B[3],B[4],B[5],10);
@@ -609,9 +616,9 @@ static int setParse(const char*name,int depth){
                 else printf("[set] path cap is %d per actor\n",SET_MAXWP); }
             continue; }
         if(!strncmp(ln,"place ",6)){   /* (11-12) `place <t> <x> <y> <z> [yaw]`: the last actor is put there at t, with no walk between (set.inc SetPlace) */
-            float pt=0.f,px2=0.f,py2=0.f,pz2=0.f,pyw=0.f; const int n9=sscanf(ln,"place %f %f %f %f %f",&pt,&px2,&py2,&pz2,&pyw);
+            float pt=0.f,px2=0.f,py2=0.f,pz2=0.f,pyw=0.f,ppi=0.f,pro=0.f; const int n9=sscanf(ln,"place %f %f %f %f %f %f %f",&pt,&px2,&py2,&pz2,&pyw,&ppi,&pro);
             if(n9>=4&&g_setNA>0){ SetActor*A=&g_setA[g_setNA-1];
-                if(A->nPl<SET_MAXPLACE){ SetPlace*Q=&A->pl[A->nPl++]; Q->t=pt; Q->x=px2; Q->y=py2; Q->z=pz2; Q->yaw=pyw; Q->hasYaw=(n9>=5); }
+                if(A->nPl<SET_MAXPLACE){ SetPlace*Q=&A->pl[A->nPl++]; Q->t=pt; Q->x=px2; Q->y=py2; Q->z=pz2; Q->yaw=pyw; Q->hasYaw=(n9>=5); Q->pitch=(n9>=6)?ppi:0.f; Q->roll=(n9>=7)?pro:0.f; }   /* (11-14) tipped and rolled */
                 else printf("[set] place cap is %d per actor\n",SET_MAXPLACE); }
             else printf("[set] place: wants t x y z [yaw] after an actor line -- IGNORED\n");
             continue; }
@@ -705,31 +712,39 @@ static int setParse(const char*name,int depth){
             g_artExact=(strstr(ln," exact")!=NULL);   /* (11-13) the world's layers in the file's own colours */
             if(sscanf(ln,"art %255s %f",p9,&o9)>=1){ artLoad(p9,o9); if(g_artExact){ printf("[art] its drawings in the world in the file's own colours (exact)\n"); fflush(stdout); } } else printf("[set] art: want `art <file> [seconds] [exact]` -- %s\n",ln);
             continue; }
-        if(!strncmp(ln,"mover ",6)){ char st9[64]; float c9[3]={1.f,1.f,1.f}; int gc9=0,gr9=0;
+        if(!strncmp(ln,"mover ",6)){ char st9[64]; float c9[3]={1.f,1.f,1.f}; int gc9=0,gr9=0,flat9=0;
+            { char*f9=strstr(ln," flat"); if(f9&&(f9[5]==0||f9[5]==' '||f9[5]=='\n'||f9[5]=='\r')){ flat9=1; memset(f9,' ',5); } }   /* (11-13) `flat`: wholly in its colour, it's that colour exactly, unlit */
             { char*g9=strstr(ln," grid="); if(g9){ if(sscanf(g9+6,"%dx%d",&gc9,&gr9)!=2){ gc9=gr9=0; printf("[set] mover: grid=CxR, as in grid=4x2 -- %s\n",ln); } for(char*w9=g9;*w9&&*w9!='\n'&&*w9!='\r';w9++) *w9=' '; } }   /* (step 21) its texture is a sheet of pictures */
             int n9=sscanf(ln,"mover %63s %f %f %f",st9,c9,c9+1,c9+2);
             g_texKeep=(gc9>0&&gr9>0);
             int pi9=(n9>=1)?setPack(st9):-1;
             g_texKeep=0;
             if(pi9>=0&&g_setNI<SET_MAXI){ SetInst*I9=&g_setI[g_setNI++]; memset(I9,0,sizeof *I9); I9->pk=pi9; I9->mover=g_nMover++; I9->hid=1; I9->m[15]=1.f;
-                I9->tinted=(n9>=4); memcpy(I9->tint,c9,12);
+                I9->tinted=(n9>=4); memcpy(I9->tint,c9,12); I9->flat=flat9;
                 if(gc9>0&&gr9>0) stkSheet(pi9,gc9,gr9); }
             else printf("[set] mover: no such prop, or the set is full -- %s\n",ln);
             if(g_texKeepPx){ stbi_image_free(g_texKeepPx); g_texKeepPx=NULL; }
             continue; }
         if(!strncmp(ln,"reflect ",8)){ float v9[3];   /* (step 22) where the bake looks out from for this set's surroundings (engine/bake.inc) */
             if(sscanf(ln,"reflect %f %f %f",v9,v9+1,v9+2)==3){ memcpy(g_setEnvAt,v9,12); g_setEnvOn=1; }
-            else printf("[set] reflect: want `reflect x y z` -- %s\n",ln);
+            else if(strstr(ln," off")) g_setNoReflect=1;   /* (11-16) `reflect off`: its surfaces reflect nothing of their surroundings (a Godot scene with a plain colour behind it) */
+            else printf("[set] reflect: want `reflect x y z` or `reflect off` -- %s\n",ln);
             continue; }
         if(!strncmp(ln,"slotwash ",9)){ int s9=-1,m9=-1; float a9=0.f;   /* (11-11) a scene's body washed with a mover's colour (engine/set.inc) */
             if(sscanf(ln,"slotwash %d %d %f",&s9,&m9,&a9)==3&&s9>=0&&s9<SLOTWASH_N&&m9>=0&&m9<SLOTWASH_MOV&&a9>=0.f&&a9<=1.f){
-                g_slotWashM[s9]=m9; g_slotWashA[s9]=a9; g_slotWashOn=1; printf("[set] scene slot %d is washed %.2f with mover %d's colour\n",s9,a9,m9); }
-            else printf("[set] slotwash: want `slotwash <slot 0..%d> <mover> <amount 0..1>` -- %s\n",SLOTWASH_N-1,ln);
+                g_slotWashM[s9]=m9; g_slotWashA[s9]=a9; g_slotWashOn=1; g_slotWashHair[s9]=(strstr(ln," hair")!=NULL); g_slotWashFlat[s9]=(strstr(ln," flat")!=NULL); g_slotWashTone[s9]=(strstr(ln," tone")!=NULL);   /* (11-13) */
+                printf("[set] scene slot %d is washed %.2f with mover %d's colour%s%s\n",s9,a9,m9,g_slotWashHair[s9]?", her hair too":"",g_slotWashFlat[s9]?", flat":""); }
+            else printf("[set] slotwash: want `slotwash <slot 0..%d> <mover> <amount 0..1> [hair] [flat]` -- %s\n",SLOTWASH_N-1,ln);
+            continue; }
+        if(!strncmp(ln,"actorhair ",10)){ int i9=-1,m9=-1; float a9=0.f;   /* (11-13) a set actor's HAIR washed with a mover's colour of its own (body.inc g_bodyHair) */
+            if(sscanf(ln,"actorhair %d %d %f",&i9,&m9,&a9)==3&&i9>=0&&i9<g_setNA&&m9>=0&&m9<SLOTWASH_MOV&&a9>=0.f&&a9<=1.f){
+                g_setA[i9].hairM=m9; g_setA[i9].hairA=a9; printf("[set] actor %d's hair is washed %.2f with mover %d's colour\n",i9,a9,m9); }
+            else printf("[set] actorhair: want `actorhair <actor 0..%d, an actor above this line> <mover> <amount 0..1>` -- %s\n",g_setNA-1,ln);
             continue; }
         if(!strncmp(ln,"actorwash ",10)){ int i9=-1,m9=-1; float a9=0.f;   /* (11-11) a set actor washed with a mover's colour, as `slotwash` washes a scene's body (shadow.inc actorsDraw) */
             if(sscanf(ln,"actorwash %d %d %f",&i9,&m9,&a9)==3&&i9>=0&&i9<g_setNA&&m9>=0&&m9<SLOTWASH_MOV&&a9>=0.f&&a9<=1.f){
-                g_setA[i9].washM=m9; g_setA[i9].washA=a9; g_setA[i9].washHair=(strstr(ln," hair")!=NULL);   /* (11-13) her hair too */
-                printf("[set] actor %d is washed %.2f with mover %d's colour%s\n",i9,a9,m9,g_setA[i9].washHair?", her hair too":""); }
+                g_setA[i9].washM=m9; g_setA[i9].washA=a9; g_setA[i9].washHair=(strstr(ln," hair")!=NULL); g_setA[i9].washFlat=(strstr(ln," flat")!=NULL); g_setA[i9].washTone=(strstr(ln," tone")!=NULL);   /* (11-13) her hair too; one flat colour; her face kept */
+                printf("[set] actor %d is washed %.2f with mover %d's colour%s%s%s\n",i9,a9,m9,g_setA[i9].washHair?", her hair too":"",g_setA[i9].washFlat?", flat":"",g_setA[i9].washTone?", keeping her texture's light and dark (tone)":""); }
             else printf("[set] actorwash: want `actorwash <actor 0..%d, an actor above this line> <mover> <amount 0..1>` -- %s\n",g_setNA-1,ln);
             fflush(stdout); continue; }
         if(!strncmp(ln,"sceneclock",10)&&(ln[10]==0||ln[10]==' '||ln[10]=='\t'||ln[10]=='\r'||ln[10]=='\n')){   /* (11-11) the LAST actor's clip on the scene's clock (williams.inc actorsTick) */
@@ -768,6 +783,7 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"film ",5)){ const char*q9; if((q9=strstr(ln," sepia="))) g_filmSepia=(float)atof(q9+7); if((q9=strstr(ln," grain="))) g_filmGrain=(float)atof(q9+7); if((q9=strstr(ln," burn="))) g_filmBurn=(float)atof(q9+6);
             if((q9=strstr(ln," flash="))) g_filmFlash=(float)atof(q9+7);
             if((q9=strstr(ln," weave="))) sscanf(q9+7,"%f,%f",&g_filmWeave[0],&g_filmWeave[1]);
+            if((q9=strstr(ln," split="))) sscanf(q9+7,"%f,%f",&g_filmSplit[0],&g_filmSplit[1]);   /* (11-14) the colours parted */
             printf("[set] its film: sepia %.2f, grain %.2f, burn %.2f, flash %.2f, weave %.4f,%.4f\n",g_filmSepia,g_filmGrain,g_filmBurn,g_filmFlash,g_filmWeave[0],g_filmWeave[1]); continue; }   /* (step 24) a mark thrown at the set: engine/decals.inc */   /* (step 24) particles: smoke, fire, sparks ... at a place, or riding a mover */
         if(!strncmp(ln,"beam ",5)){ float v9[15]; v9[13]=1.f; v9[14]=2.f;   /* ⭐ 10-22: a glowing volume (see beamDraw) */
             int n9=sscanf(ln,"beam %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",v9,v9+1,v9+2,v9+3,v9+4,v9+5,v9+6,v9+7,
@@ -795,6 +811,14 @@ static int setParse(const char*name,int depth){
             else printf("[set] fog: want `fog <density> [r g b]`, density 0 to 1 -- %s",ln);
             continue; }
         if(!strncmp(ln,"exposure ",9)){ sscanf(ln,"exposure %f",&g_exposure); continue; }
+        if(!strncmp(ln,"tone ",5)){ g_setTone=strstr(ln,"linear")!=NULL; printf("[set] tone %s\n",g_setTone?"linear: the light as it is, clipped":"the machine's curve"); continue; }   /* (11-16) a Godot scene's tonemap */
+        if(!strncmp(ln,"bloom ",6)){ g_setNoBloom=strstr(ln,"off")!=NULL||strstr(ln," 0")!=NULL; continue; }   /* (11-16) its glow off */
+        if(!strncmp(ln,"occlusion ",10)){ g_setNoAO=strstr(ln,"off")!=NULL||strstr(ln," 0")!=NULL; continue; }   /* (11-16) and its occlusion and contact shadows: a Godot scene with no SSAO */
+        if(!strncmp(ln,"background ",11)){ float r9,g9,b9; if(sscanf(ln,"background %f %f %f",&r9,&g9,&b9)==3&&isfinite(r9)&&isfinite(g9)&&isfinite(b9)){
+                const float c9[3]={r9,g9,b9}; for(int i9=0;i9<3;i9++) g_setBg[i9]=c9[i9]<0.f?0.f:c9[i9]>1.f?1.f:c9[i9];   /* as it looks: the renderer makes a clear colour linear itself */
+                g_setBgOn=1; printf("[set] background %.3f %.3f %.3f: no sky dome\n",r9,g9,b9); }
+            else printf("[set] background: want `background r g b`, 0 to 1 -- %s",ln);
+            continue; }   /* (11-16) a Godot scene's background colour */
         if(!strncmp(ln,"haze ",5)){ sscanf(ln,"haze %f",&g_haze); continue; }
         if(!strncmp(ln,"ground ",7)){ sscanf(ln,"ground %f %f %f",&g_ground[0],&g_ground[1],&g_ground[2]); continue; }
         if(!strncmp(ln,"spot ",5)){ float x9,y9,z9,dx9,dy9,dz9,r9=1.f,g9=1.f,b9=1.f,pw9=4.f,ag9=30.f,re9=0.f; int sh9=0; if(sscanf(ln,"spot %f %f %f %f %f %f %f %f %f %f %f %d %f",&x9,&y9,&z9,&dx9,&dy9,&dz9,&r9,&g9,&b9,&pw9,&ag9,&sh9,&re9)>=6&&g_setNSpot<32){ lightFill(&g_setSpot[g_setNSpot],x9,y9,z9,r9*pw9,g9*pw9,b9*pw9,0.055f,dx9,dy9,dz9,ag9); g_setSpot[g_setNSpot].reach=re9>0.f?re9:0.f; g_setSpot[g_setNSpot++].shadow=sh9; }   /* (11-11) a 13th number: its reach */ continue; }
@@ -802,19 +826,20 @@ static int setParse(const char*name,int depth){
         if(!strncmp(ln,"grade ",6)){ char g9[64]; if(sscanf(ln,"grade %63s",g9)==1) gfxGradeLoad(g9); continue; }
 #endif
         if(!strncmp(ln,"light ",6)){
-            float lx,ly,lz,lr,lg,lb,lpw=1.f,lrc=0.f,lend=0.f;
-            int nl=sscanf(ln,"light %f %f %f %f %f %f %f %f %f",&lx,&ly,&lz,&lr,&lg,&lb,&lpw,&lrc,&lend);
+            float lx,ly,lz,lr,lg,lb,lpw=1.f,lrc=0.f,lend=0.f,ldec=0.f;
+            int nl=sscanf(ln,"light %f %f %f %f %f %f %f %f %f %f",&lx,&ly,&lz,&lr,&lg,&lb,&lpw,&lrc,&lend,&ldec);   /* (11-16) a 10th: Godot's decay */
             /* ⛔ THE TOP SLOT IS RESERVED FOR A HELD LIGHT, so a set takes NLIGHT-1. */
             if(nl>=6&&g_setNL<NLIGHT-1){
                 g_setLp[g_setNL*3]=lx; g_setLp[g_setNL*3+1]=ly; g_setLp[g_setNL*3+2]=lz;
                 g_setLc[g_setNL*3]=lr*lpw; g_setLc[g_setNL*3+1]=lg*lpw; g_setLc[g_setNL*3+2]=lb*lpw;
                 g_setLk[g_setNL]=(nl>=8)?lightReachK(lrc):0.f;   /* ⭐ the lamp's reach */
                 g_setLr[g_setNL]=(nl>=9&&lend>0.f)?lend:0.f;   /* (11-12) and where it ends */
+                g_setLd[g_setNL]=(nl>=10&&ldec>0.f&&ldec<16.f)?ldec:0.f;   /* (11-16) and how, if it's a Godot light */
                 g_setNL++; }
             else if(nl>=6&&g_setNLX<SETL_MORE){   /* (11-12) past the practicals: straight into the frame's lights */
                 g_setLpX[g_setNLX*3]=lx; g_setLpX[g_setNLX*3+1]=ly; g_setLpX[g_setNLX*3+2]=lz;
                 g_setLcX[g_setNLX*3]=lr*lpw; g_setLcX[g_setNLX*3+1]=lg*lpw; g_setLcX[g_setNLX*3+2]=lb*lpw;
-                g_setLkX[g_setNLX]=(nl>=8)?lightReachK(lrc):0.f; g_setLrX[g_setNLX]=(nl>=9&&lend>0.f)?lend:0.f; g_setNLX++; }
+                g_setLkX[g_setNLX]=(nl>=8)?lightReachK(lrc):0.f; g_setLrX[g_setNLX]=(nl>=9&&lend>0.f)?lend:0.f; g_setLdX[g_setNLX]=(nl>=10&&ldec>0.f&&ldec<16.f)?ldec:0.f; g_setNLX++; }
             else if(nl>=6) printf("[set] a set's lights stop at %d\n",NLIGHT-1+SETL_MORE);
             continue; }
         if(!strncmp(ln,"actor ",6)){
@@ -832,8 +857,8 @@ static int setParse(const char*name,int depth){
             { char*q9=strstr(lb9," eyes="); if(q9){ char*v9=q9+6; int k9=0; while(v9[k9]&&v9[k9]!=' '&&v9[k9]!='\t'&&v9[k9]!='\n'&&v9[k9]!='\r') k9++;
                   eyesSay(ey9,v9); for(char*w9=q9;w9<v9+k9;w9++) *w9=' '; } }
             /* (11-11) `prop=<spec>` and `prop2=<spec>` anywhere on the line: what she holds, a scene prop's spec (stem@size@pitch@where@RRGGBB). Taken out the same way */
-            char pr9[2][PROP_SPEC]; pr9[0][0]=pr9[1][0]=0;
-            for(int w2=1;w2>=0;w2--){ char*q9=strstr(lb9,w2?" prop2=":" prop="); if(!q9) continue; char*v9=q9+(w2?7:6); int k9=0;
+            char pr9[3][PROP_SPEC]; pr9[0][0]=pr9[1][0]=pr9[2][0]=0;   /* (11-14) and `prop3=` */
+            for(int w2=2;w2>=0;w2--){ char*q9=strstr(lb9,w2==2?" prop3=":w2?" prop2=":" prop="); if(!q9) continue; char*v9=q9+(w2?7:6); int k9=0;
                 while(v9[k9]&&v9[k9]!=' '&&v9[k9]!='\t'&&v9[k9]!='\n'&&v9[k9]!='\r'&&k9<PROP_SPEC-1){ pr9[w2][k9]=v9[k9]; k9++; }
                 pr9[w2][k9]=0; for(char*w9=q9;w9<v9+k9;w9++) *w9=' '; }
             int na=sscanf(lb9,"actor %63s %63s %f %f %f %f %f %f %f %f %63s",
@@ -844,11 +869,11 @@ static int setParse(const char*name,int depth){
             SetActor*A=&g_setA[g_setNA++];
             /* (step 21) `clip>12.5s` starts her clip that many seconds in, and `clip>0.33` that far through it. Taken off the name here, before anything looks the clip up */
             A->cueS=A->cueF=-1.f; A->cued=0; memcpy(A->eye,ey9,16);
-            memcpy(A->prop,pr9[0],PROP_SPEC); memcpy(A->prop2,pr9[1],PROP_SPEC);   /* (11-11) what she holds, if her line says (an actor isn't cleared between sets) */
+            memcpy(A->prop,pr9[0],PROP_SPEC); memcpy(A->prop2,pr9[1],PROP_SPEC); memcpy(A->prop3,pr9[2],PROP_SPEC);   /* (11-11) what she holds, if her line says (an actor isn't cleared between sets) */
             if(pr9[0][0]||pr9[1][0]){ printf("[set] actor %d (%s) holds '%s'%s%s\n",g_setNA-1,ap,pr9[0],pr9[1][0]?" and ":"",pr9[1]); fflush(stdout); }
-            A->washM=-1; A->washA=0.f; A->washHair=0; A->sceneClk=0; A->sceneOff=0.f;   /* (11-11) no wash, and her own clock, until a line says otherwise */
+            A->washM=-1; A->washA=0.f; A->washHair=0; A->washFlat=0; A->washTone=0; A->hairM=-1; A->hairA=0.f; A->sceneClk=0; A->sceneOff=0.f;   /* (11-11) no wash, and her own clock, until a line says otherwise */
             { char*g9=strchr(ac,'>'); if(g9){ *g9=0; const char*v9=g9+1; const size_t L9=strlen(v9); if(L9&&v9[L9-1]=='s') A->cueS=(float)atof(v9); else { A->cueF=(float)atof(v9); if(A->cueF<0.f) A->cueF=0.f; if(A->cueF>1.f) A->cueF=1.f; } } }
-            A->nCue=0; A->curCue=-1; A->nWp=0; A->onPath=0; A->cspd=0.f; A->leash=-1; A->nPl=0; A->curPl=-1;
+            A->nCue=0; A->curCue=-1; A->nWp=0; A->onPath=0; A->cspd=0.f; A->leash=-1; A->nPl=0; A->curPl=-1; A->pitch=0.f; A->roll=0.f;
             memset(&A->wms,0,sizeof A->wms);
             A->hasLook=0;
             A->mind=MIND_NONE; A->mindOn=0; A->zombie=!strcmp(ac,"zombie"); A->mindR=0.f; A->tmr=0.f; A->fleeT=0.f; A->replanT=0.f;

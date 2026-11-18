@@ -940,7 +940,9 @@ int main(int argc,char**argv){
           static int grabOK=-1; if(grabOK<0) grabOK=getenv("REVA_NOMOUSEGRAB")?0:1;
 #ifdef REVA_SDL
           const int gp9=GAME_ON?g_tune.pointer:0;   /* (11-12) a game's say: 1 the pointer shown and free (its menus), 2 grabbed for looking round */
-          SDL_SetRelativeMouseMode((gp9==2||(gp9==0&&grabOK&&g_kbActive&&!g_pause))?SDL_TRUE:SDL_FALSE);
+          /* (11-16) a window nobody can see (REVA_NOWINDOW) and a take being captured never take the pointer: relative mode hides the cursor
+             and clips it whatever the window, so a machine doing other work while takes ran lost its mouse to them */
+          SDL_SetRelativeMouseMode((!g_noWindow&&!capLocked()&&(gp9==2||(gp9==0&&grabOK&&g_kbActive&&!g_pause)))?SDL_TRUE:SDL_FALSE);
 #else
           (void)grabOK;
 #endif
@@ -1560,6 +1562,7 @@ int main(int argc,char**argv){
                     qmul(off9,off9,tq9); qmul(Q[b9],Q[b9],off9); } }
             if(GAME_ON) rideBodyPose(si,P,Q,T);   /* (11-05) standing on what it rides */
             if(GAME_ON) perfBodyPose(si,P,Q,T);   /* (11-08) playing an instrument: its limbs on their targets (engine/perform.inc) */
+            if(GAME_ON) boneLayPose(si,P,Q,T);   /* (11-16) bones laid over the clip (E->boneAim, E->boneCurl: engine/gameworld.inc) */
             { /* THE STATE TREE'S EDGES (S4d): every clip/state switch crossfades ~0.2s.
                * Slots used to HARD-CUT between walk/dance/attack/fall -- and each cut was a pop.
                * Same trick as the hero's rvXf, stored per slot for the first 128 nodes. */
@@ -1576,7 +1579,7 @@ int main(int argc,char**argv){
               if(xF[si]<1.f){ float e9=xF[si]*xF[si]*(3.f-2.f*xF[si]);
                   for(unsigned i9=0;i9<nn9;i9++){ qnlerp(Q[i9],xQ[si][i9],Q[i9],e9);
                       for(int k9=0;k9<3;k9++) T[i9][k9]=xT[si][i9][k9]*(1.f-e9)+T[i9][k9]*e9; }
-                  xF[si]+=(float)dt*5.5f; }
+                  { const float bl9=agK9>=0?agBodyBlend(si):0.f; xF[si]+=(float)dt*(bl9>0.004f?1.f/bl9:5.5f); } }   /* (11-16) a graph state's own blend= */
               for(unsigned i9=0;i9<nn9;i9++){ memcpy(xQ[si][i9],Q[i9],16); memcpy(xT[si][i9],T[i9],12); }
               xInit[si]=1; } }
             g_faceCur=(g_faceN&&si<1024&&g_faceOf[si])?&g_faces[g_faceOf[si]-1]:NULL; if(g_faceCur) faceLayer(g_faceCur,P,Q);
@@ -1584,6 +1587,7 @@ int main(int argc,char**argv){
             if(!pr9||!pr9->world) bodyFK(P,T,Q,S,world);
             if(pr9&&!pr9->world&&!poseKeep(pr9,P,world)) pr9=NULL;
             M4*world9=pr9?pr9->world:world; if(pr9) g_poseStood++;
+            M4*plain9=world9;   /* (11-16) the pose before any mirror: a body's whole cloth is solved on it (engine/clubwear.inc) */
             if(GAME_ON&&si<1024&&g_bodyMirror[si]) world9=poseMirror(P,world9);   /* (11-12) left for right (E->bodyMirror) */
             if(g_faceCur) facePosed(g_faceCur,P,world9);   /* (step 20) where its eyes are now, for a seated body's look and shot */
             /* STATUE RESCUE (rooster/zoo-class: no clips AND unmapped rig): the whole body
@@ -1614,7 +1618,7 @@ int main(int argc,char**argv){
             if(GAME_ON) rideBodyModel(si,model);   /* (11-05) tipped and leaned with what it rides */
             if(GAME_ON&&si<1024&&g_bodyPlaceOn[si]) bodyPlaceModel(si,model);   /* (11-12) where and how the game said, this frame (E->bodyPlace) */
             if(g_rdGameOn) rdBody(si,P,world,(const float*)model);   /* limp, if a game said so */
-            if(g_attN&&GAME_ON&&si<1024) attDraw(si,P,world9,model);   /* what's on its bones */
+            if(g_attN&&GAME_ON&&si<1024){ const float fdW9=g_instFade; if(g_bodyFade[si]>0.f) g_instFade=g_bodyFade[si]; attDraw(si,P,world9,model); g_instFade=fdW9; }   /* what's on its bones, faded with it */
             /* AUTO-QUARANTINE (measured, not guessed): if this dancer's RENDERED hips diverge >4u
              * from its sim slot, it self-bans from the spotlight (ghosts kept turning up) */
             { static int pd9=-2; if(pd9==-2){ const char*e=getenv("REVA_POSEDUMP"); pd9=e?atoi(e):-9999; }
@@ -1702,12 +1706,15 @@ int main(int argc,char**argv){
                       printf("SQUID: %s (slot %d, mesh %u) -- hidden\n",P->label,si,mi); fflush(stdout);
                       break; } }
                   if(pr9&&(palU=poseKeepPal(pr9,mi,M->boneCount,pal))!=pal) palS9=1; }
-                if(nearRv&&nCast<NCASTMAX-2){   /* MORE SHADOWS: pair + neighbors cast for real (2 slots reserved for reva) */
+                /* (11-16) a garment in whole cloth is drawn from the solver's points, and casts from them (engine/clubwear.inc) */
+                const int cw9=(GAME_ON&&si<1024)?cwPrep(si,P,mi,plain9,model,g_bodyMirror[si]):0;
+                if(nearRv&&nCast<NCASTMAX-2&&!cw9){   /* MORE SHADOWS: pair + neighbors cast for real (2 slots reserved for reva) */
                     memcpy(castPal[nCast],palU,M->boneCount*64); castP[nCast]=P; castMi[nCast]=(int)mi;
                     memcpy(castModelA[nCast],model,64); nCast++; }
                 if(lite9>=0&&P->liteN[mi*2+lite9]){ g_vkIdxIb=P->liteIb[mi*2+lite9]; g_vkIdxN=P->liteN[mi*2+lite9]; }   /* (11-07) its light copy: the same vertices, fewer triangles */
-                if(g_shadowOn) sunStash(P,(int)mi,palU,(int)M->boneCount,model,1);   /* ⭐ the crowd casts under a sun (09-11), capped */
-                unsigned*b=&P->vbo[mi*6];
+                if(g_shadowOn&&!cw9) sunStash(P,(int)mi,palU,(int)M->boneCount,model,1);   /* ⭐ the crowd casts under a sun (09-11), capped */
+                unsigned*b=&P->vbo[mi*6]; unsigned bcw9[6];
+                if(cw9==2){ memcpy(bcw9,b,sizeof bcw9); bcw9[0]=g_skVbo[0]; bcw9[1]=g_skVbo[1]; b=bcw9; }
                 int tex=P->meshTex[mi];
                 if(tex>=0&&(M->flags&2)){
                     /* ⭐ a texture wins over a tint outright, so the cab's "sickly green" never showed on a textured body. Part of the way, it does:
@@ -1716,7 +1723,8 @@ int main(int argc,char**argv){
                 else {  }
                 g_vkPalShared=palS9?g_poseStamp:0u;
                 { static const float lc9[2][3]={{0.2f,1.f,0.2f},{1.f,0.9f,0.1f}};   /* REVA_LODDBG: a body drawn from its first copy washed green, its second yellow */
-                  const int d9=liteDbg9&&g_vkIdxIb; g_meshTintSlot=GAME_ON?si:-1; bodyDrawMesh(P,mi,model,palU,b,d9?lc9[lite9]:tint,d9?0.55f:(GAME_ON?g_game->bodyUse(si):1.0f),0,0); g_meshTintSlot=-1; }
+                  const int d9=liteDbg9&&g_vkIdxIb; g_meshTintSlot=GAME_ON?si:-1; const float fdW9=g_instFade; if(GAME_ON&&si<1024&&g_bodyFade[si]>0.f) g_instFade=g_bodyFade[si];   /* (11-16) E->bodyFade */
+                  bodyDrawMesh(P,mi,model,palU,b,d9?lc9[lite9]:tint,d9?0.55f:(GAME_ON?g_game->bodyUse(si):1.0f),cw9,0); g_meshTintSlot=-1; g_instFade=fdW9; }
                 g_vkPalShared=0u; g_vkIdxIb=g_vkIdxN=0;
             }
         }
@@ -3800,6 +3808,9 @@ int main(int argc,char**argv){
                             if(S8->hprop2[0])  snprintf(g_castProp2[0],PROP_SPEC,"%s",S8->hprop2);
                             if(S8->pprop2[0])  snprintf(g_castProp2[1],PROP_SPEC,"%s",S8->pprop2);
                             if(S8->p2prop2[0]) snprintf(g_castProp2[2],PROP_SPEC,"%s",S8->p2prop2);
+                            if(S8->hprop3[0])  snprintf(g_castProp3[0],PROP_SPEC,"%s",S8->hprop3);   /* (11-14) a third */
+                            if(S8->pprop3[0])  snprintf(g_castProp3[1],PROP_SPEC,"%s",S8->pprop3);
+                            if(S8->p2prop3[0]) snprintf(g_castProp3[2],PROP_SPEC,"%s",S8->p2prop3);
                             /* ⭐ (11-11) slots 2 and 3 read a clip's `@` hold and `>` cue as the partner's does. They matched the WHOLE string against
                              * the clip names, so the music video run's riders (`p2clip=z_rm_fv_rider>5.58s`) found nothing, said nothing, and stood in
                              * z_rest across the pourer. ⛔ Cast EXPLICITLY or not at all (`auto` doesn't resolve past slot 1) */
@@ -4392,6 +4403,7 @@ int main(int argc,char**argv){
                         if((q=strstr(buf,"grain="))){ g_filmGrain=(float)atof(q+6); printf("[film] grain %.2f\n",g_filmGrain); }
                         if((q=strstr(buf,"flash="))){ g_filmFlash=(float)atof(q+6); printf("[film] flash %.2f\n",g_filmFlash); }
                         if((q=strstr(buf,"burn="))){ g_filmBurn=(float)atof(q+5); printf("[film] burn %.2f\n",g_filmBurn); }
+                        if((q=strstr(buf,"split="))){ g_filmSplit[0]=g_filmSplit[1]=0.f; sscanf(q+6,"%f,%f",&g_filmSplit[0],&g_filmSplit[1]); printf("[film] split %.4f,%.4f\n",g_filmSplit[0],g_filmSplit[1]); }   /* (11-14) */
                         if((q=strstr(buf,"weave="))){ g_filmWeave[0]=g_filmWeave[1]=0.f; sscanf(q+6,"%f,%f",&g_filmWeave[0],&g_filmWeave[1]); printf("[film] weave %.4f,%.4f\n",g_filmWeave[0],g_filmWeave[1]); }
                         if((q=strstr(buf,"vig="))){ g_vig=(float)atof(q+4); printf("[post] vignette %.2f\n",g_vig); }
                         if((q=strstr(buf,"fog="))){ float d=0,r=0,g=0,b=0; int n=sscanf(q+4,"%f,%f,%f,%f",&d,&r,&g,&b);
@@ -4945,9 +4957,11 @@ int main(int argc,char**argv){
           /* the dance floor's coloured movers, which the old road lit the crowd with */
           if(!GAME_ON&&!WORLD_OFF&&g_mode!=MODE_ANIM&&!g_setNI) for(int k9=0;k9<nLite;k9++) frameLightAdd(liteP[k9][0],liteP[k9][1],liteP[k9][2],liteC[k9][0],liteC[k9][1],liteC[k9][2],0.055f,0.f,0.f,0.f,0.f);
           v9.skyDome=(g_mode!=MODE_ANIM&&(g_setNI||g_nPipe)&&!g_setSpace&&!WORLD_OFF);
+          if(g_setBgOn&&!WORLD_OFF){ v9.skyDome=0; memcpy(v9.clear,g_setBg,12); }   /* (11-16) a set's own background colour, and its tone and bloom */
+          v9.tone=g_setTone; v9.noBloom=g_setNoBloom; v9.noAO=g_setNoAO; v9.noReflect=g_setNoReflect;
           { static float sp9[72]; v9.space=NULL; if(g_setSpace&&!WORLD_OFF){ spaceFill(sp9,H); v9.space=sp9; } }
           v9.tunnel=g_xrDraw?g_xrTunnelAmt:0.f;   /* (11-11) a headset's comfort tunnel, as the game asks */
-          v9.focus=g_lensNow.focus; v9.dof=g_lensNow.focus>0.f?g_lensNow.dof:0.f; v9.shutter=g_lensNow.shutter; v9.sepia=g_lensNow.sepia; v9.flash=g_lensNow.flash; v9.burn=g_lensNow.burn; v9.grain=g_lensNow.grain; v9.weave[0]=g_lensNow.weave[0]; v9.weave[1]=g_lensNow.weave[1];
+          v9.focus=g_lensNow.focus; v9.dof=g_lensNow.focus>0.f?g_lensNow.dof:0.f; v9.shutter=g_lensNow.shutter; v9.sepia=g_lensNow.sepia; v9.flash=g_lensNow.flash; v9.burn=g_lensNow.burn; v9.grain=g_lensNow.grain; v9.weave[0]=g_lensNow.weave[0]; v9.weave[1]=g_lensNow.weave[1]; v9.split[0]=g_lensNow.split[0]; v9.split[1]=g_lensNow.split[1];
           if(g_lensNow.exposure>0.f) v9.exposure=g_lensNow.exposure;   /* (step 25) the timeline's, for this frame */
           v9.filmBloom=g_bloom; v9.filmPostOn=g_postOn; v9.filmTone=g_tone; v9.fish=(g_fishTh>0.f)?g_fish:0.f; v9.fishTh=(g_fishTh>0.f)?g_fishTh:0.8f; v9.feed=g_tape; v9.feedT=g_tapeT; if(g_gloss.on){ v9.gloss[0]=g_gloss.y; v9.gloss[1]=1.f/g_gloss.fade; v9.gloss[2]=g_gloss.f0; v9.gloss[3]=g_gloss.fmax; }
           { static int rd9=0; static float gr9=0.f,vg9=0.f; if(!rd9){ rd9=1; const char*e9=getenv("REVA_GRADE"); if(e9&&e9[0]) gr9=(float)atof(e9); e9=getenv("REVA_VIG"); if(e9&&e9[0]) vg9=(float)atof(e9); } v9.filmGrade=g_grade>0.f?g_grade:gr9; v9.filmVig=g_vig>0.f?g_vig:vg9; if(g_lensNow.grade>=0.f) v9.filmGrade=g_lensNow.grade; }
@@ -4956,9 +4970,9 @@ int main(int argc,char**argv){
             { float lp9[NLIGHT*3],lc9[NLIGHT*3]; memcpy(lp9,g_setLp,sizeof lp9); memcpy(lc9,g_setLc,sizeof lc9); for(int k9=g_setNL*3;k9<NLIGHT*3;k9++) lc9[k9]=0.f;
               if(g_lampScale!=1.f) for(int k9=0;k9<g_setNL*3&&k9<NLIGHT*3;k9++) lc9[k9]*=g_lampScale;   /* a scene's `lamps=` */
               lightsStamp(lp9,lc9,g_setNL); for(int k9=0;k9<g_setNL&&k9<NLIGHT;k9++) g_stampK[k9]=g_setLk[k9];   /* and a light in someone's hand, in the top slots */
-              for(int k9=0;k9<NLIGHT&&n9<GFX_MAX_LIGHTS;k9++){ if(lc9[k9*3]+lc9[k9*3+1]+lc9[k9*3+2]<=0.f) continue; GfxLight*L=&L9[n9++]; memset(L,0,sizeof *L); memcpy(L->pos,&lp9[k9*3],12); memcpy(L->col,&lc9[k9*3],12); L->falloff=0.055f+g_stampK[k9]; if(k9<g_setNL) L->reach=g_setLr[k9]; }
+              for(int k9=0;k9<NLIGHT&&n9<GFX_MAX_LIGHTS;k9++){ if(lc9[k9*3]+lc9[k9*3+1]+lc9[k9*3+2]<=0.f) continue; GfxLight*L=&L9[n9++]; memset(L,0,sizeof *L); memcpy(L->pos,&lp9[k9*3],12); memcpy(L->col,&lc9[k9*3],12); L->falloff=0.055f+g_stampK[k9]; if(k9<g_setNL){ L->reach=g_setLr[k9]; L->decay=g_setLd[k9]; } }
               for(int k9=0;k9<g_setNLX&&n9<GFX_MAX_LIGHTS;k9++){ GfxLight*L=&L9[n9++]; memset(L,0,sizeof *L); memcpy(L->pos,&g_setLpX[k9*3],12);   /* (11-12) the set's lights past the practicals */
-                  for(int c9=0;c9<3;c9++){ L->col[c9]=g_setLcX[k9*3+c9]*g_lampScale; } L->falloff=0.055f+g_setLkX[k9]; L->reach=g_setLrX[k9]; } }
+                  for(int c9=0;c9<3;c9++){ L->col[c9]=g_setLcX[k9*3+c9]*g_lampScale; } L->falloff=0.055f+g_setLkX[k9]; L->reach=g_setLrX[k9]; L->decay=g_setLdX[k9]; } }
             for(int k9=0;k9<g_setNSpot&&n9<GFX_MAX_LIGHTS;k9++){ L9[n9]=g_setSpot[k9];   /* (11-11) a TRK5 timeline colours the set's spots, frame by frame */
                 if(g_stk&&k9<g_stkNS) for(int c9=0;c9<3;c9++) L9[n9].col[c9]*=g_stkSpot[k9][c9];
                 n9++; }

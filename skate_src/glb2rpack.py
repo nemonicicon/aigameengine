@@ -144,6 +144,153 @@ def collect(js, bin_):
             stack.append((c, world))
     return P, N, UV, IDX, have_n, have_uv
 
+def collect_parts(js, bin_):
+    """(11-16) every glTF MESH as a part of its own, named as the mesh is: [(name, P, N, UV, IDX, have_n, have_uv)], in the order the scene
+    first reaches each. A prop made of more than one material (round glasses: plastic rims, and lenses that are glass) is one pack of several
+    meshes, each with its own name, so the engine knows what each is made of by its words (engine/load.inc packMaterials). collect() above
+    still merges everything, and a .glb of one mesh is written exactly as before"""
+    order, parts = [], {}
+    scene = js.get('scenes', [{}])[js.get('scene', 0)]
+    stack = [(r, [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]) for r in reversed(scene.get('nodes', []))]
+    mats = js.get('materials', [])
+    while stack:
+        ni, parent = stack.pop()
+        nd = js['nodes'][ni]
+        world = mul(parent, node_matrix(nd))
+        if 'mesh' in nd:
+            mi = nd['mesh']
+            # (11-16) a glTF mesh of several materials is a part per material (the skate game's board: its deck is grip tape, maple and the deck's
+            # picture, three materials and two pictures, and as one part it took the grip's picture all over, so its underside was black). A mesh of
+            # one material is one part, named as it was
+            used = sorted({p.get('material', -1) for p in js['meshes'][mi].get('primitives', []) if p.get('mode', 4) == 4})
+            for prim in js['meshes'][mi].get('primitives', []):
+                if prim.get('mode', 4) != 4: continue
+                att = prim.get('attributes', {})
+                if 'POSITION' not in att: continue
+                mt = prim.get('material', -1)
+                key = (mi, mt if len(used) > 1 else None)
+                if key not in parts:
+                    nm = js['meshes'][mi].get('name') or ('mesh%d' % mi)
+                    if len(used) > 1:
+                        nm += '_' + ''.join(ch if ch.isalnum() else '_' for ch in (mats[mt].get('name', 'mat%d' % mt) if 0 <= mt < len(mats) else 'mat%d' % mt))
+                    parts[key] = dict(name=nm, P=[], N=[], UV=[], IDX=[], have_n=False, have_uv=False, mat=mt, split=len(used) > 1); order.append(key)
+                g = parts[key]
+                pos = accessor(js, bin_, att['POSITION']); cnt = len(pos)//3; base = len(g['P'])//3
+                for i in range(cnt): g['P'].extend(xform(world, pos[i*3:i*3+3]))
+                if 'NORMAL' in att:
+                    g['have_n'] = True; nor = accessor(js, bin_, att['NORMAL'])
+                    for i in range(cnt):
+                        d = xform_dir(world, nor[i*3:i*3+3]); L = (d[0]*d[0]+d[1]*d[1]+d[2]*d[2]) ** 0.5 or 1.0
+                        g['N'].extend((d[0]/L, d[1]/L, d[2]/L))
+                else: g['N'].extend([0.0, 1.0, 0.0] * cnt)
+                if 'TEXCOORD_0' in att: g['have_uv'] = True; g['UV'].extend(accessor(js, bin_, att['TEXCOORD_0']))
+                else: g['UV'].extend([0.0, 0.0] * cnt)
+                if 'indices' in prim: g['IDX'].extend(i + base for i in accessor(js, bin_, prim['indices']))
+                else: g['IDX'].extend(range(base, base + cnt))
+        for c in reversed(nd.get('children', [])): stack.append((c, world))
+    return [(parts[m]['name'], parts[m]['P'], parts[m]['N'], parts[m]['UV'], parts[m]['IDX'], parts[m]['have_n'], parts[m]['have_uv'], parts[m]['mat'], parts[m]['split'])
+            for m in order if parts[m]['P']]
+
+
+def image_bytes(js, bin_, ii, src):
+    """an image of the file, its bytes: in the binary, a data URI, or a file beside the .glb"""
+    im = js['images'][ii]
+    if 'bufferView' in im:
+        bv = js['bufferViews'][im['bufferView']]; o = bv.get('byteOffset', 0); return bin_[o:o+bv['byteLength']]
+    if im.get('uri', '').startswith('data:'):
+        return base64.b64decode(im['uri'].split(',', 1)[1])
+    if im.get('uri'):
+        import urllib.parse
+        side = os.path.join(os.path.dirname(os.path.abspath(src)), urllib.parse.unquote(im['uri']))
+        if os.path.exists(side): return open(side, 'rb').read()
+    return b''
+
+
+def part_textures(a, js, bin_, parts):
+    """(11-16) each part's picture: its own material's, as the file says, one copy of each picture in the pack. A part of a split mesh with no picture
+    of its own is drawn in its material's colour (the file's is linear light, a name's as it's seen, as glb2rpack_anim.py writes it); a part of a
+    mesh of one material with none takes the file's first picture, as every part did before. --tex is the one picture for every part, as before.
+    Returns (pictures, each part's picture or -1, the parts renamed)"""
+    if a.tex:
+        return [open(a.tex, 'rb').read()], [0] * len(parts), parts
+    mats, texs, pics, seen = js.get('materials', []), js.get('textures', []), [], {}
+    def pic(ii):
+        if ii not in seen:
+            b = image_bytes(js, bin_, ii, a.src)
+            seen[ii] = len(pics) if b else -1
+            if b: pics.append(b)
+        return seen[ii]
+    out, renamed = [], []
+    for (n, P, N, UV, I, hn, hu, mt, split) in parts:
+        m = mats[mt] if 0 <= mt < len(mats) else {}
+        pbr = m.get('pbrMetallicRoughness', {})
+        ti = pbr.get('baseColorTexture', {}).get('index')
+        src = texs[ti].get('source') if ti is not None and ti < len(texs) else None
+        t = pic(src) if (src is not None and hu) else -1
+        if t < 0 and not split and hu and js.get('images'):
+            t = pic(0)
+        if t < 0 and split and '#' not in n:
+            fac = pbr.get('baseColorFactor', [1.0, 1.0, 1.0, 1.0])
+            n = '%s#%02x%02x%02x' % ((n,) + tuple(max(0, min(255, int(round((max(0.0, c) ** (1.0 / 2.2)) * 255)))) for c in fac[:3]))
+        out.append(t); renamed.append((n, P, N, UV, I, hn, hu))
+    return pics, out, renamed
+
+
+def write_parts(a, parts, pics, ptex):
+    """(11-16) a pack of several meshes, one per part, each named as its glTF mesh is. A part whose name carries a colour (`#rrggbb`) is drawn in that
+    colour, untextured; `#rrggbbAA` with AA under ff makes it sheer (flag 8, drawn blended, last: engine/load.inc); everything else takes its
+    picture (pics[ptex[k]], part_textures). The rest is the one-mesh pack's: one joint at the origin, every vertex on it, the markers"""
+    import re
+    if a.scale != 1.0: parts = [(n, [v * a.scale for v in P], N, UV, I, hn, hu) for (n, P, N, UV, I, hn, hu) in parts]
+    allP = [v for p in parts for v in p[1]]
+    mnx, mxx, mny, mxy, mnz, mxz = min(allP[0::3]), max(allP[0::3]), min(allP[1::3]), max(allP[1::3]), min(allP[2::3]), max(allP[2::3])
+    dx = -(mnx+mxx)/2 if a.center else 0.0; dy = -mny if a.ground else 0.0; dz = -(mnz+mxz)/2 if a.center else 0.0
+    if dx or dy or dz: parts = [(n, [v + (dx, dy, dz)[i % 3] for i, v in enumerate(P)], N, UV, I, hn, hu) for (n, P, N, UV, I, hn, hu) in parts]
+    nTex = len(pics)
+    names = [b'root'] + [m.encode('ascii') for m in a.marker] + [p[0].encode('ascii') for p in parts]
+    nM = len(parts); maxv = max(len(p[1])//3 for p in parts)
+    HDR = 4 + 15*4; off = HDR; nNodes = 1 + len(a.marker)
+    offNodes = off; off += 52 * nNodes
+    offMeshes = off; off += 60 * nM
+    offMats = off; off += 36 * nM
+    offClips = off; offTexTable = off; off += 16*nTex
+    body = []
+    def place(b):
+        nonlocal off
+        o = off; off += len(b); body.append(b); return o
+    recs, mats = [], []
+    joi_b = bytes(maxv*4); wei_b = bytes([255,0,0,0]) * maxv   # one block each, as long as the longest part: every vertex on the one joint
+    offJoints = place(joi_b); offWeights = place(wei_b)
+    ident = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+    offBoneMap = place(struct.pack('<I', 0)); offIBM = place(struct.pack('<16f', *ident)); offBind = place(struct.pack('<16f', *ident))
+    for k, (n, P, N, UV, I, hn, hu) in enumerate(parts):
+        nv = len(P)//3; m = re.search(r'#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?', n)
+        textured = bool(ptex[k] >= 0 and hu and not m)
+        sheer = bool(m and m.group(2) and int(m.group(2), 16) < 255)
+        flags = (1 if hn else 0) | (2 if textured else 0) | 4 | (8 if sheer else 0)
+        oP = place(struct.pack('<%df' % (nv*3), *P)); oN = place(struct.pack('<%df' % (nv*3), *N)); oU = place(struct.pack('<%df' % (nv*2), *UV)); oI = place(struct.pack('<%dI' % len(I), *I))
+        recs.append(struct.pack('<15I', 1 + len(a.marker) + k, 0, nv, len(I), 1, flags, oP, oN, oU, offJoints, offWeights, oI, offBoneMap, offIBM, offBind))
+        mat = bytearray(36); struct.pack_into('<I', mat, 0, k); struct.pack_into('<I', mat, 16, 0); struct.pack_into('<i', mat, 24, ptex[k] if textured else -1); mats.append(bytes(mat))
+        print(f"  part {k}: {n}   vertices {nv:,}   triangles {len(I)//3:,}" + ("   sheer" if sheer else "") + (f"   picture {ptex[k]}" if textured else "   its name's colour"))
+    offTexData = [place(b) for b in pics]
+    tbl = struct.pack('<I', len(names)); so = 0
+    for nm in names: tbl += struct.pack('<II', so, len(nm)); so += len(nm)
+    tbl += b''.join(names); offStr = place(tbl)
+    szb = [0.0]*12; szb[7] = float('nan'); szb[9] = float('nan'); offSize = place(struct.pack('<12f', *szb))
+    out = bytearray(b'RPK1')
+    out += struct.pack('<15I', 2, nNodes, nM, nM, 0, nTex, offNodes, offMeshes, offMats, offClips, offTexTable, offStr, offSize, off, 0)
+    out += struct.pack('<IiI3f4f3f', 0, -1, 1, 0,0,0, 0,0,0,1, 1,1,1)
+    for k in range(len(a.marker)): out += struct.pack('<IiI3f4f3f', k + 1, 0, 1, 0,0,0, 0,0,0,1, 1,1,1)
+    for r in recs: out += r
+    for m in mats: out += m
+    for i, b in enumerate(pics): t = bytearray(16); struct.pack_into('<I', t, 8, offTexData[i]); struct.pack_into('<I', t, 12, len(b)); out += t
+    assert len(out) == HDR + 52 * nNodes + 60 * nM + 36 * nM + 16 * nTex
+    for b in body: out += b
+    assert len(out) == off
+    open(a.dst, 'wb').write(out)
+    print(f"{a.dst}\n  {nM} meshes   file {len(out):,} B" + (f"   markers {' '.join(a.marker)}" if a.marker else ""))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src'); ap.add_argument('dst')
@@ -158,6 +305,10 @@ def main():
     a = ap.parse_args()
 
     js, bin_ = read_glb(a.src)
+    parts = collect_parts(js, bin_)
+    if len(parts) > 1:   # (11-16) a prop of several materials keeps its meshes apart, each with its own picture
+        pics, ptex, parts = part_textures(a, js, bin_, parts)
+        write_parts(a, parts, pics, ptex); return
     P, N, UV, IDX, have_n, have_uv = collect(js, bin_)
     nv = len(P)//3
     if nv == 0: raise SystemExit("no triangle geometry found")

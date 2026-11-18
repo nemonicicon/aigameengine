@@ -108,6 +108,8 @@ static float g_scrAmp=2.8f;   /* ctl screenamp= : a screen emits, and his head i
 #define SCN_MAXCAST 5
 #define SCN_BODIES  (SCN_MAXCAST-1)   /* slots with a body: 0..3 */
 #define SCN_VOICE   (SCN_MAXCAST-1)   /* the off-screen voice slot */
+#define HELD_ACTORS 31                 /* (11-14) set actors that hold props at once, beyond the first (who keeps the voice slot) */
+#define HELD_SLOTS  (SCN_MAXCAST+HELD_ACTORS)   /* the held props' places: the scene's slots, then those actors' (scene.inc, actorHeldSync) */
 #define MAXB 256
 #define MAXB_STR2(x) #x
 #define MAXB_STR(x) MAXB_STR2(x)
@@ -206,6 +208,7 @@ static FILE* clubOpen(const char*p,const char*m){ FILE*f=fopen(p,m); if(f&&m[0]=
 #include "engine/head.inc"    /* the head layer, jaw, look-at, eyes */
 #include "engine/strands.inc" /* (11-06) hair, lock by lock: every lock its own simulation */
 #include "engine/cloth.inc"   /* cloth on bodies, measuring the body, the hanging cloth */
+#include "engine/clubwear.inc"   /* (11-16) whole cloth on a game's body, by the engine's own solver */
 #include "engine/marks.inc"   /* the mark editor, eye morphs, the performance layer */
 #include "engine/audit.inc"   /* the clipping audit */
 #include "engine/contact.inc" /* the contact pass and jiggle */

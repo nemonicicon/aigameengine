@@ -173,7 +173,7 @@ static int apiPath(float x0,float y0,float z0,float x1,float y1,float z1,float r
 
 /* ---- PROPS ON ANY BONE. E->attach puts a model on a bone of a body, by the bone's name in that body's pack or a plain word: head, hand_l, hand_r, spine, hips, foot_l, foot_r. It goes with the bone wherever the clips, a face or a ragdoll take it, and with the body's size: an offset and a scale are for a body of ordinary height, so the same crown fits a child. As many as the pool holds, each one on and off whenever the game says, and nothing's added to the pack. It's what's drawn and not the rules. */
 #define ATT_MAX 256
-typedef struct { int on,body,prop,node; Pack*pk; char bone[40]; float off[3],q[4],scale; } Att;
+typedef struct { int on,body,prop,node; Pack*pk; char bone[40]; float off[3],q[4],scale; int upright; int ground; float gp[2][3]; float F[16]; int drawn; } Att;   /* F, drawn (11-16): where it was last drawn (E->attachPoint) */   /* ground (11-16): gp, two of its points kept out of the ground (E->attachGround) */   /* upright (11-16): at the bone's place, turned with the body, not the bone (E->attachUpright) */
 static Att g_att[ATT_MAX]; static int g_attN=0,g_attHi=0;
 __attribute__((unused)) static int attBoneOf(Pack*P,const char*nm){ if(!P) return -1; static const struct { const char*w; int pb; } W[]={{"hips",0},{"spine",2},{"chest",3},{"neck",4},{"head",5},{"foot_l",-1},{"foot_r",-1},{"hand_l",-1},{"hand_r",-1}}; for(size_t i=0;i<sizeof W/sizeof W[0];i++) if(!strcmp(nm,W[i].w)&&W[i].pb>=0&&P->pb[W[i].pb]>=0) return P->pb[W[i].pb];
     const char*need=NULL; if(!strcmp(nm,"hand_l")) need="LeftHand"; else if(!strcmp(nm,"hand_r")) need="RightHand"; else if(!strcmp(nm,"foot_l")) need="LeftFoot"; else if(!strcmp(nm,"foot_r")) need="RightFoot"; const char*q=need?need:nm;
@@ -183,15 +183,89 @@ __attribute__((unused)) static int attBoneOf(Pack*P,const char*nm){ if(!P) retur
     return -1; }
 static int apiAttach(int body,int prop,const char*bone,float x,float y,float z,float yaw,float pitch,float roll,float scale){ if(!bone||prop<0||prop>=g_nObjProp) return 0; int k=-1; for(int i=0;i<ATT_MAX;i++) if(!g_att[i].on){ k=i; break; } if(k<0){ printf("[attach] more than %d at once\n",ATT_MAX); fflush(stdout); return 0; }
     Att*A=&g_att[k]; memset(A,0,sizeof *A); A->on=1; A->body=body; A->prop=prop; A->node=-1; snprintf(A->bone,sizeof A->bone,"%s",bone); A->off[0]=x; A->off[1]=y; A->off[2]=z; A->scale=scale>0.f?scale:1.f; float qa[4],qb[4],qc[4],t[4]; qaxis(qa,0,1,0,yaw); qaxis(qb,1,0,0,pitch); qaxis(qc,0,0,1,roll); qmul(t,qa,qb); qmul(A->q,t,qc); g_attN++; if(k>=g_attHi) g_attHi=k+1; return k+1; }
+/* (11-16) E->attachUpright: at the bone's place and turned with the body, not with the bone: a board carried in a hand, nose up whatever the hand's
+ * swing does (the skate game's carried board: the deck at the hand, turned by the skeleton's own frame) */
+static int apiAttachUpright(int body,int prop,const char*bone,float x,float y,float z,float yaw,float pitch,float roll,float scale){ const int h=apiAttach(body,prop,bone,x,y,z,yaw,pitch,roll,scale); if(h>0) g_att[h-1].upright=1; return h; }
+/* (11-16) E->attachGround: two of an attachment's points (its own units, as attach's offset) kept on the ground as it's drawn; on 0 lets them go */
+static void apiAttachGround(int h,int on,float ax,float ay,float az,float bx,float by,float bz){ if(h<1||h>ATT_MAX||!g_att[h-1].on) return; Att*A=&g_att[h-1];
+    A->ground=on!=0; const float v[6]={ax,ay,az,bx,by,bz}; for(int k=0;k<6;k++) A->gp[k/3][k%3]=(v[k]==v[k]&&fabsf(v[k])<1e4f)?v[k]:0.f; }
 static void apiDetach(int h){ if(h<1||h>ATT_MAX||!g_att[h-1].on) return; g_att[h-1].on=0; g_attN--; }
 static void apiDetachAll(int body){ for(int i=0;i<g_attHi;i++) if(g_att[i].on&&g_att[i].body==body){ g_att[i].on=0; g_attN--; } }
 /* a body's been posed: what's on it, at the bone, this frame */
+/* (11-16) E->attachGround's rule, as the skate game keeps its board on the ground: each of the two points is looked for 0.2 m
+ * along the model's up either side of it, on a triangle facing up (its normal within 60 degrees of the model's up), so a rail or a ledge over it
+ * isn't taken for the ground; a point below that goes back onto it, the model lifted by the two's mean and turned about its own z by the
+ * difference over the points' distance, so both sit on it. A point the pose lifts on purpose stays where it is. What's drawn, not the rules */
+static void attOnGround(const Att*A,float*F){
+    float up[3]={F[4],F[5],F[6]}, zx[3]={F[8],F[9],F[10]}; const float ul=sqrtf(up[0]*up[0]+up[1]*up[1]+up[2]*up[2]), zl=sqrtf(zx[0]*zx[0]+zx[1]*zx[1]+zx[2]*zx[2]);
+    if(ul<1e-6f||zl<1e-6f) return;
+    for(int k=0;k<3;k++){ up[k]/=ul; zx[k]/=zl; }
+    const float reach=0.2f*1.75f; float p[2][3], sunk[2]={0.f,0.f};
+    for(int i=0;i<2;i++){ const float*g=A->gp[i]; for(int k=0;k<3;k++) p[i][k]=F[k]*g[0]+F[4+k]*g[1]+F[8+k]*g[2]+F[12+k];
+        float a[3],b[3]; for(int k=0;k<3;k++){ a[k]=p[i][k]+up[k]*reach; b[k]=p[i][k]-up[k]*reach; }
+        EngineTriHit h; if(!trRay(a,b,&h)) continue;
+        if(h.nrm[0]*up[0]+h.nrm[1]*up[1]+h.nrm[2]*up[2]<0.5f) continue;
+        const float s=(h.pos[0]-p[i][0])*up[0]+(h.pos[1]-p[i][1])*up[1]+(h.pos[2]-p[i][2])*up[2]; sunk[i]=s>0.f?s:0.f; }
+    if(sunk[0]<=0.f&&sunk[1]<=0.f) return;
+    float d[3]={p[0][0]-p[1][0],p[0][1]-p[1][1],p[0][2]-p[1][2]}; const float len=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(len<1e-6f) return;
+    const float t=atan2f(sunk[0]-sunk[1],len), c=cosf(t), s=sinf(t), x=zx[0], y=zx[1], z=zx[2], C=1.f-c;
+    const float Rm[9]={c+x*x*C, x*y*C-z*s, x*z*C+y*s,  y*x*C+z*s, c+y*y*C, y*z*C-x*s,  z*x*C-y*s, z*y*C+x*s, c+z*z*C};   /* rows: about zx by t */
+    for(int col=0;col<3;col++){ float v[3]={F[col*4],F[col*4+1],F[col*4+2]}; for(int r=0;r<3;r++) F[col*4+r]=Rm[r*3]*v[0]+Rm[r*3+1]*v[1]+Rm[r*3+2]*v[2]; }
+    const float lift=(sunk[0]+sunk[1])*0.5f; for(int k=0;k<3;k++) F[12+k]+=up[k]*lift; }
 static void attDraw(int body,Pack*P,M4*W,const float*model){ if(!g_attN||g_noDraw) return; for(int i=0;i<g_attHi;i++){ Att*A=&g_att[i]; if(!A->on||A->body!=body) continue;
         if(A->pk!=P){ A->pk=P; A->node=attBoneOf(P,A->bone); if(A->node<0){ static int said=0; if(said++<8){ printf("[attach] %s has no bone called %s\n",P->label,A->bone); fflush(stdout); } } } if(A->node<0) continue;
-        const int pk=objPropLoad(A->prop); if(pk<0) continue; Pack*Q=&g_setPk[pk]; const float sc=P->scale>1e-6f?P->scale:1.f,k=faceEyeHeight(P)/2.75f,S=A->scale*k/sc,T=k/sc; const float zero[3]={A->off[0]*T,A->off[1]*T,A->off[2]*T},one[3]={S,S,S}; M4 L,B,F; m4_trs(L,zero,A->q,one); m4_mul(B,W[A->node],L); m4_mul(F,(float*)model,B);
+        const int pk=objPropLoad(A->prop); if(pk<0) continue; Pack*Q=&g_setPk[pk]; const float sc=P->scale>1e-6f?P->scale:1.f,k=(GAME_ON&&g_tune.propTrue)?1.f:faceEyeHeight(P)/2.75f,S=A->scale*k/sc,T=k/sc;   /* (11-16) propTrue: its own size */ const float zero[3]={A->off[0]*T,A->off[1]*T,A->off[2]*T},one[3]={S,S,S}; M4 L,B,F; m4_trs(L,zero,A->q,one);
+        if(A->upright){ M4 Tb={1,0,0,0, 0,1,0,0, 0,0,1,0, W[A->node][12],W[A->node][13],W[A->node][14],1}; m4_mul(B,Tb,L); } else m4_mul(B,W[A->node],L);   /* upright: the bone's place, the body's turn */
+        m4_mul(F,(float*)model,B);
+        if(A->ground&&g_tr.n>0) attOnGround(A,F);   /* (11-16) its two points on the ground under them, as it's drawn */
+        memcpy(A->F,F,sizeof A->F); A->drawn=1;   /* (11-16) E->attachPoint */
         const unsigned owner=g_vkOwner; const float use=g_vkUse; float tint[3]; memcpy(tint,g_vkTint,12); g_vkOwner=((unsigned)GFX_KIND_OBJECT<<28)|((0x8000u+(unsigned)i)<<12); g_vkUse=1.f; g_vkTint[0]=g_vkTint[1]=g_vkTint[2]=1.f; Face*fc=g_faceCur; g_faceCur=NULL;
-        for(unsigned mi=0;mi<Q->nMeshes;mi++){ const PMesh*M=&Q->meshes[mi]; if(!(M->flags&4)) continue; g_vkMirror=1|2; vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,0,NULL); g_vkMirror=0; if(g_shadowOn) vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,GFX_SHADOW,NULL); }
+        for(unsigned mi=0;mi<Q->nMeshes;mi++){ const PMesh*M=&Q->meshes[mi]; if(!(M->flags&4)) continue; g_vkMirror=1|2; vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,0,NULL); g_vkMirror=0; if(g_shadowOn&&!Q->nocast) vkMesh(Q,mi,F,(float*)(Q->pk+M->offBind),NULL,0,g_vkTint,g_vkUse,GFX_SHADOW,NULL); }   /* (11-16) a NoCast prop on a bone casts none, as a set's and an object's don't: a torch under its own light threw an octagon a metre wide */
         g_faceCur=fc; g_vkOwner=owner; g_vkUse=use; memcpy(g_vkTint,tint,12); } }
+
+/* (11-16) E->attachPoint: a point of an attachment's model (its own units, as attach's offset) where it was last drawn, in the world; 1 if it has been */
+static int apiAttachPoint(int h,float x,float y,float z,float*out){ if(!out||h<1||h>ATT_MAX||!g_att[h-1].on||!g_att[h-1].drawn||!(x==x&&y==y&&z==z)) return 0; const float*F=g_att[h-1].F;
+    for(int k=0;k<3;k++) out[k]=F[k]*x+F[4+k]*y+F[8+k]*z+F[12+k]; return 1; }
+
+/* ---- (11-16) BONES LAID OVER THE CLIP: a Godot SkeletonModifier3D on a game's body (the skate game's raised torch: the right arm aimed
+ * up beside the head, the fingers round the grip), after its clip, the ride's pose and the performer's, before the bones become matrices, so the cloth and what's
+ * on its bones follow. E->boneAim turns a bone so its length (its own +y, as a glTF rig's bones lie) points along right*R + up*U + front*F in the body's model
+ * space: F the way bone `frame` faces (its +z) laid flat, or the model's +z with no frame; U the model's up; R = F x U (the body's right, as their script works
+ * it out: in switch his chest turns on the deck, and an arm aimed by the skeleton's own axes came through his neck). The turn is the shortest from where the
+ * bone's length lies now, taken into its parent's frame, as their script's aim does. E->boneCurl sets a bone to its rest turned about its own x (a finger round a grip).
+ * A body's lines are done in the order they were first said (seq), each on the pose the last left; saying a bone again changes its line in place.
+ * E->boneLayOff(body) takes them all off. What's drawn, never the rules: nothing here is in [simhash] */
+#define BL_MAX 64
+typedef struct { int on,body,kind; unsigned seq; char bone[40],frame[40]; float v[3]; Pack*pk; int node,fnode; } BoneLay;
+static BoneLay g_bl[BL_MAX]; static int g_blHi=0; static unsigned g_blSeq=0;
+static int blNode(Pack*P,const char*nm){ if(!nm||!nm[0]) return -1;
+    for(unsigned i=0;i<P->nNodes;i++) if(!strcmp(packStr(P,P->nodes[i].name),nm)) return (int)i;
+    for(unsigned i=0;i<P->nNodes;i++){ const char*s=packStr(P,P->nodes[i].name),*c=strrchr(s,':'); if(c&&!strcmp(c+1,nm)) return (int)i; }   /* mixamorig:RightArm */
+    return attBoneOf(P,nm); }
+static BoneLay*blSlot(int body,const char*bone){ if(body<0||!bone||!bone[0]) return NULL; int k=-1;
+    for(int i=0;i<g_blHi;i++) if(g_bl[i].on&&g_bl[i].body==body&&!strcmp(g_bl[i].bone,bone)) return &g_bl[i];
+    for(int i=0;i<BL_MAX;i++) if(!g_bl[i].on){ k=i; break; }
+    if(k<0){ static int said=0; if(!said++){ printf("[bonelay] more than %d bones laid over clips at once\n",BL_MAX); fflush(stdout); } return NULL; }
+    BoneLay*b=&g_bl[k]; memset(b,0,sizeof *b); b->on=1; b->body=body; b->seq=++g_blSeq; snprintf(b->bone,sizeof b->bone,"%s",bone); b->node=b->fnode=-1; if(k>=g_blHi) g_blHi=k+1; return b; }
+static void apiBoneAim(int body,const char*bone,const char*frame,float right,float up,float front){ if(!(right==right&&up==up&&front==front)) return; BoneLay*b=blSlot(body,bone); if(!b) return;
+    b->kind=0; snprintf(b->frame,sizeof b->frame,"%s",frame?frame:""); b->v[0]=right; b->v[1]=up; b->v[2]=front; b->pk=NULL; }
+static void apiBoneCurl(int body,const char*bone,float angle){ if(!(angle==angle)) return; BoneLay*b=blSlot(body,bone); if(!b) return; b->kind=1; b->frame[0]=0; b->v[0]=angle; b->pk=NULL; }
+static void apiBoneLayOff(int body){ for(int i=0;i<g_blHi;i++) if(g_bl[i].on&&g_bl[i].body==body) g_bl[i].on=0; }
+static void boneLayPose(int si,Pack*P,float Q[][4],float T[][3]){ if(!g_blHi) return;
+    unsigned last=0; for(;;){ BoneLay*b=NULL; for(int i=0;i<g_blHi;i++){ BoneLay*c=&g_bl[i]; if(c->on&&c->body==si&&c->seq>last&&(!b||c->seq<b->seq)) b=c; } if(!b) break; last=b->seq;
+        if(b->pk!=P){ b->pk=P; b->node=blNode(P,b->bone); b->fnode=b->kind==0?blNode(P,b->frame):-1;
+            if(b->node<0){ static int said=0; if(said++<8){ printf("[bonelay] %s has no bone called %s\n",P->label,b->bone); fflush(stdout); } } }
+        if(b->node<0) continue;
+        if(b->kind==1){ float c[4]; qaxis(c,1.f,0.f,0.f,b->v[0]); qmul(Q[b->node],P->nodes[b->node].q,c); continue; }   /* rest, turned about its own x */
+        float F[3]={0.f,0.f,1.f};
+        if(b->fnode>=0){ float r[4]; const float z[3]={0.f,0.f,1.f}; rideWorld(P,Q,T,b->fnode,NULL,r,NULL); rideQv(r,z,F); F[1]=0.f;
+            const float l=sqrtf(F[0]*F[0]+F[2]*F[2]); if(l>1e-2f){ F[0]/=l; F[2]/=l; } else { F[0]=0.f; F[2]=1.f; } }
+        const float Rt[3]={-F[2],0.f,F[0]};   /* F x up */
+        float d[3]={Rt[0]*b->v[0]+F[0]*b->v[2],b->v[1],Rt[2]*b->v[0]+F[2]*b->v[2]}; const float dl=sqrtf(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]); if(dl<1e-6f) continue;
+        for(int k=0;k<3;k++) d[k]/=dl;
+        float r[4],cy[3],dq[4]; const float y[3]={0.f,1.f,0.f}; rideWorld(P,Q,T,b->node,NULL,r,NULL); rideQv(r,y,cy);
+        const float cl=sqrtf(cy[0]*cy[0]+cy[1]*cy[1]+cy[2]*cy[2]); if(cl<1e-6f) continue; for(int k=0;k<3;k++) cy[k]/=cl;
+        qarc(dq,cy,d); rideTurn(P,Q,T,b->node,dq); } }
 
 /* ---- A MUSIC CLOCK. E->musicClock says the music that's just started has this many beats a minute, its first beat this many seconds in, and so many beats to a bar. E->musicBeat says where it is, in beats, and GameExport.beat falls on the tick each one comes round. In a live game it follows the sound itself, because a late frame slows the game by a hair and the sound doesn't stop for it, and a tape keeps what it read, so a replay's the same session. In anything measured it's the tick clock, and no sound's involved. */
 static struct { int on,bar,last,hasNext; float bpm,first,t,next; double dev0; } g_mclk;

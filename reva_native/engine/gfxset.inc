@@ -91,7 +91,7 @@ static void lightFill(GfxLight*L,float x,float y,float z,float r,float g,float b
     float l=(float)sqrt(dx*dx+dy*dy+dz*dz); if(l>0.f&&deg>0.f){ L->dir[0]=dx/l; L->dir[1]=dy/l; L->dir[2]=dz/l; L->cosOuter=(float)cos(deg*3.14159265/180.0); L->cosInner=(float)cos(deg*0.75*3.14159265/180.0); } }
 static void frameLightAdd(float x,float y,float z,float r,float g,float b,float falloff,float dx,float dy,float dz,float deg){ if(g_frameNL<GFX_MAX_LIGHTS) lightFill(&g_frameLight[g_frameNL++],x,y,z,r,g,b,falloff,dx,dy,dz,deg); }
 static void setLookClear(void){
-    g_exposure=0.f; g_ground[0]=g_ground[1]=g_ground[2]=0.f; g_setNSpot=0; g_haze=0.f;
+    g_exposure=0.f; g_ground[0]=g_ground[1]=g_ground[2]=0.f; g_setNSpot=0; g_haze=0.f; g_setTone=g_setNoBloom=g_setNoAO=g_setNoReflect=g_setBgOn=0;
     { const char*e=getenv("REVA_HAZE"); if(e&&e[0]) g_haze=(float)atof(e); }
     { const char*e=getenv("REVA_EXPOSURE"); if(e&&e[0]) g_exposure=(float)atof(e); }
 #ifdef REVA_VK

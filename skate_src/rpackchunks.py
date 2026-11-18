@@ -157,6 +157,37 @@ def faces_chunk(nodes):
     return bytes(b.b)
 
 
+def tailor_of(c):
+    """CLTH (11-16): [(the mesh's name, how many vertices it has, its 2 floats a vertex as bytes)]"""
+    out = []
+    for i in range(struct.unpack_from("<I", c, 0)[0]):
+        nm, verts, off = struct.unpack_from("<3I", c, 4 + i * 12)
+        out.append((_name(c, nm), verts, c[off:off + verts * 8]))
+    return out
+
+
+def tailor_chunk(rows):
+    """CLTH (11-16): what the tailor painted on each garment, by mesh name: each vertex's two numbers, in metres, how far it may go from its
+    skinned pose and how near the skin it may come (a glTF garment's TEXCOORD_1, which is how the engine's cloth solver is told: clubcloth/README.md).
+    rows: (the mesh's name, its vertex count, 2 floats a vertex). A u32 count, then 12 bytes each: its name, its vertex count, its numbers"""
+    b = Blob(b"\0" * (4 + len(rows) * 12))
+    struct.pack_into("<I", b.b, 0, len(rows))
+    for i, (name, nv, nums) in enumerate(rows):
+        struct.pack_into("<3I", b.b, 4 + i * 12, b.name(name), nv, b.data(struct.pack("<%df" % (nv * 2), *nums[:nv * 2])))
+    return bytes(b.b)
+
+
+def put_tailor(path, rows):
+    """a baked pack's CLTH, put in place of any it had (a bake writes it from the glTF every time, so it's never carried)"""
+    body, chunks = split(open(path, "rb").read())
+    if not rows and not any(c[0] == b"CLTH" for c in chunks):
+        return   # nothing to say, and the file stays exactly as the bake wrote it
+    chunks = [c for c in chunks if c[0] != b"CLTH"]
+    if rows:
+        chunks.append((b"CLTH", None, tailor_chunk(rows)))
+    open(path, "wb").write(join(body, chunks))
+
+
 # ---- a body, read ------------------------------------------------------------------------
 class Img:
     """an old body: what its tables say, by name"""

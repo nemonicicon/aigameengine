@@ -178,7 +178,7 @@ static const char* charSelect(int W,int H){
     for(int i=0;i<nc;i++){ Pack*P=&cp[i];
         for(unsigned m=0;m<P->nMeshes;m++) if(P->vbo[m*6]) gfxBuffersDrop(6,P->vbo+m*6);
         for(unsigned t2=0;t2<P->nTex;t2++) if(P->tex[t2]) gfxTextureDrop(P->tex[t2]);
-        free(P->vbo); free(P->tex); free(P->meshTex); free(P->meshMatFlags); free(P->meshMat); free(P->nodes); free(P->pk); }
+        free(P->vbo); free(P->tex); free(P->meshTex); free(P->meshMatFlags); free(P->meshMat); free(P->meshTail); free(P->nodes); free(P->pk); }
     free(world); free(T); free(Q); free(S);
     return cand[done].path;
 }

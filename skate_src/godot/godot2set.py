@@ -174,13 +174,24 @@ def main():
 
     # ---- the static shapes Godot draws nothing for but stands things on (a ground box): drawn here, so the floor is there to ride
     extra = []
+    solids = []   # (11-16) (the static's name, its kind, a box's centre and half size, Godot's metres): the set's `solid` lines, below
     for s in man.get("statics", []):
         leaf = s["name"].split("/")[-1]
         if not any(w in leaf.lower() for w in ("ground", "floor")):
-            # (the skate game's SafetyNet under a map and SidecarWalls round it): solid and never drawn in Godot. Drawing them would wall the park
-            # in or lay a floor over its low places, and the engine has no prop that's solid and not drawn: left out, and said
-            holes.append("static %s: solid in Godot and never drawn (%d box%s); the engine has no solid prop that isn't drawn, so it's left out" % (
-                s["name"], len(s["shapes"]), "" if len(s["shapes"]) == 1 else "es"))
+            # (the skate game's safety net under a map and the walls round it): solid and never drawn in Godot. Drawn, they'd wall the park in or lay
+            # a floor over its low places; left out (until 11-16), a rider's vert air carried him out over a hedge maze's low walls. A set's `solid`
+            # line is a box that's solid and isn't drawn (engine/tris.inc): a wall's an obstacle, anything else ground, as their layers have them
+            kind = "wall" if "wall" in leaf.lower() else "ride"
+            for sh in s["shapes"]:
+                if sh["type"] != "BoxShape3D":
+                    holes.append("static %s: a %s collision shape: only boxes are made solid" % (s["name"], sh["type"]))
+                    continue
+                q = sh["xf"]["quat"]
+                if abs(q[0]) + abs(q[1]) + abs(q[2]) > 1e-4:
+                    holes.append("static %s: a turned box, made solid as if square to the axes" % s["name"])
+                solids.append((s["name"], kind, sh["xf"]["pos"], [0.5 * v for v in sh["size"]]))
+            came.append("static %s: %d box%s, solid and not drawn, as %s" % (s["name"], len(s["shapes"]), "" if len(s["shapes"]) == 1 else "es",
+                                                                          "walls" if kind == "wall" else "ground"))
             continue
         for sh in s["shapes"]:
             if sh["type"] != "BoxShape3D":
@@ -301,7 +312,9 @@ def main():
         x, y, z = eng(l["xf"]["pos"])
         c = l["color"]
         decay = max(0.25, float(l.get("attenuation", 1.0) or 1.0))
-        return "light %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f" % (x, y, z, c[0], c[1], c[2], l["energy"], (2.0 ** (1.0 / decay)) * U, l.get("range", 5.0) * U)
+        # (11-16) a 10th number: its attenuation, so the engine falls it off as Godot does (energy over metres to that power, in its range's window);
+        # the 8th stays for whatever reads the old falloff (the engine's own rasterizer)
+        return "light %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f" % (x, y, z, c[0], c[1], c[2], l["energy"], (2.0 ** (1.0 / decay)) * U, l.get("range", 5.0) * U, decay)
     for l in man.get("lights", []):
         if l["type"] == "OmniLight3D":
             L.append(light_line(l))
@@ -312,7 +325,7 @@ def main():
         came.append("lights: %d (%s)" % (len(man["lights"]), ", ".join(sorted({l["type"] for l in man["lights"]}))))
     if env:
         if env.get("sky") == "ProceduralSkyMaterial" and "sky_horizon" in env:
-            L.append("sky %.3f %.3f %.3f" % tuple(env["sky_horizon"]))
+            L.append("sky %.3f %.3f %.3f" % tuple(ambient_of(env) or env["sky_horizon"]))
             came.append("the sky: Godot's procedural sky, as its horizon colour")
         elif env.get("sky_shader"):
             sky_rec = shd_by_key.get(env.get("sky_key", ""))
@@ -328,8 +341,26 @@ def main():
                 holes.append("the sky is a shader (%s) that isn't carried: %s. The sky is the engine's own" % (env["sky_shader"], e))
             L.append("sky %.3f %.3f %.3f" % tuple(ambient_of(env) or env.get("background_color", [0.5, 0.6, 0.7])))
         else:
-            L.append("sky %.3f %.3f %.3f" % tuple(env.get("background_color", [0.5, 0.6, 0.7])))
-            came.append("the sky: Godot's background colour")
+            # (11-16) the ambient is their ambient colour when they gave one (one park's is a soft grey-blue at 0.7: its shadows came out the
+            # background's blue), and a background colour is the picture behind everything, with no sky dome (it came out the engine's white haze)
+            L.append("sky %.3f %.3f %.3f" % tuple(ambient_of(env) or env.get("background_color", [0.5, 0.6, 0.7])))
+            if env.get("background_mode") == 1 and env.get("background_color"):
+                L.append("background %.3f %.3f %.3f" % tuple(env["background_color"][:3]))
+            came.append("the sky: Godot's background colour, flat behind everything")
+        if ambient_of(env):   # (11-16) a colour as its ambient is the same from every side: the engine's ground under its sky is that colour too (left to
+            # itself the ground is the sky darkened and warmed; with `reflect off` as well, the alien's shaded skin is their albedo times their ambient)
+            L.append("ground %.3f %.3f %.3f" % tuple(ambient_of(env)))
+        if env.get("tonemap_mode") == 0:   # Godot's TONEMAP_LINEAR: the light as it is, clipped (ours bends it with a filmic curve)
+            L.append("tone linear")
+            came.append("the tone: Godot's linear tonemap")
+        if "glow" in env and not env.get("glow"):
+            L.append("bloom off")
+        if env.get("background_mode") in (0, 1) or env.get("sky_shader"):   # (11-16) a plain colour behind it: Godot's materials have nothing to reflect
+            # (a park's skateboard trucks are black); and a sky shader's own picture is what they reflect, which the engine can't yet (it reflected its ambient
+            # colour, and a lobby's floor came out under a blue haze where theirs reflects dark space)
+            L.append("reflect off")
+        if "ssao" in env and not env.get("ssao"):   # (11-16) theirs has none: our occlusion and contact shadows darkened the rider's shirt and the ground under him
+            L.append("occlusion off")
         if env.get("fog"):
             L.append("fog %g %.3f %.3f %.3f" % (env["fog_density"] / U, *env["fog_color"]))
             came.append("fog: density %.4f a metre" % env["fog_density"])
@@ -338,6 +369,9 @@ def main():
         for k, what, ours in (("glow", "glow", "bloom"), ("ssao", "screen-space ambient occlusion", "occlusion (`ao`)")):
             if env.get(k):
                 holes.append("the environment's %s: the engine's %s is a machine's graphics setting, not a set's" % (what, ours))
+    for nm, kind, c, h in solids:
+        x, y, z = eng(c)
+        L.append("solid %s %.3f %.3f %.3f %.3f %.3f %.3f" % (kind, x, y, z, h[0] * U, h[1] * U, h[2] * U))
     sp = man.get("spawn")
     if sp:
         x, y, z = eng(sp["pos"])
@@ -347,6 +381,34 @@ def main():
         x, y, z = eng(mk["xf"]["pos"])
         L.append("mark %s %.3f %.3f %.3f %.1f" % (mk["name"].split("/")[-1], x, y, z, mk["xf"]["yaw_deg"]))
     L.append("mark godot_origin %.3f %.3f %.3f 0" % eng((0.0, 0.0, 0.0)))   # where Godot's (0, 0, 0) is after the lift: a game's heights in their own terms (the void at -5.6 m)
+    un_l = man.get("unsupported", {}).get("labels", [])
+    lab = [l for l in un_l if l.get("picture")]
+    if len(lab) < len(un_l):
+        holes.append("%d Label3D(s) from an older export, with no picture: export again" % (len(un_l) - len(lab)))
+    if lab:   # (11-16) each Label3D a quad in its plane, its picture its text (engine_export.gd _label), unlit and see-through, in a pack of its own
+        lm, lt = [], []
+        for i, l in enumerate(lab):
+            bx, by, bz = (np.array(v, dtype=np.float64) for v in l["basis"])
+            w, h = l["px"][0] * l["pixel_size"], l["px"][1] * l["pixel_size"]
+            o = np.array(l["xf"]["pos"], dtype=np.float64) + bx * l["offset"][0] * l["pixel_size"] + by * l["offset"][1] * l["pixel_size"]
+            cs = [o - bx * w / 2 + by * h / 2, o + bx * w / 2 + by * h / 2, o + bx * w / 2 - by * h / 2, o - bx * w / 2 - by * h / 2]
+            pos = np.array([[c[0] * U, (c[1] + lift) * U, c[2] * U] for c in cs], dtype=np.float32)
+            n = bz / max(np.linalg.norm(bz), 1e-9)
+            joints, weights, bone_map = rigid_skin(4, 0)
+            lm.append({"name": "label_%03d" % i, "node": 1, "pos": pos.ravel().tolist(), "nrm": n.tolist() * 4, "uv": [0, 0, 1, 0, 1, 1, 0, 1],
+                       "idx": [0, 3, 2, 0, 2, 1], "joints": joints, "weights": weights, "boneMap": bone_map, "ibm": I16, "tex": len(lt), "blend": True})
+            lt.append(open(os.path.join(a.export, l["picture"]), "rb").read())
+            for why, bad in (("its outline", l.get("outline_size", 0) > 0), ("facing the camera", l.get("billboard", 0) != 0), ("lit", l.get("shaded")),
+                             ("%d glyph(s) whose picture couldn't be read" % l.get("glyphs_missing", 0), l.get("glyphs_missing", 0) > 0)):
+                if bad:
+                    holes.append("Label3D %r: %s isn't carried" % (l["text"], why))
+        lnodes = [{"name": "root", "parent": -1, "kind": 1, "t": [0, 0, 0], "q": [0, 0, 0, 1], "s": [1, 1, 1]},
+                  {"name": "labels", "parent": 0, "kind": 2, "t": [0, 0, 0], "q": [0, 0, 0, 1], "s": [1, 1, 1]},
+                  {"name": "Glow", "parent": 0, "kind": 1, "t": [0, 0, 0], "q": [0, 0, 0, 1], "s": [1, 1, 1]},
+                  {"name": "NoCast", "parent": 0, "kind": 1, "t": [0, 0, 0], "q": [0, 0, 0, 1], "s": [1, 1, 1]}]
+        write_pack(os.path.join(a.game, "props", P + "_labels.rpack"), lnodes, lm, [], lt, verbose=False, fresh=True)
+        L.append("prop %s_labels 0 0 0 0 1" % P)
+        came.append("%d Label3D(s), each its text as a picture in their font on a quad, unlit and see-through (%s)" % (len(lab), "; ".join(l["text"].replace("\n", " ") for l in lab[:4])))
     with open(os.path.join(a.game, "sets", P + ".set"), "w", newline="\n") as f:
         f.write("\n".join(L) + "\n")
 
@@ -421,13 +483,13 @@ def main():
     if not man.get("shaders"):   # an export from before step 12 carried no shaders
         for sh, nn in sorted((un.get("shader_materials") or {}).items()):
             holes.append("%d surface(s) draw with the Godot shader %s: drawn with the exported material's colour instead (export it again to carry it)" % (nn, sh))
+    if un.get("multimesh_unplaced"):
+        holes.append("%d MultiMesh copies read back at the origin (an export run headless: Godot's dummy renderer keeps no places a script sets as it runs): export it again with a renderer" % un["multimesh_unplaced"])
     if un.get("particles"):
         holes.append("%d particle emitter(s) (%s): the set's `emitter` line is the engine's own; not converted" % (
             len(un["particles"]), ", ".join(sorted({p["type"] for p in un["particles"]}))))
     if un.get("decals"):
         holes.append("%d Decal node(s): not converted (the set's `decal` line throws its own)" % len(un["decals"]))
-    if un.get("labels"):
-        holes.append("%d Label3D(s): text in the world isn't converted (%s)" % (len(un["labels"]), "; ".join(l["text"] for l in un["labels"][:4])))
     if un.get("instances_expanded"):
         came.append("%d MultiMesh instances, each made a mesh of its own (the engine has no instanced prop)" % un["instances_expanded"])
     if un.get("skinned_skipped"):

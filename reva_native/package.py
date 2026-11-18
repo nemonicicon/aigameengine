@@ -32,7 +32,6 @@ import tarfile
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-MINGW = r"C:\msys64\mingw64"
 BOX = os.environ.get("BOX", "revalinux")
 ARGS = {"sample": ["12", "packs", "packs/v1_sample.rpack"], "talk": ["4", "packs", "packs/v1_talk.rpack"], "tower": ["10", "packs", "packs/v1_tower.rpack"], "rocks": ["0", "packs"], "rally": ["0", "packs"],
         "herd": ["400", "packs", "packs/v1_herd.rpack"], "people": ["8", "packs", "packs/v1_boot.rpack"], "roam": ["0", "packs", "packs/v1_tower.rpack"], "rvz": ["100", "packs_rvz", "packs_rvz/v1_kaeli_game.rpack"]}
@@ -130,6 +129,7 @@ def lock_section(key):
 
 def windows(a, name, dst):
     d = driver()
+    mg = os.path.dirname(d.MINGW)   # (11-17) the toolchain wherever the driver found it, not one fixed place
     ns = argparse.Namespace(game=a.game, sample=False)
     if d.buildvk(ns) or d.buildsoft(ns):
         sys.exit("the build failed")
@@ -138,15 +138,15 @@ def windows(a, name, dst):
     dlls = set()
     for out, src in exes.items():
         shutil.copy2(os.path.join(HERE, src), os.path.join(dst, out))
-        for m in re.finditer(r"DLL Name: (\S+)", run([os.path.join(MINGW, "bin", "objdump.exe"), "-p", os.path.join(dst, out)]).stdout):
-            if m.group(1).lower() != "vulkan-1.dll" and os.path.exists(os.path.join(MINGW, "bin", m.group(1))):     # one the toolchain brought: Windows hasn't got it. Never the Vulkan loader: that's the graphics driver's, and a stale copy beside the game would win over it
+        for m in re.finditer(r"DLL Name: (\S+)", run([os.path.join(mg, "bin", "objdump.exe"), "-p", os.path.join(dst, out)]).stdout):
+            if m.group(1).lower() != "vulkan-1.dll" and os.path.exists(os.path.join(mg, "bin", m.group(1))):     # one the toolchain brought: Windows hasn't got it. Never the Vulkan loader: that's the graphics driver's, and a stale copy beside the game would win over it
                 dlls.add(m.group(1))
     for f in sorted(dlls):
-        shutil.copy2(os.path.join(MINGW, "bin", f), os.path.join(dst, f))
+        shutil.copy2(os.path.join(mg, "bin", f), os.path.join(dst, f))
     lic = os.path.join(dst, "licenses")
     os.makedirs(lic, exist_ok=True)
     for pk in WIN_LICENCES:
-        src = os.path.join(MINGW, "share", "licenses", pk)
+        src = os.path.join(mg, "share", "licenses", pk)
         if os.path.isdir(src):
             for f in os.listdir(src):
                 shutil.copy2(os.path.join(src, f), os.path.join(lic, "%s-%s%s" % (pk, f, "" if "." in f else ".txt")))

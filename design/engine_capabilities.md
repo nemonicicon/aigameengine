@@ -1269,3 +1269,18 @@ on the others). Not yet measured in a recorded mix.
 Proof: built, and the flight game's APPLY DISPLAY CHANGES calls it. Not yet tried with a window: every run here was headless.
 For 58 to 60: the sample, rocks, rally, tower and herd checks come out the same (their tapes, all older than v8, play as before);
 warncheck finds the same 14 warnings as before, none new.
+
+### 61 · One exe that runs on any Windows PC, built from MSYS2 wherever it is -- BUILT (11-17)
+
+A game handed to someone else needed MSYS2 at `C:\msys64`: its play.bat put that folder on the PATH for `SDL2.dll` and `libwinpthread-1.dll`,
+and the driver looked for gcc only there.
+- **Linked in:** every build is `-static` (driver.py `LIBS`): SDL2, with its own static libs as `pkg-config --static --libs sdl2` gives them,
+  and the threads library are inside the exe. A Vulkan build asks only for Windows' own DLLs and `vulkan-1.dll`, which every graphics driver
+  brings. `package.py` still copies the libraries' licence texts.
+- **MSYS2 anywhere:** the driver takes `REVA_MINGW` (its mingw64 folder), else a gcc on the PATH with SDL2's headers beside it, else MSYS2's
+  usual homes, and says plainly what to set when it finds none. `package.py` uses the toolchain the driver found.
+Proof: the flight game's static build ran its whole menu tour (a match and back included) with nothing on the PATH but Windows' own
+folders, its eleven pictures the same to the pixel as before; the old build, run the same way, stops at once (a DLL not found). A build through MSYS2 at
+another path (`REVA_MINGW`) came out static too. Not changed: the engine's own games' play.bat files still put `C:\msys64` on the PATH,
+which their exes no longer need, and the checks in anim_bench still look for gcc there.
+The sample, rocks, rally, tower and herd checks come out the same on the static builds; warncheck finds the same 14 warnings, none new.

@@ -8,7 +8,7 @@ didn't happen", and a log line is not a receipt.
 
     python .claude/skills/run-reva/driver.py <command> [...]
 
-    build                      compile to crowd_new.exe (mingw64 PATH handled)
+    build                      compile to crowd_new.exe (mingw64 found and PATH handled)
     buildvk [--game X]         one game, with no old game modes -> crowd_X_vk.exe (no --game: crowd_vk.exe)
     buildsoft [--game X]       the same on the engine's own rasterizer, no driver -> crowd_X_soft.exe
                                X is a folder name in games/, or a PATH: a game's .c file, or a folder holding one,
@@ -32,6 +32,8 @@ Run `... driver.py <command> --help` for the flags. Everything takes --subject
 (default r2moves) which names packs/v1_<subject>.rpack.
 
 WHY EACH GUARD IS HERE (all learned the hard way, see SKILL.md Gotchas):
+  * (11-17) MSYS2 can be anywhere: REVA_MINGW names its mingw64 folder, or a gcc on PATH with SDL2 beside it is used, or
+    MSYS2's usual homes are looked in. Nothing assumes one place.
   * gcc needs mingw64 FIRST on PATH -- the shell's own /mingw64/bin entry is dead.
   * only ONE instance may run; a second one fights for the GPU and the ctl file.
   * the engine writes PPM and needs a WINDOWS path for it ("a native exe needs a
@@ -48,7 +50,39 @@ AUTHOR = os.path.join(ROOT, "skate_src", "author")
 
 # bare `python` is the Microsoft Store alias: it shadows APPDATA and poisons results.
 PY = os.environ.get("CLUB_PYTHON", sys.executable)
-MINGW = r"C:\msys64\mingw64\bin"
+
+
+def find_mingw():
+    """(11-17) MinGW-w64's bin folder, wherever MSYS2 is: REVA_MINGW (its mingw64 folder or the bin in it), else a gcc on PATH (an MSYS2 MINGW64
+    shell puts one there), else MSYS2's usual homes. Only one with SDL2's headers beside it counts, so another gcc on PATH (Strawberry Perl's,
+    say) isn't taken for it. None found: the usual home, for the build to say so"""
+    cands = []
+    e = os.environ.get("REVA_MINGW")
+    if e:
+        e = e.rstrip("\\/")
+        cands.append(e if os.path.basename(e).lower() == "bin" else os.path.join(e, "bin"))
+    g = shutil.which("gcc")
+    if g:
+        cands.append(os.path.dirname(g))
+    for root in (os.environ.get("MSYS2_ROOT"), r"C:\msys64", r"C:\tools\msys64", os.path.expanduser(r"~\scoop\apps\msys2\current"), r"D:\msys64"):
+        if root:
+            cands.append(os.path.join(root, "mingw64", "bin"))
+    for c in cands:
+        if os.path.isfile(os.path.join(c, "gcc.exe")) and os.path.isfile(os.path.join(c, "..", "include", "SDL2", "SDL.h")):
+            return os.path.abspath(c)
+    return r"C:\msys64\mingw64\bin"
+
+
+MINGW = find_mingw()
+
+
+def tool(name):
+    """a MinGW tool by its whole path (subprocess finds an exe through the PARENT's PATH, not env=), or a plain word on what to do"""
+    p = os.path.join(MINGW, name)
+    if not os.path.isfile(p):
+        sys.exit("No MinGW-w64 gcc with SDL2 was found (looked in %s). Install MSYS2 and the packages in README.md's Quick start, or set "
+                 "REVA_MINGW to its mingw64 folder." % MINGW)
+    return p
 LF = chr(10)
 FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
     os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
@@ -56,13 +90,18 @@ FFMPEG = shutil.which("ffmpeg") or next(iter(glob.glob(os.path.join(
 
 GAME = "games/rvz/rvz.c" if os.path.exists(os.path.join(NATIVE, "games", "rvz", "rvz.c")) else "games/sample/sample.c"   # the game's one file; the kit has only the sample
 SRC = ["crowd_kms.c", "club_math.c", "club_audio.c", "club_save.c", "holly_fbo.c", "club_bridge.c", "club_net.c", GAME, "crowd_win_rc.o"]   # the split (2026-09-30): club.h lists the units
-LIBS = ["-Dmain=SDL_main", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lvulkan-1", "-lm"]   # step 18 (11-04): the old renderer is gone, so every build is the Vulkan engine
+# ⭐ (11-17) ONE EXE THAT RUNS ON ANY WINDOWS PC: SDL2 and the threads library are linked in (-static, with SDL2's own static libs as
+# `pkg-config --static --libs sdl2` gives them), so a game needs nothing beside it that Windows hasn't got, and nothing on the PATH. The Vulkan
+# loader stays the graphics driver's (vulkan-1.dll, on every PC with one): its import library is named by its whole path, which -static needs
+LIBS = ["-Dmain=SDL_main", "-static", "-lws2_32", "-lmingw32", "-lSDL2main", "-lSDL2", "-lm", "-lkernel32", "-luser32", "-lgdi32", "-lwinmm", "-limm32",
+        "-lole32", "-loleaut32", "-lversion", "-luuid", "-ladvapi32", "-lsetupapi", "-lshell32", "-ldinput8"]   # step 18 (11-04): the old renderer is gone, so every build is the Vulkan engine
+VK_LIBS = [os.path.join(MINGW, "..", "lib", "libvulkan-1.dll.a")]
 RENDER = ["gfx_packet.c", "gfx_vk.c"]   # the frame as data, and what draws it. The no-display build takes the first alone
 DEFS = ["-DREVA_VK"]
 # ⭐ THE ENGINE'S OWN RASTERIZER (queue step 27, 11-05): gfx_soft.c in gfx_vk.c's place, and nothing links Vulkan. 320 x 240 on the processor, the same pixels on every machine
 SOFT_RENDER = ["gfx_packet.c", "gfx_soft.c"]
 SOFT_DEFS = ["-DREVA_SOFT"]
-SOFT_LIBS = [l for l in LIBS if l != "-lvulkan-1"]
+SOFT_LIBS = LIBS   # nothing links Vulkan
 
 # the face rig's panel rectangles in the saved 1280x720 image (crowd_kms.c, g_labFace):
 # eight heads across the top half, then the mouth and the eyes big across the bottom.
@@ -103,7 +142,7 @@ def build(a):
     # you hand it is only inherited by the child. Passing "gcc" here fails with
     # WinError 2 even though env["PATH"] starts with mingw64. Name it absolutely; the
     # env PATH still matters, because the linker looks up its DLLs through it.
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + ["-o", out] + SRC + RENDER + LIBS
+    cmd = [tool("gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + ["-o", out] + SRC + RENDER + LIBS + VK_LIBS
     print("build: " + " ".join(cmd))
     r = subprocess.run(cmd, cwd=NATIVE, env=env,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -122,7 +161,7 @@ def rc_object(env):
     fopen dies on a non-ASCII pack name. The kit's first build failed at the link for want of it (11-04), so every build makes it when it's missing."""
     if os.path.exists(os.path.join(NATIVE, "crowd_win_rc.o")) or not os.path.exists(os.path.join(NATIVE, "crowd_win.rc")):
         return
-    r = subprocess.run([os.path.join(MINGW, "windres.exe"), "crowd_win.rc", "-O", "coff", "-o", "crowd_win_rc.o"], cwd=NATIVE, env=env,
+    r = subprocess.run([tool("windres.exe"), "crowd_win.rc", "-O", "coff", "-o", "crowd_win_rc.o"], cwd=NATIVE, env=env,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     print("windres: crowd_win_rc.o " + ("built" if r.returncode == 0 else "FAILED: " + r.stdout[-400:]))
 
@@ -155,7 +194,7 @@ def buildvk(a):
     rc_object(env)
     name, src, outdir, inc = game_unit(a)   # --game NAME (--sample is --game sample): that game with no old game modes, as the kit has it. Its play.bat runs it. Or --game PATH
     exe = os.path.join(outdir, f"crowd_{name}_vk.exe" if name else "crowd_vk.exe")
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + RENDER + LIBS
+    cmd = [tool("gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + RENDER + LIBS + VK_LIBS
     r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
     if r.returncode != 0 or errs:
@@ -175,7 +214,7 @@ def check(a):
     # --nodoors: the engine with no old game modes. --game NAME: that game. (11-16) --game PATH: a game in a folder of its own, which keeps its own scenarios (check.txt)
     name, src, outdir, inc = game_unit(a)
     exe = os.path.join(outdir, f"crowd_{name}_h.exe" if name else "crowd_nodoors.exe" if a.nodoors else "crowd_headless.exe")
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + inc + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + [l for l in LIBS if l != "-lvulkan-1"]
+    cmd = [tool("gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off", "-DREVA_HEADLESS"] + inc + (["-DREVA_NODOORS"] if a.nodoors or name else []) + ["-o", exe] + src + ["gfx_packet.c"] + LIBS
     builds = [cmd]
     procs = [subprocess.Popen(c, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") for c in builds]
     failed = 0
@@ -199,7 +238,7 @@ def buildsoft(a):
     rc_object(env)
     name, src, outdir, inc = game_unit(a)
     exe = os.path.join(outdir, f"crowd_{name}_soft.exe" if name else "crowd_soft.exe")
-    cmd = [os.path.join(MINGW, "gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + SOFT_RENDER + SOFT_LIBS
+    cmd = [tool("gcc.exe"), "-O2", "-std=gnu17", "-ffp-contract=off"] + SOFT_DEFS + inc + (["-DREVA_NODOORS"] if name else []) + ["-o", exe] + src + SOFT_RENDER + SOFT_LIBS
     r = subprocess.run(cmd, cwd=NATIVE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     errs = [l for l in r.stdout.splitlines() if "error:" in l or "undefined reference" in l or l.startswith("cc1")]
     if r.returncode != 0 or errs:

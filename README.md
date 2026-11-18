@@ -32,7 +32,7 @@ make everything they need by code. The licence is MIT ([LICENSE](LICENSE), [NOTI
 
 Install three things, once:
 
-1. **MSYS2**, where it installs itself (`C:\msys64`). Then, in its MINGW64 shell:
+1. **MSYS2**, wherever you like (it offers `C:\msys64`). Then, in its MINGW64 shell:
    `pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2 mingw-w64-x86_64-vulkan-devel mingw-w64-x86_64-stb`
 2. **Python 3** from python.org, then `pip install numpy Pillow`. The `python` that opens the Microsoft Store
    is not Python.
@@ -93,7 +93,8 @@ It is the plain picture: 320 x 240, no shadows and no materials. Its pixels are 
 
 ### If it doesn't work
 
-- **The build ends at once and says nothing.** gcc isn't where the driver looks. MSYS2 has to be at `C:\msys64`.
+- **The build says no MinGW-w64 gcc with SDL2 was found.** The driver looks for MSYS2 on the PATH and in its usual homes. Set
+  `REVA_MINGW` to its `mingw64` folder (for example `D:\msys64\mingw64`), or install the packages above.
 - **`FATAL: no packs`.** That game makes its files first: see the line under the table above.
 - **Python opens the Microsoft Store, or a tool hangs.** That is the Store's stand-in. Install real Python.
 

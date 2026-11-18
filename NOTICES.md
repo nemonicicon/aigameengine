@@ -33,11 +33,11 @@ Nothing of raylib's or Wicked Engine's code is in the tree. The plan names both 
 
 | What | Where | Its terms | Shipped with a packaged game? |
 |---|---|---|---|
-| SDL2 | every build (window, pads, sound) | zlib licence, Sam Lantinga | Windows: `SDL2.dll`, with its licence text. Linux and the Pi: the system's. Android: `libSDL2.so` (2.32.10, built for Android) inside the APK |
+| SDL2 | every build (window, pads, sound) | zlib licence, Sam Lantinga | Windows: linked into the exe (since 2026-11-17), with its licence text. Linux and the Pi: the system's. Android: `libSDL2.so` (2.32.10, built for Android) inside the APK |
 | The Vulkan loader | the Vulkan build (`vulkan-1.dll`, `libvulkan.so`) | Apache 2.0, The Khronos Group | No: it comes with the machine's graphics driver. The build on the engine's own rasterizer doesn't link it |
 | The Vulkan headers | at build time only | Apache 2.0 or MIT, The Khronos Group | No |
 | libdrm | the Pi's direct road | MIT | No: the system's |
-| mingw-w64's runtime and winpthreads | Windows builds (`libwinpthread-1.dll`, and the runtime inside the exe) | ZPL 2.1 and public domain; winpthreads MIT and BSD | Yes, with their licence texts |
+| mingw-w64's runtime and winpthreads | Windows builds (both linked into the exe since 2026-11-17) | ZPL 2.1 and public domain; winpthreads MIT and BSD | Yes, with their licence texts |
 | GCC's runtime (libgcc) | inside every build | GPL 3 with the GCC Runtime Library Exception, which allows this | In the exe |
 | The C library | Linux and the Pi (glibc, linked at run time) | LGPL 2.1 | No: the system's |
 
